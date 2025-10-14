@@ -7,18 +7,14 @@ struct Position {
     float x, y;
 };
 
-entt::handle create_entity(entt::registry &registry) {
+entt::handle create_handle(entt::registry &registry) {
     return {registry, registry.create()};
 }
 
 int main() {
     entt::registry registry;
-    const auto entity = create_entity(registry);
+    const auto entity = create_handle(registry);
     entity.emplace<Position>(10.f, 20.f);
-
-    for (const auto &[entity, position]: registry.view<Position>().each()) {
-        std::cout << position.x << ", " << position.y << std::endl;
-    }
 
     sf::RenderWindow window(sf::VideoMode{{800u, 600u}}, "Window");
 

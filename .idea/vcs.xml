@@ -4,7 +4,5 @@
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/entt-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/sfml-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/entt-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/sfml-src" vcs="Git" />
   </component>
 </project>
