@@ -1,18 +1,10 @@
 #pragma once
 
-#include <cstdint>
+#include <Core/Export.hpp>
 
 namespace re::core
 {
 
-using EntityID = uint32_t;
 using TimeDelta = float;
-
-enum class LogLevel
-{
-	Info,
-	Warning,
-	Error
-};
 
 } // namespace re::core

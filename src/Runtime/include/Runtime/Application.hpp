@@ -5,8 +5,6 @@
 #include <Core/Types.hpp>
 #include <Runtime/Scene.hpp>
 
-#include <entt/entt.hpp>
-
 #include <memory>
 
 namespace re::runtime

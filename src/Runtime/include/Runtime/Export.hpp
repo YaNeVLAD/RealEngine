@@ -1,11 +1,13 @@
 #pragma once
 
-#if defined(_WIN32)
+#include <Core/Config.hpp>
+
 #if defined(RUNTIME_EXPORTS)
-#define RE_RUNTIME_API __declspec(dllexport)
+
+#define RE_RUNTIME_API RE_API_EXPORT
+
 #else
-#define RE_RUNTIME_API __declspec(dllimport)
-#endif
-#else
-#define RE_RUNTIME_API
+
+#define RE_RUNTIME_API RE_API_IMPORT
+
 #endif

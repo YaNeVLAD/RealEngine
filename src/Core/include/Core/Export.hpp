@@ -1,11 +1,13 @@
 #pragma once
 
-#if defined(_WIN32)
+#include <Core/Config.hpp>
+
 #if defined(CORE_EXPORTS)
-#define RE_CORE_API __declspec(dllexport)
+
+#define RE_CORE_API RE_API_EXPORT
+
 #else
-#define RE_CORE_API __declspec(dllimport)
-#endif
-#else
-#define RE_CORE_API
+
+#define RE_CORE_API RE_API_IMPORT
+
 #endif

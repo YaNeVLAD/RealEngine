@@ -1,5 +1,5 @@
 #include <Runtime/Application.hpp>
-#include <Scripting/ScriptNode.hpp>
+#include <Scripting/ScriptLoader.hpp>
 
 #include <iostream>
 #include <stdexcept>
@@ -14,15 +14,19 @@ void LoadGameConfig(re::runtime::Application& engine)
 {
 	using namespace re::scripting;
 
-	// Имитация загрузки скрипта
-	// В реальности: ScriptLoader loader; auto root = loader.LoadFromFile("game.txt");
-	std::cout << "Loading Paradox-style scripts..." << std::endl;
+	std::cout << "Loading scripts..." << std::endl;
 
-	// Создаем энтити на основе данных
-	auto& registry = engine.CurrentScene();
-	// const auto player = registry.CreateEntity();
-	//
-	// registry.emplace<PlayerData>(player, 50.0f, 100);
+	ScriptLoader loader;
+	loader.LoadFromFile("aboba");
+
+	auto& scene = engine.CurrentScene();
+	auto player = scene.CreateEntity();
+
+	player.Add<PlayerData>(50.0f, 100);
+
+	const auto& id = player.Get<int>();
+
+	std::cout << id << std::endl;
 }
 
 int main()
@@ -31,13 +35,10 @@ int main()
 	{
 		re::runtime::Application app;
 
-		// 1. Инициализация систем
-		app.Initialize("Saturn Engine: Paradox Style", 1280, 720);
+		app.Initialize("Real Engine: Paradox Style", 1280, 720);
 
-		// 2. Загрузка "скриптовой" части (Game Logic)
 		LoadGameConfig(app);
 
-		// 3. Запуск цикла
 		app.Run();
 	}
 	catch (const std::exception& e)
