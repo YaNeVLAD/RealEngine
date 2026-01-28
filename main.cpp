@@ -15,7 +15,7 @@ entt::handle CreateHandle(entt::registry& registry)
 	return { registry, registry.create() };
 }
 
-[[maybe_unused]] bool SetActive(sf::RenderWindow* const window, bool active)
+[[maybe_unused]] bool SetActive(sf::RenderWindow* const window, const bool active)
 {
 	return window->setActive(active);
 }

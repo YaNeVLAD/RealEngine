@@ -1,8 +1,17 @@
 cmake_minimum_required(VERSION 3.31)
+project(RealEngine VERSION 0.1.0 LANGUAGES CXX)
+
 include(FetchContent)
-project(Engine)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) # Отключаем расширения компилятора (например, gnu++20), оставляем чистый c++20
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 FetchContent_Declare(
         EnTT
@@ -19,13 +28,18 @@ FetchContent_Declare(SFML
         SYSTEM)
 FetchContent_MakeAvailable(SFML)
 
-add_executable(Engine main.cpp)
+add_subdirectory(src/Core)
+add_subdirectory(src/Scripting)
+add_subdirectory(src/Runtime)
+add_subdirectory(src/Launcher)
 
-target_link_libraries(Engine PRIVATE
-        EnTT::EnTT
-        SFML::Graphics
-)
-
-if (MINGW)
-    target_link_options(Engine PRIVATE -static -Wl,--allow-multiple-definition)
-endif ()
+#add_executable(Engine main.cpp)
+#
+#target_link_libraries(Engine PRIVATE
+#        EnTT::EnTT
+#        SFML::Graphics
+#)
+#
+#if (MINGW)
+#    target_link_options(Engine PRIVATE -static -Wl,--allow-multiple-definition)
+#endif ()
