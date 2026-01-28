@@ -1,4 +1,11 @@
 # add a new target which is Real Engine module
+# for this function to work properly you need to organize module folders like this:
+# <module_name>/
+#   include/
+#     <module_name>/
+#       Header files (.h .hpp)
+#   src/
+#     Source files (.cpp)
 function(re_add_module target_name)
     file(GLOB_RECURSE SOURCES "src/*.cpp" "include/*.hpp" "include/*.h")
 
