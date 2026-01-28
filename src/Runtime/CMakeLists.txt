@@ -1,6 +1,6 @@
 file(GLOB_RECURSE SOURCES "src/*.cpp" "include/*.hpp")
 
-add_library(ReRuntime SHARED ${SOURCES})
+add_library(ReRuntime ${SOURCES})
 
 target_include_directories(ReRuntime
         PUBLIC

@@ -1,6 +1,6 @@
 file(GLOB_RECURSE SOURCES "src/*.cpp" "include/*.hpp")
 
-add_library(ReCore SHARED ${SOURCES})
+add_library(ReCore ${SOURCES})
 
 target_include_directories(ReCore
         PUBLIC

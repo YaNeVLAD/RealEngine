@@ -1,6 +1,6 @@
 file(GLOB_RECURSE SOURCES "src/*.cpp" "include/*.hpp")
 
-add_library(ReScripting SHARED ${SOURCES})
+add_library(ReScripting ${SOURCES})
 
 target_include_directories(ReScripting
         PUBLIC

@@ -1,6 +1,7 @@
-cmake-*
-build-*
+cmake-*/
+build-*/
+out/
 
-.vs
-.idea
-.vscode
+.vs/
+.idea/
+.vscode/
