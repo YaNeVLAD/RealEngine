@@ -1,25 +1,50 @@
 #pragma once
 
-#include <Runtime/Export.hpp>
+#include <stdexcept>
 
 #include <entt/entt.hpp>
 
 namespace re::runtime
 {
 
-class RE_RUNTIME_API Entity
+class Scene;
+
+class Entity
 {
 public:
-	explicit Entity(entt::registry& registry);
+	Entity(entt::entity entity, entt::registry& registry);
+	Entity(Entity const&) = default;
 
 	template <typename TComponent, typename... TArgs>
 	Entity Add(TArgs&&... args);
 
 	template <typename... TComponents>
-	decltype(auto) Get() const;
+	[[nodiscard]] decltype(auto) Get();
+
+	template <typename... TComponents>
+	[[nodiscard]] decltype(auto) Get() const;
+
+	template <typename... TComponents>
+	[[nodiscard]] bool Has() const;
+
+	template <typename TComponent>
+	void Remove();
+
+	void Invalidate();
+
+	[[nodiscard]] bool IsValid() const;
+
+	bool operator==(const Entity& other) const;
+	bool operator!=(const Entity& other) const;
+
+	explicit operator bool() const;
+	explicit operator entt::entity() const;
 
 private:
-	entt::entity m_entity;
+	void AssertValid() const;
+
+private:
+	entt::entity m_entity{ entt::null };
 	entt::registry& m_registry;
 };
 

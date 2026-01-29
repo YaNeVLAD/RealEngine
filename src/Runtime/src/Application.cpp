@@ -81,6 +81,8 @@ void Application::Run()
 
 		m_window->Clear();
 
+		m_scene.OnUpdate(dt);
+
 		OnUpdate(dt);
 
 		m_window->Display();

@@ -1,15 +1,39 @@
 #pragma once
 
+#include "Runtime/System.hpp"
+
 #include <Runtime/Application.hpp>
 #include <Scripting/ScriptLoader.hpp>
 
 #include <iostream>
 #include <stdexcept>
 
-struct PlayerData
+struct PlayerTag
 {
-	float speed;
-	int health;
+};
+
+struct Transform
+{
+	float x, y;
+};
+
+struct Velocity
+{
+	float dx, dy;
+};
+
+class MovementSystem final : public re::runtime::System
+{
+public:
+	void OnUpdate(re::runtime::Scene& scene, re::core::TimeDelta dt) override
+	{
+		const auto view = scene.View<Transform, Velocity>();
+
+		view.each([dt](auto& transform, auto& vel) {
+			transform.x += vel.dx * dt;
+			transform.y += vel.dy * dt;
+		});
+	}
 };
 
 class LauncherApplication final : public re::runtime::Application
@@ -18,21 +42,14 @@ public:
 	LauncherApplication()
 		: Application("Launcher application")
 	{
-		using namespace re::scripting;
+		CurrentScene().AddSystem<MovementSystem>();
 
-		std::cout << "Loading scripts..." << std::endl;
+		auto player = CurrentScene().CreateEntity();
 
-		ScriptLoader loader;
-		loader.LoadFromFile("aboba");
-
-		auto& scene = CurrentScene();
-		auto player = scene.CreateEntity();
-
-		player.Add<PlayerData>(50.0f, 100);
-
-		const auto& id = player.Get<int>();
-
-		std::cout << id << std::endl;
+		player
+			.Add<PlayerTag>()
+			.Add<Transform>(0.0f, 0.0f)
+			.Add<Velocity>(10.0f, 5.0f);
 	}
 
 	void OnStart() override
@@ -41,6 +58,12 @@ public:
 
 	void OnUpdate(re::core::TimeDelta deltaTime) override
 	{
+		const auto player = CurrentScene().View<PlayerTag, Transform, Velocity>();
+
+		player.each([](auto& transform, auto& vel) {
+			std::cout << "Player position: " << transform.x << ", " << transform.y << std::endl;
+			std::cout << "Player velocity: " << vel.dx << ", " << vel.dy << std::endl;
+		});
 	}
 
 	void OnStop() override

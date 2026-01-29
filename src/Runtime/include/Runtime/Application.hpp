@@ -4,6 +4,7 @@
 
 #include <Core/Types.hpp>
 #include <Runtime/Scene.hpp>
+#include <Runtime/Entity.hpp>
 
 #include <memory>
 
