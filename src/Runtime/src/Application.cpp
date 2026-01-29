@@ -6,6 +6,7 @@
 
 namespace re::runtime
 {
+
 class SfmlWindow final : public IWindow
 {
 public:
@@ -52,9 +53,10 @@ private:
 	sf::RenderWindow m_renderWindow;
 };
 
-Application::Application()
+Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
+	m_window = std::make_unique<SfmlWindow>(name, 1920u, 1080u);
 }
 
 Application::~Application()
@@ -62,34 +64,37 @@ Application::~Application()
 	Shutdown();
 }
 
-void Application::Initialize(const std::string& title, uint32_t width, uint32_t height)
-{
-	m_window = std::make_unique<SfmlWindow>(title, width, height);
-	m_isRunning = true;
-
-	// Пример: создание сущности при инициализации
-	// auto entity = m_scene.CreateEntity();
-	// m_registry.emplace<TransformComponent>(entity, ...);
-}
-
 void Application::Run()
 {
-	sf::Clock clock;
+	m_isRunning = true;
+
+	OnStart();
+
+	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning && m_window->IsOpen())
 	{
-		const core::TimeDelta dt = clock.restart().asSeconds();
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
+		lastTime = currentTime;
 
 		m_window->PollEvents();
 
-		Update(dt);
-		Render();
+		m_window->Clear();
+
+		OnUpdate(dt);
+
+		m_window->Display();
 	}
+
+	OnStop();
+
+	m_window.reset();
+	m_scene.Clear();
 }
 
 void Application::Shutdown()
 {
 	m_isRunning = false;
-	m_scene.Clear();
 }
 
 Scene& Application::CurrentScene()
@@ -97,19 +102,9 @@ Scene& Application::CurrentScene()
 	return m_scene;
 }
 
-void Application::Update(core::TimeDelta dt)
+IWindow& Application::Window() const
 {
-	// Здесь будет логика систем ECS
-	// Например: SystemPhysics(m_registry, dt);
+	return *m_window;
 }
 
-void Application::Render()
-{
-	m_window->Clear();
-
-	// В будущем здесь будет проход по RenderSystem
-	// auto view = m_registry.view<RenderComponent, TransformComponent>();
-
-	m_window->Display();
-}
 } // namespace re::runtime

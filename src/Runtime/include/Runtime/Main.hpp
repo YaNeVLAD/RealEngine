@@ -1,0 +1,38 @@
+#pragma once
+
+#include <Runtime/Application.hpp>
+
+extern re::runtime::Application* CreateApplication(int argc, char** argv);
+
+namespace re::runtime
+{
+
+inline int Main(int argc, char** argv)
+{
+	const auto app = CreateApplication(argc, argv);
+	app->Run();
+
+	delete app;
+
+	return 0;
+}
+
+} // namespace re::runtime
+
+#if defined(RE_SYSTEM_WINDOWS) && defined(RE_DIST)
+
+#include <Windows.h>
+
+inline int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, PSTR cmdline, int show)
+{
+	return re::runtime::Main(__argc, __argv);
+}
+
+#else
+
+inline int main(int argc, char** argv)
+{
+	return re::runtime::Main(argc, argv);
+}
+
+#endif

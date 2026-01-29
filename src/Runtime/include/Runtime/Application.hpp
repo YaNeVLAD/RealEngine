@@ -24,23 +24,31 @@ public:
 class RE_RUNTIME_API Application
 {
 public:
-	Application();
-	~Application();
+	explicit Application(std::string const& name);
 
-	void Initialize(const std::string& title, uint32_t width, uint32_t height);
+	virtual ~Application();
+
 	void Run();
+
 	void Shutdown();
 
-	Scene& CurrentScene();
+	virtual void OnStart() = 0;
+
+	virtual void OnUpdate(core::TimeDelta deltaTime) = 0;
+
+	virtual void OnStop() = 0;
+
+protected:
+	[[nodiscard]] Scene& CurrentScene();
+
+	[[nodiscard]] IWindow& Window() const;
 
 private:
-	void Update(core::TimeDelta dt);
-	void Render();
-
-private:
-	std::unique_ptr<IWindow> m_window;
-	Scene m_scene;
 	bool m_isRunning;
+
+	Scene m_scene;
+
+	std::unique_ptr<IWindow> m_window;
 };
 
 } // namespace re::runtime

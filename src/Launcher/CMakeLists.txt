@@ -1,4 +1,15 @@
-add_executable(ReLauncher "main.cpp")
+add_executable(ReLauncher "main.cpp"
+        LauncherApplication.hpp)
+
+set_target_properties(ReLauncher
+        PROPERTIES
+        WIN32_EXECUTABLE "$<OR:$<CONFIG:Release>,$<CONFIG:Dist>>"
+)
+
+target_compile_definitions(ReLauncher
+        PRIVATE
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:Dist>>:RE_DIST>"
+)
 
 target_link_libraries(ReLauncher PRIVATE ReRuntime)
 
