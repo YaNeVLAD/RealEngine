@@ -1,18 +1,20 @@
+#include <ECS/ViewManager/ViewManager.hpp>
+
 namespace re::ecs
 {
 
-template <typename... _TComponents>
-inline std::shared_ptr<View<_TComponents...>> ViewManager::CreateView(
+template <typename... TComponents>
+std::shared_ptr<View<TComponents...>> ViewManager::CreateView(
 	ComponentManager& componentManager, EntityManager const& entityManager)
 {
-	Signature signature = CreateSignature<_TComponents...>();
+	Signature signature = CreateSignature<TComponents...>();
 
 	if (m_views.contains(signature))
 	{
-		return std::dynamic_pointer_cast<View<_TComponents...>>(m_views.at(signature));
+		return std::dynamic_pointer_cast<View<TComponents...>>(m_views.at(signature));
 	}
 
-	auto view = std::make_shared<View<_TComponents...>>(componentManager, signature);
+	auto view = std::make_shared<View<TComponents...>>(componentManager, signature);
 
 	for (Entity entity : entityManager.GetActiveEntities())
 	{
@@ -26,28 +28,28 @@ inline std::shared_ptr<View<_TComponents...>> ViewManager::CreateView(
 	return view;
 }
 
-inline void ecs::ViewManager::OnEntityDestroyed(Entity entity)
+inline void ViewManager::OnEntityDestroyed(const Entity entity)
 {
-	for (auto const& [_, view] : m_views)
+	for (const auto& view : m_views | std::views::values)
 	{
 		view->OnEntityDestroyed(entity);
 	}
 }
 
-inline void ViewManager::OnEntitySignatureChanged(Entity entity, Signature signature)
+inline void ViewManager::OnEntitySignatureChanged(const Entity entity, const Signature signature)
 {
-	for (auto const& [_, view] : m_views)
+	for (const auto& view : m_views | std::views::values)
 	{
 		view->OnEntitySignatureChanged(entity, signature);
 	}
 }
 
-template <typename... _TComponents>
-inline Signature ViewManager::CreateSignature()
+template <typename... TComponents>
+Signature ViewManager::CreateSignature()
 {
 	Signature signature;
-	(signature.set(TypeIndex<_TComponents>()), ...);
+	(signature.set(TypeIndex<TComponents>()), ...);
 	return signature;
 }
 
-}
+} // namespace re::ecs

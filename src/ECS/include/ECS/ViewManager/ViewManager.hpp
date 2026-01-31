@@ -21,7 +21,7 @@ public:
 
 private:
 	template <typename... TComponents>
-	Signature CreateSignature();
+	static Signature CreateSignature();
 
 	std::unordered_map<Signature, std::shared_ptr<IView>> m_views;
 };
