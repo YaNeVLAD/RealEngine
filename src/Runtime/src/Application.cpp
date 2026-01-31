@@ -2,8 +2,6 @@
 
 #include <SFML/Graphics.hpp>
 
-#include <iostream>
-
 namespace re::runtime
 {
 
@@ -81,17 +79,18 @@ void Application::Run()
 
 		m_window->Clear();
 
-		m_scene.OnUpdate(dt);
+		m_scene.Frame(dt);
 
 		OnUpdate(dt);
 
 		m_window->Display();
+
+		m_scene.ConfirmChanges();
 	}
 
 	OnStop();
 
 	m_window.reset();
-	m_scene.Clear();
 }
 
 void Application::Shutdown()
@@ -99,7 +98,7 @@ void Application::Shutdown()
 	m_isRunning = false;
 }
 
-Scene& Application::CurrentScene()
+ecs::Scene& Application::CurrentScene()
 {
 	return m_scene;
 }

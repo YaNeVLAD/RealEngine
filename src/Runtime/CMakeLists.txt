@@ -3,6 +3,7 @@ re_add_module(ReRuntime)
 target_link_libraries(ReRuntime
         PUBLIC
         ReCore
+        ReECS
         ReScripting
         EnTT::EnTT
         SFML::Graphics

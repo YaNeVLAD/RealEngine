@@ -3,10 +3,10 @@
 #include <Runtime/Export.hpp>
 
 #include <Core/Types.hpp>
-#include <Runtime/Scene.hpp>
-#include <Runtime/Entity.hpp>
+#include <ECS/Scene/Scene.hpp>
 
 #include <memory>
+#include <string>
 
 namespace re::runtime
 {
@@ -40,14 +40,14 @@ public:
 	virtual void OnStop() = 0;
 
 protected:
-	[[nodiscard]] Scene& CurrentScene();
+	[[nodiscard]] ecs::Scene& CurrentScene();
 
 	[[nodiscard]] IWindow& Window() const;
 
 private:
 	bool m_isRunning;
 
-	Scene m_scene;
+	ecs::Scene m_scene;
 
 	std::unique_ptr<IWindow> m_window;
 };

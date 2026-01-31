@@ -1,16 +1,11 @@
 #pragma once
 
-#include "Runtime/System.hpp"
-
+#include <ECS/System/System.hpp>
 #include <Runtime/Application.hpp>
 #include <Scripting/ScriptLoader.hpp>
 
 #include <iostream>
 #include <stdexcept>
-
-struct PlayerTag
-{
-};
 
 struct Transform
 {
@@ -22,17 +17,16 @@ struct Velocity
 	float dx, dy;
 };
 
-class MovementSystem final : public re::runtime::System
+class MovementSystem final : public re::ecs::System
 {
 public:
-	void OnUpdate(re::runtime::Scene& scene, re::core::TimeDelta dt) override
+	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		const auto view = scene.View<Transform, Velocity>();
-
-		view.each([dt](auto& transform, auto& vel) {
+		for (auto&& [id, transform, vel] : *scene.CreateView<Transform, Velocity>())
+		{
 			transform.x += vel.dx * dt;
 			transform.y += vel.dy * dt;
-		});
+		}
 	}
 };
 
@@ -42,14 +36,19 @@ public:
 	LauncherApplication()
 		: Application("Launcher application")
 	{
-		CurrentScene().AddSystem<MovementSystem>();
+		CurrentScene().RegisterComponents<Transform, Velocity>();
 
-		auto player = CurrentScene().CreateEntity();
+		CurrentScene()
+			.RegisterSystem<MovementSystem>()
+			.WithRead<Velocity>()
+			.WithWrite<Transform>();
 
-		player
-			.Add<PlayerTag>()
-			.Add<Transform>(0.0f, 0.0f)
-			.Add<Velocity>(10.0f, 5.0f);
+		CurrentScene().BuildSystemGraph();
+
+		const auto player = CurrentScene().CreateEntity();
+
+		CurrentScene().AddComponent<Transform>(player, 0.0f, 0.0f);
+		CurrentScene().AddComponent<Velocity>(player, 10.0f, 5.0f);
 	}
 
 	void OnStart() override
@@ -58,12 +57,10 @@ public:
 
 	void OnUpdate(re::core::TimeDelta deltaTime) override
 	{
-		const auto player = CurrentScene().View<PlayerTag, Transform, Velocity>();
-
-		player.each([](auto& transform, auto& vel) {
+		for (auto&& [id, transform, velocity] : *CurrentScene().CreateView<Transform, Velocity>())
+		{
 			std::cout << "Player position: " << transform.x << ", " << transform.y << std::endl;
-			std::cout << "Player velocity: " << vel.dx << ", " << vel.dy << std::endl;
-		});
+		}
 	}
 
 	void OnStop() override
