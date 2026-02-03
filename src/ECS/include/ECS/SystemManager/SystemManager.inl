@@ -120,7 +120,9 @@ inline void SystemManager::BuildExecutionGraph()
 	{
 		for (auto const& [readerId, readSignature] : m_readDependencies)
 		{
-			if (readerId != writerId && readSignature.test(writtenComponent))
+			if (readerId != writerId && readSignature.test(writtenComponent)
+				&& !(m_mainThreadSystems.contains(readerId)
+					|| m_mainThreadSystems.contains(writerId)))
 			{
 				adjList[writerId].push_back(readerId);
 				inDegree[readerId]++;
@@ -131,7 +133,7 @@ inline void SystemManager::BuildExecutionGraph()
 	std::queue<SystemId> q;
 	for (const auto& id : m_systems | std::views::keys)
 	{
-		if (!inDegree.contains(id))
+		if (!inDegree.contains(id) && !m_mainThreadSystems.contains(id))
 		{
 			q.push(id);
 		}
@@ -169,7 +171,8 @@ inline void SystemManager::BuildExecutionGraph()
 		scheduledSystems += stage.size();
 	}
 
-	assert(scheduledSystems == m_systems.size() && "Cycle detected in system dependencies!");
+	assert(scheduledSystems == m_systems.size() - m_mainThreadSystems.size()
+		&& "Cycle detected in system dependencies!");
 }
 
 inline void SystemManager::Execute(Scene& scene, float dt)
@@ -182,7 +185,7 @@ inline void SystemManager::Execute(Scene& scene, float dt)
 		{
 			{
 				std::unique_lock lock(m_queueMutex);
-				m_taskQueue.emplace([this, id, &scene, dt]() {
+				m_taskQueue.emplace([this, id, &scene, dt] {
 					m_systems.at(id)->Update(scene, dt);
 				});
 			}
@@ -192,11 +195,21 @@ inline void SystemManager::Execute(Scene& scene, float dt)
 
 		{
 			std::unique_lock lock(m_queueMutex);
-			m_mainCondition.wait(lock, [this]() {
+			m_mainCondition.wait(lock, [this] {
 				return m_tasksInProgress == 0;
 			});
 		}
 	}
+
+	for (SystemId const& id : m_mainThreadSystems)
+	{
+		m_systems.at(id)->Update(scene, dt);
+	}
+}
+
+inline void SystemManager::RunSystemOnMainThread(SystemId systemId)
+{
+	m_mainThreadSystems.insert(systemId);
 }
 
 inline void SystemManager::WorkerLoop()

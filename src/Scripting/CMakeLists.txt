@@ -5,4 +5,4 @@ target_link_libraries(ReScripting
         ReCore
 )
 
-target_compile_definitions(ReScripting PRIVATE SCRIPTING_EXPORTS)
+target_compile_definitions(ReScripting PRIVATE RE_SCRIPTING_EXPORTS)

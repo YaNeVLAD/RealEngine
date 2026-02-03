@@ -1,16 +1,13 @@
 #pragma once
 
+#include "Runtime/Components.hpp"
+
 #include <ECS/System/System.hpp>
 #include <Runtime/Application.hpp>
 #include <Scripting/ScriptLoader.hpp>
 
 #include <iostream>
 #include <stdexcept>
-
-struct Transform
-{
-	float x, y;
-};
 
 struct Velocity
 {
@@ -22,10 +19,12 @@ class MovementSystem final : public re::ecs::System
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		for (auto&& [id, transform, vel] : *scene.CreateView<Transform, Velocity>())
+		using namespace re::runtime;
+
+		for (auto&& [id, transform, vel] : *scene.CreateView<TransformComponent, Velocity>())
 		{
-			transform.x += vel.dx * dt;
-			transform.y += vel.dy * dt;
+			transform.position.x += vel.dx * dt;
+			transform.position.y += vel.dy * dt;
 		}
 	}
 };
@@ -36,19 +35,22 @@ public:
 	LauncherApplication()
 		: Application("Launcher application")
 	{
-		CurrentScene().RegisterComponents<Transform, Velocity>();
+		using namespace re::runtime;
+
+		CurrentScene().RegisterComponents<Velocity>();
 
 		CurrentScene()
 			.RegisterSystem<MovementSystem>()
 			.WithRead<Velocity>()
-			.WithWrite<Transform>();
+			.WithWrite<TransformComponent>();
 
 		CurrentScene().BuildSystemGraph();
 
 		const auto player = CurrentScene().CreateEntity();
 
-		CurrentScene().AddComponent<Transform>(player, 0.0f, 0.0f);
+		CurrentScene().AddComponent<TransformComponent>(player, re::core::Vector2f{ 0.f, 0.f });
 		CurrentScene().AddComponent<Velocity>(player, 10.0f, 5.0f);
+		CurrentScene().AddComponent<SpriteComponent>(player, re::core::Color::Red);
 	}
 
 	void OnStart() override
@@ -57,9 +59,9 @@ public:
 
 	void OnUpdate(re::core::TimeDelta deltaTime) override
 	{
-		for (auto&& [id, transform, velocity] : *CurrentScene().CreateView<Transform, Velocity>())
+		for (auto&& [id, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
 		{
-			std::cout << "Player position: " << transform.x << ", " << transform.y << std::endl;
+			std::cout << "Player position: " << transform.position.x << ", " << transform.position.y << std::endl;
 		}
 	}
 

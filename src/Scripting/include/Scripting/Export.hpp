@@ -2,7 +2,7 @@
 
 #include <Core/Config.hpp>
 
-#if defined(SCRIPTING_EXPORTS)
+#if defined(RE_SCRIPTING_EXPORTS)
 
 #define RE_SCRIPTING_API RE_API_EXPORT
 

@@ -4,23 +4,13 @@
 
 #include <Core/Types.hpp>
 #include <ECS/Scene/Scene.hpp>
+#include <RenderCore/IWindow.hpp>
 
 #include <memory>
 #include <string>
 
 namespace re::runtime
 {
-
-class RE_RUNTIME_API IWindow
-{
-public:
-	virtual ~IWindow() = default;
-	virtual bool IsOpen() const = 0;
-	virtual void PollEvents() = 0;
-	virtual void Clear() = 0;
-	virtual void Display() = 0;
-	virtual void* GetNativeHandle() = 0;
-};
 
 class RE_RUNTIME_API Application
 {
@@ -42,14 +32,14 @@ public:
 protected:
 	[[nodiscard]] ecs::Scene& CurrentScene();
 
-	[[nodiscard]] IWindow& Window() const;
+	[[nodiscard]] render::IWindow& Window() const;
 
 private:
 	bool m_isRunning;
 
 	ecs::Scene m_scene;
 
-	std::unique_ptr<IWindow> m_window;
+	std::unique_ptr<render::IWindow> m_window;
 };
 
 } // namespace re::runtime

@@ -10,6 +10,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace re::ecs
@@ -40,6 +41,13 @@ public:
 		SystemConfiguration& WithWrite()
 		{
 			m_manager.AddWriteDependency<TComponent>(m_id);
+
+			return *this;
+		}
+
+		SystemConfiguration& RunOnMainThread()
+		{
+			m_manager.RunSystemOnMainThread(m_id);
 
 			return *this;
 		}
@@ -78,6 +86,8 @@ private:
 	template <typename TComponent>
 	void AddWriteDependency(SystemId systemId);
 
+	void RunSystemOnMainThread(SystemId systemId);
+
 	void WorkerLoop();
 
 private:
@@ -99,6 +109,8 @@ private:
 	std::condition_variable m_mainCondition;
 	std::atomic<size_t> m_tasksInProgress = 0;
 	std::atomic<bool> m_stopThreads = false;
+
+	std::unordered_set<SystemId> m_mainThreadSystems;
 };
 
 } // namespace re::ecs

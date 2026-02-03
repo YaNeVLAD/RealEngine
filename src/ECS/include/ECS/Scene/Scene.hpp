@@ -121,11 +121,6 @@ public:
 		m_systemManager->Execute(*this, dt);
 	}
 
-	ComponentManager& GetComponentManager() const
-	{
-		return *m_componentManager;
-	}
-
 	void ConfirmChanges()
 	{
 		for (Entity const& entity : m_entitiesToDestroy)

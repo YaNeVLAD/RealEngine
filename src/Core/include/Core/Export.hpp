@@ -2,7 +2,7 @@
 
 #include <Core/Config.hpp>
 
-#if defined(CORE_EXPORTS)
+#if defined(RE_CORE_EXPORTS)
 
 #define RE_CORE_API RE_API_EXPORT
 

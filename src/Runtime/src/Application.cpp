@@ -1,60 +1,42 @@
+#include "Runtime/Components.hpp"
+#include "Runtime/RenderSystem2D.hpp"
+
 #include <Runtime/Application.hpp>
+
+#include <Render2D/Renderer2D.hpp>
+#include <Render2D/SFMLRenderAPI.hpp>
+#include <RenderCore/SFMLWindow.hpp>
 
 #include <SFML/Graphics.hpp>
 
 namespace re::runtime
 {
 
-class SfmlWindow final : public IWindow
-{
-public:
-	SfmlWindow(std::string const& title, const uint32_t width, const uint32_t height)
-	{
-		m_renderWindow.create(sf::VideoMode(sf::Vector2u{ width, height }), title);
-	}
-
-	bool IsOpen() const override
-	{
-		return m_renderWindow.isOpen();
-	}
-
-	void PollEvents() override
-	{
-		while (const auto event = m_renderWindow.pollEvent())
-		{
-			if (event->is<sf::Event::Closed>())
-				m_renderWindow.close();
-		}
-	}
-
-	void Clear() override
-	{
-		m_renderWindow.clear();
-	}
-
-	void Display() override
-	{
-		m_renderWindow.display();
-	}
-
-	void* GetNativeHandle() override
-	{
-		return m_renderWindow.getNativeHandle();
-	}
-
-	sf::RenderWindow& GetSFMLWindow()
-	{
-		return m_renderWindow;
-	}
-
-private:
-	sf::RenderWindow m_renderWindow;
-};
-
 Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
-	m_window = std::make_unique<SfmlWindow>(name, 1920u, 1080u);
+	m_window = std::make_unique<render::SFMLWindow>(name, 1920u, 1080u);
+
+	if (auto* sfWindow = dynamic_cast<render::SFMLWindow&>(*m_window).GetSFMLWindow())
+	{
+		render::Renderer2D::Init(std::make_unique<render::SFMLRenderAPI>(*sfWindow));
+	}
+	else
+	{
+		throw std::runtime_error("Created window and render api are not compatible");
+	}
+
+	CurrentScene().RegisterComponents<TransformComponent, SpriteComponent, CameraComponent>();
+
+	m_scene.RegisterSystem<RenderSystem2D>()
+		.WithRead<TransformComponent, SpriteComponent>()
+		.RunOnMainThread();
+
+	const auto mainCamera = m_scene.CreateEntity();
+	m_scene.AddComponent<CameraComponent>(mainCamera);
+	m_scene.AddComponent<TransformComponent>(mainCamera);
+
+	m_scene.BuildSystemGraph();
 }
 
 Application::~Application()
@@ -103,7 +85,7 @@ ecs::Scene& Application::CurrentScene()
 	return m_scene;
 }
 
-IWindow& Application::Window() const
+render::IWindow& Application::Window() const
 {
 	return *m_window;
 }

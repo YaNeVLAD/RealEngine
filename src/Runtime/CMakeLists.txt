@@ -5,10 +5,8 @@ target_link_libraries(ReRuntime
         ReCore
         ReECS
         ReScripting
-        EnTT::EnTT
-        SFML::Graphics
-        SFML::Window
-        SFML::System
+        ReRenderCore
+        ReRender2D
 )
 
-target_compile_definitions(ReRuntime PRIVATE RUNTIME_EXPORTS)
+target_compile_definitions(ReRuntime PRIVATE RE_RUNTIME_EXPORTS)

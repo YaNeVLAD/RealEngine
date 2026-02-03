@@ -3,6 +3,7 @@
 #include <ECS/EntityWrapper/EntityWrapper.hpp>
 
 #include <vector>
+#include <unordered_map>
 
 namespace re::ecs
 {
