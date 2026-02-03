@@ -1,9 +1,10 @@
 #pragma once
 
+#include <Core/Types.hpp>
 #include <ECS/EntityWrapper/EntityWrapper.hpp>
 
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace re::ecs
 {
@@ -18,7 +19,7 @@ public:
 
 	virtual ~System() = default;
 
-	virtual void Update(Scene& scene, float dt) = 0;
+	virtual void Update(Scene& scene, core::TimeDelta dt) = 0;
 
 	std::vector<WrappedEntity> Entities;
 	std::unordered_map<Entity, size_t> EntityToIndexMap;
