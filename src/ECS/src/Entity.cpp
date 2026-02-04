@@ -14,7 +14,7 @@ constexpr std::size_t ENTITY_GENERATION_MASK = (1ULL << ENTITY_GENERATION_BITS) 
 namespace re::ecs
 {
 
-const auto Entity::InvalidId = Entity{ ENTITY_INDEX_MASK };
+const auto Entity::INVALID_ID = Entity{ ENTITY_INDEX_MASK };
 
 Entity::Entity(const std::size_t id)
 	: m_id(id)

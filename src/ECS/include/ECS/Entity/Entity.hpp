@@ -17,7 +17,7 @@ public:
 
 	operator std::size_t() const;
 
-	static const Entity InvalidId;
+	static const Entity INVALID_ID;
 
 	[[nodiscard]] std::size_t Id() const;
 

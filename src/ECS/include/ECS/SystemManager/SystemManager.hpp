@@ -91,7 +91,7 @@ private:
 	void WorkerLoop();
 
 private:
-	SystemId m_currentSystemId = Entity::InvalidId;
+	SystemId m_currentSystemId = Entity::INVALID_ID;
 
 	std::unordered_map<SystemId, std::unique_ptr<System>> m_systems;
 	std::unordered_map<SystemId, Signature> m_signatures;
