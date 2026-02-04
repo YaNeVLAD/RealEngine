@@ -7,7 +7,7 @@
 namespace re::runtime
 {
 
-void RenderSystem2D::Update(ecs::Scene& scene, float dt)
+void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 {
 	core::Vector2f cameraPos = { 0, 0 };
 	float cameraZoom = 1.0f;

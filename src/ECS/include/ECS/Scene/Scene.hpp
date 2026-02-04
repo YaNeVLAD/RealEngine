@@ -3,6 +3,7 @@
 #include <ECS/ComponentManager/ComponentManager.hpp>
 #include <ECS/Entity/Entity.hpp>
 #include <ECS/EntityManager/EntityManager.hpp>
+#include <ECS/EntityWrapper/EntityWrapper.hpp>
 #include <ECS/SystemManager/SystemManager.hpp>
 #include <ECS/ViewManager/ViewManager.hpp>
 
@@ -12,7 +13,7 @@
 namespace re::ecs
 {
 
-class Scene
+class Scene final
 {
 public:
 	Scene()
@@ -23,9 +24,12 @@ public:
 	{
 	}
 
-	Entity CreateEntity()
+	EntityWrapper<Scene> CreateEntity()
 	{
-		return m_entityManager->CreateEntity();
+		const auto entity = m_entityManager->CreateEntity();
+		const auto signature = m_entityManager->GetSignature(entity);
+
+		return { this, entity, signature };
 	}
 
 	void DestroyEntity(const Entity entity)
@@ -100,7 +104,7 @@ public:
 	}
 
 	template <typename TSystem, typename... TArgs>
-	SystemManager::SystemConfiguration RegisterSystem(TArgs&&... args)
+	SystemManager::SystemConfiguration AddSystem(TArgs&&... args)
 	{
 		return m_systemManager->RegisterSystem<TSystem>(std::forward<TArgs>(args)...);
 	}
@@ -141,13 +145,18 @@ public:
 	}
 
 private:
-	template <typename _TComponent>
-	void AddComponentImpl(Entity entity, _TComponent component)
+	template <typename TComponent>
+	void AddComponentImpl(Entity entity, TComponent component)
 	{
+		if (!m_componentManager->IsComponentRegistered<TComponent>())
+		{
+			m_componentManager->RegisterComponent<TComponent>();
+		}
+
 		m_componentManager->AddComponent(entity, component);
 
 		auto& signature = m_entityManager->GetSignature(entity);
-		signature.set(TypeIndex<_TComponent>());
+		signature.set(TypeIndex<TComponent>());
 		m_entityManager->SetSignature(entity, signature);
 
 		m_systemManager->OnEntitySignatureChanged(entity, signature, this);

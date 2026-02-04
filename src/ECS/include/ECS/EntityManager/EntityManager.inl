@@ -26,7 +26,7 @@ namespace re::ecs
 		m_entityLocations.resize(index + 1);
 	}
 
-	const Entity entity = ecs::CreateEntity(index, m_generations[index]);
+	const Entity entity(index, m_generations[index]);
 
 	m_signatures[entity.Index()].reset();
 

@@ -1,12 +1,14 @@
 #pragma once
 
+#include <Core/Export.hpp>
+
 #include <compare>
 #include <cstdint>
 
 namespace re::core
 {
 
-struct Color
+struct RE_CORE_API Color
 {
 	Color();
 	Color(Color&&) = default;

@@ -40,17 +40,17 @@ public:
 		CurrentScene().RegisterComponents<Velocity>();
 
 		CurrentScene()
-			.RegisterSystem<MovementSystem>()
+			.AddSystem<MovementSystem>()
 			.WithRead<Velocity>()
 			.WithWrite<TransformComponent>();
 
 		CurrentScene().BuildSystemGraph();
 
-		const auto player = CurrentScene().CreateEntity();
-
-		CurrentScene().AddComponent<TransformComponent>(player, re::core::Vector2f{ 0.f, 0.f });
-		CurrentScene().AddComponent<Velocity>(player, 10.0f, 5.0f);
-		CurrentScene().AddComponent<SpriteComponent>(player, re::core::Color::Red);
+		CurrentScene()
+			.CreateEntity()
+			.AddComponent<TransformComponent>(re::core::Vector2f{ 0.f, 0.f })
+			.AddComponent<Velocity>(10.0f, 5.0f)
+			.AddComponent<SpriteComponent>(re::core::Color::Red);
 	}
 
 	void OnStart() override
@@ -59,9 +59,9 @@ public:
 
 	void OnUpdate(re::core::TimeDelta deltaTime) override
 	{
-		for (auto&& [id, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
+		for (auto&& [entity, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
 		{
-			std::cout << "Player position: " << transform.position.x << ", " << transform.position.y << std::endl;
+			std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
 		}
 	}
 

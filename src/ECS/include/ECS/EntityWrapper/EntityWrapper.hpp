@@ -10,85 +10,45 @@ template <typename TScene>
 class EntityWrapper final
 {
 public:
-	EntityWrapper(TScene* scene, Entity id, Signature signature)
-		: m_scene(scene)
-		, m_id(id)
-		, m_signature(signature)
-	{
-	}
+	EntityWrapper(TScene* scene, Entity id, Signature signature);
 
-	[[nodiscard]] Entity GetEntity() const
-	{
-		return m_id;
-	}
+	[[nodiscard]] Entity GetEntity() const;
 
-	[[nodiscard]] Signature GetSignature() const
-	{
-		return m_signature;
-	}
+	[[nodiscard]] Signature GetSignature() const;
 
 	template <typename TComponent>
-	void AddComponent(TComponent const& component)
-	{
-		m_scene->template AddComponent<TComponent>(m_id, component);
-	}
+	EntityWrapper AddComponent(TComponent const& component);
 
 	template <typename TComponent, typename... TArgs>
-	void AddComponent(TArgs&&... args)
-	{
-		m_scene->template AddComponent<TComponent>(
-			m_id,
-			TComponent{ std::forward<TArgs>(args)... });
-	}
+	EntityWrapper AddComponent(TArgs&&... args);
 
 	template <typename TComponent>
-	TComponent& GetComponent()
-	{
-		return m_scene->template GetComponent<TComponent>(m_id);
-	}
+	TComponent& GetComponent();
 
 	template <typename TComponent>
-	TComponent const& GetComponent() const
-	{
-		return m_scene->template GetComponent<TComponent>(m_id);
-	}
+	TComponent const& GetComponent() const;
 
 	template <typename TComponent>
-	[[nodiscard]] bool HasComponent() const
-	{
-		return m_scene->template HasComponent<TComponent>(m_id);
-	}
+	[[nodiscard]] bool HasComponent() const;
 
 	template <typename TComponent>
-	void RemoveComponent()
-	{
-		m_scene->template RemoveComponent<TComponent>(m_id);
-	}
+	void RemoveComponent();
 
-	void Destroy()
-	{
-		m_scene->DestroyEntity(m_id);
-	}
+	void Destroy();
 
-	auto operator<=>(EntityWrapper const& other) const
-	{
-		return m_id <=> other.m_id;
-	}
+	auto operator<=>(EntityWrapper const& other) const;
 
-	bool operator==(EntityWrapper const& other) const
-	{
-		return m_id == other.m_id;
-	}
+	bool operator==(EntityWrapper const& other) const;
 
-	bool operator==(Entity const& entity) const
-	{
-		return m_id == entity;
-	}
+	bool operator==(Entity const& entity) const;
 
 private:
 	TScene* m_scene;
+
 	Entity m_id;
 	Signature m_signature;
 };
 
 } // namespace re::ecs
+
+#include <ECS/EntityWrapper/EntityWrapper.inl>

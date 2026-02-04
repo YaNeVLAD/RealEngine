@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ECS/Export.hpp>
+
 #include <ECS/EntityManager/EntityManager.hpp>
 #include <ECS/View/View.hpp>
 
@@ -8,7 +10,7 @@
 namespace re::ecs
 {
 
-class ViewManager final
+class RE_ECS_API ViewManager final
 {
 public:
 	template <typename... TComponents>

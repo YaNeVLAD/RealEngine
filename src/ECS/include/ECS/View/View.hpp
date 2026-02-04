@@ -1,8 +1,8 @@
 #pragma once
 
 #include <ECS/ComponentManager/ComponentManager.hpp>
-#include <ECS/View/IView.h>
-#include <ECS/View/Iterator/ViewIterator.h>
+#include <ECS/View/IView.hpp>
+#include <ECS/View/Iterator/ViewIterator.hpp>
 
 #include <vector>
 
@@ -16,42 +16,19 @@ public:
 	using Iterator = ViewIterator<false, TComponents...>;
 	using ConstIterator = ViewIterator<true, TComponents...>;
 
-	View(ComponentManager& manager, const Signature signature)
-		: m_manager(manager)
-		, m_signature(signature)
-	{
-	}
+	View(ComponentManager& manager, Signature signature);
 
-	auto begin() { return Iterator(m_manager, m_entities.begin()); }
-	auto end() { return Iterator(m_manager, m_entities.end()); }
+	auto begin();
+	auto end();
 
-	auto begin() const { return ConstIterator(m_manager, m_entities.cbegin()); }
-	auto end() const { return ConstIterator(m_manager, m_entities.cend()); }
+	auto begin() const;
+	auto end() const;
 
-	void AddEntity(const Entity entity)
-	{
-		m_entities.push_back(entity);
-	}
+	void AddEntity(Entity entity);
 
-	void OnEntityDestroyed(const Entity entity) override
-	{
-		std::erase(m_entities, entity);
-	}
+	void OnEntityDestroyed(Entity entity) override;
 
-	void OnEntitySignatureChanged(const Entity entity, const Signature entitySignature) override
-	{
-		if ((entitySignature & m_signature) == m_signature)
-		{
-			if (std::ranges::find(m_entities, entity) == m_entities.end())
-			{
-				m_entities.push_back(entity);
-			}
-		}
-		else
-		{
-			std::erase(m_entities, entity);
-		}
-	}
+	void OnEntitySignatureChanged(Entity entity, Signature entitySignature) override;
 
 private:
 	ComponentManager& m_manager;
@@ -60,3 +37,5 @@ private:
 };
 
 } // namespace re::ecs
+
+#include <ECS/View/View.inl>

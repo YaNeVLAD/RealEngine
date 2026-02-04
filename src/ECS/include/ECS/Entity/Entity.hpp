@@ -1,55 +1,35 @@
 #pragma once
 
+#include <ECS/Export.hpp>
+
 #include <compare>
 #include <cstddef>
-
-namespace re::ecs::details
-{
-
-constexpr std::size_t ENTITY_INDEX_BITS = 32;
-constexpr std::size_t ENTITY_GENERATION_BITS = 32;
-
-constexpr std::size_t ENTITY_INDEX_MASK = (1ULL << ENTITY_INDEX_BITS) - 1;
-constexpr std::size_t ENTITY_GENERATION_MASK = (1ULL << ENTITY_GENERATION_BITS) - 1;
-
-} // namespace re::ecs::details
 
 namespace re::ecs
 {
 
-struct Entity
+class RE_ECS_API Entity final
 {
-	std::size_t id;
+public:
+	explicit Entity(std::size_t id);
 
-	operator std::size_t()
-	{
-		return Index();
-	}
+	Entity(std::size_t index, std::size_t generation);
 
-	operator std::size_t() const
-	{
-		return Index();
-	}
+	operator std::size_t() const;
 
-	[[nodiscard]] std::size_t Index() const
-	{
-		return id & details::ENTITY_INDEX_MASK;
-	}
+	static const Entity InvalidId;
 
-	[[nodiscard]] std::size_t Generation() const
-	{
-		return (id >> details::ENTITY_INDEX_BITS) & details::ENTITY_GENERATION_MASK;
-	}
+	[[nodiscard]] std::size_t Id() const;
+
+	[[nodiscard]] std::size_t Index() const;
+
+	[[nodiscard]] std::size_t Generation() const;
 
 	auto operator<=>(Entity const&) const = default;
+
+private:
+	std::size_t m_id{};
 };
-
-[[nodiscard]] constexpr Entity CreateEntity(const std::size_t index, const std::size_t generation)
-{
-	return Entity{ (generation << details::ENTITY_INDEX_BITS) | index };
-}
-
-constexpr auto InvalidEntity = Entity{ details::ENTITY_INDEX_MASK };
 
 } // namespace re::ecs
 
@@ -58,6 +38,6 @@ struct std::hash<re::ecs::Entity>
 {
 	std::size_t operator()(re::ecs::Entity const& entity) const noexcept
 	{
-		return entity.id;
+		return entity.Id();
 	}
-}; // namespace std
+};

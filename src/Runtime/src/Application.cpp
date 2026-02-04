@@ -28,13 +28,13 @@ Application::Application(std::string const& name)
 
 	CurrentScene().RegisterComponents<TransformComponent, SpriteComponent, CameraComponent>();
 
-	m_scene.RegisterSystem<RenderSystem2D>()
+	m_scene.AddSystem<RenderSystem2D>()
 		.WithRead<TransformComponent, SpriteComponent>()
 		.RunOnMainThread();
 
-	const auto mainCamera = m_scene.CreateEntity();
-	m_scene.AddComponent<CameraComponent>(mainCamera);
-	m_scene.AddComponent<TransformComponent>(mainCamera);
+	m_scene.CreateEntity()
+		.AddComponent<CameraComponent>()
+		.AddComponent<TransformComponent>();
 
 	m_scene.BuildSystemGraph();
 }

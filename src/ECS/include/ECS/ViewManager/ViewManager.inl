@@ -28,22 +28,6 @@ std::shared_ptr<View<TComponents...>> ViewManager::CreateView(
 	return view;
 }
 
-inline void ViewManager::OnEntityDestroyed(const Entity entity)
-{
-	for (const auto& view : m_views | std::views::values)
-	{
-		view->OnEntityDestroyed(entity);
-	}
-}
-
-inline void ViewManager::OnEntitySignatureChanged(const Entity entity, const Signature signature)
-{
-	for (const auto& view : m_views | std::views::values)
-	{
-		view->OnEntitySignatureChanged(entity, signature);
-	}
-}
-
 template <typename... TComponents>
 Signature ViewManager::CreateSignature()
 {
