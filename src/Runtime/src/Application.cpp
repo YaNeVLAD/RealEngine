@@ -1,8 +1,7 @@
-#include "Runtime/Components.hpp"
-#include "Runtime/RenderSystem2D.hpp"
-
 #include <Runtime/Application.hpp>
 
+#include "Runtime/Components.hpp"
+#include "Runtime/RenderSystem2D.hpp"
 #include <Render2D/Renderer2D.hpp>
 #include <Render2D/SFMLRenderAPI.hpp>
 #include <RenderCore/SFMLWindow.hpp>

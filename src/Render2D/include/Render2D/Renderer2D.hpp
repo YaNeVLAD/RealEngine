@@ -22,8 +22,6 @@ public:
 
 	static void EndScene();
 
-	static void Clear();
-
 	static void DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color);
 
 private:

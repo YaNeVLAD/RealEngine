@@ -12,7 +12,7 @@ void Renderer2D::Shutdown()
 {
 }
 
-void Renderer2D::BeginScene(core::Vector2f const& cameraPos, float cameraZoom)
+void Renderer2D::BeginScene(core::Vector2f const& cameraPos, const float cameraZoom)
 {
 	const core::Vector2f worldSize = {
 		VIEWPORT_SIZE.x / cameraZoom,
@@ -24,11 +24,7 @@ void Renderer2D::BeginScene(core::Vector2f const& cameraPos, float cameraZoom)
 
 void Renderer2D::EndScene()
 {
-}
-
-void Renderer2D::Clear()
-{
-	m_api->Clear();
+	m_api->Flush();
 }
 
 void Renderer2D::DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color)
