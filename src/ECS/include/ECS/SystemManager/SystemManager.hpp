@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ECS/Export.hpp>
+
 #include <ECS/ComponentManager/ComponentManager.hpp>
 #include <ECS/System/System.hpp>
 #include <ECS/TypeIndex/TypeIndex.hpp>
@@ -17,40 +19,21 @@ namespace re::ecs
 {
 using SystemId = TypeIndexType;
 
-class SystemManager final
+class RE_ECS_API SystemManager final
 {
 public:
-	class SystemConfiguration
+	class RE_ECS_API SystemConfiguration
 	{
 	public:
-		SystemConfiguration(SystemManager& manager, SystemId id)
-			: m_id(id)
-			, m_manager(manager)
-		{
-		}
+		SystemConfiguration(SystemManager& manager, SystemId id);
 
 		template <typename... TComponents>
-		SystemConfiguration& WithRead()
-		{
-			m_manager.AddReadDependencies<TComponents...>(m_id);
-
-			return *this;
-		}
+		SystemConfiguration& WithRead();
 
 		template <typename TComponent>
-		SystemConfiguration& WithWrite()
-		{
-			m_manager.AddWriteDependency<TComponent>(m_id);
+		SystemConfiguration& WithWrite();
 
-			return *this;
-		}
-
-		SystemConfiguration& RunOnMainThread()
-		{
-			m_manager.RunSystemOnMainThread(m_id);
-
-			return *this;
-		}
+		SystemConfiguration& RunOnMainThread();
 
 	private:
 		SystemId m_id;
@@ -100,14 +83,15 @@ private:
 
 	std::vector<std::vector<SystemId>> m_executionStages;
 
-	std::unordered_map<Entity, size_t> m_entityToIndexMap;
+	std::unordered_map<Entity, std::size_t> m_entityToIndexMap;
 
 	std::vector<std::jthread> m_workerThreads;
 	std::queue<std::function<void()>> m_taskQueue;
+
 	std::mutex m_queueMutex;
 	std::condition_variable m_workerCondition;
 	std::condition_variable m_mainCondition;
-	std::atomic<size_t> m_tasksInProgress = 0;
+	std::atomic<std::size_t> m_tasksInProgress = 0;
 	std::atomic<bool> m_stopThreads = false;
 
 	std::unordered_set<SystemId> m_mainThreadSystems;

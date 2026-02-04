@@ -1,0 +1,200 @@
+#include <ECS/SystemManager/SystemManager.hpp>
+
+namespace re::ecs
+{
+
+SystemManager::SystemConfiguration::SystemConfiguration(SystemManager& manager, SystemId id)
+	: m_id(id)
+	, m_manager(manager)
+{
+}
+
+SystemManager::SystemConfiguration& SystemManager::SystemConfiguration::RunOnMainThread()
+{
+	m_manager.RunSystemOnMainThread(m_id);
+
+	return *this;
+}
+
+SystemManager::SystemManager()
+{
+	const std::size_t threadCount = std::thread::hardware_concurrency();
+	m_workerThreads.reserve(threadCount);
+	for (std::size_t i = 0; i < threadCount; ++i)
+	{
+		m_workerThreads.emplace_back(&SystemManager::WorkerLoop, this);
+	}
+}
+
+SystemManager::~SystemManager()
+{
+	m_stopThreads = true;
+	m_workerCondition.notify_all();
+}
+
+void SystemManager::OnEntitySignatureChanged(Entity entity, Signature entitySignature, Scene* scene)
+{
+	for (auto const& [id, system] : m_systems)
+	{
+		const Signature& systemSignature = m_signatures.at(id);
+		const bool hasEntity = system->EntityToIndexMap.contains(entity);
+		const bool signatureMatch = (entitySignature & systemSignature) == systemSignature;
+
+		if (signatureMatch && !hasEntity)
+		{
+			system->EntityToIndexMap[entity] = system->Entities.size();
+			system->Entities.emplace_back(scene, entity, entitySignature);
+		}
+		else if (!signatureMatch && hasEntity)
+		{
+			if (system->Entities.size() == 1)
+			{
+				system->Entities.clear();
+				system->EntityToIndexMap.clear();
+				continue;
+			}
+
+			const std::size_t indexOfRemoved = system->EntityToIndexMap.at(entity);
+			Entity lastEntity = system->Entities.back().GetEntity();
+
+			system->Entities[indexOfRemoved] = system->Entities.back();
+			system->EntityToIndexMap[lastEntity] = indexOfRemoved;
+
+			system->Entities.pop_back();
+			system->EntityToIndexMap.erase(entity);
+		}
+	}
+}
+
+void SystemManager::BuildExecutionGraph()
+{
+	std::unordered_map<SystemId, std::size_t> inDegree;
+	std::unordered_map<SystemId, std::vector<SystemId>> adjList;
+
+	for (auto const& [writerId, writtenComponent] : m_writeDependencies)
+	{
+		for (auto const& [readerId, readSignature] : m_readDependencies)
+		{
+			if (readerId != writerId && readSignature.test(writtenComponent)
+				&& !(m_mainThreadSystems.contains(readerId)
+					|| m_mainThreadSystems.contains(writerId)))
+			{
+				adjList[writerId].push_back(readerId);
+				inDegree[readerId]++;
+			}
+		}
+	}
+
+	std::queue<SystemId> q;
+	for (const auto& id : m_systems | std::views::keys)
+	{
+		if (!inDegree.contains(id) && !m_mainThreadSystems.contains(id))
+		{
+			q.push(id);
+		}
+	}
+
+	m_executionStages.clear();
+	while (!q.empty())
+	{
+		const std::size_t stageSize = q.size();
+		std::vector<SystemId> currentStage;
+		for (std::size_t i = 0; i < stageSize; ++i)
+		{
+			SystemId u = q.front();
+			q.pop();
+			currentStage.push_back(u);
+
+			if (adjList.contains(u))
+			{
+				for (SystemId v : adjList.at(u))
+				{
+					inDegree[v]--;
+					if (inDegree[v] == 0)
+					{
+						q.push(v);
+					}
+				}
+			}
+		}
+		m_executionStages.push_back(currentStage);
+	}
+
+	std::size_t scheduledSystems = 0;
+	for (const auto& stage : m_executionStages)
+	{
+		scheduledSystems += stage.size();
+	}
+
+	assert(scheduledSystems == m_systems.size() - m_mainThreadSystems.size()
+		&& "Cycle detected in system dependencies!");
+}
+
+void SystemManager::Execute(Scene& scene, float dt)
+{
+	for (const auto& stage : m_executionStages)
+	{
+		m_tasksInProgress = stage.size();
+
+		for (SystemId id : stage)
+		{
+			{
+				std::unique_lock lock(m_queueMutex);
+				m_taskQueue.emplace([this, id, &scene, dt] {
+					m_systems.at(id)->Update(scene, dt);
+				});
+			}
+		}
+
+		m_workerCondition.notify_all();
+
+		{
+			std::unique_lock lock(m_queueMutex);
+			m_mainCondition.wait(lock, [this] {
+				return m_tasksInProgress == 0;
+			});
+		}
+	}
+
+	for (SystemId const& id : m_mainThreadSystems)
+	{
+		m_systems.at(id)->Update(scene, dt);
+	}
+}
+
+void SystemManager::RunSystemOnMainThread(SystemId systemId)
+{
+	m_mainThreadSystems.insert(systemId);
+}
+
+void SystemManager::WorkerLoop()
+{
+	while (!m_stopThreads)
+	{
+		std::function<void()> task;
+		{
+			std::unique_lock lock(m_queueMutex);
+			m_workerCondition.wait(lock, [this] {
+				return m_stopThreads || !m_taskQueue.empty();
+			});
+
+			if (m_stopThreads && m_taskQueue.empty())
+			{
+				return;
+			}
+
+			task = std::move(m_taskQueue.front());
+			m_taskQueue.pop();
+		}
+
+		task();
+
+		if (--m_tasksInProgress == 0)
+		{
+			std::lock_guard lock(m_queueMutex);
+			m_mainCondition.notify_one();
+		}
+	}
+}
+
+} // namespace re::ecs
