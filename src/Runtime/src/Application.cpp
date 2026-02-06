@@ -6,8 +6,6 @@
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Window/SFMLWindow.hpp>
 
-#include <SFML/Graphics.hpp>
-
 namespace re::runtime
 {
 
