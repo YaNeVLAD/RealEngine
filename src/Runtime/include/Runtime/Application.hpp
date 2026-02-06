@@ -27,6 +27,8 @@ public:
 
 	virtual void OnUpdate(core::TimeDelta deltaTime) = 0;
 
+	virtual void OnEvent(Event const&) {}
+
 	virtual void OnStop() = 0;
 
 protected:

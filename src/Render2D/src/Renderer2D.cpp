@@ -3,6 +3,8 @@
 namespace re::render
 {
 
+core::Vector2u Renderer2D::m_viewportSize = { 1920u, 1080u };
+
 void Renderer2D::Init(std::unique_ptr<IRenderAPI> renderApi)
 {
 	m_api = std::move(renderApi);
@@ -12,11 +14,19 @@ void Renderer2D::Shutdown()
 {
 }
 
+void Renderer2D::SetViewport(core::Vector2u const& newSize)
+{
+	m_viewportSize = newSize;
+	m_api->SetViewport(
+		{ 0.f, 0.f },
+		{ static_cast<float>(newSize.x), static_cast<float>(newSize.y) });
+}
+
 void Renderer2D::BeginScene(core::Vector2f const& cameraPos, const float cameraZoom)
 {
 	const core::Vector2f worldSize = {
-		VIEWPORT_SIZE.x / cameraZoom,
-		VIEWPORT_SIZE.y / cameraZoom
+		m_viewportSize.x / cameraZoom,
+		m_viewportSize.y / cameraZoom
 	};
 
 	m_api->SetCamera(cameraPos, worldSize);

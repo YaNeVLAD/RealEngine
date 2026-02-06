@@ -66,7 +66,15 @@ public:
 	{
 		for (auto&& [entity, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
 		{
-			// std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
+			std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
+		}
+	}
+
+	void OnEvent(re::Event const& event) override
+	{
+		if (event.Is<re::Event::Resized>())
+		{
+			std::cout << "Resized from user app" << std::endl;
 		}
 	}
 

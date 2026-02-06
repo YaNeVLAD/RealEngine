@@ -1,10 +1,11 @@
 #include <Runtime/Application.hpp>
 
-#include "Runtime/Components.hpp"
-#include "Runtime/RenderSystem2D.hpp"
+#include <Core/Utils.hpp>
 #include <Render2D/RenderAPI/SFMLRenderAPI.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Window/SFMLWindow.hpp>
+#include <Runtime/Components.hpp>
+#include <Runtime/RenderSystem2D.hpp>
 
 namespace re::runtime
 {
@@ -54,7 +55,19 @@ void Application::Run()
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
 		lastTime = currentTime;
 
-		m_window->PollEvents();
+		while (const auto event = m_window->PollEvent())
+		{
+			event->Visit(utils::overloaded{
+				[this](Event::Closed const&) {
+					Shutdown();
+				},
+				[this](Event::Resized const& resized) {
+					render::Renderer2D::SetViewport(resized.newSize);
+				},
+				[](const auto&) {} });
+
+			OnEvent(*event);
+		}
 
 		m_window->Clear();
 

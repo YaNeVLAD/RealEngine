@@ -18,6 +18,8 @@ public:
 
 	static void Shutdown();
 
+	static void SetViewport(core::Vector2u const& newSize);
+
 	static void BeginScene(core::Vector2f const& cameraPos, float cameraZoom);
 
 	static void EndScene();
@@ -25,7 +27,7 @@ public:
 	static void DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color);
 
 private:
-	static constexpr core::Vector2f VIEWPORT_SIZE = { 1920.f, 1080.f };
+	static core::Vector2u m_viewportSize;
 
 	static std::unique_ptr<IRenderAPI> m_api;
 };

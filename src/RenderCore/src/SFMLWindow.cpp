@@ -16,15 +16,23 @@ bool SFMLWindow::IsOpen() const
 	return m_window.isOpen();
 }
 
-void SFMLWindow::PollEvents()
+std::optional<Event> SFMLWindow::PollEvent()
 {
-	while (const auto event = m_window.pollEvent())
+	if (const auto event = m_window.pollEvent())
 	{
 		if (event->is<sf::Event::Closed>())
 		{
-			m_window.close();
+			return Event(Event::Closed{});
 		}
+		if (const auto* resized = event->getIf<sf::Event::Resized>())
+		{
+			return Event(Event::Resized{ resized->size.x, resized->size.y });
+		}
+
+		return PollEvent();
 	}
+
+	return std::nullopt;
 }
 
 void SFMLWindow::Clear()

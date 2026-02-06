@@ -18,7 +18,7 @@ public:
 
 	bool IsOpen() const override;
 
-	void PollEvents() override;
+	std::optional<Event> PollEvent() override;
 
 	void Clear() override;
 
