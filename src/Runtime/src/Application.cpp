@@ -2,9 +2,9 @@
 
 #include "Runtime/Components.hpp"
 #include "Runtime/RenderSystem2D.hpp"
+#include <Render2D/RenderAPI/SFMLRenderAPI.hpp>
 #include <Render2D/Renderer2D.hpp>
-#include <Render2D/SFMLRenderAPI.hpp>
-#include <RenderCore/SFMLWindow.hpp>
+#include <RenderCore/Window/SFMLWindow.hpp>
 
 #include <SFML/Graphics.hpp>
 
@@ -27,7 +27,7 @@ Application::Application(std::string const& name)
 
 	CurrentScene().RegisterComponents<TransformComponent, SpriteComponent, CameraComponent>();
 
-	m_scene.AddSystem<RenderSystem2D>()
+	m_scene.AddSystem<RenderSystem2D>(*m_window)
 		.WithRead<TransformComponent, SpriteComponent>()
 		.RunOnMainThread();
 

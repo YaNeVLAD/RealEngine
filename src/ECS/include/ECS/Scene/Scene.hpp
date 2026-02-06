@@ -139,7 +139,7 @@ public:
 	}
 
 	template <typename... TComponents>
-	auto CreateView()
+	std::shared_ptr<View<TComponents...>> CreateView()
 	{
 		return m_viewManager->CreateView<TComponents...>(*m_componentManager, *m_entityManager);
 	}

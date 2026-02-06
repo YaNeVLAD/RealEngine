@@ -7,6 +7,11 @@
 namespace re::runtime
 {
 
+RenderSystem2D::RenderSystem2D(render::IWindow& window)
+	: m_window(window)
+{
+}
+
 void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 {
 	core::Vector2f cameraPos = { 0, 0 };

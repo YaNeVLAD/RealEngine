@@ -1,4 +1,4 @@
-#include <RenderCore/SFMLWindow.hpp>
+#include <RenderCore/Window/SFMLWindow.hpp>
 
 #include <SFML/Graphics.hpp>
 

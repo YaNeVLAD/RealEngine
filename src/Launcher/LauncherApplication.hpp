@@ -9,6 +9,10 @@
 #include <iostream>
 #include <stdexcept>
 
+struct PlayerTag
+{
+};
+
 struct Velocity
 {
 	float dx, dy;
@@ -48,6 +52,7 @@ public:
 
 		CurrentScene()
 			.CreateEntity()
+			.AddComponent<PlayerTag>()
 			.AddComponent<TransformComponent>(re::core::Vector2f{ 0.f, 0.f })
 			.AddComponent<Velocity>(10.0f, 5.0f)
 			.AddComponent<SpriteComponent>(re::core::Color::Red);
@@ -61,7 +66,7 @@ public:
 	{
 		for (auto&& [entity, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
 		{
-			std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
+			// std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
 		}
 	}
 
