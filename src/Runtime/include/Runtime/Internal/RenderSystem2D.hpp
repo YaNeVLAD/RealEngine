@@ -5,7 +5,7 @@
 #include <ECS/System/System.hpp>
 #include <RenderCore/IWindow.hpp>
 
-namespace re::runtime
+namespace re::detail
 {
 
 class RE_RUNTIME_API RenderSystem2D final : public ecs::System
@@ -19,4 +19,4 @@ private:
 	render::IWindow& m_window;
 };
 
-} // namespace re::runtime
+} // namespace re::detail

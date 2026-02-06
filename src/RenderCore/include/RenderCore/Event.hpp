@@ -17,7 +17,7 @@ public:
 
 	struct Resized
 	{
-		core::Vector2u newSize;
+		Vector2u newSize;
 	};
 
 	template <typename TEventType>

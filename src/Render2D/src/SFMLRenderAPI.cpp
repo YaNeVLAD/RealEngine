@@ -13,7 +13,7 @@ SFMLRenderAPI::SFMLRenderAPI(sf::RenderWindow& window)
 	m_vertices.reserve(MAX_QUAD_COUNT * VERTICES_PER_QUAD);
 }
 
-void SFMLRenderAPI::SetViewport(const core::Vector2f topLeft, const core::Vector2f size)
+void SFMLRenderAPI::SetViewport(const Vector2f topLeft, const Vector2f size)
 {
 	sf::View view = m_window.getView();
 	view.setViewport(sf::FloatRect(
@@ -27,7 +27,7 @@ void SFMLRenderAPI::SetViewport(const core::Vector2f topLeft, const core::Vector
 	m_window.setView(view);
 }
 
-void SFMLRenderAPI::SetCamera(core::Vector2f center, core::Vector2f size)
+void SFMLRenderAPI::SetCamera(Vector2f center, Vector2f size)
 {
 	sf::View view = m_window.getView();
 
@@ -37,7 +37,7 @@ void SFMLRenderAPI::SetCamera(core::Vector2f center, core::Vector2f size)
 	m_window.setView(view);
 }
 
-void SFMLRenderAPI::SetClearColor(core::Color const& color)
+void SFMLRenderAPI::SetClearColor(Color const& color)
 {
 	m_clearColor = color;
 }
@@ -53,23 +53,50 @@ void SFMLRenderAPI::Flush()
 
 	m_vertices.clear();
 }
-
-void SFMLRenderAPI::DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color)
+void SFMLRenderAPI::DrawQuad(
+	Vector2f const& pos,
+	Vector2f const& size,
+	const float rotation,
+	Color const& color)
 {
 	sf::Color sfColor(color.ToInt());
 
-	const float left = pos.x;
-	const float top = pos.y;
-	const float right = pos.x + size.x;
-	const float bottom = pos.y + size.y;
+	const float hw = size.x / 2.0f;
+	const float hh = size.y / 2.0f;
 
-	m_vertices.emplace_back(sf::Vector2f(left, top), sfColor);
-	m_vertices.emplace_back(sf::Vector2f(right, top), sfColor);
-	m_vertices.emplace_back(sf::Vector2f(left, bottom), sfColor);
+	Vector2f p0 = { -hw, -hh };
+	Vector2f p1 = { hw, -hh };
+	Vector2f p2 = { hw, hh };
+	Vector2f p3 = { -hw, hh };
 
-	m_vertices.emplace_back(sf::Vector2f(right, top), sfColor);
-	m_vertices.emplace_back(sf::Vector2f(right, bottom), sfColor);
-	m_vertices.emplace_back(sf::Vector2f(left, bottom), sfColor);
+	if (rotation != 0.0f)
+	{
+		p0 = p0.Rotate(rotation);
+		p1 = p1.Rotate(rotation);
+		p2 = p2.Rotate(rotation);
+		p3 = p3.Rotate(rotation);
+	}
+
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p0.x, pos.y + p0.y), sfColor);
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p1.x, pos.y + p1.y), sfColor);
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p3.x, pos.y + p3.y), sfColor);
+
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p1.x, pos.y + p1.y), sfColor);
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p2.x, pos.y + p2.y), sfColor);
+	m_vertices.emplace_back(sf::Vector2f(pos.x + p3.x, pos.y + p3.y), sfColor);
+}
+
+void SFMLRenderAPI::DrawCircle(
+	Vector2f const& center,
+	const float radius,
+	Color const& color)
+{
+	sf::CircleShape circle(radius);
+	circle.setOrigin({ radius, radius });
+	circle.setPosition({ center.x, center.y });
+	circle.setFillColor(sf::Color(color.ToInt()));
+
+	m_window.draw(circle);
 }
 
 } // namespace re::render

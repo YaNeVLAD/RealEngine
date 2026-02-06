@@ -18,6 +18,6 @@ enum class Button
 
 RE_RENDER_CORE_API bool IsButtonPressed(Button button);
 
-RE_RENDER_CORE_API core::Vector2i GetPosition();
+RE_RENDER_CORE_API Vector2i GetPosition();
 
 } // namespace re::Mouse

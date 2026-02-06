@@ -18,16 +18,25 @@ public:
 
 	static void Shutdown();
 
-	static void SetViewport(core::Vector2u const& newSize);
+	static void SetViewport(Vector2u const& newSize);
 
-	static void BeginScene(core::Vector2f const& cameraPos, float cameraZoom);
+	static void BeginScene(Vector2f const& cameraPos, float cameraZoom);
 
 	static void EndScene();
 
-	static void DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color);
+	static void DrawQuad(
+		Vector2f const& pos,
+		Vector2f const& size,
+		float rotation,
+		Color const& color);
+
+	static void DrawCircle(
+		Vector2f const& center,
+		float radius,
+		Color const& color);
 
 private:
-	static core::Vector2u m_viewportSize;
+	static Vector2u m_viewportSize;
 
 	static std::unique_ptr<IRenderAPI> m_api;
 };

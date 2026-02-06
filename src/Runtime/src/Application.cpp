@@ -5,9 +5,9 @@
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Window/SFMLWindow.hpp>
 #include <Runtime/Components.hpp>
-#include <Runtime/RenderSystem2D.hpp>
+#include <Runtime/Internal/RenderSystem2D.hpp>
 
-namespace re::runtime
+namespace re
 {
 
 Application::Application(std::string const& name)
@@ -24,15 +24,15 @@ Application::Application(std::string const& name)
 		throw std::runtime_error("Created window and render api are not compatible");
 	}
 
-	CurrentScene().RegisterComponents<TransformComponent, SpriteComponent, CameraComponent>();
+	CurrentScene().RegisterComponents<TransformComponent, RectangleComponent, CameraComponent>();
 
-	m_scene.AddSystem<RenderSystem2D>(*m_window)
-		.WithRead<TransformComponent, SpriteComponent>()
+	m_scene.AddSystem<detail::RenderSystem2D>(*m_window)
+		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
 		.RunOnMainThread();
 
 	m_scene.CreateEntity()
-		.AddComponent<CameraComponent>()
-		.AddComponent<TransformComponent>();
+		.Add<CameraComponent>()
+		.Add<TransformComponent>();
 
 	m_scene.BuildSystemGraph();
 }
@@ -100,4 +100,4 @@ render::IWindow& Application::Window() const
 	return *m_window;
 }
 
-} // namespace re::runtime
+} // namespace re

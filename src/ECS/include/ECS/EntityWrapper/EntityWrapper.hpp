@@ -17,22 +17,22 @@ public:
 	[[nodiscard]] Signature GetSignature() const;
 
 	template <typename TComponent>
-	EntityWrapper AddComponent(TComponent const& component);
+	EntityWrapper Add(TComponent const& component);
 
 	template <typename TComponent, typename... TArgs>
-	EntityWrapper AddComponent(TArgs&&... args);
+	EntityWrapper Add(TArgs&&... args);
 
 	template <typename TComponent>
-	TComponent& GetComponent();
+	TComponent& Get();
 
 	template <typename TComponent>
-	TComponent const& GetComponent() const;
+	TComponent const& Get() const;
 
 	template <typename TComponent>
-	[[nodiscard]] bool HasComponent() const;
+	[[nodiscard]] bool Has() const;
 
 	template <typename TComponent>
-	void RemoveComponent();
+	void Remove();
 
 	void Destroy();
 

@@ -1,39 +1,50 @@
 #pragma once
 
-#include "Runtime/Components.hpp"
-
 #include <ECS/System/System.hpp>
 #include <Runtime/Application.hpp>
+#include <Runtime/Components.hpp>
 #include <Scripting/ScriptLoader.hpp>
 
 #include <iostream>
 #include <stdexcept>
 
-struct PlayerTag
-{
-};
+#include "Components.hpp"
+#include "Letters.hpp"
 
-struct Velocity
-{
-	float dx, dy;
-};
-
-class MovementSystem final : public re::ecs::System
+class JumpPhysicsSystem final : public re::ecs::System
 {
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		using namespace re::runtime;
+		constexpr float GRAVITY = 2000.0f;
+		constexpr float JUMP_FORCE = -900.0f;
 
-		for (auto&& [id, transform, vel] : *scene.CreateView<TransformComponent, Velocity>())
+		for (auto&& [_, transform, physics] : *scene.CreateView<re::TransformComponent, GravityComponent>())
 		{
-			transform.position.x += vel.dx * dt;
-			transform.position.y += vel.dy * dt;
-		}
+			if (physics.startY == 0.0f)
+			{
+				physics.startY = transform.position.y;
+			}
+
+			if (physics.phaseTime > 0.0f)
+			{
+				physics.phaseTime -= dt;
+				return;
+			}
+
+			physics.velocity.y += GRAVITY * dt;
+			transform.position.y += physics.velocity.y * dt;
+
+			if (transform.position.y >= physics.startY)
+			{
+				transform.position.y = physics.startY;
+				physics.velocity.y = JUMP_FORCE;
+			}
+		};
 	}
 };
 
-class LauncherApplication final : public re::runtime::Application
+class LauncherApplication final : public re::Application
 {
 public:
 	LauncherApplication()
@@ -41,33 +52,25 @@ public:
 	{
 		using namespace re::runtime;
 
-		CurrentScene().RegisterComponents<Velocity>();
-
 		CurrentScene()
-			.AddSystem<MovementSystem>()
-			.WithRead<Velocity>()
-			.WithWrite<TransformComponent>();
+			.AddSystem<JumpPhysicsSystem>()
+			.WithRead<re::TransformComponent>()
+			.WithWrite<GravityComponent>();
 
 		CurrentScene().BuildSystemGraph();
 
-		CurrentScene()
-			.CreateEntity()
-			.AddComponent<PlayerTag>()
-			.AddComponent<TransformComponent>(re::core::Vector2f{ 0.f, 0.f })
-			.AddComponent<Velocity>(10.0f, 5.0f)
-			.AddComponent<SpriteComponent>(re::core::Color::Red);
+		CreateKLetter(CurrentScene());
+		CreateB1Letter(CurrentScene());
+		CreateB2Letter(CurrentScene());
 	}
 
 	void OnStart() override
 	{
 	}
 
-	void OnUpdate(re::core::TimeDelta deltaTime) override
+	void OnUpdate(const re::core::TimeDelta deltaTime) override
 	{
-		for (auto&& [entity, transform, velocity] : *CurrentScene().CreateView<re::runtime::TransformComponent, Velocity>())
-		{
-			std::cout << "Entity " << entity.Index() << " position: " << transform.position.x << ", " << transform.position.y << std::endl;
-		}
+		std::cout << 1.f / deltaTime << std::endl;
 	}
 
 	void OnEvent(re::Event const& event) override

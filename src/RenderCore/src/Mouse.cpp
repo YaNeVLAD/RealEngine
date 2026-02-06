@@ -10,7 +10,7 @@ bool IsButtonPressed(const Button button)
 	return detail::Input::IsMouseButtonPressed(button);
 }
 
-core::Vector2i GetPosition()
+Vector2i GetPosition()
 {
 	return detail::Input::GetMousePosition();
 }

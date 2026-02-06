@@ -13,6 +13,6 @@ RE_RENDER_CORE_API bool IsKeyPressed(Keyboard::Key key);
 
 RE_RENDER_CORE_API bool IsMouseButtonPressed(Mouse::Button button);
 
-RE_RENDER_CORE_API core::Vector2i GetMousePosition();
+RE_RENDER_CORE_API Vector2i GetMousePosition();
 
 } // namespace re::detail::Input

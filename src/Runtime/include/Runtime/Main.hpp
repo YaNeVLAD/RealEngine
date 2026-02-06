@@ -2,7 +2,7 @@
 
 #include <Runtime/Application.hpp>
 
-extern re::runtime::Application* CreateApplication(int argc, char** argv);
+extern re::Application* CreateApplication(int argc, char** argv);
 
 namespace re::runtime
 {

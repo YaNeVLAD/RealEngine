@@ -3,7 +3,7 @@
 namespace re::render
 {
 
-core::Vector2u Renderer2D::m_viewportSize = { 1920u, 1080u };
+Vector2u Renderer2D::m_viewportSize = { 1920u, 1080u };
 
 void Renderer2D::Init(std::unique_ptr<IRenderAPI> renderApi)
 {
@@ -14,7 +14,7 @@ void Renderer2D::Shutdown()
 {
 }
 
-void Renderer2D::SetViewport(core::Vector2u const& newSize)
+void Renderer2D::SetViewport(Vector2u const& newSize)
 {
 	m_viewportSize = newSize;
 	m_api->SetViewport(
@@ -22,9 +22,9 @@ void Renderer2D::SetViewport(core::Vector2u const& newSize)
 		{ static_cast<float>(newSize.x), static_cast<float>(newSize.y) });
 }
 
-void Renderer2D::BeginScene(core::Vector2f const& cameraPos, const float cameraZoom)
+void Renderer2D::BeginScene(Vector2f const& cameraPos, const float cameraZoom)
 {
-	const core::Vector2f worldSize = {
+	const Vector2f worldSize = {
 		m_viewportSize.x / cameraZoom,
 		m_viewportSize.y / cameraZoom
 	};
@@ -37,9 +37,21 @@ void Renderer2D::EndScene()
 	m_api->Flush();
 }
 
-void Renderer2D::DrawQuad(core::Vector2f const& pos, core::Vector2f const& size, core::Color const& color)
+void Renderer2D::DrawQuad(
+	Vector2f const& pos,
+	Vector2f const& size,
+	const float rotation,
+	Color const& color)
 {
-	m_api->DrawQuad(pos, size, color);
+	m_api->DrawQuad(pos, size, rotation, color);
+}
+
+void Renderer2D::DrawCircle(
+	Vector2f const& center,
+	const float radius,
+	Color const& color)
+{
+	m_api->DrawCircle(center, radius, color);
 }
 
 std::unique_ptr<IRenderAPI> Renderer2D::m_api = nullptr;

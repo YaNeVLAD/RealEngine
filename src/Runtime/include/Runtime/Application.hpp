@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 
-namespace re::runtime
+namespace re
 {
 
 class RE_RUNTIME_API Application

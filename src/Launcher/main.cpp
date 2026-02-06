@@ -2,7 +2,7 @@
 
 #include "LauncherApplication.hpp"
 
-re::runtime::Application* CreateApplication(int argc, char** argv)
+re::Application* CreateApplication(int argc, char** argv)
 {
 	return new LauncherApplication();
 }

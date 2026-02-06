@@ -25,7 +25,7 @@ Signature EntityWrapper<TScene>::GetSignature() const
 
 template <typename TScene>
 template <typename TComponent>
-EntityWrapper<TScene> EntityWrapper<TScene>::AddComponent(TComponent const& component)
+EntityWrapper<TScene> EntityWrapper<TScene>::Add(TComponent const& component)
 {
 	m_scene->template AddComponent<TComponent>(m_id, component);
 
@@ -34,7 +34,7 @@ EntityWrapper<TScene> EntityWrapper<TScene>::AddComponent(TComponent const& comp
 
 template <typename TScene>
 template <typename TComponent, typename... TArgs>
-EntityWrapper<TScene> EntityWrapper<TScene>::AddComponent(TArgs&&... args)
+EntityWrapper<TScene> EntityWrapper<TScene>::Add(TArgs&&... args)
 {
 	m_scene->template AddComponent<TComponent>(
 		m_id,
@@ -45,28 +45,28 @@ EntityWrapper<TScene> EntityWrapper<TScene>::AddComponent(TArgs&&... args)
 
 template <typename TScene>
 template <typename TComponent>
-TComponent& EntityWrapper<TScene>::GetComponent()
+TComponent& EntityWrapper<TScene>::Get()
 {
 	return m_scene->template GetComponent<TComponent>(m_id);
 }
 
 template <typename TScene>
 template <typename TComponent>
-TComponent const& EntityWrapper<TScene>::GetComponent() const
+TComponent const& EntityWrapper<TScene>::Get() const
 {
 	return m_scene->template GetComponent<TComponent>(m_id);
 }
 
 template <typename TScene>
 template <typename TComponent>
-bool EntityWrapper<TScene>::HasComponent() const
+bool EntityWrapper<TScene>::Has() const
 {
 	return m_scene->template HasComponent<TComponent>(m_id);
 }
 
 template <typename TScene>
 template <typename TComponent>
-void EntityWrapper<TScene>::RemoveComponent()
+void EntityWrapper<TScene>::Remove()
 {
 	m_scene->template RemoveComponent<TComponent>(m_id);
 }

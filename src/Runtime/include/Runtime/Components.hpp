@@ -3,27 +3,32 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 
-namespace re::runtime
+namespace re
 {
 
 struct TransformComponent
 {
-	core::Vector2f position = { 0.f, 0.f };
-	core::Vector2f scale = { 1.f, 1.f };
-
+	Vector2f position = { 0.f, 0.f };
 	float rotation = 0.f;
+	Vector2f scale = { 1.f, 1.f };
 };
 
-struct SpriteComponent
+struct CircleComponent
 {
-	core::Color color = core::Color::White;
-	core::Vector2f size = { 50.f, 50.f };
+	Color color = Color::White;
+	float radius = 50.f;
+};
+
+struct RectangleComponent
+{
+	Color color = Color::White;
+	Vector2f size = { 50.f, 50.f };
 };
 
 struct CameraComponent
 {
-	bool isPrimal = true;
 	float zoom = 1.f;
+	bool isPrimal = true;
 };
 
-} // namespace re::runtime
+} // namespace re

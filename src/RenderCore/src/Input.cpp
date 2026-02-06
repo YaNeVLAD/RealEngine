@@ -148,7 +148,7 @@ bool Input::IsMouseButtonPressed(const Mouse::Button button)
 	return sf::Mouse::isButtonPressed(MouseButtonToSfMouseButton(button));
 }
 
-core::Vector2i Input::GetMousePosition()
+Vector2i Input::GetMousePosition()
 {
 	const auto pos = sf::Mouse::getPosition();
 	return { pos.x, pos.y };
