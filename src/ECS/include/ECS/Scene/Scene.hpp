@@ -60,6 +60,11 @@ public:
 		return m_componentManager->IsComponentRegistered<T>();
 	}
 
+	bool IsValid(const Entity entity) const
+	{
+		return m_entityManager->IsValid(entity);
+	}
+
 	template <typename TComponent>
 	void AddComponent(Entity entity, TComponent const& component)
 	{

@@ -9,3 +9,10 @@ struct GravityComponent
 	float phaseTime = 0.0f;
 	bool isGrounded = false;
 };
+
+struct ChildComponent
+{
+	re::ecs::Entity parentEntity;
+	re::Vector2f localPosition = { 0.f, 0.f };
+	float localRotation = 0.0f;
+};

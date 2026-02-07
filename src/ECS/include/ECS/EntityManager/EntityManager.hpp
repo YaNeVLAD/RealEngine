@@ -27,7 +27,6 @@ public:
 
 	[[nodiscard]] std::vector<Entity> const& GetActiveEntities() const;
 
-private:
 	[[nodiscard]] bool IsValid(Entity entity) const;
 
 private:
