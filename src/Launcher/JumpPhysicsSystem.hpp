@@ -23,7 +23,7 @@ public:
 			if (physics.phaseTime > 0.0f)
 			{
 				physics.phaseTime -= dt;
-				return;
+				continue;
 			}
 
 			physics.velocity.y += GRAVITY * dt;

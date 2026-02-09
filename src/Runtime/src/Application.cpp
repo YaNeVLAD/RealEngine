@@ -24,8 +24,6 @@ Application::Application(std::string const& name)
 		throw std::runtime_error("Created window and render api are not compatible");
 	}
 
-	CurrentScene().RegisterComponents<TransformComponent, RectangleComponent, CameraComponent>();
-
 	m_scene.AddSystem<detail::RenderSystem2D>(*m_window)
 		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
 		.RunOnMainThread();

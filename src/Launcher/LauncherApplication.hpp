@@ -16,25 +16,25 @@ public:
 	LauncherApplication()
 		: Application("Launcher application")
 	{
-		using namespace re::runtime;
-
-		CurrentScene()
-			.AddSystem<JumpPhysicsSystem>()
-			.WithRead<re::TransformComponent>()
-			.WithWrite<GravityComponent>();
-
-		CurrentScene()
-			.AddSystem<HierarchySystem>()
-			.WithRead<ChildComponent>()
-			.WithWrite<re::TransformComponent>();
-
-		CurrentScene().BuildSystemGraph();
-
-		CreateLettersScene(CurrentScene());
 	}
 
 	void OnStart() override
 	{
+		CurrentScene()
+			.AddSystem<JumpPhysicsSystem>()
+			.WithRead<re::TransformComponent>()
+			.WithWrite<GravityComponent>()
+			.RunOnMainThread();
+
+		CurrentScene()
+			.AddSystem<HierarchySystem>()
+			.WithRead<ChildComponent>()
+			.WithWrite<re::TransformComponent>()
+			.RunOnMainThread();
+
+		CurrentScene().BuildSystemGraph();
+
+		CreateLettersScene(CurrentScene());
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override

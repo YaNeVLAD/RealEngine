@@ -1,36 +1,20 @@
 #pragma once
 
-#include <cstddef>
+#include <Core/Meta/TypeInfo.hpp>
 
-namespace re::ecs::details
-{
-
-class TypeIndexGenerator final
-{
-public:
-	template <typename>
-	static std::size_t Get()
-	{
-		static const std::size_t id = m_counter++;
-
-		return id;
-	}
-
-private:
-	inline static std::size_t m_counter = 0;
-};
-
-} // namespace re::ecs::details
+#include <typeinfo>
 
 namespace re::ecs
 {
 
-using TypeIndexType = std::size_t;
+using TypeIndexType = meta::TypeIndexType;
 
 template <typename T>
 TypeIndexType TypeIndex()
 {
-	return details::TypeIndexGenerator::Get<T>();
+	static const TypeIndexType id = TypeOf<T>().Index();
+
+	return id;
 }
 
 template <typename T>
