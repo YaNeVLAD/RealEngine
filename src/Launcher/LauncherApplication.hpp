@@ -48,6 +48,28 @@ public:
 		{
 			std::cout << "Resized from user app" << std::endl;
 		}
+		if (const auto* e = event.GetIf<re::Event::MouseButtonPressed>())
+		{
+			std::cout << "Mouse button pressed" << std::endl;
+			std::cout << "At " << e->position.x << ", " << e->position.y << std::endl;
+		}
+		if (const auto* e = event.GetIf<re::Event::MouseButtonReleased>())
+		{
+			std::cout << "Mouse button released" << std::endl;
+			std::cout << "At " << e->position.x << ", " << e->position.y << std::endl;
+		}
+		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
+		{
+			std::cout << "Key " << e->key << " pressed" << std::endl;
+		}
+		if (const auto* e = event.GetIf<re::Event::KeyReleased>())
+		{
+			std::cout << "Key " << e->key << " released" << std::endl;
+		}
+		// if (const auto* e = event.GetIf<re::Event::MouseMoved>())
+		// {
+		// 	std::cout << "MouseMoved to " << e->position.x << ", " << e->position.y << std::endl;
+		// }
 	}
 
 	void OnStop() override

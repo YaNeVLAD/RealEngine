@@ -18,6 +18,8 @@ public:
 
 	bool IsOpen() const override;
 
+	bool SetActive(bool active) override;
+
 	std::optional<Event> PollEvent() override;
 
 	void Clear() override;

@@ -13,7 +13,7 @@ namespace re
 Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
-	m_window = std::make_unique<render::SFMLWindow>(name, 1920u, 1080u);
+	m_window = std::make_unique<render::SFMLWindow>(name, 1024u, 680u);
 
 	if (auto* sfWindow = dynamic_cast<render::SFMLWindow&>(*m_window).GetSFMLWindow())
 	{
@@ -46,31 +46,82 @@ void Application::Run()
 
 	OnStart();
 
+	m_window->SetActive(false);
+
+	m_gameLoopThread = std::jthread(&Application::GameLoop, this);
+
+	while (m_isRunning)
+	{
+		while (const auto event = m_window->PollEvent())
+		{
+			if (const auto* resized = event->GetIf<Event::Resized>())
+			{
+				m_newWidth = resized->newSize.x;
+				m_newHeight = resized->newSize.y;
+				m_wasResized = true;
+
+				continue;
+			}
+
+			event->Visit(utils::overloaded{
+				[this](Event::Closed const&) {
+					Shutdown();
+				},
+				[](const auto&) {} });
+
+			{
+				std::lock_guard lock(m_eventMutex);
+				m_eventQueue.push(*event);
+			}
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+
+	OnStop();
+
+	if (m_gameLoopThread.joinable())
+	{
+		m_gameLoopThread.join();
+	}
+
+	m_window.reset();
+}
+
+void Application::GameLoop()
+{
+	m_window->SetActive(true);
+
 	auto lastTime = std::chrono::high_resolution_clock::now();
-	while (m_isRunning && m_window->IsOpen())
+	while (m_isRunning)
 	{
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
 		lastTime = currentTime;
 
-		while (const auto event = m_window->PollEvent())
 		{
-			event->Visit(utils::overloaded{
-				[this](Event::Closed const&) {
-					Shutdown();
-				},
-				[this](Event::Resized const& resized) {
-					render::Renderer2D::SetViewport(resized.newSize);
-				},
-				[](const auto&) {} });
+			if (m_wasResized.exchange(false))
+			{
+				Vector2u newSize = { m_newWidth, m_newHeight };
+				render::Renderer2D::SetViewport(newSize);
 
-			OnEvent(*event);
+				Event resizeEvent(Event::Resized{ newSize });
+				OnEvent(resizeEvent);
+			}
+
+			std::lock_guard lock(m_eventMutex);
+			while (!m_eventQueue.empty())
+			{
+				auto event = m_eventQueue.front();
+				m_eventQueue.pop();
+
+				OnEvent(event);
+			}
 		}
 
 		m_window->Clear();
 
 		m_scene.Frame(dt);
-
 		OnUpdate(dt);
 
 		m_window->Display();
@@ -78,9 +129,7 @@ void Application::Run()
 		m_scene.ConfirmChanges();
 	}
 
-	OnStop();
-
-	m_window.reset();
+	m_window->SetActive(false);
 }
 
 void Application::Shutdown()

@@ -16,7 +16,7 @@ bool Event::Is() const
 }
 
 template <typename TEventType>
-TEventType* Event::GetIf() const
+const TEventType* Event::GetIf() const
 {
 	return std::get_if<TEventType>(&m_data);
 }

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <Core/Math/Vector2.hpp>
+#include <RenderCore/Keyboard.hpp>
+#include <RenderCore/Mouse.hpp>
 
-#include <concepts>
 #include <variant>
 
 namespace re
@@ -20,6 +21,41 @@ public:
 		Vector2u newSize;
 	};
 
+	struct MouseButtonPressed
+	{
+		Mouse::Button button{};
+		Vector2i position;
+	};
+
+	struct MouseButtonReleased
+	{
+		Mouse::Button button{};
+		Vector2i position;
+	};
+
+	struct MouseMoved
+	{
+		Vector2i position;
+	};
+
+	struct KeyPressed
+	{
+		Keyboard::Key key{};
+
+		bool alt{};
+		bool ctrl{};
+		bool shift{};
+	};
+
+	struct KeyReleased
+	{
+		Keyboard::Key key{};
+
+		bool alt{};
+		bool ctrl{};
+		bool shift{};
+	};
+
 	template <typename TEventType>
 	explicit Event(TEventType const& data);
 
@@ -27,7 +63,7 @@ public:
 	[[nodiscard]] bool Is() const;
 
 	template <typename TEventType>
-	[[nodiscard]] TEventType* GetIf() const;
+	[[nodiscard]] const TEventType* GetIf() const;
 
 	template <typename TVisitor>
 	decltype(auto) Visit(TVisitor&& visitor) const;
@@ -35,7 +71,12 @@ public:
 private:
 	std::variant<
 		Closed,
-		Resized>
+		Resized,
+		KeyPressed,
+		KeyReleased,
+		MouseButtonPressed,
+		MouseButtonReleased,
+		MouseMoved>
 		m_data;
 };
 
