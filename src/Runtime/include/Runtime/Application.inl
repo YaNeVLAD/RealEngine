@@ -3,16 +3,35 @@
 namespace re
 {
 
-template <typename TScene>
-ecs::Scene& Application::CreateScene()
+template <std::derived_from<Layout> TLayout, typename... TArgs>
+void Application::AddLayout(TArgs&&... args)
 {
-	return AddSceneImpl(TypeOf<TScene>().Name());
+	const auto layoutsSize = m_layouts.size();
+
+	const auto type = TypeOf<TLayout>();
+	const auto hash = type.Hash();
+	const auto name = type.Name();
+
+	if (m_layouts.count(hash))
+	{
+		return;
+	}
+
+	auto& layout = *(m_layouts[hash] = std::make_shared<TLayout>(*this, std::forward<TArgs>(args)...));
+	layout.OnCreate();
+	SetupScene(layout);
+
+	if (layoutsSize == 0)
+	{
+		SwitchLayoutImpl(name);
+	}
 }
 
-template <typename TScene>
-void Application::ChangeScene()
+template <std::derived_from<Layout> TLayout>
+void Application::SwitchLayout()
 {
-	ChangeSceneImpl(TypeOf<TScene>().Name());
+	const auto name = TypeOf<TLayout>().Name();
+	SwitchLayoutImpl(name);
 }
 
 } // namespace re

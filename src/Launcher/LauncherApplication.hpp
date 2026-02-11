@@ -10,12 +10,41 @@
 #include "JumpPhysicsSystem.hpp"
 #include "Letters.hpp"
 
-struct LettersTag
+struct LettersLayout final : re::Layout
 {
+	using Layout::Layout;
+
+	void OnCreate() override
+	{
+		auto& scene = GetScene();
+		scene
+			.AddSystem<JumpPhysicsSystem>()
+			.WithRead<re::TransformComponent>()
+			.WithWrite<GravityComponent>()
+			.RunOnMainThread();
+
+		scene
+			.AddSystem<HierarchySystem>()
+			.WithRead<ChildComponent>()
+			.WithWrite<re::TransformComponent>()
+			.RunOnMainThread();
+
+		scene.BuildSystemGraph();
+		CreateLettersScene(scene);
+	}
 };
 
-struct MenuTag
+struct MenuLayout final : re::Layout
 {
+	using Layout::Layout;
+
+	void OnCreate() override
+	{
+		auto& scene = GetScene();
+		scene.CreateEntity()
+			.Add<re::TransformComponent>(re::Vector2f{}, 0.f, re::Vector2f{ 3.f, 1.f })
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 100, 100 });
+	}
 };
 
 class LauncherApplication final : public re::Application
@@ -28,28 +57,10 @@ public:
 
 	void OnStart() override
 	{
-		auto& letterScene = CreateScene<LettersTag>();
-		letterScene
-			.AddSystem<JumpPhysicsSystem>()
-			.WithRead<re::TransformComponent>()
-			.WithWrite<GravityComponent>()
-			.RunOnMainThread();
+		AddLayout<LettersLayout>();
+		AddLayout<MenuLayout>();
 
-		letterScene
-			.AddSystem<HierarchySystem>()
-			.WithRead<ChildComponent>()
-			.WithWrite<re::TransformComponent>()
-			.RunOnMainThread();
-
-		letterScene.BuildSystemGraph();
-		CreateLettersScene(letterScene);
-
-		auto& menuScene = CreateScene<MenuTag>();
-		menuScene.CreateEntity()
-			.Add<re::TransformComponent>(re::Vector2f{}, 0.f, re::Vector2f{ 3.f, 1.f })
-			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 100, 100 });
-
-		ChangeScene<MenuTag>();
+		SwitchLayout<MenuLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
@@ -59,38 +70,16 @@ public:
 
 	void OnEvent(re::Event const& event) override
 	{
-		if (event.Is<re::Event::Resized>())
-		{
-			std::cout << "Resized from user app" << std::endl;
-		}
-		if (const auto* e = event.GetIf<re::Event::MouseButtonPressed>())
-		{
-			std::cout << "Mouse button pressed" << std::endl;
-			std::cout << "At " << e->position.x << ", " << e->position.y << std::endl;
-		}
-		if (const auto* e = event.GetIf<re::Event::MouseButtonReleased>())
-		{
-			std::cout << "Mouse button released" << std::endl;
-			std::cout << "At " << e->position.x << ", " << e->position.y << std::endl;
-		}
 		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
 		{
 			if (e->key == re::Keyboard::Key::Enter)
 			{
-				ChangeScene<LettersTag>();
+				SwitchLayout<LettersLayout>();
 			}
 			if (e->key == re::Keyboard::Key::Escape)
 			{
-				ChangeScene<MenuTag>();
+				SwitchLayout<MenuLayout>();
 			}
-		}
-		if (const auto* e = event.GetIf<re::Event::KeyReleased>())
-		{
-			std::cout << "Key " << e->key << " released" << std::endl;
-		}
-		if (const auto* e = event.GetIf<re::Event::MouseMoved>())
-		{
-			std::cout << "MouseMoved to " << e->position.x << ", " << e->position.y << std::endl;
 		}
 	}
 

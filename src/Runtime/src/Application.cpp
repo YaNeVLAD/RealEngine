@@ -10,8 +10,9 @@
 namespace
 {
 
-struct DefaultTag
+struct DefaultTag final : re::Layout
 {
+	using Layout::Layout;
 };
 
 } // namespace
@@ -33,8 +34,8 @@ Application::Application(std::string const& name)
 		throw std::runtime_error("Created window and render api are not compatible");
 	}
 
-	CreateScene<DefaultTag>();
-	ChangeToPendingScene();
+	AddLayout<DefaultTag>();
+	ChangeToPendingLayout();
 }
 
 Application::~Application()
@@ -97,7 +98,7 @@ void Application::GameLoop()
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
-		ChangeToPendingScene();
+		ChangeToPendingLayout();
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
@@ -110,7 +111,12 @@ void Application::GameLoop()
 				render::Renderer2D::SetViewport(newSize);
 
 				Event resizeEvent(Event::Resized{ newSize });
+
 				OnEvent(resizeEvent);
+				if (m_currentLayout)
+				{
+					m_currentLayout->OnEvent(resizeEvent);
+				}
 			}
 
 			std::lock_guard lock(m_eventMutex);
@@ -120,82 +126,80 @@ void Application::GameLoop()
 				m_eventQueue.pop();
 
 				OnEvent(event);
+				if (m_currentLayout)
+				{
+					m_currentLayout->OnEvent(event);
+				}
 			}
 		}
 
 		m_window->Clear();
 
-		if (m_currentScene)
+		OnUpdate(dt);
+		if (m_currentLayout)
 		{
-			m_currentScene->Frame(dt);
-			OnUpdate(dt);
+			auto& scene = m_currentLayout->GetScene();
+			scene.Frame(dt);
+
+			m_currentLayout->OnUpdate(dt);
 
 			m_window->Display();
 
-			m_currentScene->ConfirmChanges();
+			scene.ConfirmChanges();
 		}
 	}
 
 	m_window->SetActive(false);
 }
 
-ecs::Scene& Application::AddSceneImpl(std::string const& name)
+void Application::SetupScene(Layout& layout) const
 {
-	const auto scenesCount = m_scenes.size();
-	const auto hash = meta::HashStr(name);
-
-	if (m_scenes.contains(hash))
-	{
-		return *m_scenes[hash];
-	}
-
-	const auto newScene = std::make_shared<ecs::Scene>();
-	newScene
-		->AddSystem<detail::RenderSystem2D>(*m_window)
+	auto& scene = layout.GetScene();
+	scene
+		.AddSystem<detail::RenderSystem2D>(*m_window)
 		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
 		.RunOnMainThread();
 
-	newScene
-		->CreateEntity()
+	scene
+		.CreateEntity()
 		.Add<CameraComponent>()
 		.Add<TransformComponent>();
 
-	newScene->BuildSystemGraph();
-
-	auto& scene = *(m_scenes[hash] = newScene);
-
-	if (scenesCount == 0)
-	{
-		ChangeScene(name);
-	}
-
-	return scene;
+	scene.BuildSystemGraph();
 }
 
-void Application::ChangeSceneImpl(std::string const& name)
+void Application::SwitchLayoutImpl(std::string const& name)
 {
 	const auto hash = meta::HashStr(name);
-	if (!m_scenes.contains(hash))
+	if (!m_layouts.contains(hash))
 	{
 		return;
 	}
 
-	m_pendingSceneHash = hash;
+	m_pendingLayoutHash = hash;
 }
 
-void Application::ChangeToPendingScene()
+void Application::ChangeToPendingLayout()
 {
-	if (m_pendingSceneHash == meta::InvalidTypeHash)
+	if (m_pendingLayoutHash == meta::InvalidTypeHash)
 	{
 		return;
 	}
 
-	if (const auto it = m_scenes.find(m_pendingSceneHash); it != m_scenes.end())
+	if (const auto it = m_layouts.find(m_pendingLayoutHash); it != m_layouts.end())
 	{
-		m_currentScene = it->second.get();
+		if (m_currentLayout)
+		{
+			m_currentLayout->OnDetach();
+		}
+
+		if (m_currentLayout = it->second.get(); m_currentLayout)
+		{
+			m_currentLayout->OnAttach();
+		}
 	}
 
-	m_pendingSceneHash = meta::InvalidTypeHash;
+	m_pendingLayoutHash = meta::InvalidTypeHash;
 }
 
 void Application::Shutdown()
@@ -203,19 +207,9 @@ void Application::Shutdown()
 	m_isRunning = false;
 }
 
-ecs::Scene& Application::CreateScene(std::string const& name)
+Layout& Application::CurrentLayout() const
 {
-	return AddSceneImpl(name);
-}
-
-void Application::ChangeScene(std::string const& name)
-{
-	ChangeSceneImpl(name);
-}
-
-ecs::Scene& Application::CurrentScene() const
-{
-	return *m_currentScene;
+	return *m_currentLayout;
 }
 
 render::IWindow& Application::Window() const

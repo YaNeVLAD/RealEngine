@@ -5,6 +5,7 @@
 #include <Core/Types.hpp>
 #include <ECS/Scene/Scene.hpp>
 #include <RenderCore/IWindow.hpp>
+#include <Runtime/Layout.hpp>
 
 #include <atomic>
 #include <memory>
@@ -35,28 +36,24 @@ public:
 	virtual void OnStop() = 0;
 
 protected:
-	template <typename TScene>
-	ecs::Scene& CreateScene();
+	template <std::derived_from<Layout> TLayout, typename... TArgs>
+	void AddLayout(TArgs&&... args);
 
-	ecs::Scene& CreateScene(std::string const& name);
+	template <std::derived_from<Layout> TLayout>
+	void SwitchLayout();
 
-	template <typename TScene>
-	void ChangeScene();
-
-	void ChangeScene(std::string const& name);
-
-	[[nodiscard]] ecs::Scene& CurrentScene() const;
+	[[nodiscard]] Layout& CurrentLayout() const;
 
 	[[nodiscard]] render::IWindow& Window() const;
 
 private:
 	void GameLoop();
 
-	ecs::Scene& AddSceneImpl(std::string const& name);
+	void SetupScene(Layout& layout) const;
 
-	void ChangeSceneImpl(std::string const& name);
+	void SwitchLayoutImpl(std::string const& name);
 
-	void ChangeToPendingScene();
+	void ChangeToPendingLayout();
 
 private:
 	std::atomic_bool m_isRunning;
@@ -65,10 +62,10 @@ private:
 	std::mutex m_eventMutex;
 	std::queue<Event> m_eventQueue;
 
-	std::unordered_map<meta::TypeHashType, std::shared_ptr<ecs::Scene>> m_scenes;
+	std::unordered_map<meta::TypeHashType, std::shared_ptr<Layout>> m_layouts;
 
-	ecs::Scene* m_currentScene = nullptr;
-	meta::TypeHashType m_pendingSceneHash = meta::InvalidTypeHash;
+	Layout* m_currentLayout = nullptr;
+	meta::TypeHashType m_pendingLayoutHash = meta::InvalidTypeHash;
 
 	std::atomic_bool m_wasResized{ false };
 	std::atomic_uint32_t m_newWidth{ 0 };
