@@ -63,7 +63,23 @@ public:
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
 	{
-		std::cout << 1.f / deltaTime << std::endl;
+		static float timeAccumulator = 0.0f;
+		static int frames = 0;
+
+		timeAccumulator += deltaTime;
+		frames++;
+
+		if (timeAccumulator >= 1.0f)
+		{
+			std::cout << "FPS: "
+					  << frames
+					  << " | ms: "
+					  << timeAccumulator / static_cast<float>(frames) * 1000.0f
+					  << std::endl;
+
+			frames = 0;
+			timeAccumulator = 0.0f;
+		}
 	}
 
 	void OnEvent(re::Event const& event) override
