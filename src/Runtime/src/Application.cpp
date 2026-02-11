@@ -24,15 +24,8 @@ Application::Application(std::string const& name)
 		throw std::runtime_error("Created window and render api are not compatible");
 	}
 
-	m_scene.AddSystem<detail::RenderSystem2D>(*m_window)
-		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
-		.RunOnMainThread();
-
-	m_scene.CreateEntity()
-		.Add<CameraComponent>()
-		.Add<TransformComponent>();
-
-	m_scene.BuildSystemGraph();
+	CreateScene("Default");
+	ChangeToPendingScene();
 }
 
 Application::~Application()
@@ -95,6 +88,8 @@ void Application::GameLoop()
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
+		ChangeToPendingScene();
+
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
 		lastTime = currentTime;
@@ -121,15 +116,77 @@ void Application::GameLoop()
 
 		m_window->Clear();
 
-		m_scene.Frame(dt);
-		OnUpdate(dt);
+		if (m_currentScene)
+		{
+			m_currentScene->Frame(dt);
+			OnUpdate(dt);
 
-		m_window->Display();
+			m_window->Display();
 
-		m_scene.ConfirmChanges();
+			m_currentScene->ConfirmChanges();
+		}
 	}
 
 	m_window->SetActive(false);
+}
+
+ecs::Scene& Application::AddSceneImpl(std::string const& name)
+{
+	const auto scenesCount = m_scenes.size();
+	const auto hash = meta::HashStr(name);
+
+	if (m_scenes.contains(hash))
+	{
+		return *m_scenes[hash];
+	}
+
+	const auto newScene = std::make_shared<ecs::Scene>();
+	newScene
+		->AddSystem<detail::RenderSystem2D>(*m_window)
+		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
+		.RunOnMainThread();
+
+	newScene
+		->CreateEntity()
+		.Add<CameraComponent>()
+		.Add<TransformComponent>();
+
+	newScene->BuildSystemGraph();
+
+	auto& scene = *(m_scenes[hash] = newScene);
+
+	if (scenesCount == 0)
+	{
+		ChangeScene(name);
+	}
+
+	return scene;
+}
+
+void Application::ChangeSceneImpl(std::string const& name)
+{
+	const auto hash = meta::HashStr(name);
+	if (!m_scenes.contains(hash))
+	{
+		return;
+	}
+
+	m_pendingSceneHash = hash;
+}
+
+void Application::ChangeToPendingScene()
+{
+	if (m_pendingSceneHash == meta::InvalidTypeHash)
+	{
+		return;
+	}
+
+	if (const auto it = m_scenes.find(m_pendingSceneHash); it != m_scenes.end())
+	{
+		m_currentScene = it->second.get();
+	}
+
+	m_pendingSceneHash = meta::InvalidTypeHash;
 }
 
 void Application::Shutdown()
@@ -137,9 +194,19 @@ void Application::Shutdown()
 	m_isRunning = false;
 }
 
-ecs::Scene& Application::CurrentScene()
+ecs::Scene& Application::CreateScene(std::string const& name)
 {
-	return m_scene;
+	return AddSceneImpl(name);
+}
+
+void Application::ChangeScene(std::string const& name)
+{
+	ChangeSceneImpl(name);
+}
+
+ecs::Scene& Application::CurrentScene() const
+{
+	return *m_currentScene;
 }
 
 render::IWindow& Application::Window() const

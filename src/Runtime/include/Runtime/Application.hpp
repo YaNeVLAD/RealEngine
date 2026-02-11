@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 namespace re
 {
@@ -34,12 +35,28 @@ public:
 	virtual void OnStop() = 0;
 
 protected:
-	[[nodiscard]] ecs::Scene& CurrentScene();
+	template <typename TScene>
+	ecs::Scene& CreateScene();
+
+	ecs::Scene& CreateScene(std::string const& name);
+
+	template <typename TScene>
+	void ChangeScene();
+
+	void ChangeScene(std::string const& name);
+
+	[[nodiscard]] ecs::Scene& CurrentScene() const;
 
 	[[nodiscard]] render::IWindow& Window() const;
 
 private:
 	void GameLoop();
+
+	ecs::Scene& AddSceneImpl(std::string const& name);
+
+	void ChangeSceneImpl(std::string const& name);
+
+	void ChangeToPendingScene();
 
 private:
 	std::atomic_bool m_isRunning;
@@ -48,7 +65,10 @@ private:
 	std::mutex m_eventMutex;
 	std::queue<Event> m_eventQueue;
 
-	ecs::Scene m_scene;
+	std::unordered_map<meta::TypeHashType, std::shared_ptr<ecs::Scene>> m_scenes;
+
+	ecs::Scene* m_currentScene = nullptr;
+	meta::TypeHashType m_pendingSceneHash = meta::InvalidTypeHash;
 
 	std::atomic_bool m_wasResized{ false };
 	std::atomic_uint32_t m_newWidth{ 0 };
@@ -58,3 +78,5 @@ private:
 };
 
 } // namespace re
+
+#include <Runtime/Application.inl>

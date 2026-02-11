@@ -10,6 +10,14 @@
 #include "JumpPhysicsSystem.hpp"
 #include "Letters.hpp"
 
+struct LettersTag
+{
+};
+
+struct MenuTag
+{
+};
+
 class LauncherApplication final : public re::Application
 {
 public:
@@ -20,21 +28,28 @@ public:
 
 	void OnStart() override
 	{
-		CurrentScene()
+		auto& letterScene = CreateScene<LettersTag>();
+		letterScene
 			.AddSystem<JumpPhysicsSystem>()
 			.WithRead<re::TransformComponent>()
 			.WithWrite<GravityComponent>()
 			.RunOnMainThread();
 
-		CurrentScene()
+		letterScene
 			.AddSystem<HierarchySystem>()
 			.WithRead<ChildComponent>()
 			.WithWrite<re::TransformComponent>()
 			.RunOnMainThread();
 
-		CurrentScene().BuildSystemGraph();
+		letterScene.BuildSystemGraph();
+		CreateLettersScene(letterScene);
 
-		CreateLettersScene(CurrentScene());
+		auto& menuScene = CreateScene<MenuTag>();
+		menuScene.CreateEntity()
+			.Add<re::TransformComponent>(re::Vector2f{}, 0.f, re::Vector2f{ 3.f, 1.f })
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 100, 100 });
+
+		ChangeScene<MenuTag>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
@@ -60,16 +75,23 @@ public:
 		}
 		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
 		{
-			std::cout << "Key " << e->key << " pressed" << std::endl;
+			if (e->key == re::Keyboard::Key::Enter)
+			{
+				ChangeScene<LettersTag>();
+			}
+			if (e->key == re::Keyboard::Key::Escape)
+			{
+				ChangeScene<MenuTag>();
+			}
 		}
 		if (const auto* e = event.GetIf<re::Event::KeyReleased>())
 		{
 			std::cout << "Key " << e->key << " released" << std::endl;
 		}
-		// if (const auto* e = event.GetIf<re::Event::MouseMoved>())
-		// {
-		// 	std::cout << "MouseMoved to " << e->position.x << ", " << e->position.y << std::endl;
-		// }
+		if (const auto* e = event.GetIf<re::Event::MouseMoved>())
+		{
+			std::cout << "MouseMoved to " << e->position.x << ", " << e->position.y << std::endl;
+		}
 	}
 
 	void OnStop() override

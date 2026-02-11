@@ -14,6 +14,8 @@ namespace re::meta
 using TypeHashType = std::size_t;
 using TypeIndexType = std::size_t;
 
+constexpr TypeHashType InvalidTypeHash = std::numeric_limits<TypeHashType>::max();
+
 struct TypeInfo
 {
 	TypeHashType hash{};
