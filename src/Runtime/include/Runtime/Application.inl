@@ -12,7 +12,7 @@ void Application::AddLayout(TArgs&&... args)
 	const auto hash = type.Hash();
 	const auto name = type.Name();
 
-	if (m_layouts.count(hash))
+	if (m_layouts.contains(hash))
 	{
 		return;
 	}
