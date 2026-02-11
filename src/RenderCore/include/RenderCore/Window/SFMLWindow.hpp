@@ -20,6 +20,8 @@ public:
 
 	bool SetActive(bool active) override;
 
+	void SetTitle(std::string const& title) override;
+
 	std::optional<Event> PollEvent() override;
 
 	void Clear() override;

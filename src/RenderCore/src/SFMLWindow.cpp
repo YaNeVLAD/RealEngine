@@ -21,6 +21,11 @@ bool SFMLWindow::SetActive(const bool active)
 	return m_window.setActive(active);
 }
 
+void SFMLWindow::SetTitle(std::string const& title)
+{
+	m_window.setTitle(title);
+}
+
 std::optional<Event> SFMLWindow::PollEvent()
 {
 	if (const auto event = m_window.pollEvent())

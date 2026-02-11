@@ -4,6 +4,7 @@
 #include <Runtime/Components.hpp>
 
 #include <iostream>
+#include <sstream>
 
 #include "Components.hpp"
 #include "HierarchySystem.hpp"
@@ -71,11 +72,11 @@ public:
 
 		if (timeAccumulator >= 1.0f)
 		{
-			std::cout << "FPS: "
-					  << frames
-					  << " | ms: "
-					  << timeAccumulator / static_cast<float>(frames) * 1000.0f
-					  << std::endl;
+			const auto fps = std::format("FPS: {} | ms: {}",
+				frames,
+				timeAccumulator / static_cast<float>(frames) * 1000.0f);
+
+			Window().SetTitle(fps);
 
 			frames = 0;
 			timeAccumulator = 0.0f;
