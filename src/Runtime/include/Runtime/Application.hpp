@@ -65,6 +65,7 @@ private:
 	std::unordered_map<meta::TypeHashType, std::shared_ptr<Layout>> m_layouts;
 
 	Layout* m_currentLayout = nullptr;
+	meta::TypeHashType m_currentLayoutHash = meta::InvalidTypeHash;
 	meta::TypeHashType m_pendingLayoutHash = meta::InvalidTypeHash;
 
 	std::atomic_bool m_wasResized{ false };

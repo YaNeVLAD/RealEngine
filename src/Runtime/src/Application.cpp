@@ -98,7 +98,10 @@ void Application::GameLoop()
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
-		ChangeToPendingLayout();
+		if (m_pendingLayoutHash != meta::InvalidTypeHash)
+		{
+			ChangeToPendingLayout();
+		}
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
@@ -171,6 +174,11 @@ void Application::SetupScene(Layout& layout) const
 void Application::SwitchLayoutImpl(std::string const& name)
 {
 	const auto hash = meta::HashStr(name);
+	if (m_pendingLayoutHash == hash || m_currentLayoutHash == hash)
+	{
+		return;
+	}
+
 	if (!m_layouts.contains(hash))
 	{
 		return;
@@ -197,6 +205,8 @@ void Application::ChangeToPendingLayout()
 		{
 			m_currentLayout->OnAttach();
 		}
+
+		m_currentLayoutHash = m_pendingLayoutHash;
 	}
 
 	m_pendingLayoutHash = meta::InvalidTypeHash;

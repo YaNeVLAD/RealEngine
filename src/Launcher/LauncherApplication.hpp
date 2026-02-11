@@ -20,14 +20,12 @@ struct LettersLayout final : re::Layout
 		scene
 			.AddSystem<JumpPhysicsSystem>()
 			.WithRead<re::TransformComponent>()
-			.WithWrite<GravityComponent>()
-			.RunOnMainThread();
+			.WithWrite<GravityComponent>();
 
 		scene
 			.AddSystem<HierarchySystem>()
 			.WithRead<ChildComponent>()
-			.WithWrite<re::TransformComponent>()
-			.RunOnMainThread();
+			.WithWrite<re::TransformComponent>();
 
 		scene.BuildSystemGraph();
 		CreateLettersScene(scene);
