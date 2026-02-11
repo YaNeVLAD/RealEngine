@@ -22,6 +22,8 @@ public:
 
 	void SetTitle(std::string const& title) override;
 
+	Vector2f ToWorldPos(Vector2i const& pixelPos) override;
+
 	std::optional<Event> PollEvent() override;
 
 	void Clear() override;

@@ -35,9 +35,21 @@ using Vector2f = Vector2<float>;
 using Vector2d = Vector2<double>;
 
 template <typename T>
-constexpr Vector2<T> operator+(Vector2<T> left, Vector2<T> right)
+[[nodiscard]] constexpr Vector2<T> operator+(Vector2<T> left, Vector2<T> right)
 {
 	return Vector2<T>(left.x + right.x, left.y + right.y);
+}
+
+template <typename T>
+[[nodiscard]] constexpr Vector2<T> operator-(Vector2<T> left, Vector2<T> right)
+{
+	return Vector2<T>(left.x - right.x, left.y - right.y);
+}
+
+template <typename T>
+[[nodiscard]] constexpr Vector2<T> operator*(Vector2<T> left, T right)
+{
+	return Vector2<T>(left.x * right, left.y * right);
 }
 
 } // namespace re

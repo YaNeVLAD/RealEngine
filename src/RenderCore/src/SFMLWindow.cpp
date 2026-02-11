@@ -26,6 +26,12 @@ void SFMLWindow::SetTitle(std::string const& title)
 	m_window.setTitle(title);
 }
 
+Vector2f SFMLWindow::ToWorldPos(Vector2i const& pixelPos)
+{
+	const sf::Vector2f worldPos = m_window.mapPixelToCoords(sf::Vector2i(pixelPos.x, pixelPos.y));
+	return Vector2f{ worldPos.x, worldPos.y };
+}
+
 std::optional<Event> SFMLWindow::PollEvent()
 {
 	if (const auto event = m_window.pollEvent())
