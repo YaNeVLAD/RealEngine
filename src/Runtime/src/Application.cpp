@@ -7,6 +7,15 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
 
+namespace
+{
+
+struct DefaultTag
+{
+};
+
+} // namespace
+
 namespace re
 {
 
@@ -24,7 +33,7 @@ Application::Application(std::string const& name)
 		throw std::runtime_error("Created window and render api are not compatible");
 	}
 
-	CreateScene("Default");
+	CreateScene<DefaultTag>();
 	ChangeToPendingScene();
 }
 
