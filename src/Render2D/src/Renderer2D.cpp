@@ -54,6 +54,11 @@ void Renderer2D::DrawCircle(
 	m_api->DrawCircle(center, radius, color);
 }
 
+void Renderer2D::DrawText(std::string const& text, Font const& font, Vector2f pos, float size, Color color)
+{
+	m_api->DrawText(text, font, pos, size, color);
+}
+
 std::unique_ptr<IRenderAPI> Renderer2D::m_api = nullptr;
 
 } // namespace re::render

@@ -3,7 +3,7 @@
 #include <ECS/Scene/Scene.hpp>
 #include <Runtime/Components.hpp>
 
-#include "Components.hpp"
+#include "../../Components.hpp"
 
 class JumpPhysicsSystem final : public re::ecs::System
 {

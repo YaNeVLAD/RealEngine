@@ -1,8 +1,8 @@
 add_executable(ReLauncher main.cpp
         Components.hpp
         HierarchySystem.hpp
-        JumpPhysicsSystem.hpp
-        Letters.hpp
+        Lab1/Letters/JumpPhysicsSystem.hpp
+        Lab1/Letters/LettersLayout.hpp
         LauncherApplication.hpp)
 
 set_target_properties(ReLauncher

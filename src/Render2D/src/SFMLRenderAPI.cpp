@@ -99,4 +99,21 @@ void SFMLRenderAPI::DrawCircle(
 	m_window.draw(circle);
 }
 
+void SFMLRenderAPI::DrawText(
+	std::string const& text,
+	Font const& font,
+	Vector2f const& pos,
+	const float fontSize,
+	Color const& color)
+{
+	Flush();
+
+	sf::Text sfText(font.GetSfFont(), text, static_cast<unsigned>(fontSize));
+	sfText.setOrigin({ pos.x / 2, pos.y / 2 });
+	sfText.setFillColor(sf::Color(color.ToInt()));
+	sfText.setPosition({ pos.x, pos.y });
+
+	m_window.draw(sfText);
+}
+
 } // namespace re::render

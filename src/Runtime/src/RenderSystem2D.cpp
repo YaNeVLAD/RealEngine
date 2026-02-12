@@ -53,6 +53,21 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 			circle.color);
 	}
 
+	for (auto&& [_, transform, textComp] : *scene.CreateView<TransformComponent, TextComponent>())
+	{
+		if (textComp.font)
+		{
+			const float finalSize = textComp.size * transform.scale.x;
+
+			render::Renderer2D::DrawText(
+				textComp.text,
+				*textComp.font,
+				transform.position,
+				finalSize,
+				textComp.color);
+		}
+	}
+
 	render::Renderer2D::EndScene();
 }
 

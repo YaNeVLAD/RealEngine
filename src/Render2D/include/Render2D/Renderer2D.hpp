@@ -35,6 +35,13 @@ public:
 		float radius,
 		Color const& color);
 
+	static void DrawText(
+		std::string const& text,
+		Font const& font,
+		Vector2f pos,
+		float size,
+		Color color);
+
 private:
 	static Vector2u m_viewportSize;
 

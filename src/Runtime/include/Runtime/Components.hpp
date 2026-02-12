@@ -2,6 +2,7 @@
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
+#include <RenderCore/Assets/Font.hpp>
 
 namespace re
 {
@@ -23,6 +24,14 @@ struct RectangleComponent
 {
 	Color color = Color::White;
 	Vector2f size = { 50.f, 50.f };
+};
+
+struct TextComponent
+{
+	std::string text;
+	std::shared_ptr<Font> font;
+	Color color = Color::White;
+	float size = 24.f;
 };
 
 struct CameraComponent

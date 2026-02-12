@@ -1,11 +1,14 @@
 #pragma once
 
 #include <Render2D/Export.hpp>
-#include <vector>
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
+#include <RenderCore/Assets/Font.hpp>
 #include <RenderCore/IRenderAPI.hpp>
+
+#include <string>
+#include <vector>
 
 namespace sf
 {
@@ -32,6 +35,8 @@ public:
 	void DrawQuad(Vector2f const& pos, Vector2f const& size, float rotation, Color const& color) override;
 
 	void DrawCircle(Vector2f const& center, float radius, Color const& color) override;
+
+	void DrawText(std::string const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) override;
 
 private:
 	static constexpr std::size_t MAX_QUAD_COUNT = 1024;
