@@ -126,6 +126,7 @@ void SFMLRenderAPI::DrawTexturedQuad(
 
 	sf::RectangleShape rect(sf::Vector2f(size.x, size.y));
 	rect.setPosition({ pos.x, pos.y });
+	rect.setOrigin({ size.x / 2, size.y / 2 });
 	rect.setFillColor(sf::Color(tint.ToInt()));
 
 	if (texture)

@@ -32,6 +32,8 @@ inline void AttachChild(
 
 } // namespace detail
 
+// Поменять шрифт, сделать сложнее
+// Букву K усложнить
 struct LettersLayout final : re::Layout
 {
 	using Layout::Layout;
@@ -60,7 +62,7 @@ private:
 
 		const auto root = scene.CreateEntity()
 							  .Add<TransformComponent>(detail::START_POS, 0.0f)
-							  .Add<RectangleComponent>(detail::COLOR_K, Vector2f{ 40.0f, 200.0f })
+							  .Add<RectangleComponent>(detail::COLOR_K, Vector2f{ 50.0f, 200.0f })
 							  .Add<GravityComponent>(Vector2f{ 0, 0 }, 0.f, 0.0f);
 
 		detail::AttachChild(scene, root, { 40.f, -50.f }, 45.0f, [](auto e) {
@@ -84,12 +86,12 @@ private:
 
 		const auto root = scene.CreateEntity()
 							  .Add<TransformComponent>(pos, 0.0f)
-							  .Add<RectangleComponent>(color, Vector2f{ 40.0f, 200.0f })
+							  .Add<RectangleComponent>(color, Vector2f{ 50.0f, 200.0f })
 							  .Add<GravityComponent>(Vector2f{ 0, 0 }, 0.f, phase);
 
 		constexpr float TOP_RADIUS = 50.0f;
 		constexpr float BOTTOM_RADIUS = 60.0f;
-		constexpr float HOLE_FACTOR = 0.55f;
+		constexpr float HOLE_FACTOR = 0.4f;
 
 		detail::AttachChild(scene, root, { 30.f, -50.f }, 0.0f, [&](auto e) {
 			e.template Add<CircleComponent>(color, TOP_RADIUS);

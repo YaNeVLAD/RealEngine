@@ -4,6 +4,7 @@
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
+#include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/House/HouseLayout.hpp"
 #include "Lab1/Letters/LettersLayout.hpp"
 
@@ -37,9 +38,10 @@ public:
 
 	void OnStart() override
 	{
-		AddLayout<LettersLayout>();
 		AddLayout<MenuLayout>();
+		AddLayout<LettersLayout>();
 		AddLayout<HouseLayout>(Window());
+		AddLayout<CircleLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -69,7 +71,6 @@ public:
 	{
 		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
 		{
-
 			if (e->key == re::Keyboard::Key::Num1)
 			{
 				SwitchLayout<MenuLayout>();
@@ -81,6 +82,19 @@ public:
 			if (e->key == re::Keyboard::Key::Num3)
 			{
 				SwitchLayout<HouseLayout>();
+			}
+			if (e->key == re::Keyboard::Key::Num4)
+			{
+				SwitchLayout<CircleLayout>();
+			}
+		}
+
+		if (const auto* e = event.GetIf<re::Event::MouseWheelScrolled>())
+		{
+			for (auto&& [entity, camera] : *CurrentScene().CreateView<re::CameraComponent>())
+			{
+				const auto newZoom = camera.zoom + e->delta;
+				camera.zoom = std::max(newZoom, 0.1f);
 			}
 		}
 	}

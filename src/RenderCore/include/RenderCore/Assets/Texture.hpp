@@ -18,7 +18,7 @@ class RE_RENDER_CORE_API Texture
 public:
 	Texture(std::uint32_t width, std::uint32_t height);
 
-	void SetData(void* data, std::uint32_t size);
+	void SetData(const std::uint8_t* data, std::uint32_t size);
 
 	[[nodiscard]] std::uint32_t Width() const;
 	[[nodiscard]] std::uint32_t Height() const;

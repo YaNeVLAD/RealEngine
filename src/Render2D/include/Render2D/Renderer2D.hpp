@@ -40,7 +40,13 @@ public:
 		Font const& font,
 		Vector2f pos,
 		float size,
-		Color color);
+		Color const& color);
+
+	static void DrawTexturedQuad(
+		Vector2f const& pos,
+		Vector2f const& size,
+		Texture* texture,
+		Color tint);
 
 private:
 	static Vector2u m_viewportSize;

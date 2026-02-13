@@ -11,7 +11,7 @@ public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
 		constexpr float GRAVITY = 2000.0f;
-		constexpr float JUMP_FORCE = -900.0f;
+		constexpr float JUMP_SPEED = -900.0f;
 
 		for (auto&& [_, transform, physics] : *scene.CreateView<re::TransformComponent, GravityComponent>())
 		{
@@ -32,7 +32,7 @@ public:
 			if (transform.position.y >= physics.startY)
 			{
 				transform.position.y = physics.startY;
-				physics.velocity.y = JUMP_FORCE;
+				physics.velocity.y = JUMP_SPEED;
 			}
 		}
 	}

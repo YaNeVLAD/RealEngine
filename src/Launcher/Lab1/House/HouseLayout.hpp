@@ -8,6 +8,7 @@
 #include "../../Components.hpp"
 #include "../../HierarchySystem.hpp"
 
+// Поправить поведение при ресайзе окна
 struct HouseLayout final : re::Layout
 {
 	HouseLayout(re::Application& app, re::render::IWindow& window)
@@ -23,6 +24,8 @@ struct HouseLayout final : re::Layout
 			.AddSystem<HierarchySystem>()
 			.WithRead<ChildComponent>()
 			.WithWrite<re::TransformComponent>();
+
+		scene.BuildSystemGraph();
 
 		m_rootEntity = std::make_unique<re::ecs::EntityWrapper<re::ecs::Scene>>(scene.CreateEntity());
 		m_rootEntity->Add<re::TransformComponent>();
@@ -96,20 +99,12 @@ private:
 							  re::Vector2f localPos,
 							  float localRot,
 							  re::Color color,
-							  re::Vector2f size,
-							  const bool isCircle = false) {
+							  re::Vector2f size) {
 			auto entity = scene.CreateEntity();
 			entity.Add<ChildComponent>(m_rootEntity->GetEntity(), localPos, localRot);
 			entity.Add<re::TransformComponent>();
 
-			if (isCircle)
-			{
-				entity.Add<re::CircleComponent>(color, size.x / 2.f);
-			}
-			else
-			{
-				entity.Add<re::RectangleComponent>(color, size);
-			}
+			entity.Add<re::RectangleComponent>(color, size);
 
 			return entity;
 		};
@@ -122,18 +117,15 @@ private:
 		constexpr auto frameColor = re::Color{ 255, 250, 250 };
 
 		createPart({ 35.f, -90.f }, 0.f, chimneyColor, { 25.f, 50.f });
+		createPart({ 0.f, -49.f }, 45, rootColor, { 105.f, 105.f });
 
-		createPart({ 0.f, 0.f }, 0.f, wallColor, { 120.f, 100.f });
+		createPart({ 0.f, 0.f }, 0.f, wallColor, { 149.f, 100.f });
 
-		// Replace with triangle
-		createPart({ 0.f, -70.f }, 3.14159f / 4.f, rootColor, { 100.f, 100.f });
-
-		createPart({ 0.f, 30.f }, 0.f, doorColor, { 36.f, 60.f });
-		createPart({ 12.f, 30.f }, 0.f, re::Color::Black, { 6.f, 6.f }, true); // Ручка
+		createPart({ 0.f, 20.f }, 0.f, doorColor, { 30.f, 60.f });
 
 		auto makeWindow = [&](const float xOffset) {
-			createPart({ xOffset, -10.f }, 0.f, frameColor, { 34.f, 34.f }); // Рама
-			createPart({ xOffset, -10.f }, 0.f, windowColor, { 28.f, 28.f }); // Стекло
+			createPart({ xOffset, -10.f }, 0.f, frameColor, { 34.f, 34.f });
+			createPart({ xOffset, -10.f }, 0.f, windowColor, { 28.f, 28.f });
 
 			createPart({ xOffset, -10.f }, 0.f, frameColor, { 28.f, 4.f });
 			createPart({ xOffset, -10.f }, 0.f, frameColor, { 4.f, 28.f });
@@ -158,11 +150,6 @@ private:
 			if (scene.HasComponent<re::RectangleComponent>(entity))
 			{
 				size = scene.GetComponent<re::RectangleComponent>(entity).size;
-			}
-			else if (scene.HasComponent<re::CircleComponent>(entity))
-			{
-				const float r = scene.GetComponent<re::CircleComponent>(entity).radius;
-				size = { r * 2.f, r * 2.f };
 			}
 
 			if (child.localRotation != 0.f)

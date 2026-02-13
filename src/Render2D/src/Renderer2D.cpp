@@ -54,9 +54,23 @@ void Renderer2D::DrawCircle(
 	m_api->DrawCircle(center, radius, color);
 }
 
-void Renderer2D::DrawText(std::string const& text, Font const& font, Vector2f pos, float size, Color color)
+void Renderer2D::DrawText(
+	std::string const& text,
+	Font const& font,
+	const Vector2f pos,
+	const float size,
+	Color const& color)
 {
 	m_api->DrawText(text, font, pos, size, color);
+}
+
+void Renderer2D::DrawTexturedQuad(
+	Vector2f const& pos,
+	Vector2f const& size,
+	Texture* texture,
+	const Color tint)
+{
+	m_api->DrawTexturedQuad(pos, size, texture, tint);
 }
 
 std::unique_ptr<IRenderAPI> Renderer2D::m_api = nullptr;

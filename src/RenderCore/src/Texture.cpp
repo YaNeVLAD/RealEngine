@@ -1,5 +1,7 @@
 #include <RenderCore/Assets/Texture.hpp>
 
+#include <Core/Math/Color.hpp>
+
 #include <SFML/Graphics/Texture.hpp>
 
 namespace re
@@ -15,9 +17,12 @@ Texture::Texture(std::uint32_t width, std::uint32_t height)
 	}
 }
 
-void Texture::SetData(void* data, std::uint32_t size)
+void Texture::SetData(const std::uint8_t* data, const std::uint32_t size)
 {
-	m_texture->update(static_cast<const std::uint8_t*>(data));
+	if (size == m_width * m_height * sizeof(Color))
+	{
+		m_texture->update(data);
+	}
 }
 
 std::uint32_t Texture::Width() const

@@ -28,6 +28,7 @@ public:
 
 	[[nodiscard]] std::uint32_t Width() const;
 	[[nodiscard]] std::uint32_t Height() const;
+	[[nodiscard]] std::uint32_t Size() const;
 
 	[[nodiscard]] bool IsEmpty() const;
 

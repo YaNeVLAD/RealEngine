@@ -68,6 +68,39 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 		}
 	}
 
+	for (auto&& [_, transform, comp] : *scene.CreateView<TransformComponent, DynamicTextureComponent>())
+	{
+		if (comp.isDirty && !comp.image.IsEmpty())
+		{
+			if (!comp.texture
+				|| comp.texture->Width() != comp.image.Width()
+				|| comp.texture->Height() != comp.image.Height())
+			{
+				comp.texture = std::make_shared<re::Texture>(
+					comp.image.Width(),
+					comp.image.Height());
+			}
+
+			comp.texture->SetData(comp.image.Data(), comp.image.Size());
+
+			comp.isDirty = false;
+		}
+
+		if (comp.texture)
+		{
+			Vector2f size = {
+				static_cast<float>(comp.texture->Width()) * transform.scale.x,
+				static_cast<float>(comp.texture->Height()) * transform.scale.y
+			};
+
+			render::Renderer2D::DrawTexturedQuad(
+				transform.position,
+				size,
+				comp.texture.get(),
+				Color::White);
+		}
+	}
+
 	render::Renderer2D::EndScene();
 }
 

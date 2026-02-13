@@ -36,11 +36,11 @@ struct TextComponent
 	float size = 24.f;
 };
 
-struct ImageComponent
+struct DynamicTextureComponent
 {
 	Image image;
 	std::shared_ptr<Texture> texture = nullptr;
-	bool isDirty = false;
+	bool isDirty = true;
 };
 
 struct CameraComponent

@@ -23,11 +23,11 @@ void Image::SetPixel(const std::uint32_t x, const std::uint32_t y, const Color c
 		return;
 	}
 
-	const size_t index = (y * m_width + x) * 4;
-	m_data[index + 0] = color.r * 255;
-	m_data[index + 1] = color.g * 255;
-	m_data[index + 2] = color.b * 255;
-	m_data[index + 3] = color.a * 255;
+	const size_t index = (y * m_width + x) * sizeof(Color);
+	m_data[index + 0] = color.r;
+	m_data[index + 1] = color.g;
+	m_data[index + 2] = color.b;
+	m_data[index + 3] = color.a;
 }
 
 Color Image::GetPixel(const std::uint32_t x, const std::uint32_t y) const
@@ -37,7 +37,7 @@ Color Image::GetPixel(const std::uint32_t x, const std::uint32_t y) const
 		return Color::Transparent;
 	}
 
-	const size_t index = (y * m_width + x) * 4;
+	const size_t index = (y * m_width + x) * sizeof(Color);
 	return Color{
 		m_data[index + 0],
 		m_data[index + 1],
@@ -49,9 +49,11 @@ Color Image::GetPixel(const std::uint32_t x, const std::uint32_t y) const
 void Image::Fill(Color const& fillColor)
 {
 	if (m_data.empty())
+	{
 		return;
+	}
 
-	const uint8_t pixel[4] = {
+	const uint8_t pixel[sizeof(Color)] = {
 		static_cast<uint8_t>(fillColor.r),
 		static_cast<uint8_t>(fillColor.g),
 		static_cast<uint8_t>(fillColor.b),
@@ -77,6 +79,11 @@ std::uint32_t Image::Width() const
 std::uint32_t Image::Height() const
 {
 	return m_height;
+}
+
+std::uint32_t Image::Size() const
+{
+	return m_width * m_height * sizeof(Color);
 }
 
 bool Image::IsEmpty() const

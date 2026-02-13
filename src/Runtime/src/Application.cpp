@@ -160,7 +160,12 @@ void Application::SetupScene(Layout& layout) const
 	auto& scene = layout.GetScene();
 	scene
 		.AddSystem<detail::RenderSystem2D>(*m_window)
-		.WithRead<TransformComponent, RectangleComponent, CircleComponent>()
+		.WithRead<
+			TransformComponent,
+			RectangleComponent,
+			CircleComponent,
+			DynamicTextureComponent>()
+		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
 
 	scene
