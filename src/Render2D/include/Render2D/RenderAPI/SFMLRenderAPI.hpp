@@ -38,6 +38,8 @@ public:
 
 	void DrawText(std::string const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) override;
 
+	void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) override;
+
 private:
 	static constexpr std::size_t MAX_QUAD_COUNT = 1024;
 

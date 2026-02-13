@@ -42,7 +42,7 @@ protected:
 	template <std::derived_from<Layout> TLayout>
 	void SwitchLayout();
 
-	[[nodiscard]] Layout& CurrentLayout() const;
+	[[nodiscard]] ecs::Scene& CurrentScene() const;
 
 	[[nodiscard]] render::IWindow& Window() const;
 

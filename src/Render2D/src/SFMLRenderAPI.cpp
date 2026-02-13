@@ -116,4 +116,25 @@ void SFMLRenderAPI::DrawText(
 	m_window.draw(sfText);
 }
 
+void SFMLRenderAPI::DrawTexturedQuad(
+	Vector2f const& pos,
+	Vector2f const& size,
+	Texture* texture,
+	Color const& tint)
+{
+	Flush();
+
+	sf::RectangleShape rect(sf::Vector2f(size.x, size.y));
+	rect.setPosition({ pos.x, pos.y });
+	rect.setFillColor(sf::Color(tint.ToInt()));
+
+	if (texture)
+	{
+		const auto sfTexture = static_cast<sf::Texture*>(texture->GetNativeHandle());
+		rect.setTexture(sfTexture);
+	}
+
+	m_window.draw(rect);
+}
+
 } // namespace re::render

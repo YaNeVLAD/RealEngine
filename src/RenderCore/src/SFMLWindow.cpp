@@ -79,6 +79,15 @@ std::optional<Event> SFMLWindow::PollEvent()
 			const auto position = Vector2i{ mouseMoved->position.x, mouseMoved->position.y };
 			return Event(Event::MouseMoved{ position });
 		}
+		if (const auto* mouseWheelScrolled = event->getIf<sf::Event::MouseWheelScrolled>())
+		{
+			const auto delta = mouseWheelScrolled->delta;
+			const auto position = Vector2i{ mouseWheelScrolled->position.x, mouseWheelScrolled->position.y };
+			if (mouseWheelScrolled->wheel == sf::Mouse::Wheel::Vertical)
+			{
+				return Event(Event::MouseWheelScrolled{ delta, position });
+			}
+		}
 
 		return PollEvent();
 	}

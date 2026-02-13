@@ -56,6 +56,12 @@ public:
 		bool shift{};
 	};
 
+	struct MouseWheelScrolled
+	{
+		float delta{};
+		Vector2i position;
+	};
+
 	template <typename TEventType>
 	explicit Event(TEventType const& data);
 
@@ -76,7 +82,8 @@ private:
 		KeyReleased,
 		MouseButtonPressed,
 		MouseButtonReleased,
-		MouseMoved>
+		MouseMoved,
+		MouseWheelScrolled>
 		m_data;
 };
 

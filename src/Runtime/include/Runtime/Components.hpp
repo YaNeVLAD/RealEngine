@@ -3,6 +3,8 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <RenderCore/Assets/Font.hpp>
+#include <RenderCore/Assets/Texture.hpp>
+#include <RenderCore/Image.hpp>
 
 namespace re
 {
@@ -32,6 +34,13 @@ struct TextComponent
 	std::shared_ptr<Font> font;
 	Color color = Color::White;
 	float size = 24.f;
+};
+
+struct ImageComponent
+{
+	Image image;
+	std::shared_ptr<Texture> texture = nullptr;
+	bool isDirty = false;
 };
 
 struct CameraComponent

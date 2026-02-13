@@ -217,9 +217,9 @@ void Application::Shutdown()
 	m_isRunning = false;
 }
 
-Layout& Application::CurrentLayout() const
+ecs::Scene& Application::CurrentScene() const
 {
-	return *m_currentLayout;
+	return m_currentLayout->GetScene();
 }
 
 render::IWindow& Application::Window() const
