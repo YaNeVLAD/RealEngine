@@ -46,7 +46,7 @@ TypeIndexType Type::Index() const
 	return m_info->index;
 }
 
-TypeHashType Type::Hash() const
+Hash_t Type::Hash() const
 {
 	assert(m_info);
 
@@ -60,7 +60,7 @@ const char* Type::Name() const
 	return m_info->name.c_str();
 }
 
-TypeHashType Type::Size() const
+std::size_t Type::Size() const
 {
 	assert(m_info);
 

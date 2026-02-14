@@ -58,19 +58,17 @@ struct LettersLayout final : re::Layout
 private:
 	static void CreateKLetter(re::ecs::Scene& scene)
 	{
-		using namespace re;
-
 		const auto root = scene.CreateEntity()
-							  .Add<TransformComponent>(detail::START_POS, 0.0f)
-							  .Add<RectangleComponent>(detail::COLOR_K, Vector2f{ 50.0f, 200.0f })
-							  .Add<GravityComponent>(Vector2f{ 0, 0 }, 0.f, 0.0f);
+							  .Add<re::TransformComponent>(detail::START_POS, 0.0f)
+							  .Add<re::RectangleComponent>(detail::COLOR_K, re::Vector2f{ 50.0f, 200.0f })
+							  .Add<GravityComponent>(re::Vector2f{ 0, 0 }, 0.f, 0.0f);
 
 		detail::AttachChild(scene, root, { 40.f, -50.f }, 45.0f, [](auto e) {
-			e.template Add<RectangleComponent>(detail::COLOR_K, Vector2f{ 30.0f, 120.0f });
+			e.template Add<re::RectangleComponent>(detail::COLOR_K, re::Vector2f{ 30.0f, 120.0f });
 		});
 
 		detail::AttachChild(scene, root, { 40.f, 50.f }, -45.0f, [](auto e) {
-			e.template Add<RectangleComponent>(detail::COLOR_K, Vector2f{ 30.0f, 120.0f });
+			e.template Add<re::RectangleComponent>(detail::COLOR_K, re::Vector2f{ 30.0f, 120.0f });
 		});
 	}
 
@@ -80,33 +78,31 @@ private:
 		const float phase,
 		re::Color color)
 	{
-		using namespace re;
-
-		Vector2f pos = detail::START_POS + Vector2f{ offsetX, 0.0f };
+		re::Vector2f pos = detail::START_POS + re::Vector2f{ offsetX, 0.0f };
 
 		const auto root = scene.CreateEntity()
-							  .Add<TransformComponent>(pos, 0.0f)
-							  .Add<RectangleComponent>(color, Vector2f{ 50.0f, 200.0f })
-							  .Add<GravityComponent>(Vector2f{ 0, 0 }, 0.f, phase);
+							  .Add<re::TransformComponent>(pos, 0.0f)
+							  .Add<re::RectangleComponent>(color, re::Vector2f{ 50.0f, 200.0f })
+							  .Add<GravityComponent>(re::Vector2f{ 0, 0 }, 0.f, phase);
 
 		constexpr float TOP_RADIUS = 50.0f;
 		constexpr float BOTTOM_RADIUS = 60.0f;
 		constexpr float HOLE_FACTOR = 0.4f;
 
 		detail::AttachChild(scene, root, { 30.f, -50.f }, 0.0f, [&](auto e) {
-			e.template Add<CircleComponent>(color, TOP_RADIUS);
+			e.template Add<re::CircleComponent>(color, TOP_RADIUS);
 		});
 
 		detail::AttachChild(scene, root, { 30.f, -50.f }, 0.0f, [&](auto e) {
-			e.template Add<CircleComponent>(Color::Black, TOP_RADIUS * HOLE_FACTOR);
+			e.template Add<re::CircleComponent>(re::Color::Black, TOP_RADIUS * HOLE_FACTOR);
 		});
 
 		detail::AttachChild(scene, root, { 40.f, 40.f }, 0.0f, [&](auto e) {
-			e.template Add<CircleComponent>(color, BOTTOM_RADIUS);
+			e.template Add<re::CircleComponent>(color, BOTTOM_RADIUS);
 		});
 
 		detail::AttachChild(scene, root, { 40.f, 40.f }, 0.0f, [&](auto e) {
-			e.template Add<CircleComponent>(Color::Black, BOTTOM_RADIUS * HOLE_FACTOR);
+			e.template Add<re::CircleComponent>(re::Color::Black, BOTTOM_RADIUS * HOLE_FACTOR);
 		});
 	}
 

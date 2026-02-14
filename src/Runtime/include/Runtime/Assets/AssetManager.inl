@@ -4,10 +4,12 @@ namespace re
 {
 
 template <std::derived_from<IAsset> T>
-std::shared_ptr<T> AssetManager::Get(std::string const& filePath)
+std::shared_ptr<T> AssetManager::Get(String const& filePath)
 {
-	const auto hash = meta::HashStr(filePath);
-	if (const auto it = s_assets.find(hash); it != s_assets.end())
+	using namespace re::literals;
+
+	const auto hash = HashedU32String::Value(filePath.Data(), filePath.Length());
+	if (const auto it = m_assets.find(hash); it != m_assets.end())
 	{
 		return std::dynamic_pointer_cast<T>(it->second);
 	}
@@ -15,7 +17,7 @@ std::shared_ptr<T> AssetManager::Get(std::string const& filePath)
 	auto newAsset = std::make_shared<T>();
 	if (newAsset->LoadFromFile(filePath))
 	{
-		s_assets[hash] = newAsset;
+		m_assets[hash] = newAsset;
 		return newAsset;
 	}
 

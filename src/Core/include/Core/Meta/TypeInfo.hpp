@@ -2,40 +2,26 @@
 
 #include <Core/Export.hpp>
 
-#include <cstddef>
+#include <Core/HashedString.hpp>
+
 #include <mutex>
 #include <string>
-#include <string_view>
+#include <cstring>
 #include <unordered_map>
 
 namespace re::meta
 {
 
-using TypeHashType = std::size_t;
 using TypeIndexType = std::size_t;
-
-constexpr TypeHashType InvalidTypeHash = std::numeric_limits<TypeHashType>::max();
 
 struct TypeInfo
 {
-	TypeHashType hash{};
+	Hash_t hash{};
 	TypeIndexType index{};
 
 	std::string name{};
 	std::size_t size{};
 };
-
-constexpr RE_CORE_API TypeHashType HashStr(const std::string_view str)
-{
-	TypeHashType hash = 14695981039346656037ull;
-	for (const char c : str)
-	{
-		hash ^= static_cast<TypeHashType>(c);
-		hash *= 1099511628211ull;
-	}
-
-	return hash;
-}
 
 class RE_CORE_API TypeRegistry
 {
@@ -50,7 +36,7 @@ private:
 	mutable std::mutex m_mutex;
 
 	std::vector<const TypeInfo*> m_indexToInfo;
-	std::unordered_map<TypeHashType, TypeIndexType> m_hashToIndex;
+	std::unordered_map<Hash_t, TypeIndexType> m_hashToIndex;
 };
 
 template <typename T>
@@ -69,11 +55,11 @@ public:
 
 	[[nodiscard]] TypeIndexType Index() const;
 
-	[[nodiscard]] TypeHashType Hash() const;
+	[[nodiscard]] Hash_t Hash() const;
 
 	[[nodiscard]] const char* Name() const;
 
-	[[nodiscard]] TypeHashType Size() const;
+	[[nodiscard]] std::size_t Size() const;
 
 private:
 	const TypeInfo* m_info;

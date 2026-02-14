@@ -2,6 +2,7 @@
 
 #include <Runtime/Export.hpp>
 
+#include <Core/HashedString.hpp>
 #include <Core/Types.hpp>
 #include <ECS/Scene/Scene.hpp>
 #include <RenderCore/IWindow.hpp>
@@ -51,7 +52,7 @@ private:
 
 	void SetupScene(Layout& layout) const;
 
-	void SwitchLayoutImpl(std::string const& name);
+	void SwitchLayoutImpl(const char* name);
 
 	void ChangeToPendingLayout();
 
@@ -62,11 +63,11 @@ private:
 	std::mutex m_eventMutex;
 	std::queue<Event> m_eventQueue;
 
-	std::unordered_map<meta::TypeHashType, std::shared_ptr<Layout>> m_layouts;
+	std::unordered_map<Hash_t, std::shared_ptr<Layout>> m_layouts;
 
 	Layout* m_currentLayout = nullptr;
-	meta::TypeHashType m_currentLayoutHash = meta::InvalidTypeHash;
-	meta::TypeHashType m_pendingLayoutHash = meta::InvalidTypeHash;
+	Hash_t m_currentLayoutHash = INVALID_HASH;
+	Hash_t m_pendingLayoutHash = INVALID_HASH;
 
 	std::atomic_bool m_wasResized{ false };
 	std::atomic_uint32_t m_newWidth{ 0 };

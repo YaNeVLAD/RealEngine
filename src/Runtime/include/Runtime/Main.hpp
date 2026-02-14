@@ -20,7 +20,7 @@ inline int Main(int argc, char** argv)
 } // namespace re::runtime
 
 #if defined(RE_SYSTEM_WINDOWS) && defined(RE_DIST)
-
+#define NOMINMAX
 #include <Windows.h>
 
 inline int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, PSTR cmdline, int show)

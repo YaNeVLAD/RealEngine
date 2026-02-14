@@ -98,7 +98,7 @@ void Application::GameLoop()
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
-		if (m_pendingLayoutHash != meta::InvalidTypeHash)
+		if (m_pendingLayoutHash != INVALID_HASH)
 		{
 			ChangeToPendingLayout();
 		}
@@ -176,9 +176,9 @@ void Application::SetupScene(Layout& layout) const
 	scene.BuildSystemGraph();
 }
 
-void Application::SwitchLayoutImpl(std::string const& name)
+void Application::SwitchLayoutImpl(const char* name)
 {
-	const auto hash = meta::HashStr(name);
+	const auto hash = HashedString::Value(name, std::strlen(name));
 	if (m_pendingLayoutHash == hash || m_currentLayoutHash == hash)
 	{
 		return;
@@ -194,7 +194,7 @@ void Application::SwitchLayoutImpl(std::string const& name)
 
 void Application::ChangeToPendingLayout()
 {
-	if (m_pendingLayoutHash == meta::InvalidTypeHash)
+	if (m_pendingLayoutHash == INVALID_HASH)
 	{
 		return;
 	}
@@ -214,7 +214,7 @@ void Application::ChangeToPendingLayout()
 		m_currentLayoutHash = m_pendingLayoutHash;
 	}
 
-	m_pendingLayoutHash = meta::InvalidTypeHash;
+	m_pendingLayoutHash = INVALID_HASH;
 }
 
 void Application::Shutdown()

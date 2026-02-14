@@ -2,7 +2,8 @@
 
 #include <Runtime/Export.hpp>
 
-#include <Core/Meta/TypeInfo.hpp>
+#include <Core/HashedString.hpp>
+#include <Core/String.hpp>
 #include <RenderCore/Assets/IAsset.hpp>
 
 #include <memory>
@@ -15,12 +16,12 @@ class RE_RUNTIME_API AssetManager
 {
 public:
 	template <std::derived_from<IAsset> T>
-	std::shared_ptr<T> Get(std::string const& filePath);
+	std::shared_ptr<T> Get(String const& filePath);
 
 	void CleanUp();
 
 private:
-	std::unordered_map<meta::TypeHashType, std::shared_ptr<IAsset>> s_assets;
+	std::unordered_map<Hash_t, std::shared_ptr<IAsset>> m_assets;
 };
 
 } // namespace re

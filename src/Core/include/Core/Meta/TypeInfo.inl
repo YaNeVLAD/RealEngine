@@ -9,8 +9,11 @@ const TypeInfo& TypeFactory<T>::Get()
 		using ClearType = std::decay_t<T>;
 
 		TypeInfo ti;
-		ti.name = typeid(ClearType).name();
-		ti.hash = HashStr(ti.name);
+		const auto cStrName = typeid(ClearType).name();
+		const auto hashedStr = HashedString(cStrName, std::strlen(cStrName));
+
+		ti.name = hashedStr.Data();
+		ti.hash = hashedStr.Value();
 		ti.size = sizeof(ClearType);
 
 		TypeRegistry::Get().Register(&ti);
