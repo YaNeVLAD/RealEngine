@@ -55,7 +55,7 @@ void Renderer2D::DrawCircle(
 }
 
 void Renderer2D::DrawText(
-	std::string const& text,
+	String const& text,
 	Font const& font,
 	const Vector2f pos,
 	const float size,

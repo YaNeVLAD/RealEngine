@@ -36,7 +36,7 @@ public:
 
 	void DrawCircle(Vector2f const& center, float radius, Color const& color) override;
 
-	void DrawText(std::string const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) override;
+	void DrawText(String const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) override;
 
 	void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) override;
 

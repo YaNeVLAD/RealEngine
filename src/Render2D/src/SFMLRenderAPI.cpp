@@ -100,7 +100,7 @@ void SFMLRenderAPI::DrawCircle(
 }
 
 void SFMLRenderAPI::DrawText(
-	std::string const& text,
+	String const& text,
 	Font const& font,
 	Vector2f const& pos,
 	const float fontSize,
@@ -108,8 +108,12 @@ void SFMLRenderAPI::DrawText(
 {
 	Flush();
 
-	sf::Text sfText(font.GetSfFont(), text, static_cast<unsigned>(fontSize));
-	sfText.setOrigin({ pos.x / 2, pos.y / 2 });
+	sf::Text sfText(font.GetSfFont(), text.ToU32String(), static_cast<unsigned>(fontSize));
+
+	const auto bounds = sfText.getLocalBounds();
+	sfText.setOrigin(
+		{ bounds.position.x + bounds.size.x / 2.0f,
+			bounds.position.y + bounds.size.y / 2.0f });
 	sfText.setFillColor(sf::Color(color.ToInt()));
 	sfText.setPosition({ pos.x, pos.y });
 

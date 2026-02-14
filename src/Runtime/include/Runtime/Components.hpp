@@ -2,6 +2,7 @@
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
+#include <Core/String.hpp>
 #include <RenderCore/Assets/Font.hpp>
 #include <RenderCore/Assets/Texture.hpp>
 #include <RenderCore/Image.hpp>
@@ -30,7 +31,7 @@ struct RectangleComponent
 
 struct TextComponent
 {
-	std::string text;
+	String text;
 	std::shared_ptr<Font> font;
 	Color color = Color::White;
 	float size = 24.f;
@@ -47,6 +48,23 @@ struct CameraComponent
 {
 	float zoom = 1.f;
 	bool isPrimal = true;
+};
+
+struct BoxColliderComponent
+{
+	Vector2f size;
+	Vector2f position;
+
+	[[nodiscard]] bool Contains(const Vector2f point) const
+	{
+		const float halfW = size.x / 2.0f;
+		const float halfH = size.y / 2.0f;
+
+		return point.x >= position.x - halfW
+			&& point.x <= position.x + halfW
+			&& point.y >= position.y - halfH
+			&& point.y <= position.y + halfH;
+	}
 };
 
 } // namespace re

@@ -4,6 +4,7 @@
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
+#include <Core/String.hpp>
 #include <RenderCore/IRenderAPI.hpp>
 
 #include <memory>
@@ -36,7 +37,7 @@ public:
 		Color const& color);
 
 	static void DrawText(
-		std::string const& text,
+		String const& text,
 		Font const& font,
 		Vector2f pos,
 		float size,
