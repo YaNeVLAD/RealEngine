@@ -1,12 +1,8 @@
 #include "HangmanLayout.hpp"
 
-#include <Core/String.hpp>
-
 #include <cctype>
 #include <fstream>
 #include <random>
-
-#include <SFML/System/String.hpp>
 
 void HangmanLayout::OnCreate()
 {
