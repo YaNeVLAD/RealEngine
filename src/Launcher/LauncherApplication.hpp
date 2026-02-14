@@ -5,6 +5,7 @@
 #include <Runtime/Components.hpp>
 
 #include "Lab1/Circle/CircleLayout.hpp"
+#include "Lab1/Hangman/HangmanLayout.hpp"
 #include "Lab1/House/HouseLayout.hpp"
 #include "Lab1/Letters/LettersLayout.hpp"
 
@@ -42,6 +43,7 @@ public:
 		AddLayout<LettersLayout>();
 		AddLayout<HouseLayout>(Window());
 		AddLayout<CircleLayout>(Window());
+		AddLayout<HangmanLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -86,6 +88,10 @@ public:
 			if (e->key == re::Keyboard::Key::Num4)
 			{
 				SwitchLayout<CircleLayout>();
+			}
+			if (e->key == re::Keyboard::Key::Num5)
+			{
+				SwitchLayout<HangmanLayout>();
 			}
 		}
 

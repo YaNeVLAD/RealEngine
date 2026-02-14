@@ -1,0 +1,316 @@
+#include "HangmanLayout.hpp"
+
+#include <Core/String.hpp>
+
+#include <cctype>
+#include <fstream>
+#include <random>
+
+#include <SFML/System/String.hpp>
+
+void HangmanLayout::OnCreate()
+{
+	m_assetManager.Get<re::Font>(FONT_PATH);
+
+	GetScene()
+		.AddSystem<CollisionSystem>()
+		.WithRead<re::TransformComponent, re::BoxColliderComponent>()
+		.WithWrite<re::BoxColliderComponent>();
+
+	GetScene().BuildSystemGraph();
+
+	LoadWords();
+	StartNewGame();
+}
+
+void HangmanLayout::OnUpdate(const re::core::TimeDelta ts)
+{
+	const auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+	if (gameState.gameState == GameStateComponent::State::Playing)
+	{
+		UpdateUI();
+	}
+}
+
+void HangmanLayout::OnEvent(re::Event const& event)
+{
+	if (const auto* mousePressed = event.GetIf<re::Event::MouseButtonPressed>())
+	{
+		if (mousePressed->button == re::Mouse::Button::Left)
+		{
+			const auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+			const auto mousePos = m_window.ToWorldPos(mousePressed->position);
+
+			if (gameState.gameState == GameStateComponent::State::Playing)
+			{
+				for (auto&& [entity, letterButton, collider] : *GetScene().CreateView<LetterButtonComponent, re::BoxColliderComponent>())
+				{
+					if (letterButton.buttonState == LetterButtonComponent::State::Normal && collider.Contains(mousePos))
+					{
+						CheckGuess(letterButton.letter);
+						break;
+					}
+				}
+			}
+			else
+			{
+				for (auto&& [entity, button, collider] : *GetScene().CreateView<DialogButtonComponent, re::BoxColliderComponent>())
+				{
+					if (collider.Contains(mousePos))
+					{
+						if (button.action == DialogButtonAction::PlayAgain)
+						{
+							StartNewGame();
+						}
+						else if (button.action == DialogButtonAction::Quit)
+						{
+							// TODO: Add exit
+						}
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
+void HangmanLayout::LoadWords()
+{
+	std::ifstream file("assets/words.txt");
+	std::string line;
+	while (std::getline(file, line))
+	{
+		const auto delimiterPos = line.find(';');
+		if (delimiterPos != std::string::npos)
+		{
+			std::string word = line.substr(0, delimiterPos);
+			std::string hint = line.substr(delimiterPos + 1);
+			for (char& c : word)
+			{
+				c = static_cast<char>(std::toupper(c));
+			}
+
+			m_words.emplace_back(word, hint);
+		}
+	}
+}
+
+void HangmanLayout::StartNewGame()
+{
+	for (auto&& [entity, _] : *GetScene().CreateView<re::TransformComponent>())
+	{
+		GetScene().DestroyEntity(entity);
+	}
+
+	if (GetScene().IsValid(m_gameStateEntity))
+	{
+		GetScene().DestroyEntity(m_gameStateEntity);
+	}
+	GetScene().ConfirmChanges();
+
+	m_gameStateEntity = GetScene().CreateEntity().GetEntity();
+	GetScene().AddComponent<GameStateComponent>(m_gameStateEntity);
+	auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution distrib(0, static_cast<int>(m_words.size()) - 1);
+	auto const& [word, hint] = m_words[distrib(gen)];
+
+	gameState.secretWord = word;
+	gameState.hint = hint;
+
+	CreateUI();
+}
+
+void HangmanLayout::CreateUI()
+{
+	auto& scene = GetScene();
+	auto const& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
+	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
+
+	constexpr float letterSpacing = 60.0f;
+	const float startX = -static_cast<float>(gameState.secretWord.length() - 1) * letterSpacing / 2.0f;
+	for (size_t i = 0; i < gameState.secretWord.length(); ++i)
+	{
+		scene.CreateEntity()
+			.Add<re::TransformComponent>(re::Vector2f{ startX + static_cast<float>(i) * letterSpacing, 200.0f })
+			.Add<re::TextComponent>("_", font, re::Color::White, 64.f)
+			.Add<WordLetterComponent>(gameState.secretWord[i], false);
+	}
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ 0, 120.0f })
+		.Add<re::TextComponent>(gameState.hint, font, re::Color::White, 24.f);
+
+	constexpr int lettersInRow = 13;
+	constexpr float buttonSize = 50.0f;
+	constexpr float buttonSpacing = 10.0f;
+	const float totalWidth = lettersInRow * (buttonSize + buttonSpacing) - buttonSpacing;
+	for (int i = 0; i < 26; ++i)
+	{
+		char letter = 'A' + static_cast<char>(i);
+		const int row = i / lettersInRow;
+		const int col = i % lettersInRow;
+		const float x = -totalWidth / 2.0f + (float)col * (buttonSize + buttonSpacing) + buttonSize / 2.0f;
+		const float y = -150.0f - (float)row * (buttonSize + buttonSpacing);
+
+		scene.CreateEntity()
+			.Add<re::TransformComponent>(re::Vector2f{ x, y })
+			.Add<LetterButtonComponent>(letter, LetterButtonComponent::State::Normal)
+			.Add<re::RectangleComponent>(re::Color::Magenta, re::Vector2f{ buttonSize, buttonSize })
+			.Add<re::TextComponent>(std::string(1, letter), font, re::Color::White, 32.f)
+			.Add<re::BoxColliderComponent>(re::Vector2f{ buttonSize, buttonSize });
+	}
+
+	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -350, 250 }, re::Vec2{ -150, 250 }, re::colors::White, 5.0f);
+	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -250, 250 }, re::Vec2{ -250, -200 }, re::colors::White, 5.0f);
+	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -250, -200 }, re::Vec2{ -100, -200 }, re::colors::White, 5.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(0).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -200 }, re::Vec2{ -100, -150 }, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(1).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Circle, re::Vec2{ -100, -125 }, 25.0f, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(2).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -100 }, re::Vec2{ -100, 0 }, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(3).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -75 }, re::Vec2{ -150, -25 }, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(4).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -75 }, re::Vec2{ -50, -25 }, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(5).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, 0 }, re::Vec2{ -150, 50 }, re::Color::Transparent, 3.0f);
+	// scene.CreateEntity().Add<HangmanPartComponent>(6).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, 0 }, re::Vec2{ -50, 50 }, re::Color::Transparent, 3.0f);
+}
+
+void HangmanLayout::UpdateUI()
+{
+	auto& scene = GetScene();
+	auto const& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
+
+	for (auto&& [entity, wordLetter, text] : *scene.CreateView<WordLetterComponent, re::TextComponent>())
+	{
+		if (wordLetter.isVisible)
+		{
+			text.text = std::string(1, wordLetter.letter);
+		}
+	}
+
+	for (auto&& [entity, button, text] : *scene.CreateView<LetterButtonComponent, re::TextComponent>())
+	{
+		if (button.buttonState == LetterButtonComponent::State::Correct)
+		{
+			text.color = re::Color::Green;
+		}
+		else if (button.buttonState == LetterButtonComponent::State::Incorrect)
+		{
+			text.color = re::Color::Red;
+		}
+	}
+
+	// for (auto&& [entity, part, primitive] : *scene.CreateView<HangmanPartComponent, re::PrimitiveComponent>())
+	// {
+	// 	if (part.order < gameState.incorrectGuesses)
+	// 	{
+	// 		primitive.color = re::Color::White;
+	// 	}
+	// }
+}
+
+void HangmanLayout::CheckGuess(const char letter)
+{
+	auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+	gameState.guessedLetters.push_back(letter);
+
+	bool found = false;
+	for (auto&& [entity, button] : *GetScene().CreateView<LetterButtonComponent>())
+	{
+		if (button.letter == letter)
+		{
+			if (gameState.secretWord.find(letter) != std::string::npos)
+			{
+				button.buttonState = LetterButtonComponent::State::Correct;
+				found = true;
+			}
+			else
+			{
+				button.buttonState = LetterButtonComponent::State::Incorrect;
+			}
+			break;
+		}
+	}
+
+	if (found)
+	{
+		for (auto [entity, wordLetter] : *GetScene().CreateView<WordLetterComponent>())
+		{
+			if (wordLetter.letter == letter)
+			{
+				wordLetter.isVisible = true;
+			}
+		}
+	}
+	else
+	{
+		gameState.incorrectGuesses++;
+	}
+
+	CheckWinLoss();
+}
+
+void HangmanLayout::CheckWinLoss()
+{
+	auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+
+	if (gameState.incorrectGuesses >= 7)
+	{
+		gameState.gameState = GameStateComponent::State::Lost;
+		ShowEndGameDialog(false);
+		return;
+	}
+
+	bool allVisible = true;
+	for (auto&& [entity, wordLetter] : *GetScene().CreateView<WordLetterComponent>())
+	{
+		if (wordLetter.isVisible)
+		{
+			allVisible = false;
+			break;
+		}
+	}
+
+	if (allVisible)
+	{
+		gameState.gameState = GameStateComponent::State::Won;
+		ShowEndGameDialog(true);
+	}
+}
+
+void HangmanLayout::ShowEndGameDialog(const bool won)
+{
+	auto& scene = GetScene();
+	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ 0, 0 })
+		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 150), re::Vector2f{ 1280, 720 })
+		.Add<DialogButtonComponent>();
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ 0, 100.0f })
+		.Add<re::TextComponent>(won ? "You Won!" : "You Lost!", font, re::Color::White, 80.f)
+		.Add<DialogButtonComponent>();
+
+	if (!won)
+	{
+		const auto& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
+		scene.CreateEntity()
+			.Add<re::TransformComponent>(re::Vector2f{ 0, 20.0f })
+			.Add<re::TextComponent>("The word was: " + gameState.secretWord, font, re::Color::White, 32.f)
+			.Add<DialogButtonComponent>();
+	}
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ 0, -50.0f })
+		.Add<re::TextComponent>("Play Again", font, re::Color::Green, 48.f)
+		.Add<re::BoxColliderComponent>(re::Vector2f{ 300, 60 })
+		.Add<DialogButtonComponent>(DialogButtonAction::PlayAgain);
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ 0, -120.0f })
+		.Add<re::TextComponent>("Quit", font, re::Color::Red, 48.f)
+		.Add<re::BoxColliderComponent>(re::Vector2f{ 150, 60 })
+		.Add<DialogButtonComponent>(DialogButtonAction::Quit);
+}
