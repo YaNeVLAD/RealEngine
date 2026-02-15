@@ -192,7 +192,6 @@ void HangmanLayout::CreateUI()
 void HangmanLayout::UpdateUI()
 {
 	auto& scene = GetScene();
-	auto const& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
 
 	for (auto&& [entity, wordLetter, text] : *scene.CreateView<WordLetterComponent, re::TextComponent>())
 	{
@@ -226,6 +225,11 @@ void HangmanLayout::UpdateUI()
 void HangmanLayout::CheckGuess(const char32_t letter)
 {
 	auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
+	if (gameState.gameState != GameStateComponent::State::Playing)
+	{
+		return;
+	}
+
 	gameState.guessedLetters.push_back(letter);
 
 	bool found = false;
@@ -289,6 +293,7 @@ void HangmanLayout::CheckWinLoss()
 	{
 		gameState.gameState = GameStateComponent::State::Won;
 		ShowEndGameDialog(true);
+		UpdateUI();
 	}
 }
 
