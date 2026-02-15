@@ -88,6 +88,11 @@ std::optional<Event> SFMLWindow::PollEvent()
 				return Event(Event::MouseWheelScrolled{ delta, position });
 			}
 		}
+		if (const auto* textEntered = event->getIf<sf::Event::TextEntered>())
+		{
+			const auto unicode = textEntered->unicode;
+			return Event(Event::TextEntered{ unicode });
+		}
 
 		return PollEvent();
 	}

@@ -15,6 +15,11 @@ String::String(std::u32string u32Str)
 {
 }
 
+String::String(const char32_t ch)
+	: m_string(1, ch)
+{
+}
+
 String::String(const char* u8Str)
 	: m_string(u8Str ? DecodeUtf8(u8Str) : U"")
 {
@@ -30,6 +35,12 @@ String::String(std::string const& u8Str)
 {
 }
 
+String::String(const char ch)
+{
+	const char buf[1] = { ch };
+	m_string = DecodeUtf8(std::string_view(buf, 1));
+}
+
 String::String(const wchar_t* wStr)
 	: m_string(wStr ? DecodeWide(wStr) : U"")
 {
@@ -43,6 +54,12 @@ String::String(std::wstring_view wStr)
 String::String(std::wstring const& wStr)
 	: m_string(DecodeWide(wStr))
 {
+}
+
+String::String(const wchar_t ch)
+{
+	const wchar_t buf[1] = { ch };
+	m_string = DecodeWide(std::wstring_view(buf, 1));
 }
 
 String::operator std::string() const
@@ -150,9 +167,72 @@ std::size_t String::Find(const String& str, const std::size_t pos) const
 	return m_string.find(str.m_string, pos);
 }
 
+std::size_t String::Find(const char32_t& ch, const std::size_t pos) const
+{
+	return m_string.find(ch, pos);
+}
+
 String String::Substring(const std::size_t pos, const std::size_t count) const
 {
 	return { m_string.substr(pos, count) };
+}
+
+char32_t String::ToUpper(const char32_t cp)
+{
+	if (cp >= 0x0061 && cp <= 0x007A)
+	{ // a-z -> A-Z
+		return cp - 0x20;
+	}
+	if (cp >= 0x0430 && cp <= 0x044F)
+	{ // а-я -> А-Я
+		return cp - 0x20;
+	}
+	if (cp == 0x0451)
+	{ // ё -> Ё
+		return 0x0401;
+	}
+
+	return cp;
+}
+
+char32_t String::ToLower(const char32_t cp)
+{
+	if (cp >= 0x0041 && cp <= 0x005A)
+	{ // A-Z -> a-z
+		return cp + 0x20;
+	}
+	if (cp >= 0x0410 && cp <= 0x042F)
+	{ // А-Я -> а-я
+		return cp + 0x20;
+	}
+	if (cp == 0x0401)
+	{ // Ё -> ё
+		return 0x0451;
+	}
+
+	return cp;
+}
+
+String String::ToUpper() const
+{
+	String result;
+	for (const char32_t ch : m_string)
+	{
+		result += ToUpper(ch);
+	}
+
+	return result;
+}
+
+String String::ToLower() const
+{
+	String result;
+	for (const char32_t ch : m_string)
+	{
+		result += ToLower(ch);
+	}
+
+	return result;
 }
 
 String& String::operator+=(const String& other)

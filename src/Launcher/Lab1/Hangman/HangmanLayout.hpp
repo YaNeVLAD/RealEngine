@@ -16,9 +16,9 @@ constexpr auto FONT_PATH = "assets/Roboto.ttf";
 
 struct GameStateComponent
 {
-	std::string secretWord;
-	std::string hint;
-	std::vector<char> guessedLetters;
+	re::String secretWord;
+	re::String hint;
+	std::vector<char32_t> guessedLetters;
 	int incorrectGuesses = 0;
 	enum class State
 	{
@@ -31,13 +31,13 @@ struct GameStateComponent
 
 struct WordLetterComponent
 {
-	char letter{};
+	char32_t letter{};
 	bool isVisible = false;
 };
 
 struct LetterButtonComponent
 {
-	char letter{};
+	char32_t letter{};
 	enum class State
 	{
 		Normal,
@@ -80,7 +80,7 @@ private:
 	void StartNewGame();
 	void LoadWords();
 	void CreateUI();
-	void CheckGuess(char letter);
+	void CheckGuess(char32_t letter);
 	void UpdateUI();
 	void CheckWinLoss();
 	void ShowEndGameDialog(bool won);

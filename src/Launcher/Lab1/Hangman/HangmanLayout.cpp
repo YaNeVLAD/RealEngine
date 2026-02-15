@@ -2,7 +2,17 @@
 
 #include <cctype>
 #include <fstream>
+#include <iostream>
 #include <random>
+
+#include <SFML/System/String.hpp>
+
+namespace
+{
+
+const re::String RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+
+}
 
 void HangmanLayout::OnCreate()
 {
@@ -68,6 +78,15 @@ void HangmanLayout::OnEvent(re::Event const& event)
 			}
 		}
 	}
+
+	if (const auto* textEntered = event.GetIf<re::Event::TextEntered>())
+	{
+		const auto ch = re::String::ToUpper(textEntered->symbol);
+		if (RUSSIAN_ALPHABET.Find(ch) != re::String::NPos)
+		{
+			CheckGuess(ch);
+		}
+	}
 }
 
 void HangmanLayout::LoadWords()
@@ -79,14 +98,10 @@ void HangmanLayout::LoadWords()
 		const auto delimiterPos = line.find(';');
 		if (delimiterPos != std::string::npos)
 		{
-			std::string word = line.substr(0, delimiterPos);
+			re::String word(line.substr(0, delimiterPos));
 			std::string hint = line.substr(delimiterPos + 1);
-			for (char& c : word)
-			{
-				c = static_cast<char>(std::toupper(c));
-			}
 
-			m_words.emplace_back(word, hint);
+			m_words.emplace_back(word.ToUpper(), hint);
 		}
 	}
 }
@@ -126,8 +141,8 @@ void HangmanLayout::CreateUI()
 	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
 
 	constexpr float letterSpacing = 60.0f;
-	const float startX = -static_cast<float>(gameState.secretWord.length() - 1) * letterSpacing / 2.0f;
-	for (size_t i = 0; i < gameState.secretWord.length(); ++i)
+	const float startX = -static_cast<float>(gameState.secretWord.Length() - 1) * letterSpacing / 2.0f;
+	for (size_t i = 0; i < gameState.secretWord.Length(); ++i)
 	{
 		scene.CreateEntity()
 			.Add<re::TransformComponent>(re::Vector2f{ startX + static_cast<float>(i) * letterSpacing, 200.0f })
@@ -143,11 +158,14 @@ void HangmanLayout::CreateUI()
 	constexpr float buttonSize = 50.0f;
 	constexpr float buttonSpacing = 10.0f;
 	const float totalWidth = lettersInRow * (buttonSize + buttonSpacing) - buttonSpacing;
-	for (int i = 0; i < 26; ++i)
+
+	for (size_t i = 0; i < RUSSIAN_ALPHABET.Size(); ++i)
 	{
-		char letter = 'A' + static_cast<char>(i);
-		const int row = i / lettersInRow;
-		const int col = i % lettersInRow;
+		char32_t letter = RUSSIAN_ALPHABET[i];
+
+		const int row = (int)i / lettersInRow;
+		const int col = (int)i % lettersInRow;
+
 		const float x = -totalWidth / 2.0f + (float)col * (buttonSize + buttonSpacing) + buttonSize / 2.0f;
 		const float y = -150.0f - (float)row * (buttonSize + buttonSpacing);
 
@@ -155,7 +173,7 @@ void HangmanLayout::CreateUI()
 			.Add<re::TransformComponent>(re::Vector2f{ x, y })
 			.Add<LetterButtonComponent>(letter, LetterButtonComponent::State::Normal)
 			.Add<re::RectangleComponent>(re::Color::Magenta, re::Vector2f{ buttonSize, buttonSize })
-			.Add<re::TextComponent>(std::string(1, letter), font, re::Color::White, 32.f)
+			.Add<re::TextComponent>(letter, font, re::Color::White, 32.f)
 			.Add<re::BoxColliderComponent>(re::Vector2f{ buttonSize, buttonSize });
 	}
 
@@ -180,7 +198,7 @@ void HangmanLayout::UpdateUI()
 	{
 		if (wordLetter.isVisible)
 		{
-			text.text = std::string(1, wordLetter.letter);
+			text.text = wordLetter.letter;
 		}
 	}
 
@@ -205,7 +223,7 @@ void HangmanLayout::UpdateUI()
 	// }
 }
 
-void HangmanLayout::CheckGuess(const char letter)
+void HangmanLayout::CheckGuess(const char32_t letter)
 {
 	auto& gameState = GetScene().GetComponent<GameStateComponent>(m_gameStateEntity);
 	gameState.guessedLetters.push_back(letter);
@@ -215,7 +233,7 @@ void HangmanLayout::CheckGuess(const char letter)
 	{
 		if (button.letter == letter)
 		{
-			if (gameState.secretWord.find(letter) != std::string::npos)
+			if (gameState.secretWord.Find(letter) != re::String::NPos)
 			{
 				button.buttonState = LetterButtonComponent::State::Correct;
 				found = true;
@@ -230,7 +248,7 @@ void HangmanLayout::CheckGuess(const char letter)
 
 	if (found)
 	{
-		for (auto [entity, wordLetter] : *GetScene().CreateView<WordLetterComponent>())
+		for (auto&& [entity, wordLetter] : *GetScene().CreateView<WordLetterComponent>())
 		{
 			if (wordLetter.letter == letter)
 			{
@@ -260,7 +278,7 @@ void HangmanLayout::CheckWinLoss()
 	bool allVisible = true;
 	for (auto&& [entity, wordLetter] : *GetScene().CreateView<WordLetterComponent>())
 	{
-		if (wordLetter.isVisible)
+		if (!wordLetter.isVisible)
 		{
 			allVisible = false;
 			break;

@@ -62,6 +62,11 @@ public:
 		Vector2i position;
 	};
 
+	struct TextEntered
+	{
+		char32_t symbol{};
+	};
+
 	template <typename TEventType>
 	explicit Event(TEventType const& data);
 
@@ -83,7 +88,8 @@ private:
 		MouseButtonPressed,
 		MouseButtonReleased,
 		MouseMoved,
-		MouseWheelScrolled>
+		MouseWheelScrolled,
+		TextEntered>
 		m_data;
 };
 
