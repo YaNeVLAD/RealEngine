@@ -5,8 +5,6 @@
 #include <iostream>
 #include <random>
 
-#include <SFML/System/String.hpp>
-
 namespace
 {
 
