@@ -9,6 +9,8 @@
 #include "Lab1/House/HouseLayout.hpp"
 #include "Lab1/Letters/LettersLayout.hpp"
 
+#include "Lab2/Alchemy/AlchemyLayout.hpp"
+
 struct MenuLayout final : re::Layout
 {
 	using Layout::Layout;
@@ -44,6 +46,7 @@ public:
 		AddLayout<HouseLayout>(Window());
 		AddLayout<CircleLayout>(Window());
 		AddLayout<HangmanLayout>(Window());
+		AddLayout<AlchemyLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -92,6 +95,10 @@ public:
 			if (e->key == re::Keyboard::Key::Num5)
 			{
 				SwitchLayout<HangmanLayout>();
+			}
+			if (e->key == re::Keyboard::Key::Num6)
+			{
+				SwitchLayout<AlchemyLayout>();
 			}
 		}
 

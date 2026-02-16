@@ -44,23 +44,23 @@ public:
 
 	operator std::wstring() const;
 
-	std::string ToString() const;
+	[[nodiscard]] std::string ToString() const;
 
-	std::wstring ToWString() const;
+	[[nodiscard]] std::wstring ToWString() const;
 
-	std::u32string ToU32String() const;
+	[[nodiscard]] std::u32string ToU32String() const;
 
-	const char32_t* Data() const;
+	[[nodiscard]] const char32_t* Data() const;
 
-	Iterator begin();
-	ConstIterator begin() const;
+	[[nodiscard]] Iterator begin();
+	[[nodiscard]] ConstIterator begin() const;
 
-	Iterator end();
-	ConstIterator end() const;
+	[[nodiscard]] Iterator end();
+	[[nodiscard]] ConstIterator end() const;
 
-	std::size_t Length() const;
-	std::size_t Size() const;
-	bool Empty() const;
+	[[nodiscard]] std::size_t Length() const;
+	[[nodiscard]] std::size_t Size() const;
+	[[nodiscard]] bool Empty() const;
 
 	void Reserve(std::size_t newCap);
 
@@ -75,17 +75,17 @@ public:
 
 	void PushBack(char32_t ch);
 
-	std::size_t Find(const String& str, std::size_t pos = 0) const;
+	[[nodiscard]] std::size_t Find(const String& str, std::size_t pos = 0) const;
 
-	std::size_t Find(const char32_t& ch, std::size_t pos = 0) const;
+	[[nodiscard]] std::size_t Find(const char32_t& ch, std::size_t pos = 0) const;
 
-	String Substring(std::size_t pos = 0, std::size_t count = NPos) const;
+	[[nodiscard]] String Substring(std::size_t pos = 0, std::size_t count = NPos) const;
 
 	static char32_t ToUpper(char32_t cp);
 	static char32_t ToLower(char32_t cp);
 
-	String ToUpper() const;
-	String ToLower() const;
+	[[nodiscard]] String ToUpper() const;
+	[[nodiscard]] String ToLower() const;
 
 	String& operator+=(const String& other);
 
