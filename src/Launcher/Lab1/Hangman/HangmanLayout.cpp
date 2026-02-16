@@ -1,8 +1,6 @@
 #include "HangmanLayout.hpp"
 
-#include <cctype>
 #include <fstream>
-#include <iostream>
 #include <random>
 
 namespace
