@@ -21,9 +21,16 @@ bool SFMLWindow::SetActive(const bool active)
 	return m_window.setActive(active);
 }
 
-void SFMLWindow::SetTitle(std::string const& title)
+void SFMLWindow::SetTitle(String const& title)
 {
-	m_window.setTitle(title);
+	m_window.setTitle(title.Data());
+}
+
+void SFMLWindow::SetIcon(Image const& image)
+{
+	const auto size = sf::Vector2u{ image.Width(), image.Height() };
+	const sf::Image sfImage(size, image.Data());
+	m_window.setIcon(sfImage);
 }
 
 Vector2f SFMLWindow::ToWorldPos(Vector2i const& pixelPos)

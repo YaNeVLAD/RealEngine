@@ -20,7 +20,9 @@ public:
 
 	bool SetActive(bool active) override;
 
-	void SetTitle(std::string const& title) override;
+	void SetTitle(String const& title) override;
+
+	void SetIcon(Image const& image) override;
 
 	Vector2f ToWorldPos(Vector2i const& pixelPos) override;
 
