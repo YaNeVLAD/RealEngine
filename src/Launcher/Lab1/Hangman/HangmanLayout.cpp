@@ -47,7 +47,7 @@ void HangmanLayout::OnEvent(re::Event const& event)
 
 			if (gameState.gameState == GameStateComponent::State::Playing)
 			{
-				for (auto&& [entity, letterButton, collider] : *GetScene().CreateView<LetterButtonComponent, re::BoxColliderComponent>())
+				for (auto&& [_, letterButton, collider] : *GetScene().CreateView<LetterButtonComponent, re::BoxColliderComponent>())
 				{
 					if (letterButton.buttonState == LetterButtonComponent::State::Normal && collider.Contains(mousePos))
 					{
@@ -58,7 +58,7 @@ void HangmanLayout::OnEvent(re::Event const& event)
 			}
 			else
 			{
-				for (auto&& [entity, button, collider] : *GetScene().CreateView<DialogButtonComponent, re::BoxColliderComponent>())
+				for (auto&& [_, button, collider] : *GetScene().CreateView<DialogButtonComponent, re::BoxColliderComponent>())
 				{
 					if (collider.Contains(mousePos))
 					{
@@ -82,7 +82,15 @@ void HangmanLayout::OnEvent(re::Event const& event)
 		const auto ch = re::String::ToUpper(textEntered->symbol);
 		if (RUSSIAN_ALPHABET.Find(ch) != re::String::NPos)
 		{
-			CheckGuess(ch);
+			for (auto&& [_, letterButton] : *GetScene().CreateView<LetterButtonComponent>())
+			{
+				if (letterButton.letter == ch
+					&& letterButton.buttonState == LetterButtonComponent::State::Normal)
+				{
+					CheckGuess(ch);
+					break;
+				}
+			}
 		}
 	}
 }
@@ -175,21 +183,58 @@ void HangmanLayout::CreateUI()
 			.Add<re::BoxColliderComponent>(re::Vector2f{ buttonSize, buttonSize });
 	}
 
-	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -350, 250 }, re::Vec2{ -150, 250 }, re::colors::White, 5.0f);
-	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -250, 250 }, re::Vec2{ -250, -200 }, re::colors::White, 5.0f);
-	// scene.CreateEntity().Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -250, -200 }, re::Vec2{ -100, -200 }, re::colors::White, 5.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(0).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -200 }, re::Vec2{ -100, -150 }, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(1).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Circle, re::Vec2{ -100, -125 }, 25.0f, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(2).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -100 }, re::Vec2{ -100, 0 }, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(3).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -75 }, re::Vec2{ -150, -25 }, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(4).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, -75 }, re::Vec2{ -50, -25 }, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(5).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, 0 }, re::Vec2{ -150, 50 }, re::Color::Transparent, 3.0f);
-	// scene.CreateEntity().Add<HangmanPartComponent>(6).Add<re::PrimitiveComponent>(re::PrimitiveComponent::Type::Line, re::Vec2{ -100, 0 }, re::Vec2{ -50, 50 }, re::Color::Transparent, 3.0f);
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ -650.0f, 250.0f })
+		.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 200.0f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ -650.0f, 25.0f })
+		.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 5.0f, 450.0f });
+
+	scene.CreateEntity()
+		.Add<re::TransformComponent>(re::Vector2f{ -575.0f, -200.0f })
+		.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 150.0f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(0, re::Color::Brown)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -175.0f })
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 6.0f, 50.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(1)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -125.0f })
+		.Add<re::CircleComponent>(re::Color::Transparent, 30.0f);
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(2)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -50.0f })
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 8.0f, 100.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(3)
+		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, -50.0f }, -45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(4)
+		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, -50.0f }, 45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(5)
+		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, 25.0f }, -45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(6)
+		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, 25.0f }, 45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
 }
 
 void HangmanLayout::UpdateUI()
 {
 	auto& scene = GetScene();
+	const auto& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
 
 	for (auto&& [entity, wordLetter, text] : *scene.CreateView<WordLetterComponent, re::TextComponent>())
 	{
@@ -211,13 +256,21 @@ void HangmanLayout::UpdateUI()
 		}
 	}
 
-	// for (auto&& [entity, part, primitive] : *scene.CreateView<HangmanPartComponent, re::PrimitiveComponent>())
-	// {
-	// 	if (part.order < gameState.incorrectGuesses)
-	// 	{
-	// 		primitive.color = re::Color::White;
-	// 	}
-	// }
+	for (auto&& [entity, part, rect] : *scene.CreateView<HangmanPartComponent, re::RectangleComponent>())
+	{
+		if (part.order < gameState.incorrectGuesses)
+		{
+			rect.color = part.color;
+		}
+	}
+
+	for (auto&& [entity, part, circle] : *scene.CreateView<HangmanPartComponent, re::CircleComponent>())
+	{
+		if (part.order < gameState.incorrectGuesses)
+		{
+			circle.color = part.color;
+		}
+	}
 }
 
 void HangmanLayout::CheckGuess(const char32_t letter)
@@ -274,6 +327,7 @@ void HangmanLayout::CheckWinLoss()
 	{
 		gameState.gameState = GameStateComponent::State::Lost;
 		ShowEndGameDialog(false);
+		UpdateUI();
 		return;
 	}
 

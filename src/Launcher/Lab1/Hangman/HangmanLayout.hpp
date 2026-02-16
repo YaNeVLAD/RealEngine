@@ -50,6 +50,7 @@ struct LetterButtonComponent
 struct HangmanPartComponent
 {
 	int order;
+	re::Color color = re::Color::White;
 };
 
 enum class DialogButtonAction
