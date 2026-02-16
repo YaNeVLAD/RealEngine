@@ -111,12 +111,6 @@ public:
 	}
 };
 
-template <typename TChar>
-BaseHashedString(const TChar* str, std::size_t len) -> BaseHashedString<TChar>;
-
-template <typename TChar, std::size_t N>
-BaseHashedString(const TChar (&str)[N]) -> BaseHashedString<TChar>;
-
 using HashedString = BaseHashedString<char>;
 using HashedWString = BaseHashedString<wchar_t>;
 using HashedU8String = BaseHashedString<char8_t>;
@@ -126,7 +120,7 @@ using HashedU32String = BaseHashedString<char32_t>;
 inline namespace literals
 {
 
-[[nodiscard]] consteval HashedString operator"" _hs(const char* str, std::size_t size) noexcept
+[[nodiscard]] consteval HashedString operator"" _hs(const char* str, const std::size_t size) noexcept
 {
 	return HashedString{ str, size };
 }
