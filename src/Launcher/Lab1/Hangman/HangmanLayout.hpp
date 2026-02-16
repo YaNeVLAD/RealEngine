@@ -49,19 +49,17 @@ struct LetterButtonComponent
 
 struct HangmanPartComponent
 {
-	int order;
+	int order{};
 	re::Color color = re::Color::White;
-};
-
-enum class DialogButtonAction
-{
-	PlayAgain,
-	Quit
 };
 
 struct DialogButtonComponent
 {
-	DialogButtonAction action;
+	enum class Action
+	{
+		PlayAgain,
+		Quit
+	} action;
 };
 
 class HangmanLayout final : public re::Layout

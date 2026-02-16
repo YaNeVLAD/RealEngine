@@ -60,11 +60,11 @@ void HangmanLayout::OnEvent(re::Event const& event)
 				{
 					if (collider.Contains(mousePos))
 					{
-						if (button.action == DialogButtonAction::PlayAgain)
+						if (button.action == DialogButtonComponent::Action::PlayAgain)
 						{
 							StartNewGame();
 						}
-						else if (button.action == DialogButtonAction::Quit)
+						else if (button.action == DialogButtonComponent::Action::Quit)
 						{
 							// TODO: Add exit
 						}
@@ -375,11 +375,11 @@ void HangmanLayout::ShowEndGameDialog(const bool won)
 		.Add<re::TransformComponent>(re::Vector2f{ 0, -50.0f })
 		.Add<re::TextComponent>("Play Again", font, re::Color::Green, 48.f)
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 300, 60 })
-		.Add<DialogButtonComponent>(DialogButtonAction::PlayAgain);
+		.Add<DialogButtonComponent>(DialogButtonComponent::Action::PlayAgain);
 
 	scene.CreateEntity()
 		.Add<re::TransformComponent>(re::Vector2f{ 0, -120.0f })
 		.Add<re::TextComponent>("Quit", font, re::Color::Red, 48.f)
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 150, 60 })
-		.Add<DialogButtonComponent>(DialogButtonAction::Quit);
+		.Add<DialogButtonComponent>(DialogButtonComponent::Action::Quit);
 }
