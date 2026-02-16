@@ -22,9 +22,21 @@ public:
 	static const Color Red;
 	static const Color Green;
 	static const Color Blue;
+	static const Color Gray;
 	static const Color Yellow;
 	static const Color Magenta;
 	static const Color Cyan;
+	static const Color Brown;
+	static const Color Orange;
+	static const Color Pink;
+	static const Color Purple;
+	static const Color Silver;
+	static const Color Gold;
+	static const Color Lime;
+	static const Color Maroon;
+	static const Color Navy;
+	static const Color Olive;
+	static const Color Teal;
 	static const Color Transparent;
 
 	uint8_t r{};

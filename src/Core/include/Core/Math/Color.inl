@@ -43,9 +43,21 @@ inline constexpr Color Color::White(255, 255, 255);
 inline constexpr Color Color::Red(255, 0, 0);
 inline constexpr Color Color::Green(0, 255, 0);
 inline constexpr Color Color::Blue(0, 0, 255);
+inline constexpr Color Color::Gray(128, 128, 128);
 inline constexpr Color Color::Yellow(255, 255, 0);
 inline constexpr Color Color::Magenta(255, 0, 255);
 inline constexpr Color Color::Cyan(0, 255, 255);
+inline constexpr Color Color::Brown(165, 42, 42);
+inline constexpr Color Color::Orange(255, 165, 0);
+inline constexpr Color Color::Pink(255, 192, 203);
+inline constexpr Color Color::Purple(128, 0, 128);
+inline constexpr Color Color::Silver(192, 192, 192);
+inline constexpr Color Color::Gold(255, 215, 0);
+inline constexpr Color Color::Lime(50, 205, 50);
+inline constexpr Color Color::Maroon(128, 0, 0);
+inline constexpr Color Color::Navy(0, 0, 128);
+inline constexpr Color Color::Olive(128, 128, 0);
+inline constexpr Color Color::Teal(0, 128, 128);
 inline constexpr Color Color::Transparent(0, 0, 0, 0);
 
 } // namespace re
