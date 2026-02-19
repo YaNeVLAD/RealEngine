@@ -1,18 +1,14 @@
 #pragma once
 
-#include "Runtime/Assets/AssetManager.hpp"
-
 #include <algorithm>
-#include <format>
 #include <set>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/String.hpp>
 #include <Runtime/Application.hpp>
+#include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Layout.hpp>
 
@@ -333,23 +329,22 @@ private:
 			collider.position = transform.position; // Обновляем коллайдер для проверок
 		}
 	}
-
 	void HandleMouseUp()
 	{
 		if (!GetScene().IsValid(m_draggedEntity))
 			return;
 
 		auto& scene = GetScene();
-		const auto& draggedElem = scene.GetComponent<AlchemyElementComponent>(m_draggedEntity);
-		const auto& draggedTransform = scene.GetComponent<re::TransformComponent>(m_draggedEntity);
+		auto& draggedTransform = scene.GetComponent<re::TransformComponent>(m_draggedEntity);
+		auto& draggable = scene.GetComponent<DraggableComponent>(m_draggedEntity);
 		const auto& draggedCollider = scene.GetComponent<re::BoxColliderComponent>(m_draggedEntity);
 
 		// Сброс флага
-		scene.GetComponent<DraggableComponent>(m_draggedEntity).isDragging = false;
+		draggable.isDragging = false;
 
 		// 1. Проверка на удаление (пересечение с корзиной)
 		// Упрощенно проверяем расстояние до центра корзины или пересечение AABB
-		if (Intersects(draggedCollider, scene.GetComponent<re::BoxColliderComponent>(m_trashIcon)))
+		if (draggedCollider.Intersects(scene.GetComponent<re::BoxColliderComponent>(m_trashIcon)))
 		{
 			scene.DestroyEntity(m_draggedEntity);
 			scene.ConfirmChanges();
@@ -372,7 +367,7 @@ private:
 				continue;
 			}
 
-			if (Intersects(draggedCollider, collider))
+			if (draggedCollider.Intersects(collider))
 			{
 				otherEntity = entity;
 				reacted = TryCombine(m_draggedEntity, otherEntity);
@@ -527,21 +522,6 @@ private:
 		// Однако, в LauncherApplication.hpp есть пример MenuLayout, который создает свой m_manager.
 		// Мы сделаем так же.
 		return m_localAssetManager;
-	}
-
-	static bool Intersects(const re::BoxColliderComponent& a, const re::BoxColliderComponent& b)
-	{
-		float aLeft = a.position.x - a.size.x / 2;
-		float aRight = a.position.x + a.size.x / 2;
-		float aTop = a.position.y - a.size.y / 2;
-		float aBottom = a.position.y + a.size.y / 2;
-
-		float bLeft = b.position.x - b.size.x / 2;
-		float bRight = b.position.x + b.size.x / 2;
-		float bTop = b.position.y - b.size.y / 2;
-		float bBottom = b.position.y + b.size.y / 2;
-
-		return (aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop);
 	}
 
 private:

@@ -106,7 +106,7 @@ public:
 		{
 			for (auto&& [entity, camera] : *CurrentScene().CreateView<re::CameraComponent>())
 			{
-				const auto newZoom = camera.zoom + e->delta;
+				const auto newZoom = camera.zoom + e->delta * 0.1f;
 				camera.zoom = std::max(newZoom, 0.1f);
 			}
 		}
