@@ -57,13 +57,21 @@ struct BoxColliderComponent
 
 	[[nodiscard]] bool Contains(const Vector2f point) const
 	{
-		const float halfW = size.x / 2.0f;
-		const float halfH = size.y / 2.0f;
+		const float dx = std::abs(point.x - position.x);
+		const float dy = std::abs(point.y - position.y);
 
-		return point.x >= position.x - halfW
-			&& point.x <= position.x + halfW
-			&& point.y >= position.y - halfH
-			&& point.y <= position.y + halfH;
+		return dx <= size.x * 0.5f && dy <= size.y * 0.5f;
+	}
+
+	[[nodiscard]] bool Intersects(BoxColliderComponent const& rhs) const
+	{
+		const float dx = std::abs(position.x - rhs.position.x);
+		const float dy = std::abs(position.y - rhs.position.y);
+
+		const float sumHalfWidths = (size.x + rhs.size.x) * 0.5f;
+		const float sumHalfHeights = (size.y + rhs.size.y) * 0.5f;
+
+		return dx <= sumHalfWidths && dy <= sumHalfHeights;
 	}
 };
 

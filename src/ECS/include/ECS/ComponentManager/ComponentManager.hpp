@@ -3,7 +3,9 @@
 #include <ECS/ComponentArray/ComponentArray.hpp>
 #include <ECS/TypeIndex/TypeIndex.hpp>
 
+#include <cassert>
 #include <memory>
+#include <ranges>
 #include <unordered_map>
 
 namespace re::ecs

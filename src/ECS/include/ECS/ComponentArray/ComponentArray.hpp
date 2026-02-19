@@ -2,6 +2,7 @@
 
 #include <ECS/ComponentArray/IComponentArray.hpp>
 
+#include <cassert>
 #include <vector>
 
 namespace re::ecs

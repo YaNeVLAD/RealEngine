@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Entity/Entity.hpp"
+#include <ECS/Entity/Entity.hpp>
 
 namespace re::ecs
 {

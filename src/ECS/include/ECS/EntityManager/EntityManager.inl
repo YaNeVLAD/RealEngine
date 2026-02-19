@@ -1,7 +1,5 @@
 #include <ECS/EntityManager/EntityManager.hpp>
 
-#include <cassert>
-
 namespace re::ecs
 {
 

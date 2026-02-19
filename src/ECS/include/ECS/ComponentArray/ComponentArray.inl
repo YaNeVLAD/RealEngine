@@ -1,12 +1,10 @@
 #include <ECS/ComponentArray/IComponentArray.hpp>
 
-#include <cassert>
-
 namespace re::ecs
 {
 
 template <typename TComponent>
-void ComponentArray<TComponent>::AddComponent(Entity entity, TComponent const& component)
+void ComponentArray<TComponent>::AddComponent(const Entity entity, TComponent const& component)
 {
 	assert(!HasComponent(entity) && "Component already exists for this entity");
 
@@ -24,7 +22,7 @@ void ComponentArray<TComponent>::AddComponent(Entity entity, TComponent const& c
 }
 
 template <typename TComponent>
-void ComponentArray<TComponent>::RemoveComponent(Entity entity)
+void ComponentArray<TComponent>::RemoveComponent(const Entity entity)
 {
 	if (!HasComponent(entity))
 	{
@@ -56,20 +54,20 @@ void ComponentArray<TComponent>::RemoveComponent(Entity entity)
 }
 
 template <typename TComponent>
-TComponent& ComponentArray<TComponent>::GetComponent(Entity entity)
+TComponent& ComponentArray<TComponent>::GetComponent(const Entity entity)
 {
 	assert(HasComponent(entity) && "Entity does not have component of this type");
 	return m_components[m_sparse[entity.Index()]];
 }
 
 template <typename TComponent>
-TComponent const& ComponentArray<TComponent>::GetComponent(Entity entity) const
+TComponent const& ComponentArray<TComponent>::GetComponent(const Entity entity) const
 {
 	return const_cast<ComponentArray&>(*this).GetComponent(entity);
 }
 
 template <typename TComponent>
-bool ComponentArray<TComponent>::HasComponent(Entity entity) const
+bool ComponentArray<TComponent>::HasComponent(const Entity entity) const
 {
 	const auto index = entity.Index();
 	return index < m_sparse.size()
@@ -84,7 +82,7 @@ std::vector<TComponent>& ComponentArray<TComponent>::GetComponents()
 }
 
 template <typename TComponent>
-void ComponentArray<TComponent>::OnEntityDestroyed(Entity entity)
+void ComponentArray<TComponent>::OnEntityDestroyed(const Entity entity)
 {
 	if (HasComponent(entity))
 	{

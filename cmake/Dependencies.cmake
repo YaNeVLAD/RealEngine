@@ -7,10 +7,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(EnTT)
 
-FetchContent_Declare(SFML
+FetchContent_Declare(
+        SFML
         GIT_REPOSITORY https://github.com/SFML/SFML.git
         GIT_TAG 3.0.2
         GIT_SHALLOW ON
         EXCLUDE_FROM_ALL
         SYSTEM)
 FetchContent_MakeAvailable(SFML)
+
+FetchContent_Declare(
+        FSM
+        GIT_REPOSITORY https://github.com/YaNeVLAD/StateMachine.git
+        GIT_TAG master
+)
+FetchContent_MakeAvailable(FSM)

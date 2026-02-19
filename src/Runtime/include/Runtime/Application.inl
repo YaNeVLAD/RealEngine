@@ -18,8 +18,8 @@ void Application::AddLayout(TArgs&&... args)
 	}
 
 	auto& layout = *(m_layouts[hash] = std::make_shared<TLayout>(*this, std::forward<TArgs>(args)...));
-	layout.OnCreate();
 	SetupScene(layout);
+	layout.OnCreate();
 
 	if (layoutsSize == 0)
 	{

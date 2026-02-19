@@ -1,8 +1,5 @@
 #include <ECS/ComponentManager/ComponentManager.hpp>
 
-#include <ranges>
-#include <cassert>
-
 namespace re::ecs
 {
 
