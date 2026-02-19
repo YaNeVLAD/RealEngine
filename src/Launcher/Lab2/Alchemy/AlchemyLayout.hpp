@@ -179,30 +179,50 @@ private:
 	// --- UI и создание сущностей ---
 	void CreateUI()
 	{
+		auto windowSize = m_window.Size();
 		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
 
 		// Разделительная линия
-		GetScene().CreateEntity().Add<re::TransformComponent>(re::Vector2f{ 300.f, 340.f }) // x=300 - граница
-			.Add<re::RectangleComponent>(re::Color::Black, re::Vector2f{ 2.f, 680.f });
+		GetScene()
+			.CreateEntity()
+			.Add<re::TransformComponent>({ 0.f, 0.f }) // x=300 - граница
+			.Add<re::RectangleComponent>(re::Color::White, re::Vector2f{ 2.f, (float)windowSize.y });
 
 		// Кнопка сортировки (Слева вверху)
-		GetScene().CreateEntity().Add<re::TransformComponent>(re::Vector2f{ 150.f, 30.f }).Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 100.f, 30.f }).Add<re::TextComponent>("Sort", font, re::Color::White, 20.f).Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 30.f }, re::Vector2f{ 150.f, 30.f }).Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Sort);
+		GetScene()
+			.CreateEntity()
+			.Add<re::TransformComponent>({ -350.f, -300.f })
+			.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 100.f, 30.f })
+			.Add<re::TextComponent>("Sort", font, re::Color::White, 20.f)
+			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 30.f }, re::Vector2f{ -350.f, -300.f })
+			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Sort);
 
 		// Кнопка удаления (Справа внизу, красный крест)
+		re::Vector2f trashPos = { 400.f, 250.f };
 		auto deleteBtn = GetScene().CreateEntity();
-		deleteBtn.Add<re::TransformComponent>(re::Vector2f{ 950.f, 600.f })
-			.Add<re::BoxColliderComponent>(re::Vector2f{ 60.f, 60.f }, re::Vector2f{ 950.f, 600.f })
+		deleteBtn.Add<re::TransformComponent>(trashPos)
+			.Add<re::BoxColliderComponent>(re::Vector2f{ 60.f, 60.f }, trashPos)
 			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Clear);
 
 		// Визуализация крестика
 		m_trashIcon = deleteBtn.GetEntity();
 
 		// Рисуем крестик двумя прямоугольниками
-		GetScene().CreateEntity().Add<re::TransformComponent>(re::Vector2f{ 950.f, 600.f }, 45.f).Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
-		GetScene().CreateEntity().Add<re::TransformComponent>(re::Vector2f{ 950.f, 600.f }, -45.f).Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
+		GetScene()
+			.CreateEntity()
+			.Add<re::TransformComponent>(trashPos, 45.f)
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
+		GetScene()
+			.CreateEntity()
+			.Add<re::TransformComponent>(trashPos, -45.f)
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
 
 		// Лог сообщений (Внизу)
-		m_logEntity = GetScene().CreateEntity().Add<re::TransformComponent>(re::Vector2f{ 600.f, 650.f }).Add<re::TextComponent>("Start mixing elements!", font, re::Color::Black, 24.f).GetEntity();
+		m_logEntity = GetScene()
+						  .CreateEntity()
+						  .Add<re::TransformComponent>({ 0.f, 320.f })
+						  .Add<re::TextComponent>("Start mixing elements!", font, re::Color::White, 24.f)
+						  .GetEntity();
 	}
 
 	void RefreshLibrary()
@@ -216,27 +236,26 @@ private:
 			}
 		}
 		m_libraryEntities.clear();
-		GetScene().ConfirmChanges();
 
 		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
-		constexpr float startX = 60.f;
-		constexpr float startY = 80.f;
-		constexpr float paddingY = 60.f;
-		constexpr float paddingX = 120.f; // 2 колонки
+
+		constexpr re::Vector2f TOP_LEFT = { -450.f, -250.f };
+		constexpr float PADDING_Y = 60.f;
+		constexpr float PADDINT_X = 120.f;
+		constexpr int MAX_COLS = 4;
+
 		int col = 0;
 		int row = 0;
-
 		for (const int id : m_unlockedElements)
 		{
-			const auto& def = GetDef(id);
-			const float x = startX + (float)col * paddingX;
-			const float y = startY + (float)row * paddingY;
+			const float x = TOP_LEFT.x + (float)col * PADDINT_X;
+			const float y = TOP_LEFT.y + (float)row * PADDING_Y;
 
 			auto entity = CreateElementEntity(id, { x, y }, false);
 			m_libraryEntities.push_back(entity.GetEntity());
 
 			col++;
-			if (col > 1)
+			if (col >= MAX_COLS)
 			{
 				col = 0;
 				row++;
@@ -347,7 +366,6 @@ private:
 		if (draggedCollider.Intersects(scene.GetComponent<re::BoxColliderComponent>(m_trashIcon)))
 		{
 			scene.DestroyEntity(m_draggedEntity);
-			scene.ConfirmChanges();
 			m_draggedEntity = re::ecs::Entity::INVALID_ID;
 			return;
 		}
@@ -416,7 +434,6 @@ private:
 			// Удаляем реагенты
 			scene.DestroyEntity(a);
 			scene.DestroyEntity(b);
-			scene.ConfirmChanges();
 
 			// Создаем продукты
 			SpawnOnWorkspace(match->resultA, pos);
