@@ -1,7 +1,7 @@
 #pragma once
 
-#include <RenderCore/Event.hpp>
 #include <Core/String.hpp>
+#include <RenderCore/Event.hpp>
 #include <RenderCore/Image.hpp>
 
 #include <optional>
@@ -20,6 +20,7 @@ public:
 	virtual void SetIcon(Image const& image) = 0;
 	virtual Vector2f ToWorldPos(Vector2i const& pixelPos) = 0;
 	virtual std::optional<Event> PollEvent() = 0;
+	virtual Vector2u Size() = 0;
 	virtual void Clear() = 0;
 	virtual void Display() = 0;
 	virtual void* GetNativeHandle() = 0;

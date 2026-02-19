@@ -107,6 +107,12 @@ std::optional<Event> SFMLWindow::PollEvent()
 	return std::nullopt;
 }
 
+Vector2u SFMLWindow::Size()
+{
+	const auto size = m_window.getSize();
+	return { size.x, size.y };
+}
+
 void SFMLWindow::Clear()
 {
 	m_window.clear();

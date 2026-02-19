@@ -28,6 +28,8 @@ public:
 
 	std::optional<Event> PollEvent() override;
 
+	Vector2u Size() override;
+
 	void Clear() override;
 
 	void Display() override;
