@@ -1,14 +1,55 @@
 #include "HangmanLayout.hpp"
 
+#include "Runtime/Application.hpp"
+
 #include <fstream>
 #include <random>
 
 namespace
 {
 
+constexpr auto FONT_PATH = "assets/Roboto.ttf";
 const re::String RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
 
+void CreateHangman(re::ecs::Scene& scene)
+{
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(0, re::Color::Brown)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -175.0f })
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 6.0f, 50.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(1)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -125.0f })
+		.Add<re::CircleComponent>(re::Color::Transparent, 30.0f);
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(2)
+		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -50.0f })
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 8.0f, 100.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(3)
+		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, -50.0f }, -45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(4)
+		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, -50.0f }, 45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(5)
+		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, 25.0f }, -45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+
+	scene.CreateEntity()
+		.Add<HangmanPartComponent>(6)
+		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, 25.0f }, 45.f)
+		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
 }
+
+} // namespace
 
 void HangmanLayout::OnCreate()
 {
@@ -66,7 +107,7 @@ void HangmanLayout::OnEvent(re::Event const& event)
 						}
 						else if (button.action == DialogButtonComponent::Action::Quit)
 						{
-							// TODO: Add exit
+							GetApplication().Shutdown();
 						}
 						break;
 					}
@@ -158,27 +199,27 @@ void HangmanLayout::CreateUI()
 		.Add<re::TransformComponent>(re::Vector2f{ 0, 120.0f })
 		.Add<re::TextComponent>(gameState.hint, font, re::Color::White, 24.f);
 
-	constexpr int lettersInRow = 13;
-	constexpr float buttonSize = 50.0f;
-	constexpr float buttonSpacing = 10.0f;
-	const float totalWidth = lettersInRow * (buttonSize + buttonSpacing) - buttonSpacing;
+	constexpr int LETTERS_PER_ROW = 13;
+	constexpr float BUTTON_SIZE = 50.0f;
+	constexpr float BUTTON_SPACING = 10.0f;
+	constexpr float TOTAL_WIDTH = LETTERS_PER_ROW * (BUTTON_SIZE + BUTTON_SPACING) - BUTTON_SPACING;
 
 	for (size_t i = 0; i < RUSSIAN_ALPHABET.Size(); ++i)
 	{
 		char32_t letter = RUSSIAN_ALPHABET[i];
 
-		const int row = (int)i / lettersInRow;
-		const int col = (int)i % lettersInRow;
+		const int row = (int)i / LETTERS_PER_ROW;
+		const int col = (int)i % LETTERS_PER_ROW;
 
-		const float x = -totalWidth / 2.0f + (float)col * (buttonSize + buttonSpacing) + buttonSize / 2.0f;
-		const float y = -150.0f - (float)row * (buttonSize + buttonSpacing);
+		const float x = -TOTAL_WIDTH / 2.0f + (float)col * (BUTTON_SIZE + BUTTON_SPACING) + BUTTON_SIZE / 2.0f;
+		const float y = -150.0f + (float)row * (BUTTON_SIZE + BUTTON_SPACING);
 
 		scene.CreateEntity()
 			.Add<re::TransformComponent>(re::Vector2f{ x, y })
 			.Add<LetterButtonComponent>(letter, LetterButtonComponent::State::Normal)
-			.Add<re::RectangleComponent>(re::Color::Magenta, re::Vector2f{ buttonSize, buttonSize })
+			.Add<re::RectangleComponent>(re::Color::Magenta, re::Vector2f{ BUTTON_SIZE, BUTTON_SIZE })
 			.Add<re::TextComponent>(letter, font, re::Color::White, 32.f)
-			.Add<re::BoxColliderComponent>(re::Vector2f{ buttonSize, buttonSize });
+			.Add<re::BoxColliderComponent>(re::Vector2f{ BUTTON_SIZE, BUTTON_SIZE });
 	}
 
 	scene.CreateEntity()
@@ -193,40 +234,7 @@ void HangmanLayout::CreateUI()
 		.Add<re::TransformComponent>(re::Vector2f{ -575.0f, -200.0f })
 		.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 150.0f, 5.0f });
 
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(0, re::Color::Brown)
-		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -175.0f })
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 6.0f, 50.0f });
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(1)
-		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -125.0f })
-		.Add<re::CircleComponent>(re::Color::Transparent, 30.0f);
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(2)
-		.Add<re::TransformComponent>(re::Vector2f{ -500.0f, -50.0f })
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 8.0f, 100.0f });
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(3)
-		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, -50.0f }, -45.f)
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(4)
-		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, -50.0f }, 45.f)
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(5)
-		.Add<re::TransformComponent>(re::Vector2f{ -525.0f, 25.0f }, -45.f)
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
-
-	scene.CreateEntity()
-		.Add<HangmanPartComponent>(6)
-		.Add<re::TransformComponent>(re::Vector2f{ -475.0f, 25.0f }, 45.f)
-		.Add<re::RectangleComponent>(re::Color::Transparent, re::Vector2f{ 70.7f, 5.0f });
+	CreateHangman(scene);
 }
 
 void HangmanLayout::UpdateUI()
@@ -352,13 +360,18 @@ void HangmanLayout::ShowEndGameDialog(const bool won)
 	auto& scene = GetScene();
 	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
 
+	for (auto&& [entity, _] : *scene.CreateView<LetterButtonComponent>())
+	{
+		scene.DestroyEntity(entity);
+	}
+
 	scene.CreateEntity()
 		.Add<re::TransformComponent>(re::Vector2f{ 0, 0 })
 		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 150), re::Vector2f{ 1280, 720 })
 		.Add<DialogButtonComponent>();
 
 	scene.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0, 100.0f })
+		.Add<re::TransformComponent>(re::Vector2f{ 0, 50.0f })
 		.Add<re::TextComponent>(won ? "You Won!" : "You Lost!", font, re::Color::White, 80.f)
 		.Add<DialogButtonComponent>();
 
@@ -366,19 +379,19 @@ void HangmanLayout::ShowEndGameDialog(const bool won)
 	{
 		const auto& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
 		scene.CreateEntity()
-			.Add<re::TransformComponent>(re::Vector2f{ 0, 20.0f })
+			.Add<re::TransformComponent>(re::Vector2f{ 0, 0 })
 			.Add<re::TextComponent>("The word was: " + gameState.secretWord, font, re::Color::White, 32.f)
 			.Add<DialogButtonComponent>();
 	}
 
 	scene.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0, -50.0f })
+		.Add<re::TransformComponent>(re::Vector2f{ 0, -75.0f })
 		.Add<re::TextComponent>("Play Again", font, re::Color::Green, 48.f)
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 300, 60 })
 		.Add<DialogButtonComponent>(DialogButtonComponent::Action::PlayAgain);
 
 	scene.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0, -120.0f })
+		.Add<re::TransformComponent>(re::Vector2f{ 0, -150.0f })
 		.Add<re::TextComponent>("Quit", font, re::Color::Red, 48.f)
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 150, 60 })
 		.Add<DialogButtonComponent>(DialogButtonComponent::Action::Quit);

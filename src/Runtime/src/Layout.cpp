@@ -13,4 +13,9 @@ ecs::Scene& Layout::GetScene()
 	return m_scene;
 }
 
+Application& Layout::GetApplication() const
+{
+	return m_app;
+}
+
 } // namespace re

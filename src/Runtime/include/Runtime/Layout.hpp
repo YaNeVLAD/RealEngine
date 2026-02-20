@@ -28,6 +28,9 @@ public:
 
 	[[nodiscard]] ecs::Scene& GetScene();
 
+protected:
+	Application& GetApplication() const;
+
 private:
 	Application& m_app;
 	ecs::Scene m_scene;

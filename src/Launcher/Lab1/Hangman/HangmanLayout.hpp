@@ -12,8 +12,6 @@
 
 #include "CollisionSystem.hpp"
 
-constexpr auto FONT_PATH = "assets/Roboto.ttf";
-
 struct GameStateComponent
 {
 	re::String secretWord;
