@@ -60,6 +60,7 @@ struct DialogButtonComponent
 	} action;
 };
 
+// Повыносить логику, сделать независимую от UI
 class HangmanLayout final : public re::Layout
 {
 public:

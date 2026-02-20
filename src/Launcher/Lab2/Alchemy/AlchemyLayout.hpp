@@ -12,22 +12,19 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Layout.hpp>
 
-// Компонент, помечающий сущность как элемент игры
 struct AlchemyElementComponent
 {
 	int elementId = -1;
-	bool isWorkspaceElement = false; // true - на поле экспериментов, false - в библиотеке
+	bool isWorkspaceElement = false;
 };
 
-// Компонент для объектов, которые можно перетаскивать
 struct DraggableComponent
 {
 	bool isDragging = false;
 	re::Vector2f dragOffset;
-	re::Vector2f originalPosition; // Чтобы вернуть на место, если что-то пошло не так
+	re::Vector2f originalPosition;
 };
 
-// Компонент-кнопка (сортировка, очистка)
 struct AlchemyButtonComponent
 {
 	enum class Type
@@ -39,7 +36,6 @@ struct AlchemyButtonComponent
 
 class AlchemyLayout final : public re::Layout
 {
-	// Описание элемента
 	struct ElementDef
 	{
 		int id;
@@ -47,13 +43,12 @@ class AlchemyLayout final : public re::Layout
 		re::Color color;
 	};
 
-	// Описание рецепта
 	struct Recipe
 	{
 		int inputA;
 		int inputB;
 		int resultA;
-		int resultB; // -1 если нет второго результата
+		int resultB;
 	};
 
 public:
@@ -67,7 +62,6 @@ public:
 	{
 		InitDatabase();
 
-		// Добавляем 4 базовых элемента
 		UnlockElement(0); // Огонь
 		UnlockElement(1); // Вода
 		UnlockElement(2); // Земля
@@ -79,7 +73,6 @@ public:
 
 	void OnUpdate(re::core::TimeDelta dt) override
 	{
-		// Логика обновления, если потребуется анимация
 	}
 
 	void OnEvent(re::Event const& event) override
@@ -105,21 +98,17 @@ public:
 	}
 
 private:
-	// --- Инициализация данных ---
 	void InitDatabase()
 	{
-		// Цвета генерируем или задаем вручную для красоты
 		auto addEl = [&](const int id, re::String const& name, const re::Color col) {
 			m_definitions.emplace_back(ElementDef{ id, name, col });
 		};
 
-		// Базовые
 		addEl(0, "Огонь", re::Color::Red);
 		addEl(1, "Вода", re::Color::Blue);
 		addEl(2, "Земля", re::Color::Brown);
 		addEl(3, "Воздух", re::Color::Cyan);
 
-		// Производные (по таблице)
 		addEl(4, "Пар", re::Color(220, 220, 220));
 		addEl(5, "Лава", re::Color(255, 69, 0));
 		addEl(6, "Пыль", re::Color(169, 169, 169));
@@ -147,7 +136,6 @@ private:
 		addEl(28, "Бактерии", re::Color(154, 205, 50));
 		addEl(29, "Водка", re::Color(255, 255, 255));
 
-		// Рецепты (из таблицы на картинке)
 		m_recipes = {
 			{ 0, 1, 4, -1 }, // Огонь + Вода = Пар
 			{ 0, 2, 5, -1 }, // Огонь + Земля = Лава
@@ -179,22 +167,22 @@ private:
 	// --- UI и создание сущностей ---
 	void CreateUI()
 	{
-		auto windowSize = m_window.Size();
+		auto [width, height] = m_window.Size();
 		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
 
 		// Разделительная линия
 		GetScene()
 			.CreateEntity()
 			.Add<re::TransformComponent>({ 0.f, 0.f }) // x=300 - граница
-			.Add<re::RectangleComponent>(re::Color::White, re::Vector2f{ 2.f, (float)windowSize.y });
+			.Add<re::RectangleComponent>(re::Color::White, re::Vector2f{ 2.f, (float)height });
 
 		// Кнопка сортировки (Слева вверху)
 		GetScene()
 			.CreateEntity()
-			.Add<re::TransformComponent>({ -350.f, -300.f })
+			.Add<re::TransformComponent>({ -275.f, -400.f })
 			.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 100.f, 30.f })
 			.Add<re::TextComponent>("Sort", font, re::Color::White, 20.f)
-			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 30.f }, re::Vector2f{ -350.f, -300.f })
+			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 30.f }, re::Vector2f{ -275.f, -400.f })
 			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Sort);
 
 		// Кнопка удаления (Справа внизу, красный крест)
@@ -240,7 +228,7 @@ private:
 		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
 
 		constexpr re::Vector2f TOP_LEFT = { -450.f, -250.f };
-		constexpr float PADDING_Y = 60.f;
+		constexpr float PADDING_Y = 120.f;
 		constexpr float PADDINT_X = 120.f;
 		constexpr int MAX_COLS = 4;
 
@@ -266,18 +254,29 @@ private:
 	re::ecs::EntityWrapper<re::ecs::Scene> CreateElementEntity(int id, re::Vector2f pos, bool isWorkspace)
 	{
 		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
+		const auto imageFile = re::String("assets/" + std::to_string(id) + ".png");
+		const auto image = GetAssetManager().Get<re::Image>(imageFile);
 		const auto& def = GetDef(id);
 
 		auto entity = GetScene().CreateEntity();
 		entity.Add<re::TransformComponent>(pos)
-			.Add<re::RectangleComponent>(def.color, re::Vector2f{ 80.f, 40.f })
 			.Add<re::TextComponent>(def.name, font, re::Color::Black, 14.f)
 			.Add<AlchemyElementComponent>(id, isWorkspace)
-			.Add<re::BoxColliderComponent>(re::Vector2f{ 80.f, 40.f }, pos);
+			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 100.f }, pos);
 
 		if (isWorkspace)
 		{
 			entity.Add<DraggableComponent>();
+		}
+
+		if (image)
+		{
+			image->Scale(100, 100);
+			entity.Add<re::DynamicTextureComponent>(*image);
+		}
+		else
+		{
+			entity.Add<re::RectangleComponent>(def.color, re::Vector2f{ 100.f, 100.f });
 		}
 
 		return entity;
