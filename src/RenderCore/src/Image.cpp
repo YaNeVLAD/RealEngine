@@ -1,5 +1,10 @@
 #include <RenderCore/Image.hpp>
 
+#include <stb_image.h>
+#include <stb_image_resize.h>
+
+#include <iostream>
+
 namespace re
 {
 
@@ -14,6 +19,38 @@ void Image::Resize(const std::uint32_t width, const std::uint32_t height, const 
 	m_height = height;
 	m_data.resize(width * height * 4);
 	Fill(fillColor);
+}
+
+void Image::Scale(const uint32_t newWidth, const uint32_t newHeight)
+{
+	if (m_width == 0 || m_height == 0 || newWidth == 0 || newHeight == 0)
+	{
+		return;
+	}
+	if (m_width == newWidth && m_height == newHeight)
+	{
+		return;
+	}
+
+	std::vector<uint8_t> newData(newWidth * newHeight * sizeof(Color));
+
+	int result = 0;
+
+	result = stbir_resize_uint8(
+		m_data.data(),
+		static_cast<int>(m_width), static_cast<int>(m_height),
+		0,
+		newData.data(),
+		static_cast<int>(newWidth), static_cast<int>(newHeight),
+		0,
+		sizeof(Color));
+
+	if (result)
+	{
+		m_data = std::move(newData);
+		m_width = newWidth;
+		m_height = newHeight;
+	}
 }
 
 void Image::SetPixel(const std::uint32_t x, const std::uint32_t y, const Color color)
@@ -89,6 +126,28 @@ std::uint32_t Image::Size() const
 bool Image::IsEmpty() const
 {
 	return m_data.empty();
+}
+
+bool Image::LoadFromFile(std::string const& filePath)
+{
+	int w, h, channels;
+	stbi_uc* pixels = stbi_load(
+		filePath.c_str(),
+		&w, &h, &channels,
+		STBI_rgb_alpha);
+
+	if (!pixels)
+	{
+		std::cerr << "Failed to load image: " << filePath << std::endl;
+		return false;
+	}
+
+	Resize(w, h);
+	std::memcpy(m_data.data(), pixels, w * h * sizeof(Color));
+
+	stbi_image_free(pixels);
+
+	return true;
 }
 
 } // namespace re

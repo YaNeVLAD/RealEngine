@@ -7,6 +7,10 @@ target_link_libraries(ReRenderCore
         SFML::System
         SFML::Window
         SFML::Graphics
+
+        PRIVATE
+        stb_image
+        stb_image_resize
 )
 
 target_compile_definitions(ReRenderCore PRIVATE RE_RENDER_CORE_EXPORTS)
