@@ -22,9 +22,9 @@ public:
 
 	virtual void OnDetach() {}
 
-	virtual void OnUpdate(core::TimeDelta dt) {}
+	virtual void OnUpdate([[maybe_unused]] core::TimeDelta dt) {}
 
-	virtual void OnEvent(Event const& event) {}
+	virtual void OnEvent([[maybe_unused]] Event const& event) {}
 
 	[[nodiscard]] ecs::Scene& GetScene();
 

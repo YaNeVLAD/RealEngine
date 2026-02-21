@@ -19,7 +19,7 @@ struct MenuLayout final : re::Layout
 	{
 		auto& scene = GetScene();
 
-		const auto font = m_manager.Get<re::Font>("assets/Roboto.ttf");
+		const auto font = m_manager.Get<re::Font>("Roboto.ttf");
 
 		scene.CreateEntity()
 			.Add<re::TransformComponent>(re::Vector2f{}, 0.f, re::Vector2f{ 3.f, 1.f })

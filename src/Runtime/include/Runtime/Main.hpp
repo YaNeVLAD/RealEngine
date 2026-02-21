@@ -7,7 +7,7 @@ extern re::Application* CreateApplication(int argc, char** argv);
 namespace re::runtime
 {
 
-inline int Main(int argc, char** argv)
+inline int Main(const int argc, char** argv)
 {
 	const auto app = CreateApplication(argc, argv);
 	app->Run();
@@ -30,7 +30,7 @@ inline int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, PSTR cmdline, int sh
 
 #else
 
-inline int main(int argc, char** argv)
+inline int main(const int argc, char** argv)
 {
 	return re::runtime::Main(argc, argv);
 }

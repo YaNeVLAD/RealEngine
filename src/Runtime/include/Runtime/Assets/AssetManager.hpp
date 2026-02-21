@@ -2,6 +2,7 @@
 
 #include <Runtime/Export.hpp>
 
+#include <Core/FileSystem.hpp>
 #include <Core/HashedString.hpp>
 #include <Core/String.hpp>
 #include <RenderCore/Assets/IAsset.hpp>
@@ -16,7 +17,7 @@ class RE_RUNTIME_API AssetManager
 {
 public:
 	template <std::derived_from<IAsset> T>
-	std::shared_ptr<T> Get(String const& filePath);
+	std::shared_ptr<T> Get(file_system::AssetsPath const& path);
 
 	void CleanUp();
 

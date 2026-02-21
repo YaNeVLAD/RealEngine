@@ -10,7 +10,7 @@
 
 #else
 
-#error This operating system is not supported by Real Engine
+#error This OS is not supported by RealEngine
 
 #endif
 

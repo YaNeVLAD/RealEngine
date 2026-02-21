@@ -8,7 +8,7 @@
 namespace
 {
 
-constexpr auto FONT_PATH = "assets/Roboto.ttf";
+constexpr auto FONT_NAME = "Roboto.ttf";
 const re::String RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
 
 void CreateHangman(re::ecs::Scene& scene)
@@ -53,7 +53,7 @@ void CreateHangman(re::ecs::Scene& scene)
 
 void HangmanLayout::OnCreate()
 {
-	m_assetManager.Get<re::Font>(FONT_PATH);
+	m_assetManager.Get<re::Font>(FONT_NAME);
 
 	GetScene()
 		.AddSystem<CollisionSystem>()
@@ -183,7 +183,7 @@ void HangmanLayout::CreateUI()
 {
 	auto& scene = GetScene();
 	auto const& gameState = scene.GetComponent<GameStateComponent>(m_gameStateEntity);
-	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
+	auto font = m_assetManager.Get<re::Font>(FONT_NAME);
 
 	constexpr float letterSpacing = 60.0f;
 	const float startX = -static_cast<float>(gameState.secretWord.Length() - 1) * letterSpacing / 2.0f;
@@ -358,7 +358,7 @@ void HangmanLayout::CheckWinLoss()
 void HangmanLayout::ShowEndGameDialog(const bool won)
 {
 	auto& scene = GetScene();
-	auto font = m_assetManager.Get<re::Font>(FONT_PATH);
+	auto font = m_assetManager.Get<re::Font>(FONT_NAME);
 
 	for (auto&& [entity, _] : *scene.CreateView<LetterButtonComponent>())
 	{

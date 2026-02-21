@@ -98,6 +98,8 @@ public:
 	}
 
 private:
+	static constexpr auto FONT_NAME = "Roboto.ttf";
+
 	void InitDatabase()
 	{
 		auto addEl = [&](const int id, re::String const& name, const re::Color col) {
@@ -168,7 +170,7 @@ private:
 	void CreateUI()
 	{
 		auto [width, height] = m_window.Size();
-		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
+		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
 
 		// Разделительная линия
 		GetScene()
@@ -225,7 +227,7 @@ private:
 		}
 		m_libraryEntities.clear();
 
-		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
+		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
 
 		constexpr re::Vector2f TOP_LEFT = { -450.f, -250.f };
 		constexpr float PADDING_Y = 120.f;
@@ -253,8 +255,8 @@ private:
 
 	re::ecs::EntityWrapper<re::ecs::Scene> CreateElementEntity(int id, re::Vector2f pos, bool isWorkspace)
 	{
-		auto font = GetAssetManager().Get<re::Font>("assets/Roboto.ttf");
-		const auto imageFile = re::String("assets/" + std::to_string(id) + ".png");
+		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
+		const auto imageFile = re::file_system::AssetsPath(std::to_string(id) + ".png");
 		const auto image = GetAssetManager().Get<re::Image>(imageFile);
 		const auto& def = GetDef(id);
 

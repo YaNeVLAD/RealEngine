@@ -10,7 +10,7 @@
 namespace re
 {
 
-class RE_RENDER_CORE_API Image : public IAsset
+class RE_RENDER_CORE_API Image final : public IAsset
 {
 public:
 	Image() = default;

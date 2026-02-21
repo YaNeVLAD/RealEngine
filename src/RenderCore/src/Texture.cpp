@@ -34,6 +34,11 @@ std::uint32_t Texture::Height() const
 	return m_height;
 }
 
+std::uint32_t Texture::Size() const
+{
+	return m_width * m_height * sizeof(Color);
+}
+
 void* Texture::GetNativeHandle() const
 {
 	return m_texture.get();
