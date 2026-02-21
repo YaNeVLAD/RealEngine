@@ -8,7 +8,7 @@ namespace re::render
 SFMLWindow::SFMLWindow(std::string const& title, const unsigned width, const unsigned height)
 {
 	m_window.create(sf::VideoMode(sf::Vector2u{ width, height }), title);
-	m_window.setVerticalSyncEnabled(true);
+	m_window.setVerticalSyncEnabled(false);
 }
 
 bool SFMLWindow::IsOpen() const

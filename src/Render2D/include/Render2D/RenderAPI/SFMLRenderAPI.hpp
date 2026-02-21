@@ -2,10 +2,14 @@
 
 #include <Render2D/Export.hpp>
 
+#include <Core/HashedString.hpp>
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <RenderCore/Assets/Font.hpp>
 #include <RenderCore/IRenderAPI.hpp>
+
+// TODO: Remove SFML dependencies from header file
+#include <SFML/Graphics/Text.hpp>
 
 #include <string>
 #include <vector>
@@ -14,6 +18,7 @@ namespace sf
 {
 class RenderWindow;
 class Vertex;
+class Text;
 } // namespace sf
 
 namespace re::render
@@ -48,6 +53,8 @@ private:
 	Color m_clearColor;
 
 	std::vector<sf::Vertex> m_vertices;
+
+	std::unordered_map<HashedU32String::HashType, sf::Text> m_textCache;
 };
 
 } // namespace re::render

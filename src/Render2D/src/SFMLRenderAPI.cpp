@@ -108,16 +108,27 @@ void SFMLRenderAPI::DrawText(
 {
 	Flush();
 
-	sf::Text sfText(font.GetSfFont(), text.ToU32String(), static_cast<unsigned>(fontSize));
+	auto hs = HashedU32String::Value(text.Data(), text.Length());
+	hs += reinterpret_cast<std::size_t>(&font);
+	hs ^= static_cast<std::size_t>(fontSize);
 
-	const auto bounds = sfText.getLocalBounds();
-	sfText.setOrigin(
-		{ bounds.position.x + bounds.size.x / 2.0f,
+	auto it = m_textCache.find(hs);
+	if (it == m_textCache.end())
+	{
+		sf::Text sfText(font.GetSfFont(), text.Data(), fontSize);
+
+		const auto bounds = sfText.getLocalBounds();
+		sfText.setOrigin({ bounds.position.x + bounds.size.x / 2.0f,
 			bounds.position.y + bounds.size.y / 2.0f });
-	sfText.setFillColor(sf::Color(color.ToInt()));
-	sfText.setPosition({ pos.x, pos.y });
 
-	m_window.draw(sfText);
+		it = m_textCache.emplace(hs, std::move(sfText)).first;
+	}
+
+	sf::Text& cachedText = it->second;
+	cachedText.setFillColor(sf::Color(color.ToInt()));
+	cachedText.setPosition({ pos.x, pos.y });
+
+	m_window.draw(cachedText);
 }
 
 void SFMLRenderAPI::DrawTexturedQuad(
