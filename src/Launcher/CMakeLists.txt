@@ -26,7 +26,7 @@ target_compile_definitions(ReLauncher
 
 target_link_libraries(ReLauncher PRIVATE ReRuntime)
 
-if (WIN32)
+if (WIN32 AND RE_USE_SFML_RENDER STREQUAL "SFML")
     add_custom_command(TARGET ReLauncher POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:SFML::Graphics>

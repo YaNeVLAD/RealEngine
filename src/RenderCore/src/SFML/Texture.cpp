@@ -1,4 +1,4 @@
-#include <RenderCore/Assets/Texture.hpp>
+#include <RenderCore/SFML/Texture.hpp>
 
 #include <Core/Math/Color.hpp>
 #include <RenderCore/Image.hpp>

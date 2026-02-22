@@ -1,4 +1,4 @@
-#include <Render2D/RenderAPI/SFMLRenderAPI.hpp>
+#include <Render2D/SFML/SFMLRenderAPI.hpp>
 
 #include <SFML/Graphics.hpp>
 
@@ -11,6 +11,10 @@ SFMLRenderAPI::SFMLRenderAPI(sf::RenderWindow& window)
 	: m_window(window)
 {
 	m_vertices.reserve(MAX_QUAD_COUNT * VERTICES_PER_QUAD);
+}
+
+void SFMLRenderAPI::Init()
+{
 }
 
 void SFMLRenderAPI::SetViewport(const Vector2f topLeft, const Vector2f size)
@@ -115,7 +119,7 @@ void SFMLRenderAPI::DrawText(
 	auto it = m_textCache.find(hs);
 	if (it == m_textCache.end())
 	{
-		sf::Text sfText(font.GetSfFont(), text.Data(), fontSize);
+		sf::Text sfText(font.GetSfFont(), text.Data(), static_cast<unsigned>(fontSize));
 
 		const auto bounds = sfText.getLocalBounds();
 		sfText.setOrigin({ bounds.position.x + bounds.size.x / 2.0f,
@@ -151,6 +155,11 @@ void SFMLRenderAPI::DrawTexturedQuad(
 	}
 
 	m_window.draw(rect);
+}
+
+void SFMLRenderAPI::Clear()
+{
+	m_window.clear();
 }
 
 } // namespace re::render

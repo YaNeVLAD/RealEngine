@@ -7,9 +7,18 @@
 #   src/
 #     Source files (.cpp)
 function(re_add_module target_name)
-    file(GLOB_RECURSE SOURCES "src/*.cpp" "include/*.hpp" "include/*.h")
+    set(options "")
+    set(oneValueArgs "")
+    set(multiValueArgs SOURCES)
 
-    add_library(${target_name} ${SOURCES})
+    cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if (NOT ARG_SOURCES)
+        file(GLOB_RECURSE ARG_SOURCES "src/*.cpp" "include/*.hpp" "include/*.h")
+        message(STATUS "Module ${target_name}: No sources provided, using auto-discovery.")
+    endif ()
+
+    add_library(${target_name} ${ARG_SOURCES})
 
     target_include_directories(${target_name}
             PUBLIC

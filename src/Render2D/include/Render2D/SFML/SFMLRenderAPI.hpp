@@ -5,19 +5,20 @@
 #include <Core/HashedString.hpp>
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
-#include <RenderCore/Assets/Font.hpp>
 #include <RenderCore/IRenderAPI.hpp>
+#include <RenderCore/SFML/Font.hpp>
 
 // TODO: Remove SFML dependencies from header file
 #include <SFML/Graphics/Text.hpp>
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace sf
 {
 class RenderWindow;
-class Vertex;
+struct Vertex;
 class Text;
 } // namespace sf
 
@@ -28,6 +29,8 @@ class RE_RENDER_2D_API SFMLRenderAPI final : public IRenderAPI
 {
 public:
 	explicit SFMLRenderAPI(sf::RenderWindow& window);
+
+	void Init() override;
 
 	void SetViewport(Vector2f topLeft, Vector2f size) override;
 
@@ -44,6 +47,8 @@ public:
 	void DrawText(String const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) override;
 
 	void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) override;
+
+	void Clear() override;
 
 private:
 	static constexpr std::size_t MAX_QUAD_COUNT = 1024;

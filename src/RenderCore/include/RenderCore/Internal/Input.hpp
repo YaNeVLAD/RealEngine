@@ -9,6 +9,8 @@
 namespace re::detail::Input
 {
 
+RE_RENDER_CORE_API void Init(void* nativeWindowHandle);
+
 RE_RENDER_CORE_API bool IsKeyPressed(Keyboard::Key key);
 
 RE_RENDER_CORE_API bool IsMouseButtonPressed(Mouse::Button button);

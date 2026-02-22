@@ -138,17 +138,22 @@ constexpr sf::Mouse::Button MouseButtonToSfMouseButton(const re::Mouse::Button b
 namespace re::detail::Input
 {
 
-bool Input::IsKeyPressed(const Keyboard::Key key)
+void Init(void* nativeWindowHandle)
+{
+	std::ignore = nativeWindowHandle;
+}
+
+bool IsKeyPressed(const Keyboard::Key key)
 {
 	return sf::Keyboard::isKeyPressed(KeyToSfKey(key));
 }
 
-bool Input::IsMouseButtonPressed(const Mouse::Button button)
+bool IsMouseButtonPressed(const Mouse::Button button)
 {
 	return sf::Mouse::isButtonPressed(MouseButtonToSfMouseButton(button));
 }
 
-Vector2i Input::GetMousePosition()
+Vector2i GetMousePosition()
 {
 	const auto pos = sf::Mouse::getPosition();
 	return { pos.x, pos.y };

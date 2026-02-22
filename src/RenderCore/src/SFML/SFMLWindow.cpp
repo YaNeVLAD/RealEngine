@@ -1,4 +1,4 @@
-#include <RenderCore/Window/SFMLWindow.hpp>
+#include <RenderCore/SFML/SFMLWindow.hpp>
 
 #include <SFML/Graphics.hpp>
 
@@ -131,6 +131,15 @@ void* SFMLWindow::GetNativeHandle()
 sf::RenderWindow* SFMLWindow::GetSFMLWindow()
 {
 	return &m_window;
+}
+
+void SFMLWindow::OnUpdate()
+{
+}
+
+void SFMLWindow::SetVSyncEnabled(const bool enabled)
+{
+	m_window.setVerticalSyncEnabled(enabled);
 }
 
 } // namespace re::render

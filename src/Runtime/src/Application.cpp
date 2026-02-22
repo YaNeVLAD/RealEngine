@@ -1,11 +1,22 @@
 #include <Runtime/Application.hpp>
 
 #include <Core/Utils.hpp>
-#include <Render2D/RenderAPI/SFMLRenderAPI.hpp>
 #include <Render2D/Renderer2D.hpp>
-#include <RenderCore/Window/SFMLWindow.hpp>
+#include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
+
+#if defined(RE_USE_SFML_RENDER)
+#include <Render2D/SFML/SFMLRenderAPI.hpp>
+#include <RenderCore/SFML/SFMLWindow.hpp>
+#endif
+
+#if defined(RE_USE_GLFW_RENDER)
+#include <Render2D/OpenGL/OpenGLRenderAPI.hpp>
+#include <RenderCore/GLFW/GLFWWindow.hpp>
+#endif
+
+#include <chrono>
 
 namespace
 {
@@ -15,6 +26,36 @@ struct DefaultTag final : re::Layout
 	using Layout::Layout;
 };
 
+std::unique_ptr<re::render::IWindow> CreateWindow(
+	std::string const& title,
+	std::uint32_t width,
+	std::uint32_t height)
+{
+#if defined(RE_USE_GLFW_RENDER)
+	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
+	if (window->GetNativeHandle())
+	{
+		re::render::Renderer2D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
+	}
+	else
+	{
+		throw std::runtime_error("Created window and render api are not compatible");
+	}
+#elif defined(RE_USE_SFML_RENDER)
+	auto window = std::make_unique<re::render::SFMLWindow>(title, width, height);
+	if (auto* sfWindow = window->GetSFMLWindow())
+	{
+		re::render::Renderer2D::Init(std::make_unique<re::render::SFMLRenderAPI>(*sfWindow));
+	}
+	else
+	{
+		throw std::runtime_error("Created window and render api are not compatible");
+	}
+#endif
+
+	return window;
+}
+
 } // namespace
 
 namespace re
@@ -23,16 +64,8 @@ namespace re
 Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
-	m_window = std::make_unique<render::SFMLWindow>(name, 1024u, 680u);
-
-	if (auto* sfWindow = dynamic_cast<render::SFMLWindow&>(*m_window).GetSFMLWindow())
-	{
-		render::Renderer2D::Init(std::make_unique<render::SFMLRenderAPI>(*sfWindow));
-	}
-	else
-	{
-		throw std::runtime_error("Created window and render api are not compatible");
-	}
+	m_window = CreateWindow(name, 1280u, 720u);
+	detail::Input::Init(m_window->GetNativeHandle());
 
 	AddLayout<DefaultTag>();
 	ChangeToPendingLayout();
@@ -150,6 +183,7 @@ void Application::GameLoop()
 
 			scene.ConfirmChanges();
 		}
+		m_window->OnUpdate();
 	}
 
 	m_window->SetActive(false);

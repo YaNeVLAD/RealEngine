@@ -24,6 +24,67 @@
       }
     },
     {
+      "name": "base-debug-static",
+      "hidden": true,
+      "description": "Static libraries build (Single executable)",
+      "inherits": "base-windows",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_SHARED_LIBS": "OFF",
+        "SFML_STATIC_LIBRARIES": "ON"
+      }
+    },
+    {
+      "name": "base-debug-shared",
+      "hidden": true,
+      "description": "Shared libraries build (Shared)",
+      "inherits": "base-windows",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_SHARED_LIBS": "ON"
+      }
+    },
+    {
+      "name": "render-sfml",
+      "hidden": true,
+      "cacheVariables": {
+        "RE_RENDER_BACKEND": "SFML"
+      }
+    },
+    {
+      "name": "render-glfw",
+      "hidden": true,
+      "cacheVariables": {
+        "RE_RENDER_BACKEND": "GLFW"
+      }
+    },
+    {
+      "name": "windows-debug-static-glfw",
+      "displayName": "Windows Debug (Static + GLFW)",
+      "description": "Static libraries build (Single executable) with OpenGL/GLFW backend",
+      "inherits": [
+        "base-debug-static",
+        "render-glfw"
+      ]
+    },
+    {
+      "name": "windows-debug-static-sfml",
+      "displayName": "Windows Debug (Static + SFML)",
+      "description": "Static libraries build (Single executable) with SFML backend",
+      "inherits": [
+        "base-debug-static",
+        "render-sfml"
+      ]
+    },
+    {
       "name": "windows-debug-shared",
       "displayName": "Windows Debug (DLL)",
       "description": "Shared libraries build (Shared)",

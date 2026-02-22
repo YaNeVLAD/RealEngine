@@ -38,6 +38,10 @@ public:
 
 	sf::RenderWindow* GetSFMLWindow();
 
+	void OnUpdate() override;
+
+	void SetVSyncEnabled(bool enabled) override;
+
 private:
 	sf::RenderWindow m_window;
 };

@@ -3,9 +3,9 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/String.hpp>
-#include <RenderCore/Assets/Font.hpp>
-#include <RenderCore/Assets/Texture.hpp>
+#include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
+#include <RenderCore/Texture.hpp>
 
 namespace re
 {
