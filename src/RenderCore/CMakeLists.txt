@@ -10,11 +10,6 @@ if (RE_RENDER_BACKEND STREQUAL "GLFW")
             "src/GLFW/*.cpp"
             "include/RenderCore/GLFW/*.hpp"
     )
-    set(BACKEND_LIBS
-            glfw
-            glm
-            GLAD
-    )
     set(BACKEND_DEFINES RE_RENDER_PLATFORM_OPENGL)
 
 elseif (RE_RENDER_BACKEND STREQUAL "SFML")
@@ -22,11 +17,6 @@ elseif (RE_RENDER_BACKEND STREQUAL "SFML")
     file(GLOB_RECURSE BACKEND_SOURCES
             "src/SFML/*.cpp"
             "include/RenderCore/SFML/*.hpp"
-    )
-    set(BACKEND_LIBS
-            SFML::Graphics
-            SFML::Window
-            SFML::System
     )
     set(BACKEND_DEFINES RE_RENDER_PLATFORM_SFML)
 
@@ -40,12 +30,11 @@ re_add_module(ReRenderCore
 target_link_libraries(ReRenderCore
         PUBLIC
         ReCore
-        ${BACKEND_LIBS}
+        ${RENDER_LIBS}
 
         PRIVATE
         stb_image
         stb_image_resize
-        glm
 )
 
 target_compile_definitions(ReRenderCore PRIVATE RE_RENDER_CORE_EXPORTS ${BACKEND_DEFINES})

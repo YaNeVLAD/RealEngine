@@ -1,4 +1,4 @@
-#include <Render2D/SFML/SFMLRenderAPI.hpp>
+#include <RenderCore/SFML/SFMLRenderAPI.hpp>
 
 #include <SFML/Graphics.hpp>
 
@@ -57,6 +57,13 @@ void SFMLRenderAPI::Flush()
 
 	m_vertices.clear();
 }
+
+Vector2f SFMLRenderAPI::ScreenToWorld(Vector2i const& pixelPos)
+{
+	const auto pos = m_window.mapPixelToCoords({pixelPos.x, pixelPos.y});
+	return {pos.x, pos.y};
+}
+
 void SFMLRenderAPI::DrawQuad(
 	Vector2f const& pos,
 	Vector2f const& size,

@@ -7,13 +7,13 @@
 #include <Runtime/Internal/RenderSystem2D.hpp>
 
 #if defined(RE_USE_SFML_RENDER)
-#include <Render2D/SFML/SFMLRenderAPI.hpp>
+#include <RenderCore/SFML/SFMLRenderAPI.hpp>
 #include <RenderCore/SFML/SFMLWindow.hpp>
 #endif
 
 #if defined(RE_USE_GLFW_RENDER)
-#include <Render2D/OpenGL/OpenGLRenderAPI.hpp>
 #include <RenderCore/GLFW/GLFWWindow.hpp>
+#include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 #endif
 
 #include <chrono>
@@ -36,6 +36,10 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	if (window->GetNativeHandle())
 	{
 		re::render::Renderer2D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
+		re::render::Renderer2D::SetViewport(window->Size());
+		window->SetWorldPosCallback([](re::Vector2i const& pos) {
+			return re::render::Renderer2D::ScreenToWorld(pos);
+		});
 	}
 	else
 	{
@@ -46,6 +50,10 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	if (auto* sfWindow = window->GetSFMLWindow())
 	{
 		re::render::Renderer2D::Init(std::make_unique<re::render::SFMLRenderAPI>(*sfWindow));
+		re::render::Renderer2D::SetViewport(window->Size());
+		window->SetWorldPosCallback([](re::Vector2i const& pos) {
+			return re::render::Renderer2D::ScreenToWorld(pos);
+		});
 	}
 	else
 	{
@@ -65,6 +73,7 @@ Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
 	m_window = CreateWindow(name, 1280u, 720u);
+	m_window->SetVSyncEnabled(false);
 	detail::Input::Init(m_window->GetNativeHandle());
 
 	AddLayout<DefaultTag>();
@@ -183,7 +192,6 @@ void Application::GameLoop()
 
 			scene.ConfirmChanges();
 		}
-		m_window->OnUpdate();
 	}
 
 	m_window->SetActive(false);

@@ -8,6 +8,7 @@ Vector2u Renderer2D::m_viewportSize = { 1920u, 1080u };
 void Renderer2D::Init(std::unique_ptr<IRenderAPI> renderApi)
 {
 	m_api = std::move(renderApi);
+	m_api->Init();
 }
 
 void Renderer2D::Shutdown()
@@ -30,6 +31,11 @@ void Renderer2D::BeginScene(Vector2f const& cameraPos, const float cameraZoom)
 	};
 
 	m_api->SetCamera(cameraPos, worldSize);
+}
+
+Vector2f Renderer2D::ScreenToWorld(Vector2i const& pixelPos)
+{
+	return m_api->ScreenToWorld(pixelPos);
 }
 
 void Renderer2D::EndScene()

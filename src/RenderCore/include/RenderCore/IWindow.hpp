@@ -4,6 +4,7 @@
 #include <RenderCore/Event.hpp>
 #include <RenderCore/Image.hpp>
 
+#include <functional>
 #include <optional>
 
 namespace re::render
@@ -19,13 +20,15 @@ public:
 	virtual void SetTitle(String const& title) = 0;
 	virtual void SetIcon(Image const& image) = 0;
 	virtual void SetVSyncEnabled(bool enabled) = 0;
-	virtual void OnUpdate() = 0;
 	virtual Vector2f ToWorldPos(Vector2i const& pixelPos) = 0;
 	virtual std::optional<Event> PollEvent() = 0;
 	virtual Vector2u Size() = 0;
 	virtual void Clear() = 0;
 	virtual void Display() = 0;
 	virtual void* GetNativeHandle() = 0;
+
+	using WorldPosCallback = std::function<Vector2f(Vector2i const&)>;
+	virtual void SetWorldPosCallback(WorldPosCallback&& callback) = 0;
 };
 
 } // namespace re::render

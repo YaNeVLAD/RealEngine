@@ -18,6 +18,7 @@ public:
 	virtual void SetViewport(Vector2f topLeft, Vector2f size) = 0;
 	virtual void SetCamera(Vector2f center, Vector2f size) = 0;
 	virtual void SetClearColor(Color const& color) = 0;
+	virtual Vector2f ScreenToWorld(Vector2i const& pixelPos) = 0;
 	virtual void Flush() = 0;
 	virtual void Clear() = 0;
 	virtual void DrawQuad(Vector2f const& pos, Vector2f const& size, float rotation, Color const& color) = 0;

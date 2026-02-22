@@ -8,26 +8,19 @@ struct GLFWwindow; // Forward declaration
 namespace re::render
 {
 
-class GLFWWindow : public IWindow
+class RE_RENDER_CORE_API GLFWWindow final : public IWindow
 {
 public:
 	GLFWWindow(const std::string& title, uint32_t width, uint32_t height);
-	~GLFWWindow();
+	~GLFWWindow() override;
 
-	void OnUpdate() override;
 	std::optional<Event> PollEvent() override;
 
-	Vector2u Size() override
-	{
-		return { m_data.width, m_data.height };
-	}
+	Vector2u Size() override;
 
 	void SetVSyncEnabled(bool enabled) override;
 
-	void* GetNativeHandle() override
-	{
-		return m_window;
-	}
+	void* GetNativeHandle() override;
 
 	bool IsOpen() const override;
 
@@ -43,6 +36,8 @@ public:
 
 	void Display() override;
 
+	void SetWorldPosCallback(WorldPosCallback&& callback) override;
+
 private:
 	void Init(const std::string& title);
 	void Shutdown();
@@ -52,14 +47,16 @@ private:
 
 	struct WindowData
 	{
-		std::string title;
-		uint32_t width, height;
+		String title;
+		std::uint32_t width;
+		std::uint32_t height;
 		bool vsync;
 
 		std::vector<Event> eventQueue;
 	};
 
 	WindowData m_data;
+	WorldPosCallback m_worldPosCallback;
 };
 
 } // namespace re::render

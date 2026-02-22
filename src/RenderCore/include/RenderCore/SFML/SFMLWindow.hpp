@@ -38,9 +38,9 @@ public:
 
 	sf::RenderWindow* GetSFMLWindow();
 
-	void OnUpdate() override;
-
 	void SetVSyncEnabled(bool enabled) override;
+
+	void SetWorldPosCallback(WorldPosCallback&& callback) override;
 
 private:
 	sf::RenderWindow m_window;

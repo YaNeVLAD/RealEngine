@@ -23,6 +23,8 @@ public:
 
 	static void BeginScene(Vector2f const& cameraPos, float cameraZoom);
 
+	static Vector2f ScreenToWorld(Vector2i const& pixelPos);
+
 	static void EndScene();
 
 	static void DrawQuad(

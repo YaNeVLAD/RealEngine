@@ -8,14 +8,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(EnTT)
 
-# GLM
-FetchContent_Declare(
-        glm
-        GIT_REPOSITORY https://github.com/g-truc/glm.git
-        GIT_TAG 0af55ccecd98d4e5a8d1fad7de25ba429d60e863
-)
-FetchContent_MakeAvailable(glm)
-
 if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     FetchContent_Declare(
             SFML
@@ -25,10 +17,30 @@ if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
             EXCLUDE_FROM_ALL
             SYSTEM)
     FetchContent_MakeAvailable(SFML)
-    set(RENDER_LIBS sfml-graphics)
+
+    set(RENDER_LIBS
+            SFML::Graphics
+            SFML::Window
+            SFML::System
+    )
     add_compile_definitions(RE_USE_SFML_RENDER)
 
 elseif (RE_RENDER_BACKEND STREQUAL "GLFW") # GLFW
+    # GLM
+    FetchContent_Declare(
+            glm
+            GIT_REPOSITORY https://github.com/g-truc/glm.git
+            GIT_TAG 1.0.1
+    )
+    set(GLM_BUILD_LIBRARY OFF CACHE INTERNAL "")
+    set(BUILD_SHARED_LIBS_SAVED ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+
+    FetchContent_MakeAvailable(glm)
+
+    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED}) # Возвращаем обратно1
+
+    # GLFW
     FetchContent_Declare(
             glfw
             GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -41,7 +53,11 @@ elseif (RE_RENDER_BACKEND STREQUAL "GLFW") # GLFW
     add_library(GLAD STATIC "${GLAD_PATH}/glad.c")
     target_include_directories(GLAD PUBLIC "${GLAD_PATH}")
 
-    set(RENDER_LIBS glfw glm GLAD)
+    set(RENDER_LIBS
+            glfw
+            glm::glm
+            GLAD
+    )
     add_compile_definitions(RE_USE_GLFW_RENDER)
 endif ()
 

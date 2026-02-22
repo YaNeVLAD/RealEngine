@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Render2D/Export.hpp>
+#include <RenderCore/Export.hpp>
 
 #include <Core/HashedString.hpp>
 #include <Core/Math/Color.hpp>
@@ -25,7 +25,7 @@ class Text;
 namespace re::render
 {
 
-class RE_RENDER_2D_API SFMLRenderAPI final : public IRenderAPI
+class RE_RENDER_CORE_API SFMLRenderAPI final : public IRenderAPI
 {
 public:
 	explicit SFMLRenderAPI(sf::RenderWindow& window);
@@ -39,6 +39,8 @@ public:
 	void SetClearColor(Color const& color) override;
 
 	void Flush() override;
+
+	Vector2f ScreenToWorld(Vector2i const& pixelPos) override;
 
 	void DrawQuad(Vector2f const& pos, Vector2f const& size, float rotation, Color const& color) override;
 

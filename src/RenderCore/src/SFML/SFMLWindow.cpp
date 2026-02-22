@@ -133,13 +133,14 @@ sf::RenderWindow* SFMLWindow::GetSFMLWindow()
 	return &m_window;
 }
 
-void SFMLWindow::OnUpdate()
-{
-}
-
 void SFMLWindow::SetVSyncEnabled(const bool enabled)
 {
 	m_window.setVerticalSyncEnabled(enabled);
+}
+
+void SFMLWindow::SetWorldPosCallback(WorldPosCallback&& callback)
+{
+	std::ignore = callback;
 }
 
 } // namespace re::render
