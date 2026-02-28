@@ -8,7 +8,6 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Layout.hpp>
 
-// Подобрать названия, чтобы больше были похожи на названия модели игры
 #include "AlchemyComponents.hpp"
 #include "AlchemyGame.hpp"
 #include "IngredientStorage.hpp"
@@ -16,9 +15,6 @@
 #include <set>
 #include <vector>
 
-// Не давать переносить элементы на левую часть поля в библиотеку
-// Удалять элементы, если пытаемся выбросить их в левой половине экрана
-// Добавить слои для элементов
 // Добавить картинки для всех элементов
 class AlchemyLayout final : public re::Layout
 {
