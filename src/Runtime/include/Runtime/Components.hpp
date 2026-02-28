@@ -7,6 +7,8 @@
 #include <RenderCore/Image.hpp>
 #include <RenderCore/Texture.hpp>
 
+#include <compare>
+
 namespace re
 {
 
@@ -48,6 +50,13 @@ struct CameraComponent
 {
 	float zoom = 1.f;
 	bool isPrimal = true;
+};
+
+struct ZIndexComponent
+{
+	int value = 0;
+
+	auto operator<=>(const ZIndexComponent&) const = default;
 };
 
 struct BoxColliderComponent

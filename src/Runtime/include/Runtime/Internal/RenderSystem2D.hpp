@@ -5,6 +5,8 @@
 #include <ECS/System/System.hpp>
 #include <RenderCore/IWindow.hpp>
 
+#include <functional>
+
 namespace re::detail
 {
 
@@ -16,7 +18,16 @@ public:
 	void Update(ecs::Scene& scene, core::TimeDelta dt) override;
 
 private:
+	struct RenderObject
+	{
+		int zIndex;
+
+		std::function<void()> drawCall;
+	};
+
 	render::IWindow& m_window;
+
+	std::vector<RenderObject> m_renderQueue;
 };
 
 } // namespace re::detail

@@ -72,7 +72,7 @@ namespace re
 Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
-	m_window = CreateWindow(name, 1280u, 720u);
+	m_window = CreateWindow(name, 1920u, 1080u);
 	m_window->SetVSyncEnabled(false);
 	detail::Input::Init(m_window->GetNativeHandle());
 
@@ -200,13 +200,16 @@ void Application::GameLoop()
 void Application::SetupScene(Layout& layout) const
 {
 	auto& scene = layout.GetScene();
+	scene.RegisterComponent<ZIndexComponent>();
+
 	scene
 		.AddSystem<detail::RenderSystem2D>(*m_window)
 		.WithRead<
 			TransformComponent,
 			RectangleComponent,
 			CircleComponent,
-			DynamicTextureComponent>()
+			DynamicTextureComponent,
+			ZIndexComponent>()
 		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
 
