@@ -1,9 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <set>
-#include <vector>
-
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/String.hpp>
@@ -12,67 +8,41 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Layout.hpp>
 
-struct AlchemyElementComponent
-{
-	int elementId = -1;
-	bool isWorkspaceElement = false;
-};
+// Подобрать названия, чтобы больше были похожи на названия модели игры
+#include "AlchemyComponents.hpp"
+#include "AlchemyGame.hpp"
+#include "IngredientStorage.hpp"
 
-struct DraggableComponent
-{
-	bool isDragging = false;
-	re::Vector2f dragOffset;
-	re::Vector2f originalPosition;
-};
+#include <set>
+#include <vector>
 
-struct AlchemyButtonComponent
-{
-	enum class Type
-	{
-		Sort,
-		Clear
-	} type;
-};
-
+// Не давать переносить элементы на левую часть поля в библиотеку
+// Удалять элементы, если пытаемся выбросить их в левой половине экрана
+// Добавить слои для элементов
+// Добавить картинки для всех элементов
 class AlchemyLayout final : public re::Layout
 {
-	struct ElementDef
+	struct Layers
 	{
-		int id;
-		re::String name;
-		re::Color color;
-	};
-
-	struct Recipe
-	{
-		int inputA;
-		int inputB;
-		int resultA;
-		int resultB;
+		static constexpr int Background = -10;
+		static constexpr int Default = 0;
+		static constexpr int Items = 10;
+		static constexpr int UI = 50;
+		static constexpr int Dragging = 100;
 	};
 
 public:
 	AlchemyLayout(re::Application& app, re::render::IWindow& window)
 		: Layout(app)
 		, m_window(window)
+		, m_game(m_registry)
 	{
 	}
 
 	void OnCreate() override
 	{
-		InitDatabase();
-
-		UnlockElement(0); // Огонь
-		UnlockElement(1); // Вода
-		UnlockElement(2); // Земля
-		UnlockElement(3); // Воздух
-
 		CreateUI();
 		RefreshLibrary();
-	}
-
-	void OnUpdate(re::core::TimeDelta dt) override
-	{
 	}
 
 	void OnEvent(re::Event const& event) override
@@ -84,14 +54,14 @@ public:
 				HandleMouseDown(m_window.ToWorldPos(press->position));
 			}
 		}
-		else if (const auto* release = event.GetIf<re::Event::MouseButtonReleased>())
+		if (const auto* release = event.GetIf<re::Event::MouseButtonReleased>())
 		{
 			if (release->button == re::Mouse::Button::Left)
 			{
 				HandleMouseUp();
 			}
 		}
-		else if (const auto* move = event.GetIf<re::Event::MouseMoved>())
+		if (const auto* move = event.GetIf<re::Event::MouseMoved>())
 		{
 			HandleMouseMove(m_window.ToWorldPos(move->position));
 		}
@@ -100,124 +70,56 @@ public:
 private:
 	static constexpr auto FONT_NAME = "Roboto.ttf";
 
-	void InitDatabase()
-	{
-		auto addEl = [&](const int id, re::String const& name, const re::Color col) {
-			m_definitions.emplace_back(ElementDef{ id, name, col });
-		};
-
-		addEl(0, "Огонь", re::Color::Red);
-		addEl(1, "Вода", re::Color::Blue);
-		addEl(2, "Земля", re::Color::Brown);
-		addEl(3, "Воздух", re::Color::Cyan);
-
-		addEl(4, "Пар", re::Color(220, 220, 220));
-		addEl(5, "Лава", re::Color(255, 69, 0));
-		addEl(6, "Пыль", re::Color(169, 169, 169));
-		addEl(7, "Порох", re::Color(47, 79, 79));
-		addEl(8, "Взрыв", re::Color(255, 215, 0));
-		addEl(9, "Дым", re::Color(105, 105, 105));
-		addEl(10, "Энергия", re::Color(238, 130, 238));
-		addEl(11, "Камень", re::Color(112, 128, 144));
-		addEl(12, "Буря", re::Color(70, 130, 180));
-		addEl(13, "Металл", re::Color(192, 192, 192));
-		addEl(14, "Электричество", re::Color(255, 255, 0));
-		addEl(15, "Водород", re::Color(240, 248, 255));
-		addEl(16, "Кислород", re::Color(240, 255, 255));
-		addEl(17, "Озон", re::Color(176, 224, 230));
-		addEl(18, "Грязь", re::Color(101, 67, 33));
-		addEl(19, "Гейзер", re::Color(224, 255, 255));
-		addEl(20, "Паровой котел", re::Color(184, 134, 11));
-		addEl(21, "Давление", re::Color(255, 140, 0));
-		addEl(22, "Вулкан", re::Color(178, 34, 34));
-		addEl(23, "Гремучий газ", re::Color(255, 228, 181));
-		addEl(24, "Болото", re::Color(85, 107, 47));
-		addEl(25, "Спирт", re::Color(250, 250, 210));
-		addEl(26, "Коктейль Молотова", re::Color(255, 99, 71));
-		addEl(27, "Жизнь", re::Color(50, 205, 50));
-		addEl(28, "Бактерии", re::Color(154, 205, 50));
-		addEl(29, "Водка", re::Color(255, 255, 255));
-
-		m_recipes = {
-			{ 0, 1, 4, -1 }, // Огонь + Вода = Пар
-			{ 0, 2, 5, -1 }, // Огонь + Земля = Лава
-			{ 3, 2, 6, -1 }, // Воздух + Земля = Пыль
-			{ 0, 6, 7, -1 }, // Огонь + Пыль = Порох
-			{ 7, 0, 8, 9 }, // Порох + Огонь = Взрыв + Дым
-			{ 3, 0, 10, -1 }, // Воздух + Огонь = Энергия
-			{ 5, 1, 4, 11 }, // Лава + Вода = Пар + Камень
-			{ 3, 10, 12, -1 }, // Воздух + Энергия = Буря
-			{ 0, 11, 13, -1 }, // Огонь + Камень = Металл
-			{ 13, 10, 14, -1 }, // Металл + Энергия = Электричество
-			{ 14, 1, 15, 16 }, // Электр + Вода = Водород + Кислород
-			{ 14, 16, 17, -1 }, // Электр + Кислород = Озон
-			{ 6, 1, 18, -1 }, // Пыль + Вода = Грязь
-			{ 4, 2, 19, -1 }, // Пар + Земля = Гейзер
-			{ 4, 13, 20, -1 }, // Пар + Металл = Паровой котел
-			{ 20, 4, 21, -1 }, // Пар.котел + Пар = Давление
-			{ 5, 21, 22, -1 }, // Лава + Давление = Вулкан
-			{ 15, 16, 23, -1 }, // Водород + Кислород = Гремучий газ
-			{ 1, 2, 24, -1 }, // Вода + Земля = Болото
-			{ 0, 1, 25, -1 }, // Огонь + Вода = Спирт (Второй рецепт! См логику)
-			{ 25, 0, 26, -1 }, // Спирт + Огонь = К.Молотова
-			{ 24, 10, 27, -1 }, // Болото + Энергия = Жизнь
-			{ 27, 24, 28, -1 }, // Жизнь + Болото = Бактерии
-			{ 25, 1, 29, -1 } // Спирт + Вода = Водка
-		};
-	}
-
-	// --- UI и создание сущностей ---
 	void CreateUI()
 	{
 		auto [width, height] = m_window.Size();
 		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
 
-		// Разделительная линия
 		GetScene()
 			.CreateEntity()
-			.Add<re::TransformComponent>({ 0.f, 0.f }) // x=300 - граница
-			.Add<re::RectangleComponent>(re::Color::White, re::Vector2f{ 2.f, (float)height });
+			.Add<re::TransformComponent>({ 0.f, 0.f })
+			.Add<re::RectangleComponent>(re::Color::White, re::Vector2f{ 2.f, (float)height })
+			.Add<re::ZIndexComponent>(Layers::UI);
 
-		// Кнопка сортировки (Слева вверху)
 		GetScene()
 			.CreateEntity()
 			.Add<re::TransformComponent>({ -275.f, -400.f })
 			.Add<re::RectangleComponent>(re::Color::Gray, re::Vector2f{ 100.f, 30.f })
 			.Add<re::TextComponent>("Sort", font, re::Color::White, 20.f)
 			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 30.f }, re::Vector2f{ -275.f, -400.f })
-			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Sort);
+			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Sort)
+			.Add<re::ZIndexComponent>(Layers::UI);
 
-		// Кнопка удаления (Справа внизу, красный крест)
 		re::Vector2f trashPos = { 400.f, 250.f };
-		auto deleteBtn = GetScene().CreateEntity();
-		deleteBtn.Add<re::TransformComponent>(trashPos)
-			.Add<re::BoxColliderComponent>(re::Vector2f{ 60.f, 60.f }, trashPos)
-			.Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Clear);
+		m_trashIcon = GetScene()
+						  .CreateEntity()
+						  .Add<re::TransformComponent>(trashPos)
+						  .Add<re::BoxColliderComponent>(re::Vector2f{ 60.f, 60.f }, trashPos)
+						  .Add<AlchemyButtonComponent>(AlchemyButtonComponent::Type::Clear)
+						  .Add<re::ZIndexComponent>(Layers::UI)
+						  .GetEntity();
 
-		// Визуализация крестика
-		m_trashIcon = deleteBtn.GetEntity();
-
-		// Рисуем крестик двумя прямоугольниками
 		GetScene()
 			.CreateEntity()
 			.Add<re::TransformComponent>(trashPos, 45.f)
-			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f })
+			.Add<re::ZIndexComponent>(Layers::UI);
 		GetScene()
 			.CreateEntity()
 			.Add<re::TransformComponent>(trashPos, -45.f)
-			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f });
+			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 10.f, 60.f })
+			.Add<re::ZIndexComponent>(Layers::UI);
 
-		// Лог сообщений (Внизу)
 		m_logEntity = GetScene()
 						  .CreateEntity()
 						  .Add<re::TransformComponent>({ 0.f, 320.f })
 						  .Add<re::TextComponent>("Start mixing elements!", font, re::Color::White, 24.f)
+						  .Add<re::ZIndexComponent>(Layers::UI)
 						  .GetEntity();
 	}
 
 	void RefreshLibrary()
 	{
-		// Удаляем старые элементы библиотеки
 		for (const auto entity : m_libraryEntities)
 		{
 			if (GetScene().IsValid(entity))
@@ -225,27 +127,23 @@ private:
 				GetScene().DestroyEntity(entity);
 			}
 		}
+
 		m_libraryEntities.clear();
 
-		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
-
 		constexpr re::Vector2f TOP_LEFT = { -450.f, -250.f };
-		constexpr float PADDING_Y = 120.f;
-		constexpr float PADDINT_X = 120.f;
-		constexpr int MAX_COLS = 4;
+		constexpr float SPACING = 120.f;
 
-		int col = 0;
-		int row = 0;
-		for (const int id : m_unlockedElements)
+		int col = 0, row = 0;
+		for (const int id : m_game.GetUnlockedElements())
 		{
-			const float x = TOP_LEFT.x + (float)col * PADDINT_X;
-			const float y = TOP_LEFT.y + (float)row * PADDING_Y;
-
-			auto entity = CreateElementEntity(id, { x, y }, false);
+			const re::Vector2f pos = {
+				TOP_LEFT.x + static_cast<float>(col) * SPACING,
+				TOP_LEFT.y + static_cast<float>(row) * SPACING
+			};
+			auto entity = CreateElementEntity(id, pos, false);
 			m_libraryEntities.push_back(entity.GetEntity());
 
-			col++;
-			if (col >= MAX_COLS)
+			if (++col >= 4)
 			{
 				col = 0;
 				row++;
@@ -255,22 +153,25 @@ private:
 
 	re::ecs::EntityWrapper<re::ecs::Scene> CreateElementEntity(int id, re::Vector2f pos, bool isWorkspace)
 	{
+		const auto* def = m_registry.GetDef(id);
 		auto font = GetAssetManager().Get<re::Font>(FONT_NAME);
-		const auto imageFile = re::file_system::AssetsPath(std::to_string(id) + ".png");
-		const auto image = GetAssetManager().Get<re::Image>(imageFile);
-		const auto& def = GetDef(id);
-
 		auto entity = GetScene().CreateEntity();
-		entity.Add<re::TransformComponent>(pos)
-			.Add<re::TextComponent>(def.name, font, re::Color::Black, 14.f)
+
+		static int zIndex = 0;
+
+		entity
+			.Add<re::TransformComponent>(pos)
+			.Add<re::TextComponent>(def->name, font, re::Color::Black, 14.f)
 			.Add<AlchemyElementComponent>(id, isWorkspace)
-			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 100.f }, pos);
+			.Add<re::BoxColliderComponent>(re::Vector2f{ 100.f, 100.f }, pos)
+			.Add<re::ZIndexComponent>(Layers::Items + ++zIndex);
 
 		if (isWorkspace)
 		{
 			entity.Add<DraggableComponent>();
 		}
 
+		const auto image = GetAssetManager().Get<re::Image>(re::file_system::AssetsPath(std::to_string(id) + ".png"));
 		if (image)
 		{
 			image->Scale(100, 100);
@@ -278,60 +179,75 @@ private:
 		}
 		else
 		{
-			entity.Add<re::RectangleComponent>(def.color, re::Vector2f{ 100.f, 100.f });
+			entity.Add<re::RectangleComponent>(def->color, re::Vector2f{ 100.f, 100.f });
 		}
 
 		return entity;
 	}
 
-	// --- Input Handling ---
-
 	void HandleMouseDown(const re::Vector2f mousePos)
 	{
 		auto& scene = GetScene();
 
-		// 1. Проверяем UI кнопки
 		for (auto&& [entity, btn, collider] : *scene.CreateView<AlchemyButtonComponent, re::BoxColliderComponent>())
-		{
+		{ // Buttons
 			if (collider.Contains(mousePos))
 			{
 				if (btn.type == AlchemyButtonComponent::Type::Sort)
 				{
-					SortLibrary();
+					m_game.SortUnlocked();
+					RefreshLibrary();
 				}
-				else if (btn.type == AlchemyButtonComponent::Type::Clear)
-				{
-					// Кнопка очистки работает как дроп-зона, клик по ней ничего не делает
-				}
+
 				return;
 			}
 		}
 
-		// 2. Проверяем элементы на рабочем столе (верхний слой первым, но у нас нет Z-index, берем любой)
-		for (auto&& [entity, elem, collider, draggable] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent, DraggableComponent>())
-		{
+		re::ecs::Entity bestEntity = re::ecs::Entity::INVALID_ID;
+		int maxZ = std::numeric_limits<int>::lowest();
+
+		for (auto&& [entity, elem, collider, drag, zIndex] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent, DraggableComponent, re::ZIndexComponent>())
+		{ // DragStart
 			if (collider.Contains(mousePos))
 			{
-				m_draggedEntity = entity;
-				draggable.isDragging = true;
-				draggable.dragOffset = scene.GetComponent<re::TransformComponent>(entity).position - mousePos;
-				draggable.originalPosition = scene.GetComponent<re::TransformComponent>(entity).position;
-				return;
+				if (zIndex.value > maxZ)
+				{
+					maxZ = zIndex.value;
+					bestEntity = entity;
+				}
 			}
 		}
 
-		// 3. Проверяем библиотеку (спавним копию)
-		for (auto&& [entity, elem, collider] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent>())
+		if (scene.IsValid(bestEntity))
 		{
+			scene.GetComponent<re::ZIndexComponent>(bestEntity).value = Layers::Dragging;
+
+			m_draggedEntity = bestEntity;
+			auto& drag = scene.GetComponent<DraggableComponent>(bestEntity);
+			drag.isDragging = true;
+			drag.dragOffset = scene.GetComponent<re::TransformComponent>(bestEntity).position - mousePos;
+
+			return;
+		}
+
+		for (auto&& [entity, elem, collider] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent>())
+		{ // Workspace
 			if (!elem.isWorkspaceElement && collider.Contains(mousePos))
 			{
-				// Создаем новый на поле экспериментов прямо под мышкой
-				auto newEnt = CreateElementEntity(elem.elementId, mousePos, true);
+				re::Vector2f spawnPos = mousePos;
+				// if (spawnPos.x < 60.f)
+				// {
+				// 	spawnPos.x = 60.f;
+				// }
+
+				auto newEnt = CreateElementEntity(elem.elementId, spawnPos, true);
 				m_draggedEntity = newEnt.GetEntity();
-				auto& [isDragging, dragOffset, originalPosition] = newEnt.Get<DraggableComponent>();
-				isDragging = true;
-				dragOffset = { 0.f, 0.f };
-				originalPosition = mousePos;
+
+				auto& dragComp = newEnt.Get<DraggableComponent>();
+				dragComp.isDragging = true;
+
+				newEnt.Get<re::ZIndexComponent>().value = Layers::Dragging;
+
 				return;
 			}
 		}
@@ -339,172 +255,99 @@ private:
 
 	void HandleMouseMove(const re::Vector2f mousePos)
 	{
-		if (GetScene().IsValid(m_draggedEntity))
+		if (!GetScene().IsValid(m_draggedEntity))
 		{
-			auto& transform = GetScene().GetComponent<re::TransformComponent>(m_draggedEntity);
-			const auto& draggable = GetScene().GetComponent<DraggableComponent>(m_draggedEntity);
-			auto& collider = GetScene().GetComponent<re::BoxColliderComponent>(m_draggedEntity);
-
-			transform.position = mousePos + draggable.dragOffset;
-			collider.position = transform.position; // Обновляем коллайдер для проверок
+			return;
 		}
+
+		auto& tf = GetScene().GetComponent<re::TransformComponent>(m_draggedEntity);
+		const auto& drag = GetScene().GetComponent<DraggableComponent>(m_draggedEntity);
+		auto& col = GetScene().GetComponent<re::BoxColliderComponent>(m_draggedEntity);
+
+		const re::Vector2f newPos = mousePos + drag.dragOffset;
+
+		tf.position = newPos;
+		col.position = tf.position;
 	}
+
 	void HandleMouseUp()
 	{
 		if (!GetScene().IsValid(m_draggedEntity))
-			return;
-
-		auto& scene = GetScene();
-		auto& draggedTransform = scene.GetComponent<re::TransformComponent>(m_draggedEntity);
-		auto& draggable = scene.GetComponent<DraggableComponent>(m_draggedEntity);
-		const auto& draggedCollider = scene.GetComponent<re::BoxColliderComponent>(m_draggedEntity);
-
-		// Сброс флага
-		draggable.isDragging = false;
-
-		// 1. Проверка на удаление (пересечение с корзиной)
-		// Упрощенно проверяем расстояние до центра корзины или пересечение AABB
-		if (draggedCollider.Intersects(scene.GetComponent<re::BoxColliderComponent>(m_trashIcon)))
 		{
-			scene.DestroyEntity(m_draggedEntity);
-			m_draggedEntity = re::ecs::Entity::INVALID_ID;
 			return;
 		}
 
-		// 2. Проверка на реакцию (пересечение с другим элементом на столе)
-		bool reacted = false;
-		re::ecs::Entity otherEntity = re::ecs::Entity::INVALID_ID;
+		auto& scene = GetScene();
+		const auto& dragCol = scene.GetComponent<re::BoxColliderComponent>(m_draggedEntity);
 
-		for (auto&& [entity, elem, collider] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent>())
+		if (dragCol.position.x < dragCol.size.x / 2)
 		{
-			if (entity == m_draggedEntity)
-			{
-				continue;
-			}
-			if (!elem.isWorkspaceElement)
-			{
-				continue;
-			}
+			scene.DestroyEntity(m_draggedEntity);
+			return;
+		}
 
-			if (draggedCollider.Intersects(collider))
+		if (dragCol.Intersects(scene.GetComponent<re::BoxColliderComponent>(m_trashIcon)))
+		{
+			scene.DestroyEntity(m_draggedEntity);
+		}
+		else
+		{
+			for (auto&& [entity, elem, collider] : *scene.CreateView<AlchemyElementComponent, re::BoxColliderComponent>())
 			{
-				otherEntity = entity;
-				reacted = TryCombine(m_draggedEntity, otherEntity);
-				if (reacted)
+				if (entity != m_draggedEntity && elem.isWorkspaceElement && dragCol.Intersects(collider))
 				{
-					break;
+					const int idA = scene.GetComponent<AlchemyElementComponent>(m_draggedEntity).elementId;
+					const int idB = elem.elementId;
+					const re::Vector2f spawnPos = scene.GetComponent<re::TransformComponent>(entity).position;
+
+					if (const auto result = m_game.Combine(idA, idB); result.success)
+					{
+						scene.DestroyEntity(m_draggedEntity);
+						scene.DestroyEntity(entity);
+						ProcessCraftResult(result, idA, idB, spawnPos);
+
+						break;
+					}
 				}
 			}
 		}
 
-		if (reacted)
+		if (GetScene().IsValid(m_draggedEntity))
 		{
-			// Элементы удаляются внутри TryCombine
-		}
-		else
-		{
-			// Просто оставляем на месте
+			scene.GetComponent<re::ZIndexComponent>(m_draggedEntity).value = ++m_topZ;
 		}
 
 		m_draggedEntity = re::ecs::Entity::INVALID_ID;
 	}
 
-	// --- Game Logic ---
-
-	bool TryCombine(const re::ecs::Entity a, const re::ecs::Entity b)
+	void ProcessCraftResult(const AlchemyGame::CraftResult& res, const int idA, const int idB, re::Vector2f pos)
 	{
-		auto& scene = GetScene();
-		const int idA = scene.GetComponent<AlchemyElementComponent>(a).elementId;
-		const int idB = scene.GetComponent<AlchemyElementComponent>(b).elementId;
-		const auto pos = scene.GetComponent<re::TransformComponent>(b).position;
-
-		const Recipe* match = nullptr;
-		// Ищем рецепт (A+B или B+A)
-		// Обработка конфликтов (например, Огонь+Вода): берем первый найденный в векторе
-		for (const auto& r : m_recipes)
+		if (pos.x < 60.f)
 		{
-			if ((r.inputA == idA && r.inputB == idB) || (r.inputA == idB && r.inputB == idA))
-			{
-				match = &r;
-				break;
-			}
+			pos.x = 60.f;
 		}
 
-		if (match)
+		CreateElementEntity(res.resA, pos, true);
+		if (res.resB != -1)
 		{
-			// Удаляем реагенты
-			scene.DestroyEntity(a);
-			scene.DestroyEntity(b);
-
-			// Создаем продукты
-			SpawnOnWorkspace(match->resultA, pos);
-			if (match->resultB != -1)
-			{
-				SpawnOnWorkspace(match->resultB, pos + re::Vector2f{ 20.f, 20.f });
-			}
-
-			// Логика открытия новых
-			bool newDiscovered = false;
-			if (UnlockElement(match->resultA))
-			{
-				newDiscovered = true;
-			}
-			if (match->resultB != -1)
-			{
-				if (UnlockElement(match->resultB))
-				{
-					newDiscovered = true;
-				}
-			}
-
-			// Сообщение
-			re::String msg = GetDef(idA).name + " + " + GetDef(idB).name + " = " + GetDef(match->resultA).name;
-			if (match->resultB != -1)
-			{
-				msg += ", " + GetDef(match->resultB).name;
-			}
-			SetLog(msg);
-
-			if (newDiscovered)
-			{
-				RefreshLibrary();
-				CheckWinCondition();
-			}
-
-			return true;
+			CreateElementEntity(res.resB, pos + re::Vector2f{ 20, 20 }, true);
 		}
 
-		return false;
-	}
+		const re::String msg = m_registry.GetDef(idA)->name
+			+ " + "
+			+ m_registry.GetDef(idB)->name
+			+ " = "
+			+ m_registry.GetDef(res.resA)->name;
 
-	void SpawnOnWorkspace(const int id, const re::Vector2f pos)
-	{
-		CreateElementEntity(id, pos, true);
-	}
+		SetLog(msg);
 
-	bool UnlockElement(const int id)
-	{
-		if (std::ranges::find(m_unlockedElements, id) == m_unlockedElements.end())
+		if (res.isNew)
 		{
-			m_unlockedElements.push_back(id);
-			return true;
-		}
-		return false;
-	}
-
-	void SortLibrary()
-	{
-		std::ranges::sort(m_unlockedElements, [&](const int a, const int b) {
-			return GetDef(a).name < GetDef(b).name;
-		});
-		RefreshLibrary();
-	}
-
-	void CheckWinCondition()
-	{
-		if (m_unlockedElements.size() >= m_definitions.size())
-		{
-			SetLog("CONGRATULATIONS! ALL ELEMENTS FOUND!");
+			RefreshLibrary();
+			if (m_game.IsAllUnlocked())
+			{
+				SetLog("ALL ELEMENTS FOUND!");
+			}
 		}
 	}
 
@@ -516,42 +359,22 @@ private:
 		}
 	}
 
-	// --- Helpers ---
-
-	const ElementDef& GetDef(const int id)
-	{
-		for (const auto& d : m_definitions)
-		{
-			if (d.id == id)
-			{
-				return d;
-			}
-		}
-		return m_definitions[0];
-	}
-
 	re::AssetManager& GetAssetManager()
 	{
-		// Небольшой хак для доступа к менеджеру, так как Layout его не хранит публично,
-		// но Application хранит ресурсы. В данном примере мы создаем Font каждый раз через менеджер,
-		// который сам внутри кэширует. AssetManager создается внутри Application.
-		// В коде LauncherApplication.hpp видно, что Layout создается с Application&.
-		// Но Layout API не дает прямого доступа к AssetManager приложения.
-		// Однако, в LauncherApplication.hpp есть пример MenuLayout, который создает свой m_manager.
-		// Мы сделаем так же.
 		return m_localAssetManager;
 	}
 
 private:
+	int m_topZ = Layers::Items;
+
 	re::render::IWindow& m_window;
 	re::AssetManager m_localAssetManager;
 
-	std::vector<ElementDef> m_definitions;
-	std::vector<Recipe> m_recipes;
-	std::vector<int> m_unlockedElements;
+	IngredientStorage m_registry;
+	AlchemyGame m_game;
 
-	std::vector<re::ecs::Entity> m_libraryEntities;
 	re::ecs::Entity m_trashIcon = re::ecs::Entity::INVALID_ID;
 	re::ecs::Entity m_logEntity = re::ecs::Entity::INVALID_ID;
 	re::ecs::Entity m_draggedEntity = re::ecs::Entity::INVALID_ID;
+	std::vector<re::ecs::Entity> m_libraryEntities;
 };

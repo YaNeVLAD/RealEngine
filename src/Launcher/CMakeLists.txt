@@ -11,8 +11,12 @@ add_executable(ReLauncher main.cpp
         Lab1/Hangman/HangmanLayout.cpp
 
         Lab2/Alchemy/AlchemyLayout.hpp
+        Lab2/Alchemy/AlchemyComponents.hpp
+        Lab2/Alchemy/IngredientStorage.hpp
+        Lab2/Alchemy/AlchemyGame.hpp
 
-        LauncherApplication.hpp)
+        LauncherApplication.hpp
+)
 
 set_target_properties(ReLauncher
         PROPERTIES
