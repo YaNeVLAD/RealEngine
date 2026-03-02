@@ -4,7 +4,11 @@
 #include <Core/Math/Vector2.hpp>
 #include <Core/String.hpp>
 #include <RenderCore/Font.hpp>
+#include <RenderCore/PrimitiveType.hpp>
 #include <RenderCore/Texture.hpp>
+#include <RenderCore/Vertex.hpp>
+
+#include <vector>
 
 namespace re::render
 {
@@ -25,6 +29,7 @@ public:
 	virtual void DrawCircle(Vector2f const& center, float radius, Color const& color) = 0;
 	virtual void DrawText(String const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) = 0;
 	virtual void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) = 0;
+	virtual void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) = 0;
 };
 
 } // namespace re::render

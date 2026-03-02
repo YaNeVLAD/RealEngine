@@ -2,6 +2,27 @@
 
 #include <SFML/Graphics.hpp>
 
+namespace
+{
+
+constexpr sf::PrimitiveType ToSfmlType(const re::PrimitiveType type)
+{
+	// clang-format off
+	switch (type)
+	{
+	case re::PrimitiveType::Points:        return sf::PrimitiveType::Points;
+	case re::PrimitiveType::Lines:         return sf::PrimitiveType::Lines;
+	case re::PrimitiveType::LineStrip:     return sf::PrimitiveType::LineStrip;
+	case re::PrimitiveType::Triangles:     return sf::PrimitiveType::Triangles;
+	case re::PrimitiveType::TriangleStrip: return sf::PrimitiveType::TriangleStrip;
+	case re::PrimitiveType::TriangleFan:   return sf::PrimitiveType::TriangleFan;
+	default:                           return sf::PrimitiveType::Points;
+	}
+	// clang-format on
+}
+
+} // namespace
+
 namespace re::render
 {
 
@@ -60,8 +81,8 @@ void SFMLRenderAPI::Flush()
 
 Vector2f SFMLRenderAPI::ScreenToWorld(Vector2i const& pixelPos)
 {
-	const auto pos = m_window.mapPixelToCoords({pixelPos.x, pixelPos.y});
-	return {pos.x, pos.y};
+	const auto pos = m_window.mapPixelToCoords({ pixelPos.x, pixelPos.y });
+	return { pos.x, pos.y };
 }
 
 void SFMLRenderAPI::DrawQuad(
@@ -162,6 +183,27 @@ void SFMLRenderAPI::DrawTexturedQuad(
 	}
 
 	m_window.draw(rect);
+}
+
+void SFMLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type)
+{
+	Flush();
+
+	if (vertices.empty())
+	{
+		return;
+	}
+
+	sf::VertexArray va(ToSfmlType(type), vertices.size());
+
+	for (size_t i = 0; i < vertices.size(); ++i)
+	{
+		va[i].position = sf::Vector2f(vertices[i].position.x, vertices[i].position.y);
+		va[i].color = sf::Color(vertices[i].color.ToInt());
+		va[i].texCoords = sf::Vector2f(vertices[i].texCoords.x, vertices[i].texCoords.y);
+	}
+
+	m_window.draw(va);
 }
 
 void SFMLRenderAPI::Clear()

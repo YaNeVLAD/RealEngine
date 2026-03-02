@@ -50,6 +50,8 @@ public:
 
 	void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) override;
 
+	void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) override;
+
 	void Clear() override;
 
 private:

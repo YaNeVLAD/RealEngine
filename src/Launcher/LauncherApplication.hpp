@@ -13,22 +13,46 @@
 
 struct MenuLayout final : re::Layout
 {
-	using Layout::Layout;
+	MenuLayout(re::Application& app, re::render::IWindow& window)
+		: Layout(app)
+		, m_window(window)
+	{
+	}
 
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
+		auto triangle = scene.CreateEntity();
+		triangle.Add<re::TransformComponent>(re::Vector2f{ 0, 0 });
 
-		const auto font = m_manager.Get<re::Font>("Roboto.ttf");
+		auto type = re::PrimitiveType::Triangles;
+		std::vector<re::Vertex> vertices = {
+			{ { 0.f, -150.f }, re::Color::Red },
+			{ { 150.f, 150.f }, re::Color::Green },
+			{ { -150.f, 150.f }, re::Color::Blue }
+		};
 
-		scene.CreateEntity()
-			.Add<re::TransformComponent>(re::Vector2f{}, 0.f, re::Vector2f{ 3.f, 1.f })
-			.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 100, 100 })
-			.Add<re::TextComponent>("Hello world!", font, re::Color::White);
+		triangle.Add<re::MeshComponent>(vertices, type);
+		m_triangle = triangle.GetEntity();
+	}
+
+	void OnEvent(re::Event const& event) override
+	{
+		if (const auto* mouseMoved = event.GetIf<re::Event::MouseMoved>())
+		{
+			auto& transform = GetScene().GetComponent<re::TransformComponent>(m_triangle);
+			const auto worldPos = m_window.ToWorldPos(mouseMoved->position);
+
+			transform.position = worldPos;
+		}
 	}
 
 private:
+	re::ecs::Entity m_triangle = re::ecs::Entity::INVALID_ID;
+
 	re::AssetManager m_manager;
+
+	re::render::IWindow& m_window;
 };
 
 class LauncherApplication final : public re::Application
@@ -41,7 +65,7 @@ public:
 
 	void OnStart() override
 	{
-		AddLayout<MenuLayout>();
+		AddLayout<MenuLayout>(Window());
 		AddLayout<LettersLayout>();
 		AddLayout<HouseLayout>(Window());
 		AddLayout<CircleLayout>(Window());

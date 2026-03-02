@@ -82,6 +82,22 @@ GLuint CreateShader(const char* vertexSrc, const char* fragmentSrc)
 	return program;
 }
 
+constexpr GLenum ToOpenGLType(const re::PrimitiveType type)
+{
+	// clang-format off
+	switch (type)
+	{
+	case re::PrimitiveType::Points:        return GL_POINTS;
+	case re::PrimitiveType::Lines:         return GL_LINES;
+	case re::PrimitiveType::LineStrip:     return GL_LINE_STRIP;
+	case re::PrimitiveType::Triangles:     return GL_TRIANGLES;
+	case re::PrimitiveType::TriangleStrip: return GL_TRIANGLE_STRIP;
+	case re::PrimitiveType::TriangleFan:   return GL_TRIANGLE_FAN;
+	default: return GL_POINTS;
+	}
+	// clang-format on
+}
+
 } // namespace
 
 namespace re::render
@@ -89,16 +105,13 @@ namespace re::render
 
 void OpenGLRenderAPI::Init()
 {
-	// 1. Включаем блендинг (прозрачность)
 	glEnable(GL_BLEND);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	// 2. Компилируем шейдер
 	m_shaderProgram = CreateShader(s_VertexShaderSource, s_FragmentShaderSource);
 	glUseProgram(m_shaderProgram);
 
-	// 3. Инициализируем буферы
 	constexpr auto MaxQuads = 1000;
 	constexpr auto MaxVertices = MaxQuads * 4;
 	constexpr auto MaxIndices = MaxQuads * 6;
@@ -108,32 +121,31 @@ void OpenGLRenderAPI::Init()
 
 	glCreateBuffers(1, &m_vertexBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, MaxVertices * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, MaxVertices * sizeof(InnerVertex), nullptr, GL_DYNAMIC_DRAW);
 
-	// Настройка Layout:
 	// Pos(3 floats), Color(4 floats), TexCoord(2 floats), TexIndex(1 float)
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(
 		0, 3, GL_FLOAT,
-		GL_FALSE, sizeof(Vertex),
-		reinterpret_cast<const void*>(offsetof(Vertex, position)));
+		GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, position)));
 
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 4,
-		GL_FLOAT, GL_FALSE, sizeof(Vertex),
-		reinterpret_cast<const void*>(offsetof(Vertex, color)));
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, color)));
 
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, 2,
-		GL_FLOAT, GL_FALSE, sizeof(Vertex),
-		reinterpret_cast<const void*>(offsetof(Vertex, texCoord)));
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, texCoord)));
 
 	glEnableVertexAttribArray(3);
 	glVertexAttribPointer(3, 1,
-		GL_FLOAT, GL_FALSE, sizeof(Vertex),
-		reinterpret_cast<const void*>(offsetof(Vertex, texIndex)));
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, texIndex)));
 
-	// 4. Индексный буфер (Pattern: 0,1,2, 2,3,0 ...)
+	// Pattern: 0,1,2, 2,3,0 ...
 	auto* indices = new uint32_t[MaxIndices];
 	uint32_t offset = 0;
 	for (uint32_t i = 0; i < MaxIndices; i += 6)
@@ -154,6 +166,37 @@ void OpenGLRenderAPI::Init()
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndices * sizeof(uint32_t), indices, GL_STATIC_DRAW);
 
 	delete[] indices;
+
+	// --- Init Dynamic Geometry ---
+	glCreateVertexArrays(1, &m_dynamicVao);
+	glBindVertexArray(m_dynamicVao);
+
+	glCreateBuffers(1, &m_dynamicVbo);
+	glBindBuffer(GL_ARRAY_BUFFER, m_dynamicVbo);
+
+	glBufferData(GL_ARRAY_BUFFER, 4096 * sizeof(InnerVertex), nullptr, GL_DYNAMIC_DRAW);
+
+	// Pos(3 floats), Color(4 floats), TexCoord(2 floats), TexIndex(1 float)
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(
+		0, 3, GL_FLOAT,
+		GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, position)));
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 4,
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, color)));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2,
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, texCoord)));
+
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 1,
+		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
+		reinterpret_cast<const void*>(offsetof(InnerVertex, texIndex)));
 }
 
 void OpenGLRenderAPI::SetClearColor(const Color& color)
@@ -175,27 +218,23 @@ void OpenGLRenderAPI::Flush()
 
 	glUseProgram(m_shaderProgram);
 
-	// Загружаем матрицу камеры
 	const GLint loc = glGetUniformLocation(m_shaderProgram, "u_ViewProjection");
 	glUniformMatrix4fv(loc, 1, GL_FALSE, &m_viewProjection[0][0]);
 
-	// Загружаем данные вершин
 	glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
 	glBufferSubData(GL_ARRAY_BUFFER, 0,
-		static_cast<long long>(m_batchBuffer.size() * sizeof(Vertex)),
+		static_cast<long long>(m_batchBuffer.size() * sizeof(InnerVertex)),
 		m_batchBuffer.data());
 
-	// Рисуем
 	glBindVertexArray(m_vertexArray);
 
-	// Кол-во индексов = (кол-во вершин / 4) * 6
 	const GLsizei indexCount = static_cast<GLsizei>(m_batchBuffer.size() / 4) * 6;
 	glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
 
 	m_batchBuffer.clear();
 }
 
-void OpenGLRenderAPI::SetViewport(Vector2f topLeft, Vector2f size)
+void OpenGLRenderAPI::SetViewport(const Vector2f topLeft, const Vector2f size)
 {
 	glViewport(
 		static_cast<GLint>(topLeft.x),
@@ -242,7 +281,11 @@ void OpenGLRenderAPI::SetCamera(const Vector2f center, const Vector2f size)
 	m_viewProjection = glm::ortho(left, right, bottom, top, -10.0f, 10.0f);
 }
 
-void OpenGLRenderAPI::DrawQuad(const Vector2f& pos, const Vector2f& size, float rotation, const Color& color)
+void OpenGLRenderAPI::DrawQuad(
+	const Vector2f& pos,
+	const Vector2f& size,
+	const float rotation,
+	const Color& color)
 {
 	DrawTexturedQuadImpl(pos, size, rotation, nullptr, color);
 }
@@ -251,13 +294,67 @@ void OpenGLRenderAPI::DrawCircle(const Vector2f& center, float radius, const Col
 {
 }
 
-void OpenGLRenderAPI::DrawText(const String& text, const Font& font, const Vector2f& pos, float fontSize, const Color& color)
+void OpenGLRenderAPI::DrawText(
+	const String& text,
+	const Font& font,
+	const Vector2f& pos,
+	float fontSize,
+	const Color& color)
 {
 }
 
-void OpenGLRenderAPI::DrawTexturedQuad(const Vector2f& pos, const Vector2f& size, Texture* texture, const Color& tint)
+void OpenGLRenderAPI::DrawTexturedQuad(
+	const Vector2f& pos,
+	const Vector2f& size,
+	Texture* texture,
+	const Color& tint)
 {
 	DrawTexturedQuadImpl(pos, size, 0.0f, texture, tint);
+}
+
+void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type)
+{
+	if (vertices.empty())
+	{
+		return;
+	}
+
+	Flush();
+
+	glUseProgram(m_shaderProgram);
+
+	const GLint loc = glGetUniformLocation(m_shaderProgram, "u_ViewProjection");
+	glUniformMatrix4fv(loc, 1, GL_FALSE, &m_viewProjection[0][0]);
+
+	static std::vector<InnerVertex> glVertices;
+	glVertices.clear();
+	glVertices.reserve(vertices.size());
+
+	for (const auto& [position, color, texCoords] : vertices)
+	{
+		const auto& [r, g, b, a] = color;
+		const glm::vec2 uv(texCoords.x, texCoords.y);
+		const glm::vec4 glColor = {
+			static_cast<float>(r) / 255.0f,
+			static_cast<float>(g) / 255.0f,
+			static_cast<float>(b) / 255.0f,
+			static_cast<float>(a) / 255.0f
+		};
+
+		glVertices.emplace_back(glm::vec3(position.x, position.y, 0.0f), glColor, uv, -1.0f);
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_dynamicVbo);
+	glBufferData(GL_ARRAY_BUFFER, glVertices.size() * sizeof(InnerVertex), glVertices.data(), GL_DYNAMIC_DRAW);
+
+	glBindVertexArray(m_dynamicVao);
+
+	if (type == PrimitiveType::Points)
+	{
+		glPointSize(5.0f);
+	}
+
+	glDrawArrays(ToOpenGLType(type), 0, static_cast<GLsizei>(glVertices.size()));
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(
@@ -267,36 +364,31 @@ void OpenGLRenderAPI::DrawTexturedQuadImpl(
 	Texture* texture,
 	Color const& color)
 {
-	// Простейшая проверка на переполнение буфера
-	if (m_batchBuffer.size() >= 1000 * 4) // Limit
+	const auto [r, g, b, a] = color;
+	if (m_batchBuffer.size() >= 1000 * 4)
 	{
 		Flush();
 	}
 
-	// Если рисуем текстуру, нужно её забиндить.
-	// Если текущий батч рисовал другую текстуру или без текстуры, надо Flush.
-	// (Пока упрощенно: если есть текстура - всегда Flush перед рисованием для безопасности)
 	float texIndex = -1.0f;
 	if (texture)
 	{
-		Flush(); // Разрываем батч
+		Flush();
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, *static_cast<uint32_t*>(texture->GetNativeHandle()));
 		texIndex = 0.0f;
 	}
 
-	// --- Математика ---
 	const glm::vec4 c = {
-		color.r / 255.0f,
-		color.g / 255.0f,
-		color.b / 255.0f,
-		color.a / 255.0f
+		static_cast<float>(r) / 255.0f,
+		static_cast<float>(g) / 255.0f,
+		static_cast<float>(b) / 255.0f,
+		static_cast<float>(a) / 255.0f
 	};
 
 	float hw = size.x / 2.0f;
 	float hh = size.y / 2.0f;
 
-	// Локальные координаты (центр в 0,0)
 	glm::vec2 p[4] = {
 		{ -hw, -hh },
 		{ hw, -hh },
@@ -304,13 +396,11 @@ void OpenGLRenderAPI::DrawTexturedQuadImpl(
 		{ -hw, hh }
 	};
 
-	// Вращение
 	if (rotation != 0.0f)
 	{
-		// Конвертируем градусы в радианы
 		const float rad = glm::radians(rotation);
-		const float s = sin(rad);
-		const float c_rot = cos(rad);
+		const float s = std::sin(rad);
+		const float c_rot = std::cos(rad);
 
 		for (auto& i : p)
 		{
@@ -319,11 +409,6 @@ void OpenGLRenderAPI::DrawTexturedQuadImpl(
 			i = { x, y };
 		}
 	}
-
-	// Сдвиг в мировую позицию + добавление в буфер
-	// Порядок UV: (0,0), (1,0), (1,1), (0,1) для стандартного OpenGL (Y вверх)
-	// Но если у тебя SetCamera настроена так, что Y вниз (top < bottom), то UV могут быть другими.
-	// Обычно: 0,0 - левый верх.
 
 	m_batchBuffer.push_back({ { pos.x + p[0].x, pos.y + p[0].y, 0.0f }, c, { 0.0f, 0.0f }, texIndex });
 	m_batchBuffer.push_back({ { pos.x + p[1].x, pos.y + p[1].y, 0.0f }, c, { 1.0f, 0.0f }, texIndex });

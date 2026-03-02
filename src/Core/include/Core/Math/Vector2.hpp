@@ -14,6 +14,10 @@ struct Vector2
 {
 	Vector2 Rotate(float angle);
 
+	T Dot(const Vector2& rhs);
+
+	T Length();
+
 	constexpr auto operator<=>(const Vector2&) const = default;
 
 	T x{};

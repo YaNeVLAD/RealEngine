@@ -51,6 +51,10 @@ public:
 		Texture* texture,
 		Color tint);
 
+	static void DrawMesh(
+		const std::vector<Vertex>& vertices,
+		PrimitiveType type);
+
 private:
 	static Vector2u m_viewportSize;
 

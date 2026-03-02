@@ -35,6 +35,8 @@ public:
 
 	void DrawTexturedQuad(const Vector2f& pos, const Vector2f& size, Texture* texture, const Color& tint) override;
 
+	void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) override;
+
 private:
 	void DrawTexturedQuadImpl(const Vector2f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
 
@@ -45,7 +47,10 @@ private:
 	std::uint32_t m_indexBuffer = 0; // EBO
 	std::uint32_t m_shaderProgram = 0;
 
-	struct Vertex
+	uint32_t m_dynamicVao = 0;
+	uint32_t m_dynamicVbo = 0;
+
+	struct InnerVertex
 	{
 		glm::vec3 position;
 		glm::vec4 color;
@@ -53,7 +58,7 @@ private:
 		float texIndex;
 	};
 
-	std::vector<Vertex> m_batchBuffer{};
+	std::vector<InnerVertex> m_batchBuffer{};
 
 	glm::mat4 m_viewProjection{};
 	glm::vec4 m_viewport{};

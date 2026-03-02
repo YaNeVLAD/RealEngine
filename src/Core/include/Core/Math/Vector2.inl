@@ -18,6 +18,20 @@ Vector2<T> Vector2<T>::Rotate(const float angle)
 }
 
 template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+T Vector2<T>::Dot(const Vector2& rhs)
+{
+	return x * rhs.x + y * rhs.y;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+T Vector2<T>::Length()
+{
+	return std::sqrt(x * x + y * y);
+}
+
+template <typename T>
 constexpr Vector2<T> operator+(Vector2<T> left, Vector2<T> right)
 {
 	return Vector2<T>(left.x + right.x, left.y + right.y);

@@ -79,6 +79,11 @@ void Renderer2D::DrawTexturedQuad(
 	m_api->DrawTexturedQuad(pos, size, texture, tint);
 }
 
+void Renderer2D::DrawMesh(const std::vector<Vertex>& vertices, const PrimitiveType type)
+{
+	m_api->DrawMesh(vertices, type);
+}
+
 std::unique_ptr<IRenderAPI> Renderer2D::m_api = nullptr;
 
 } // namespace re::render

@@ -4,6 +4,8 @@
 #include <Render2D/Renderer2D.hpp>
 #include <Runtime/Components.hpp>
 
+#include <algorithm>
+
 namespace
 {
 
@@ -115,6 +117,24 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 						 text.color);
 				 } });
 		}
+	}
+
+	for (auto&& [entity, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent>())
+	{
+		m_renderQueue.push_back(
+			{ GetZIndex(scene, entity), [&] {
+				 std::vector<Vertex> transformedVertices = mesh.vertices;
+				 for (auto& v : transformedVertices)
+				 {
+					 const auto scaledPos = Vector2f{
+						 v.position.x * transform.scale.x,
+						 v.position.y * transform.scale.y,
+					 };
+					 v.position = transform.position + scaledPos;
+				 }
+
+				 render::Renderer2D::DrawMesh(transformedVertices, mesh.type);
+			 } });
 	}
 
 	std::ranges::stable_sort(m_renderQueue,

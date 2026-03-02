@@ -73,7 +73,6 @@ Application::Application(std::string const& name)
 	: m_isRunning(false)
 {
 	m_window = CreateWindow(name, 1920u, 1080u);
-	m_window->SetVSyncEnabled(false);
 	detail::Input::Init(m_window->GetNativeHandle());
 
 	AddLayout<DefaultTag>();

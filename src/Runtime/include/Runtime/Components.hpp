@@ -5,7 +5,9 @@
 #include <Core/String.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
+#include <RenderCore/PrimitiveType.hpp>
 #include <RenderCore/Texture.hpp>
+#include <RenderCore/Vertex.hpp>
 
 #include <compare>
 
@@ -44,6 +46,12 @@ struct DynamicTextureComponent
 	Image image;
 	std::shared_ptr<Texture> texture = nullptr;
 	bool isDirty = true;
+};
+
+struct MeshComponent
+{
+	std::vector<Vertex> vertices;
+	PrimitiveType type = PrimitiveType::Triangles;
 };
 
 struct CameraComponent
