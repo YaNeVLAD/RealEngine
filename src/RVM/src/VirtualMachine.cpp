@@ -1,5 +1,6 @@
 #include <RVM/VirtualMachine.hpp>
 
+#include <cassert>
 #include <iostream>
 
 #define READ_BYTE() (*m_ip++)
@@ -31,6 +32,7 @@ InterpreterResult VirtualMachine::Interpret(const Chunk& chunk)
 	m_chunk = &chunk;
 	m_ip = m_chunk->GetCode().data();
 	m_stack.clear();
+	m_variables.clear();
 
 	return Run();
 }
@@ -55,6 +57,36 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::Div: BINARY_OP(/); break;
 			// clang-format on
 
+		case OpCode::Pop: {
+			Pop();
+			break;
+		}
+
+		case OpCode::GetLocal: {
+			const std::uint8_t slot = READ_BYTE();
+			if (slot >= m_variables.size())
+			{ // Error
+				Push(std::monostate{});
+			}
+			else [[likely]]
+			{
+				Push(m_variables[slot]);
+			}
+			break;
+		}
+
+		case OpCode::SetLocal: {
+			std::uint8_t slot = READ_BYTE();
+			Value val = Pop();
+
+			if (m_variables.size() <= slot)
+			{
+				m_variables.resize(slot + 1);
+			}
+			m_variables[slot] = val;
+			break;
+		}
+
 		case OpCode::Return: {
 			if (!m_stack.empty())
 			{
@@ -72,6 +104,8 @@ InterpreterResult VirtualMachine::Run()
 
 Value VirtualMachine::Pop()
 {
+	assert(!m_stack.empty());
+
 	const Value val = m_stack.back();
 	m_stack.pop_back();
 

@@ -36,6 +36,7 @@ private:
 	const std::uint8_t* m_ip = nullptr;
 
 	std::vector<Value> m_stack;
+	std::vector<Value> m_variables;
 };
 
 } // namespace re::rvm

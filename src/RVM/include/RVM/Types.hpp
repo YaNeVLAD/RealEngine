@@ -17,10 +17,16 @@ using Value = std::variant<Null, Int, Double>;
 enum class OpCode : std::uint8_t
 {
 	Const,
+
+	Pop,
+	GetLocal,
+	SetLocal,
+
 	Add,
 	Sub,
 	Mul,
 	Div,
+
 	Return = std::numeric_limits<std::uint8_t>::max(),
 };
 

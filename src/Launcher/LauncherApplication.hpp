@@ -38,9 +38,31 @@ struct MenuLayout final : re::Layout
 
 		using namespace re::rvm;
 
-		Assembler assembler;
-		const std::string src = "CONST 10 CONST 2.5 ADD CONST 4 DIV RETURN";
+		// x = 10
+		// y = 20
+		// result = (x + y) * 2
+		// return result
+		const std::string src = R"(
+        CONST 10
+        SET x
 
+        CONST 20
+        SET y
+
+        GET x
+        GET y
+        ADD
+
+        CONST 2
+        MUL
+
+        SET result
+
+        GET result
+        RETURN
+		)";
+
+		Assembler assembler;
 		if (Chunk chunk; assembler.Compile(src, chunk))
 		{
 			VirtualMachine vm;
