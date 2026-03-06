@@ -4,6 +4,9 @@
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
+#include <RVM/Assembler.hpp>
+#include <RVM/VirtualMachine.hpp>
+
 #include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/Hangman/HangmanLayout.hpp"
 #include "Lab1/House/HouseLayout.hpp"
@@ -31,25 +34,25 @@ struct MenuLayout final : re::Layout
 			{ { 150.f, 150.f }, re::Color::Green },
 			{ { -150.f, 150.f }, re::Color::Blue }
 		};
-
 		triangle.Add<re::MeshComponent>(vertices, type);
-		m_triangle = triangle.GetEntity();
+
+		using namespace re::rvm;
+
+		Assembler assembler;
+		const std::string src = "CONST 10 CONST 2.5 ADD CONST 4 DIV RETURN";
+
+		if (Chunk chunk; assembler.Compile(src, chunk))
+		{
+			VirtualMachine vm;
+			vm.Interpret(chunk);
+		}
 	}
 
 	void OnEvent(re::Event const& event) override
 	{
-		if (const auto* mouseMoved = event.GetIf<re::Event::MouseMoved>())
-		{
-			auto& transform = GetScene().GetComponent<re::TransformComponent>(m_triangle);
-			const auto worldPos = m_window.ToWorldPos(mouseMoved->position);
-
-			transform.position = worldPos;
-		}
 	}
 
 private:
-	re::ecs::Entity m_triangle = re::ecs::Entity::INVALID_ID;
-
 	re::AssetManager m_manager;
 
 	re::render::IWindow& m_window;
