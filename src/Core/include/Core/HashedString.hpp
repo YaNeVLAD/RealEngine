@@ -53,18 +53,23 @@ public:
 	{
 	}
 
-	constexpr BaseHashedString(const ValueType* str, const SizeType length) noexcept
+	constexpr BaseHashedString(const TChar* str, const SizeType length) noexcept
 		: Base{ hasher({ str, length }) }
 	{
 	}
 
-	template <std::size_t N>
-	consteval BaseHashedString(const ValueType (&str)[N]) noexcept
-		: Base{ hasher({ static_cast<const ValueType*>(str) }) }
+	constexpr BaseHashedString(const std::basic_string_view<TChar> str) noexcept
+		: Base{ hasher({ str.data(), str.length() }) }
 	{
 	}
 
-	[[nodiscard]] static constexpr HashType Value(const ValueType* str, const SizeType length) noexcept
+	template <std::size_t N>
+	consteval BaseHashedString(const TChar (&str)[N]) noexcept
+		: Base{ hasher({ static_cast<const TChar*>(str) }) }
+	{
+	}
+
+	[[nodiscard]] static constexpr HashType Value(const TChar* str, const SizeType length) noexcept
 	{
 		return BaseHashedString{ str, length };
 	}

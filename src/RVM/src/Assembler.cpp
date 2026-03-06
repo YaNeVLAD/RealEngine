@@ -1,12 +1,16 @@
 #include <RVM/Assembler.hpp>
-#include <iostream>
+
+#include <Core/HashedString.hpp>
 
 #include <fsm/lexer.hpp>
+
+#include <iostream>
 
 namespace
 {
 
 using namespace re::rvm;
+using namespace re::literals;
 
 enum class TokenType
 {
@@ -17,13 +21,13 @@ enum class TokenType
 	Unknown
 };
 
-const std::unordered_map<std::string, OpCode> s_instructionMap = {
-	{ "CONST", OpCode::Const },
-	{ "ADD", OpCode::Add },
-	{ "SUB", OpCode::Sub },
-	{ "MUL", OpCode::Mul },
-	{ "DIV", OpCode::Div },
-	{ "RETURN", OpCode::Return }
+const std::unordered_map<re::HashedString, OpCode> s_instructionMap = {
+	{ "CONST"_hs, OpCode::Const },
+	{ "ADD"_hs, OpCode::Add },
+	{ "SUB"_hs, OpCode::Sub },
+	{ "MUL"_hs, OpCode::Mul },
+	{ "DIV"_hs, OpCode::Div },
+	{ "RETURN"_hs, OpCode::Return }
 };
 
 } // namespace
@@ -44,12 +48,12 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		switch (const auto& token = *tokenOpt; token.type)
 		{
 		case TokenType::Instruction: {
-			std::string mnemonic(token.lexeme);
-			auto it = s_instructionMap.find(mnemonic);
+			HashedString hash{ token.lexeme };
 
+			auto it = s_instructionMap.find(hash);
 			if (it == s_instructionMap.end())
 			{
-				std::cerr << "Error: Unknown instruction '" << mnemonic << "' at line " << token.line << "\n";
+				std::cerr << "Error: Unknown instruction '" << token.lexeme << "' at line " << token.line << "\n";
 				return false;
 			}
 
