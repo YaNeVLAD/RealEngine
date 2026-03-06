@@ -38,10 +38,11 @@ namespace re::rvm
 bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 {
 	fsm::lexer<TokenType, fsm::std_regex_matcher> lexer(source);
-	lexer.add_rule(R"([A-Z]+)", TokenType::Instruction);
-	lexer.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double);
-	lexer.add_rule(R"([0-9]+)", TokenType::Integer);
-	lexer.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
+	lexer
+		.add_rule(R"([A-Z]+)", TokenType::Instruction)
+		.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double)
+		.add_rule(R"([0-9]+)", TokenType::Integer)
+		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
 
 	while (auto tokenOpt = lexer.next())
 	{
