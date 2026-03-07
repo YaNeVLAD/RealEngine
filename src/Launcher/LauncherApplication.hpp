@@ -10,6 +10,7 @@
 #include "Lab1/Letters/LettersLayout.hpp"
 
 #include "Lab2/Alchemy/AlchemyLayout.hpp"
+#include "Lab3/Asteroids/AsteroidsLayout.hpp"
 
 struct MenuLayout final : re::Layout
 {
@@ -71,6 +72,7 @@ public:
 		AddLayout<CircleLayout>(Window());
 		AddLayout<HangmanLayout>(Window());
 		AddLayout<AlchemyLayout>(Window());
+		AddLayout<AsteroidsLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -123,6 +125,10 @@ public:
 			if (e->key == re::Keyboard::Key::Num6)
 			{
 				SwitchLayout<AlchemyLayout>();
+			}
+			if (e->key == re::Keyboard::Key::Num7)
+			{
+				SwitchLayout<AsteroidsLayout>();
 			}
 		}
 

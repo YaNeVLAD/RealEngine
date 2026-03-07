@@ -1,0 +1,154 @@
+#pragma once
+
+#include "AsteroidsComponents.hpp"
+#include <ECS/Scene/Scene.hpp>
+#include <ECS/System/System.hpp>
+#include <Runtime/Components.hpp>
+#include <functional>
+
+inline bool PointInTriangle(const re::Vector2f p, const re::Vector2f a, const re::Vector2f b, const re::Vector2f c)
+{
+	auto sign = [](const re::Vector2f p1, const re::Vector2f p2, const re::Vector2f p3) {
+		return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+	};
+	const float d1 = sign(p, a, b);
+	const float d2 = sign(p, b, c);
+	const float d3 = sign(p, c, a);
+	const bool hasNeg = (d1 < 0.0f) || (d2 < 0.0f) || (d3 < 0.0f);
+	const bool hasPos = (d1 > 0.0f) || (d2 > 0.0f) || (d3 > 0.0f);
+	return !(hasNeg && hasPos);
+}
+
+class AsteroidCollisionSystem final : public re::ecs::System
+{
+public:
+	using SpawnAsteroidCallback = std::function<void(int, re::Vector2f, re::Vector2f)>;
+	using SpawnParticleCallback = std::function<void(re::Vector2f, re::Vector2f)>;
+
+	AsteroidCollisionSystem(SpawnAsteroidCallback spawnAst, SpawnParticleCallback spawnPart)
+		: m_spawnAsteroid(std::move(spawnAst))
+		, m_spawnParticle(std::move(spawnPart))
+	{
+	}
+
+	void Update(re::ecs::Scene& scene, re::core::TimeDelta dt) override
+	{
+		AsteroidGameStateComponent* gameState = nullptr;
+		for (auto&& [entity, state] : *scene.CreateView<AsteroidGameStateComponent>())
+		{
+			gameState = &state;
+			break;
+		}
+
+		if (gameState && gameState->isGameOver)
+		{
+			return;
+		}
+
+		HandleBulletAsteroidCollisions(scene, gameState);
+
+		HandleShipAsteroidCollisions(scene, gameState);
+	}
+
+private:
+	void HandleBulletAsteroidCollisions(re::ecs::Scene& scene, AsteroidGameStateComponent* gameState) const
+	{
+		for (auto&& [bEnt, bTrans, bullet] : *scene.CreateView<re::TransformComponent, BulletComponent>())
+		{
+			for (auto&& [aEnt, aTrans, ast] : *scene.CreateView<re::TransformComponent, AsteroidComponent>())
+			{
+				if (CheckPointInAsteroid(bTrans.position, aTrans, ast))
+				{
+					if (gameState)
+					{
+						gameState->score += 100 * (4 - ast.size);
+					}
+
+					SplitAsteroid(ast.size, aTrans.position);
+
+					scene.DestroyEntity(aEnt);
+					scene.DestroyEntity(bEnt);
+					break;
+				}
+			}
+		}
+	}
+
+	void HandleShipAsteroidCollisions(re::ecs::Scene& scene, AsteroidGameStateComponent* gameState) const
+	{
+		for (auto&& [sEnt, sTrans, ship] : *scene.CreateView<re::TransformComponent, ShipComponent>())
+		{
+			if (ship.isInvulnerable || ship.respawnTimer > 0.f)
+			{
+				continue;
+			}
+
+			for (auto&& [aEnt, aTrans, ast] : *scene.CreateView<re::TransformComponent, AsteroidComponent>())
+			{
+				const float dist = (sTrans.position - aTrans.position).Length();
+				const float hitRadius = ast.size * 25.0f + 15.0f; // Approximated ship radius
+
+				if (dist < hitRadius)
+				{
+					ship.isInvulnerable = true;
+					ship.respawnTimer = 2.0f;
+					sTrans.scale = { 0.f, 0.f };
+
+					if (gameState)
+					{
+						gameState->lives--;
+						if (gameState->lives <= 0)
+						{
+							gameState->isGameOver = true;
+						}
+					}
+
+					for (int k = 0; k < 8; ++k)
+					{
+						const re::Vector2f pVel = { (rand() % 600 - 300) * 1.f, (rand() % 600 - 300) * 1.f };
+						m_spawnParticle(sTrans.position, pVel);
+					}
+
+					SplitAsteroid(ast.size, aTrans.position);
+					scene.DestroyEntity(aEnt);
+					break;
+				}
+			}
+		}
+	}
+
+	static bool CheckPointInAsteroid(const re::Vector2f& point, const re::TransformComponent& aTrans, const AsteroidComponent& ast)
+	{
+		for (std::size_t i = 0; i < ast.localPoints.size(); ++i)
+		{
+			re::Vector2f p1 = ast.localPoints[i];
+			re::Vector2f p2 = ast.localPoints[(i + 1) % ast.localPoints.size()];
+
+			const re::Vector2f A = aTrans.position;
+			const re::Vector2f B = aTrans.position + p1.Rotate(aTrans.rotation);
+			const re::Vector2f C = aTrans.position + p2.Rotate(aTrans.rotation);
+
+			if (PointInTriangle(point, A, B, C))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void SplitAsteroid(const int currentSize, const re::Vector2f& position) const
+	{
+		if (currentSize > 1)
+		{
+			const int newSize = currentSize - 1;
+			for (int k = 0; k < 2; ++k)
+			{
+				const re::Vector2f vel = { (rand() % 400 - 200) * 1.f, (rand() % 400 - 200) * 1.f };
+				m_spawnAsteroid(newSize, position, vel);
+			}
+		}
+	}
+
+	SpawnAsteroidCallback m_spawnAsteroid;
+	SpawnParticleCallback m_spawnParticle;
+};
