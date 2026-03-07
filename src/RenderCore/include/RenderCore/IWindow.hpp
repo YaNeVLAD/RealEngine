@@ -17,6 +17,7 @@ public:
 
 	virtual bool IsOpen() const = 0;
 	virtual bool SetActive(bool active) = 0;
+	virtual String GetTitle() const = 0;
 	virtual void SetTitle(String const& title) = 0;
 	virtual void SetIcon(Image const& image) = 0;
 	virtual void SetVSyncEnabled(bool enabled) = 0;

@@ -20,6 +20,8 @@ public:
 
 	bool SetActive(bool active) override;
 
+	String GetTitle() const override;
+
 	void SetTitle(String const& title) override;
 
 	void SetIcon(Image const& image) override;
@@ -43,6 +45,7 @@ public:
 	void SetWorldPosCallback(WorldPosCallback&& callback) override;
 
 private:
+	String m_title;
 	sf::RenderWindow m_window;
 };
 

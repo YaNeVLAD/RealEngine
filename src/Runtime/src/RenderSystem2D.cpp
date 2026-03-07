@@ -124,13 +124,21 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 		m_renderQueue.push_back(
 			{ GetZIndex(scene, entity), [&] {
 				 std::vector<Vertex> transformedVertices = mesh.vertices;
+
+				 const float rad = transform.rotation * (3.14159265f / 180.0f);
+				 const float cosA = std::cos(rad);
+				 const float sinA = std::sin(rad);
+
 				 for (auto& v : transformedVertices)
 				 {
-					 const auto scaledPos = Vector2f{
-						 v.position.x * transform.scale.x,
-						 v.position.y * transform.scale.y,
-					 };
-					 v.position = transform.position + scaledPos;
+					 const float scaledX = v.position.x * transform.scale.x;
+					 const float scaledY = v.position.y * transform.scale.y;
+
+					 const float rotatedX = scaledX * cosA - scaledY * sinA;
+					 const float rotatedY = scaledX * sinA + scaledY * cosA;
+
+					 v.position.x = transform.position.x + rotatedX;
+					 v.position.y = transform.position.y + rotatedY;
 				 }
 
 				 render::Renderer2D::DrawMesh(transformedVertices, mesh.type);
