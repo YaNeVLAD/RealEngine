@@ -6,6 +6,7 @@ namespace re::render
 {
 
 SFMLWindow::SFMLWindow(std::string const& title, const unsigned width, const unsigned height)
+	: m_title(title)
 {
 	m_window.create(sf::VideoMode(sf::Vector2u{ width, height }), title);
 	m_window.setVerticalSyncEnabled(false);
@@ -21,8 +22,14 @@ bool SFMLWindow::SetActive(const bool active)
 	return m_window.setActive(active);
 }
 
+String SFMLWindow::GetTitle() const
+{
+	return m_title;
+}
+
 void SFMLWindow::SetTitle(String const& title)
 {
+	m_title = title;
 	m_window.setTitle(title.Data());
 }
 

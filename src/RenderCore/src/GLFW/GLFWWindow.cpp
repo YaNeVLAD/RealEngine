@@ -156,7 +156,7 @@ void GLFWWindow::Init(const std::string& title)
 {
 	if (!s_glfwInitialized)
 	{
-		int success = glfwInit();
+		std::ignore = glfwInit();
 		// check success...
 		s_glfwInitialized = true;
 	}
@@ -342,6 +342,11 @@ bool GLFWWindow::SetActive(bool active)
 	}
 
 	return true;
+}
+
+String GLFWWindow::GetTitle() const
+{
+	return m_data.title;
 }
 
 void GLFWWindow::SetTitle(const String& title)

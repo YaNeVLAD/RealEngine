@@ -5,7 +5,7 @@
 #include <Core/FileSystem.hpp>
 #include <Core/HashedString.hpp>
 #include <Core/String.hpp>
-#include <RenderCore/Assets/IAsset.hpp>
+#include <Core/Assets/IAsset.hpp>
 
 #include <memory>
 #include <unordered_map>

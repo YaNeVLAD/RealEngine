@@ -5,9 +5,9 @@
 namespace re
 {
 
-bool Font::LoadFromFile(std::string const& filePath)
+bool Font::LoadFromFile(String const& filePath)
 {
-	std::cout << "[WARNING] Font loading not implemented in OpenGL yet: " << filePath << std::endl;
+	std::cout << "[WARNING] Font loading not implemented in OpenGL yet: " << filePath.ToString() << std::endl;
 
 	return true;
 }

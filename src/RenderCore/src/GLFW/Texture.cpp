@@ -67,7 +67,7 @@ void* Texture::GetNativeHandle()
 	return &m_rendererID;
 }
 
-bool Texture::LoadFromFile(std::string const& filePath)
+bool Texture::LoadFromFile(String const& filePath)
 {
 	Image tempImage;
 	if (!tempImage.LoadFromFile(filePath))

@@ -344,8 +344,9 @@ void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveTyp
 		glVertices.emplace_back(glm::vec3(position.x, position.y, 0.0f), glColor, uv, -1.0f);
 	}
 
+	const auto bufferSize = static_cast<GLsizeiptr>(glVertices.size() * sizeof(InnerVertex));
 	glBindBuffer(GL_ARRAY_BUFFER, m_dynamicVbo);
-	glBufferData(GL_ARRAY_BUFFER, glVertices.size() * sizeof(InnerVertex), glVertices.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, bufferSize, glVertices.data(), GL_DYNAMIC_DRAW);
 
 	glBindVertexArray(m_dynamicVao);
 

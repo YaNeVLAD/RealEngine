@@ -1,7 +1,8 @@
 #pragma once
 
-#include <RenderCore/Assets/IAsset.hpp>
 #include <RenderCore/Export.hpp>
+
+#include <Core/Assets/IAsset.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -28,7 +29,7 @@ public:
 
 	[[nodiscard]] void* GetNativeHandle() const;
 
-	bool LoadFromFile(std::string const& filePath) override;
+	bool LoadFromFile(String const& filePath) override;
 
 private:
 	std::uint32_t m_width{};

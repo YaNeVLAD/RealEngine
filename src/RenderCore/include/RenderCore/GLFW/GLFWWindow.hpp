@@ -26,6 +26,8 @@ public:
 
 	bool SetActive(bool active) override;
 
+	String GetTitle() const override;
+
 	void SetTitle(const String& title) override;
 
 	void SetIcon(const Image& image) override;

@@ -15,6 +15,14 @@ add_executable(ReLauncher main.cpp
         Lab2/Alchemy/IngredientStorage.hpp
         Lab2/Alchemy/AlchemyGame.hpp
 
+        Lab3/Asteroids/AsteroidsLayout.hpp
+        Lab3/Asteroids/AsteroidsLayout.cpp
+        Lab3/Asteroids/AsteroidCollisionSystem.hpp
+        Lab3/Asteroids/ShipSystem.hpp
+        Lab3/Asteroids/LifetimeSystem.hpp
+        Lab3/Asteroids/MovementSystem.hpp
+        Lab3/Asteroids/AsteroidsComponents.hpp
+
         LauncherApplication.hpp
 )
 

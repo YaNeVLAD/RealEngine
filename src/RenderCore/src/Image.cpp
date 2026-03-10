@@ -128,17 +128,18 @@ bool Image::IsEmpty() const
 	return m_data.empty();
 }
 
-bool Image::LoadFromFile(std::string const& filePath)
+bool Image::LoadFromFile(String const& filePath)
 {
 	int w, h, channels;
 	stbi_uc* pixels = stbi_load(
-		filePath.c_str(),
+		filePath.ToString().data(),
 		&w, &h, &channels,
 		STBI_rgb_alpha);
 
 	if (!pixels)
 	{
-		std::cerr << "Failed to load image: " << filePath << std::endl;
+		std::cerr << "Failed to load image: " << filePath.ToString() << std::endl;
+
 		return false;
 	}
 
