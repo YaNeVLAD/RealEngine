@@ -1,8 +1,9 @@
 #pragma once
 
-#include <Core/Math/Color.hpp>
-#include <RenderCore/Assets/IAsset.hpp>
 #include <RenderCore/Export.hpp>
+
+#include <Core/Assets/IAsset.hpp>
+#include <Core/Math/Color.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -33,7 +34,7 @@ public:
 
 	[[nodiscard]] bool IsEmpty() const;
 
-	bool LoadFromFile(std::string const& filePath) override;
+	bool LoadFromFile(String const& filePath) override;
 
 private:
 	std::uint32_t m_width = 0;

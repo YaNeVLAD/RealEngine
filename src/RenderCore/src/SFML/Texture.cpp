@@ -44,7 +44,7 @@ void* Texture::GetNativeHandle() const
 	return m_texture.get();
 }
 
-bool Texture::LoadFromFile(std::string const& filePath)
+bool Texture::LoadFromFile(String const& filePath)
 {
 	Image tempImage;
 	if (!tempImage.LoadFromFile(filePath))

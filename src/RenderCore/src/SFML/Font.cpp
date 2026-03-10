@@ -5,11 +5,11 @@
 namespace re
 {
 
-bool Font::LoadFromFile(std::string const& filePath)
+bool Font::LoadFromFile(String const& filePath)
 {
-	if (!m_font.openFromFile(filePath))
+	if (const auto str = filePath.ToString(); !m_font.openFromFile(str))
 	{
-		std::cerr << "Failed to load font file: " << filePath << std::endl;
+		std::cerr << "Failed to load font file: " << str << std::endl;
 		return false;
 	}
 
