@@ -23,6 +23,7 @@ add_executable(ReLauncher main.cpp
         Lab3/Asteroids/MovementSystem.hpp
         Lab3/Asteroids/AsteroidsComponents.hpp
 
+        ScriptCompiler.hpp
         LauncherApplication.hpp
 )
 
@@ -55,3 +56,10 @@ if (WIN32 AND RENDER_LIBS)
         endif ()
     endforeach ()
 endif ()
+
+add_custom_command(TARGET ReLauncher POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:ReLauncher>/assets"
+        COMMENT "Copying assets directory to build output..."
+)

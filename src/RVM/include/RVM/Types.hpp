@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Core/String.hpp>
+
 #include <cstdint>
 #include <limits>
 #include <ostream>
@@ -12,7 +14,7 @@ using Null = std::monostate;
 using Int = std::int64_t;
 using Double = std::double_t;
 
-using Value = std::variant<Null, Int, Double>;
+using Value = std::variant<Null, Int, Double, String>;
 
 enum class OpCode : std::uint8_t
 {
@@ -26,6 +28,9 @@ enum class OpCode : std::uint8_t
 	Sub,
 	Mul,
 	Div,
+
+	Call,
+	Native,
 
 	Return = std::numeric_limits<std::uint8_t>::max(),
 };

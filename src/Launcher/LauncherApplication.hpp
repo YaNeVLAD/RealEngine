@@ -4,7 +4,6 @@
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
-#include <RVM/Assembler.hpp>
 #include <RVM/VirtualMachine.hpp>
 
 #include "Lab1/Circle/CircleLayout.hpp"
@@ -39,40 +38,11 @@ struct MenuLayout final : re::Layout
 
 		using namespace re::rvm;
 
-		// x = 10
-		// y = 20
-		// result = (x + y) * 2
-		// return result
-		const std::string src = R"(
-        CONST 10
-        SET x
-
-        CONST 20
-        SET y
-
-        GET x
-        GET y
-        ADD
-
-        CONST 2
-        MUL
-
-        SET result
-
-        GET result
-        RETURN
-		)";
-
-		Assembler assembler;
-		if (Chunk chunk; assembler.Compile(src, chunk))
+		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/test.rbc"))
 		{
 			VirtualMachine vm;
-			vm.Interpret(chunk);
+			vm.Interpret(*scriptChunk);
 		}
-	}
-
-	void OnEvent(re::Event const& event) override
-	{
 	}
 
 private:

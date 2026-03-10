@@ -18,6 +18,7 @@ enum class TokenType
 	Identifier,
 	Integer,
 	Double,
+	String,
 	Whitespace,
 	Unknown
 };
@@ -47,7 +48,16 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*)", TokenType::Identifier)
 		.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double)
 		.add_rule(R"([0-9]+)", TokenType::Integer)
+		.add_rule(R"("[^"]*")", TokenType::String)
 		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
+
+	std::unordered_map<Hash_t, size_t> labels;
+	struct Fixup
+	{
+		std::size_t codeOffset;
+		String funcName;
+	};
+	std::vector<Fixup> fixups;
 
 	while (const auto tokenOpt = lexer.next())
 	{
@@ -77,6 +87,11 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 					{
 						double val = std::stod(std::string(arg.lexeme));
 						outChunk.Write(outChunk.AddConstant(val));
+					}
+					else if (arg.type == TokenType::String)
+					{
+						auto strVal = std::string(arg.lexeme.substr(1, arg.lexeme.size() - 2));
+						outChunk.Write(outChunk.AddConstant(String(strVal)));
 					}
 					else
 					{
@@ -133,6 +148,50 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 				outChunk.Write(static_cast<std::uint8_t>(OpCode::GetLocal));
 				outChunk.Write(slotOpt.value());
 			}
+			else if (hash == "DEF"_hs)
+			{
+				const auto funcNameOpt = lexer.next();
+				if (!funcNameOpt.has_value())
+				{
+					return false;
+				}
+				const auto& funcName = String(funcNameOpt->lexeme);
+				auto hs = HashedU32String::Value(funcName.Data(), funcName.Size());
+				labels[hs] = outChunk.Size();
+			}
+			else if (hash == "CALL"_hs)
+			{
+				const auto funcNameOpt = lexer.next();
+				if (!funcNameOpt.has_value())
+				{
+					return false;
+				}
+				const auto& funcName = String(funcNameOpt->lexeme);
+
+				outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
+				fixups.push_back({ outChunk.Size(), funcName });
+				outChunk.Write(0);
+			}
+			else if (hash == "NATIVE"_hs)
+			{
+				const auto funcNameOpt = lexer.next();
+				if (!funcNameOpt.has_value())
+				{
+					return false;
+				}
+				const auto argsOpt = lexer.next();
+				if (!argsOpt.has_value())
+				{
+					return false;
+				}
+				auto rawStr = std::string(funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2));
+				const auto& funcName = String(rawStr);
+				const auto& argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+
+				outChunk.Write(static_cast<std::uint8_t>(OpCode::Native));
+				outChunk.Write(outChunk.AddConstant(funcName));
+				outChunk.Write(argCount);
+			}
 			else
 			{
 				std::cerr << "Unknown instruction: " << token.lexeme << "\n";
@@ -144,6 +203,21 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			std::cerr << "Unexpected token: " << token.lexeme << "\n";
 			return false;
 		}
+	}
+
+	for (const auto& [codeOffset, funcName] : fixups)
+	{
+		auto hash = HashedU32String::Value(funcName.Data(), funcName.Size());
+		if (!labels.contains(hash))
+		{
+			std::cerr << "Error: Undefined function '" << funcName << "'\n";
+			return false;
+		}
+
+		std::int64_t offset = labels[hash];
+		std::uint8_t constIdx = outChunk.AddConstant(offset);
+
+		outChunk.Patch(codeOffset, constIdx);
 	}
 
 	return true;

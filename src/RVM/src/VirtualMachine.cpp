@@ -37,6 +37,12 @@ InterpreterResult VirtualMachine::Interpret(const Chunk& chunk)
 	return Run();
 }
 
+void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
+{
+	const auto hash = HashedU32String::Value(name.Data(), name.Length());
+	m_natives[hash] = std::move(fn);
+}
+
 InterpreterResult VirtualMachine::Run()
 {
 	for (;;)
@@ -87,13 +93,49 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
-		case OpCode::Return: {
-			if (!m_stack.empty())
+		case OpCode::Call: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+
+			m_callStack.push_back(m_ip);
+			m_ip = m_chunk->GetCode().data() + offset;
+			break;
+		}
+
+		case OpCode::Native: {
+			Value nameVal = READ_CONSTANT();
+			auto funcName = std::get<String>(nameVal);
+
+			std::uint8_t argCount = READ_BYTE();
+			auto hash = HashedU32String::Value(funcName.Data(), funcName.Length());
+			auto it = m_natives.find(hash);
+			if (it == m_natives.end())
 			{
-				std::cout << "Result: " << m_stack.back() << "\n";
-				Pop();
+				throw std::runtime_error("Unknown native function " + funcName);
 			}
-			return InterpreterResult::Success;
+
+			std::vector<Value> args(argCount);
+			for (int i = argCount - 1; i >= 0; --i)
+			{
+				args[i] = Pop();
+			}
+
+			Value result = it->second(args);
+			Push(result);
+			break;
+		}
+
+		case OpCode::Return: {
+			if (!m_callStack.empty())
+			{
+				m_ip = m_callStack.back();
+				m_callStack.pop_back();
+			}
+			else
+			{
+				return InterpreterResult::Success;
+			}
+			break;
 		}
 
 		default:
