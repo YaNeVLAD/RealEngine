@@ -1,0 +1,17 @@
+CONST 10
+SET x
+
+CONST 20
+SET y
+
+GET x
+GET y
+ADD
+
+CONST 2
+MUL
+
+SET result
+
+GET result
+RETURN

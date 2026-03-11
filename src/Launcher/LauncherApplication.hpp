@@ -14,6 +14,8 @@
 #include "Lab2/Alchemy/AlchemyLayout.hpp"
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 
+#include <iostream>
+
 struct MenuLayout final : re::Layout
 {
 	MenuLayout(re::Application& app, re::render::IWindow& window)
@@ -38,9 +40,20 @@ struct MenuLayout final : re::Layout
 
 		using namespace re::rvm;
 
-		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/test.rbc"))
+		VirtualMachine vm;
+		vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
+			std::cout << ">>> [SCRIPT]: ";
+			for (const auto& arg : args)
+			{
+				std::cout << arg << " ";
+			}
+			std::cout << "\n";
+
+			return Null;
+		});
+
+		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/function_test.rbc"))
 		{
-			VirtualMachine vm;
 			vm.Interpret(*scriptChunk);
 		}
 	}

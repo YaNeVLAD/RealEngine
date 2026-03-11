@@ -106,8 +106,7 @@ InterpreterResult VirtualMachine::Run()
 			auto funcName = std::get<String>(nameVal);
 
 			std::uint8_t argCount = READ_BYTE();
-			auto hash = funcName.Hash();
-			auto it = m_natives.find(hash);
+			auto it = m_natives.find(funcName.Hash());
 			if (it == m_natives.end())
 			{
 				throw std::runtime_error("Unknown native function " + funcName);

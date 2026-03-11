@@ -10,11 +10,13 @@
 namespace re::rvm
 {
 
-using Null = std::monostate;
+using Null_t = std::monostate;
 using Int = std::int64_t;
 using Double = std::double_t;
 
-using Value = std::variant<Null, Int, Double, String>;
+using Value = std::variant<Null_t, Int, Double, String>;
+
+constexpr auto Null = Value{ Null_t{} };
 
 enum class OpCode : std::uint8_t
 {

@@ -1,0 +1,26 @@
+DEF main
+    CONST "Hello from RVM!"
+    NATIVE "print" 1
+
+    CONST 10
+    SET x
+
+    CONST 3.5
+    SET y
+
+    CALL math_magic
+    SET result
+
+    CONST "Calculation result:"
+    GET result
+    NATIVE "print" 2
+
+    RETURN
+
+DEF math_magic
+    GET x
+    GET y
+    MUL
+    CONST 100
+    ADD
+    RETURN
