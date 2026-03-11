@@ -66,13 +66,18 @@ public:
 
 	[[nodiscard]] static constexpr HashType Value(const ValueType* str, const SizeType length) noexcept
 	{
-		return BaseHashedString{ str, length };
+		return BaseHashedString{ str, length }.hash;
 	}
 
 	template <std::size_t N>
 	[[nodiscard]] static consteval HashType Value(const char (&str)[N]) noexcept
 	{
-		return BaseHashedString{ str };
+		return BaseHashedString{ str }.hash;
+	}
+
+	[[nodiscard]] static constexpr HashType Value(const std::basic_string_view<TChar> str) noexcept
+	{
+		return BaseHashedString{ str }.hash;
 	}
 
 	[[nodiscard]] constexpr const ValueType* Data() const noexcept

@@ -1,5 +1,7 @@
 #include <Core/String.hpp>
 
+#include <Core/HashedString.hpp>
+
 #include <utility>
 
 namespace re
@@ -233,6 +235,11 @@ String String::ToLower() const
 	}
 
 	return result;
+}
+
+Hash_t String::Hash() const
+{
+	return HashedU32String::Value(m_string);
 }
 
 String& String::operator+=(const String& other)

@@ -140,7 +140,7 @@ void SFMLRenderAPI::DrawText(
 {
 	Flush();
 
-	auto hs = HashedU32String::Value(text.Data(), text.Length());
+	auto hs = text.Hash();
 	hs += reinterpret_cast<std::size_t>(&font);
 	hs ^= static_cast<std::size_t>(fontSize);
 

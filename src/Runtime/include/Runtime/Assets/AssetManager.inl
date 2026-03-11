@@ -9,7 +9,7 @@ std::shared_ptr<T> AssetManager::Get(file_system::AssetsPath const& path)
 	using namespace re::literals;
 
 	const auto str = path.Str();
-	const auto hash = HashedU32String::Value(str.Data(), str.Length());
+	const auto hash = str.Hash();
 	if (const auto it = m_assets.find(hash); it != m_assets.end())
 	{
 		return std::dynamic_pointer_cast<T>(it->second);
