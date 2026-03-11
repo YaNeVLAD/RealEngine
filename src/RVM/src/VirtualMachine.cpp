@@ -39,8 +39,7 @@ InterpreterResult VirtualMachine::Interpret(const Chunk& chunk)
 
 void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
 {
-	const auto hash = HashedU32String::Value(name.Data(), name.Length());
-	m_natives[hash] = std::move(fn);
+	m_natives[name.Hash()] = std::move(fn);
 }
 
 InterpreterResult VirtualMachine::Run()
@@ -107,7 +106,7 @@ InterpreterResult VirtualMachine::Run()
 			auto funcName = std::get<String>(nameVal);
 
 			std::uint8_t argCount = READ_BYTE();
-			auto hash = HashedU32String::Value(funcName.Data(), funcName.Length());
+			auto hash = funcName.Hash();
 			auto it = m_natives.find(hash);
 			if (it == m_natives.end())
 			{

@@ -156,7 +156,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 					return false;
 				}
 				const auto& funcName = String(funcNameOpt->lexeme);
-				auto hs = HashedU32String::Value(funcName.Data(), funcName.Size());
+				auto hs = funcName.Hash();
 				labels[hs] = outChunk.Size();
 			}
 			else if (hash == "CALL"_hs)
@@ -207,7 +207,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	for (const auto& [codeOffset, funcName] : fixups)
 	{
-		auto hash = HashedU32String::Value(funcName.Data(), funcName.Size());
+		auto hash = funcName.Hash();
 		if (!labels.contains(hash))
 		{
 			std::cerr << "Error: Undefined function '" << funcName << "'\n";
