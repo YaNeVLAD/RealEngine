@@ -33,6 +33,56 @@ const std::unordered_map<re::HashedString, OpCode> s_instructionMap = {
 	{ "RETURN"_hs, OpCode::Return }
 };
 
+std::string ProcessEscapeSequences(std::string_view raw)
+{
+	std::size_t pos = raw.find('\\');
+
+	if (pos == std::string_view::npos)
+	{
+		return std::string(raw);
+	}
+
+	std::string result;
+	result.reserve(raw.length());
+
+	std::size_t start = 0;
+	while (pos != std::string_view::npos)
+	{
+		result.append(raw.data() + start, pos - start);
+
+		if (pos + 1 < raw.length())
+		{
+			switch (raw[pos + 1])
+			{
+				// clang-format off
+			case 'n':  result.push_back('\n'); break;
+			case 't':  result.push_back('\t'); break;
+			case 'r':  result.push_back('\r'); break;
+			case '"':  result.push_back('"');  break;
+			case '\\': result.push_back('\\'); break;
+			case '0':  result.push_back('\0'); break;
+			default:   result.push_back(raw[pos + 1]); break;
+				// clang-format on
+			}
+			start = pos + 2;
+		}
+		else
+		{
+			result.push_back('\\');
+			start = pos + 1;
+		}
+
+		pos = raw.find('\\', start);
+	}
+
+	if (start < raw.length())
+	{
+		result.append(raw.data() + start, raw.length() - start);
+	}
+
+	return result;
+}
+
 } // namespace
 
 namespace re::rvm
@@ -48,10 +98,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*)", TokenType::Identifier)
 		.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double)
 		.add_rule(R"([0-9]+)", TokenType::Integer)
-		.add_rule(R"("[^"]*")", TokenType::String)
+		.add_rule(R"("(?:[^"\\]|\\.)*")", TokenType::String)
 		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
 
-	std::unordered_map<Hash_t, size_t> labels;
+	std::unordered_map<Hash_t, std::int64_t> labels;
 	struct Fixup
 	{
 		std::size_t codeOffset;
@@ -90,8 +140,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 					}
 					else if (arg.type == TokenType::String)
 					{
-						auto strVal = std::string(arg.lexeme.substr(1, arg.lexeme.size() - 2));
-						outChunk.Write(outChunk.AddConstant(String(strVal)));
+						auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
+						outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 					}
 					else
 					{
@@ -184,8 +234,9 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 				{
 					return false;
 				}
-				auto rawStr = std::string(funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2));
-				const auto& funcName = String(rawStr);
+				auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+				const auto funcName = String(ProcessEscapeSequences(rawStr));
+
 				const auto& argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
 
 				outChunk.Write(static_cast<std::uint8_t>(OpCode::Native));
@@ -195,12 +246,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			else
 			{
 				std::cerr << "Unknown instruction: " << token.lexeme << "\n";
+
 				return false;
 			}
 		}
 		else
 		{
 			std::cerr << "Unexpected token: " << token.lexeme << "\n";
+
 			return false;
 		}
 	}
@@ -211,6 +264,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		if (!labels.contains(hash))
 		{
 			std::cerr << "Error: Undefined function '" << funcName << "'\n";
+
 			return false;
 		}
 

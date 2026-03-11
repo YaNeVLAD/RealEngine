@@ -1,5 +1,5 @@
 DEF main
-    CONST "Hello from RVM!"
+    CONST "Hello from RVM!\nNew Line\n\tNew Line wit tab"
     NATIVE "print" 1
 
     CONST 10
