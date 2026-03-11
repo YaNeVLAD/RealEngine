@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Hash.hpp"
+
 #include <Core/Export.hpp>
 
 #include <compare>
@@ -86,6 +88,8 @@ public:
 
 	[[nodiscard]] String ToUpper() const;
 	[[nodiscard]] String ToLower() const;
+
+	[[nodiscard]] Hash_t Hash() const;
 
 	String& operator+=(const String& other);
 
