@@ -24,8 +24,7 @@ SystemManager::SystemConfiguration SystemManager::RegisterSystem(TArgs&&... args
 {
 	const SystemId systemId = TypeIndex<TSystem>();
 
-	assert(!m_systems.contains(systemId)
-		&& "Registering system more than once.");
+	RE_ASSERT(!m_systems.contains(systemId), "Registering {} more than once.", NameOf<TSystem>());
 
 	m_systems[systemId] = std::make_unique<TSystem>(std::forward<TArgs>(args)...);
 	m_signatures[systemId] = Signature{};
@@ -54,7 +53,7 @@ void SystemManager::AddReadDependencies(const SystemId systemId)
 template <typename TComponent>
 void SystemManager::AddWriteDependency(const SystemId systemId)
 {
-	assert(!m_writeDependencies.contains(systemId) && "System can only have one write dependency.");
+	RE_ASSERT(!m_writeDependencies.contains(systemId), "System only can have one write dependency.");
 
 	const ComponentType componentType = TypeIndex<TComponent>();
 	m_signatures[systemId].set(componentType);
@@ -65,8 +64,7 @@ template <typename TSystem>
 TSystem& SystemManager::GetSystem()
 {
 	const SystemId systemId = TypeIndex<TSystem>();
-	assert(m_systems.contains(systemId)
-		&& "Cannot get system: not registered.");
+	RE_ASSERT(m_systems.contains(systemId), "System {} is not registered.", NameOf<TSystem>());
 
 	return *static_cast<TSystem*>(m_systems.at(systemId).get());
 }

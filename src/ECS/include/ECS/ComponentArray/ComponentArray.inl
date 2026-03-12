@@ -1,4 +1,6 @@
-#include <ECS/ComponentArray/IComponentArray.hpp>
+#include "Core/Meta/TypeInfo.hpp"
+
+#include <ECS/ComponentArray/ComponentArray.hpp>
 
 namespace re::ecs
 {
@@ -6,7 +8,9 @@ namespace re::ecs
 template <typename TComponent>
 void ComponentArray<TComponent>::AddComponent(const Entity entity, TComponent const& component)
 {
-	assert(!HasComponent(entity) && "Component already exists for this entity");
+	RE_ASSERT(!HasComponent(entity),
+		"Component {} already exists for entity ID: {}",
+		NameOf<TComponent>(), entity.Id());
 
 	const auto index = entity.Index();
 
@@ -56,7 +60,9 @@ void ComponentArray<TComponent>::RemoveComponent(const Entity entity)
 template <typename TComponent>
 TComponent& ComponentArray<TComponent>::GetComponent(const Entity entity)
 {
-	assert(HasComponent(entity) && "Entity does not have component of this type");
+	RE_ASSERT(HasComponent(entity),
+		"Entity {} does not have {} component",
+		entity.Id(), NameOf<TComponent>());
 
 	return m_components[m_sparse[entity.Index()]];
 }

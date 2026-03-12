@@ -1,9 +1,8 @@
 #pragma once
 
-#include <Core/Meta/TypeInfo.hpp>
+#include <Core/Assert.hpp>
 #include <ECS/ComponentArray/IComponentArray.hpp>
 
-#include <cassert>
 #include <format>
 #include <vector>
 

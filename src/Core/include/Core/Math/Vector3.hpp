@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cassert>
+#include <Core/Assert.hpp>
+
 #include <cmath>
 #include <compare>
 #include <concepts>

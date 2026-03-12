@@ -126,8 +126,8 @@ void SystemManager::BuildExecutionGraph()
 		scheduledSystems += stage.size();
 	}
 
-	assert(scheduledSystems == m_systems.size() - m_mainThreadSystems.size()
-		&& "Cycle detected in system dependencies!");
+	const auto hasCycle = scheduledSystems != m_systems.size() - m_mainThreadSystems.size();
+	RE_ASSERT(!hasCycle, "Cycle detected in system dependencies!");
 }
 
 void SystemManager::Execute(Scene& scene, float dt)

@@ -1,6 +1,6 @@
 #include <ECS/EntityManager/EntityManager.hpp>
 
-#include <cassert>
+#include <Core/Assert.hpp>
 
 namespace re::ecs
 {
@@ -66,13 +66,13 @@ bool EntityManager::IsValid(const Entity entity) const
 
 void EntityManager::SetSignature(const Entity entity, Signature const& signature)
 {
-	assert(IsValid(entity) && "Entity is not valid");
+	RE_ASSERT(IsValid(entity), "Entity {} is not valid", entity.Id());
 	m_signatures[entity.Index()] = signature;
 }
 
 Signature& EntityManager::GetSignature(const Entity entity)
 {
-	assert(IsValid(entity) && "Entity is not valid");
+	RE_ASSERT(IsValid(entity), "Entity {} is not valid", entity.Id());
 	return m_signatures[entity.Index()];
 }
 

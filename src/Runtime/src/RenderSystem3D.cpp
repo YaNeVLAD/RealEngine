@@ -21,16 +21,12 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
 	auto [width, height] = m_window.Size();
-	if (static_cast<float>(height) <= 0.0001f)
-	{
-		height = 1.0f;
-	}
 	const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
 	const glm::mat4 viewMatrix = glm::lookAt(
-		glm::vec3(0.f, 0.f, 0.f), // Камера в нуле
-		glm::vec3(0.f, 0.f, -1.f), // Смотрит в -Z
-		glm::vec3(0.f, 1.f, 0.f) // Вверх
+		glm::vec3(0.f, 0.f, 0.f), // Position
+		glm::vec3(0.f, 0.f, -1.f), // View to -Z
+		glm::vec3(0.f, 1.f, 0.f) // Up vector
 	);
 
 	render::Renderer3D::BeginScene(45.0f, aspectRatio, viewMatrix);
