@@ -36,7 +36,7 @@ constexpr const char* ExtractFileName(const char* path)
 }
 
 template <typename... Args>
-void ReportAssertionFailure(
+constexpr void ReportAssertionFailure(
 	const char* expr,
 	const char* file,
 	const int line,
