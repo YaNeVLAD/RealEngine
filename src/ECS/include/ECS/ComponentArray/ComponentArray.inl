@@ -56,12 +56,7 @@ void ComponentArray<TComponent>::RemoveComponent(const Entity entity)
 template <typename TComponent>
 TComponent& ComponentArray<TComponent>::GetComponent(const Entity entity)
 {
-	assert(HasComponent(entity)
-		&& std::format(
-			"Entity {} does not have component of this type {}",
-			entity.Id(),
-			NameOf<TComponent>())
-			.c_str());
+	assert(HasComponent(entity) && "Entity does not have component of this type");
 
 	return m_components[m_sparse[entity.Index()]];
 }
