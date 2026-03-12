@@ -5,7 +5,7 @@ namespace re
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
-Vector2<T> Vector2<T>::Rotate(const float angle)
+Vector2<T> Vector2<T>::Rotate(const float angle) const
 {
 	const float rad = angle * (3.14f / 180.f);
 	float cos = std::cos(rad);
@@ -19,7 +19,7 @@ Vector2<T> Vector2<T>::Rotate(const float angle)
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
-T Vector2<T>::Dot(const Vector2& rhs)
+T Vector2<T>::Dot(const Vector2& rhs) const
 {
 	return x * rhs.x + y * rhs.y;
 }

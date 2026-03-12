@@ -4,6 +4,8 @@
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
+#include <Core/Math/Vector3.hpp>
+
 #include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/Hangman/HangmanLayout.hpp"
 #include "Lab1/House/HouseLayout.hpp"
@@ -23,34 +25,28 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-		auto triangle = scene.CreateEntity();
-		triangle.Add<re::TransformComponent>(re::Vector2f{ 0, 0 });
 
-		auto type = re::PrimitiveType::Triangles;
-		std::vector<re::Vertex> vertices = {
-			{ { 0.f, -150.f }, re::Color::Red },
-			{ { 150.f, 150.f }, re::Color::Green },
-			{ { -150.f, 150.f }, re::Color::Blue }
-		};
+		auto cube = scene
+						.CreateEntity()
+						.Add<re::TransformComponent3D>(
+							{ .position = { 0.f, 0.f, -3.f },
+								.rotation = { 45.f, 45.f, 0.f } })
+						.Add<re::CubeComponent>(re::Color::Red);
 
-		triangle.Add<re::MeshComponent>(vertices, type);
-		m_triangle = triangle.GetEntity();
+		m_cube = cube.GetEntity();
 	}
 
-	void OnEvent(re::Event const& event) override
+	void OnUpdate(re::core::TimeDelta dt) override
 	{
-		if (const auto* mouseMoved = event.GetIf<re::Event::MouseMoved>())
-		{
-			auto& transform = GetScene().GetComponent<re::TransformComponent>(m_triangle);
-			const auto worldPos = m_window.ToWorldPos(mouseMoved->position);
+		auto& scene = GetScene();
 
-			transform.position = worldPos;
-		}
+		auto& transform = scene.GetComponent<re::TransformComponent3D>(m_cube);
+		transform.rotation.x += 45.0f * dt;
+		transform.rotation.y += 45.0f * dt;
 	}
 
 private:
-	re::ecs::Entity m_triangle = re::ecs::Entity::INVALID_ID;
-
+	re::ecs::Entity m_cube = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
 
 	re::render::IWindow& m_window;

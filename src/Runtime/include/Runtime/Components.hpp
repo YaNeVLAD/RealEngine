@@ -2,6 +2,7 @@
 
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
+#include <Core/Math/Vector3.hpp>
 #include <Core/String.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
@@ -90,6 +91,18 @@ struct BoxColliderComponent
 
 		return dx <= sumHalfWidths && dy <= sumHalfHeights;
 	}
+};
+
+struct TransformComponent3D
+{
+	Vector3f position = { 0.f, 0.f, 0.f };
+	Vector3f rotation = { 0.f, 0.f, 0.f };
+	Vector3f scale = { 1.f, 1.f, 1.f };
+};
+
+struct CubeComponent
+{
+	Color color = Color::White;
 };
 
 } // namespace re

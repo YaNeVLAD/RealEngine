@@ -1,5 +1,6 @@
 #include <Runtime/Application.hpp>
 
+#include "Runtime/Internal/RenderSystem3D.hpp"
 #include <Core/Utils.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Internal/Input.hpp>
@@ -15,6 +16,8 @@
 #include <RenderCore/GLFW/GLFWWindow.hpp>
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 #endif
+
+#include "Render3D/Renderer3D.hpp"
 
 #include <chrono>
 
@@ -35,6 +38,8 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
 	if (window->GetNativeHandle())
 	{
+		re::render::Renderer3D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
+		re::render::Renderer3D::SetViewport(window->Size());
 		re::render::Renderer2D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
 		re::render::Renderer2D::SetViewport(window->Size());
 		window->SetWorldPosCallback([](re::Vector2i const& pos) {
@@ -200,6 +205,13 @@ void Application::SetupScene(Layout& layout) const
 {
 	auto& scene = layout.GetScene();
 	scene.RegisterComponent<ZIndexComponent>();
+
+	scene
+		.AddSystem<detail::RenderSystem3D>(*m_window)
+		.WithRead<
+			TransformComponent3D,
+			CubeComponent>()
+		.RunOnMainThread();
 
 	scene
 		.AddSystem<detail::RenderSystem2D>(*m_window)

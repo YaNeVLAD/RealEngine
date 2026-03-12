@@ -15,6 +15,7 @@ class RE_RENDER_CORE_API OpenGLRenderAPI final : public IRenderAPI
 public:
 	void Init() override;
 
+	// 2D
 	void SetClearColor(const Color& color) override;
 
 	void Clear() override;
@@ -37,6 +38,13 @@ public:
 
 	void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) override;
 
+	// 3D
+	void SetDepthTest(bool enabled) override;
+
+	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
+
+	void DrawCube(const glm::mat4& transform, const Color& color) override;
+
 private:
 	void DrawTexturedQuadImpl(const Vector2f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
 
@@ -47,8 +55,14 @@ private:
 	std::uint32_t m_indexBuffer = 0; // EBO
 	std::uint32_t m_shaderProgram = 0;
 
-	uint32_t m_dynamicVao = 0;
-	uint32_t m_dynamicVbo = 0;
+	std::uint32_t m_dynamicVao = 0;
+	std::uint32_t m_dynamicVbo = 0;
+
+	std::uint32_t m_cubeVao = 0;
+	std::uint32_t m_cubeVbo = 0;
+	std::uint32_t m_cubeEbo = 0;
+	std::uint32_t m_shader3D = 0;
+	glm::mat4 m_viewProj3D = glm::mat4(1.0f);
 
 	struct InnerVertex
 	{

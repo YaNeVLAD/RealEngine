@@ -25,6 +25,7 @@ void Renderer2D::SetViewport(Vector2u const& newSize)
 
 void Renderer2D::BeginScene(Vector2f const& cameraPos, const float cameraZoom)
 {
+	m_api->SetDepthTest(false);
 	const Vector2f worldSize = {
 		static_cast<float>(m_viewportSize.x) / cameraZoom,
 		static_cast<float>(m_viewportSize.y) / cameraZoom
