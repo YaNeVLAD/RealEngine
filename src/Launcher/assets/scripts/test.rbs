@@ -1,17 +1,97 @@
-CONST 10
-SET x
+DEF main
+    // --- 1. ТЕСТ NATIVE И СТРОК ---
+    CONST "=== RVM Test Suite Start ===\n"
+    NATIVE "print" 1
 
-CONST 20
-SET y
+    // --- 2. ТЕСТ АРИФМЕТИКИ И ПЕРЕМЕННЫХ ---
+    // Сложение
+    CONST 15
+    CONST 5
+    ADD
+    SET sum_result
 
-GET x
-GET y
-ADD
+    // Вычитание (с дробными числами)
+    CONST 10.5
+    CONST 3.0
+    SUB
+    SET sub_result
 
-CONST 2
-MUL
+    // Умножение
+    CONST 4
+    CONST 4
+    MUL
+    SET mul_result
 
-SET result
+    // Деление
+    CONST 20
+    CONST 4
+    DIV
+    SET div_result
 
-GET result
-RETURN
+    // Вывод результатов арифметики
+    CONST "Sum (15 + 5):"
+    GET sum_result
+    NATIVE "print" 2
+
+    CONST "Sub (10.5 - 3.0):"
+    GET sub_result
+    NATIVE "print" 2
+
+    CONST "Mul (4 * 4):"
+    GET mul_result
+    NATIVE "print" 2
+
+    CONST "Div (20 / 4):"
+    GET div_result
+    NATIVE "print" 2
+
+    // --- 3. ТЕСТ ВЫЗОВА ФУНКЦИЙ (CALL / RETURN) ---
+    CONST "\n=== Testing Functions ==="
+    NATIVE "print" 1
+
+    // Имитация передачи аргументов через глобальные переменные (слоты)
+    CONST 100
+    SET arg_a
+    CONST 50
+    SET arg_b
+
+    CALL complex_math
+    SET func_result
+
+    CONST "Function result ((100 * 2) + (50 / 2)):"
+    GET func_result
+    NATIVE "print" 2
+
+    // --- 4. ТЕСТ ОЧИСТКИ СТЕКА (POP) ---
+    CONST "\n=== Testing Stack POP ==="
+    NATIVE "print" 1
+
+    CONST "This string MUST be popped and not printed!"
+    POP
+
+    CONST "If you see this, POP works correctly."
+    NATIVE "print" 1
+
+    // Завершение работы программы
+    CONST "\n=== RVM Test Suite End ==="
+    NATIVE "print" 1
+    RETURN
+
+// Вспомогательная функция для теста
+// Формула: (arg_a * 2) + (arg_b / 2)
+DEF complex_math
+    // Левая часть: arg_a * 2
+    GET arg_a
+    CONST 2
+    MUL
+
+    // Правая часть: arg_b / 2
+    GET arg_b
+    CONST 2
+    DIV
+
+    // Сложение результатов (они сейчас лежат на вершине стека)
+    ADD
+
+    // Возврат результата (сумма останется на стеке для вызывающей стороны)
+    RETURN

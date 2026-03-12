@@ -52,7 +52,7 @@ struct MenuLayout final : re::Layout
 			return Null;
 		});
 
-		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/function_test.rbc"))
+		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/test.rbc"))
 		{
 			vm.Interpret(*scriptChunk);
 		}

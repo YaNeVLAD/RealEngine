@@ -1,6 +1,7 @@
 #include <RVM/Assembler.hpp>
 
 #include <Core/HashedString.hpp>
+#include <Core/String.hpp>
 
 #include <fsm/lexer.hpp>
 
@@ -14,23 +15,12 @@ using namespace re::literals;
 
 enum class TokenType
 {
-	Instruction,
 	Identifier,
 	Integer,
 	Double,
 	String,
+	Comment,
 	Whitespace,
-	Unknown
-};
-
-const std::unordered_map<re::HashedString, OpCode> s_instructionMap = {
-	{ "CONST"_hs, OpCode::Const },
-	{ "ADD"_hs, OpCode::Add },
-	{ "SUB"_hs, OpCode::Sub },
-	{ "MUL"_hs, OpCode::Mul },
-	{ "DIV"_hs, OpCode::Div },
-	{ "POP"_hs, OpCode::Pop },
-	{ "RETURN"_hs, OpCode::Return }
 };
 
 std::string ProcessEscapeSequences(std::string_view raw)
@@ -90,6 +80,12 @@ namespace re::rvm
 
 bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 {
+	struct Fixup
+	{
+		std::size_t codeOffset;
+		String funcName;
+	};
+
 	m_locals.clear();
 	m_localsCount = 0;
 
@@ -99,161 +95,169 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double)
 		.add_rule(R"([0-9]+)", TokenType::Integer)
 		.add_rule(R"("(?:[^"\\]|\\.)*")", TokenType::String)
+		.add_rule("//.*", TokenType::Comment, true)
 		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
 
 	std::unordered_map<Hash_t, std::int64_t> labels;
-	struct Fixup
-	{
-		std::size_t codeOffset;
-		String funcName;
-	};
 	std::vector<Fixup> fixups;
 
-	while (const auto tokenOpt = lexer.next())
-	{
-		if (const auto& token = *tokenOpt; token.type == TokenType::Identifier)
+	auto parseConst = [&]() -> bool {
+		outChunk.Write(static_cast<uint8_t>(OpCode::Const));
+
+		const auto argOpt = lexer.next();
+		if (!argOpt)
 		{
-			auto hash = HashedString{ token.lexeme };
+			return false;
+		}
 
-			if (auto it = s_instructionMap.find(hash); it != s_instructionMap.end())
-			{
-				OpCode op = it->second;
-				outChunk.Write(static_cast<uint8_t>(op));
-
-				if (op == OpCode::Const)
-				{
-					const auto& argOpt = lexer.next();
-					if (!argOpt)
-					{
-						return false; // Error
-					}
-					const auto& arg = *argOpt;
-					if (arg.type == TokenType::Integer)
-					{
-						std::int64_t val = std::stoll(std::string(arg.lexeme));
-						outChunk.Write(outChunk.AddConstant(val));
-					}
-					else if (arg.type == TokenType::Double)
-					{
-						double val = std::stod(std::string(arg.lexeme));
-						outChunk.Write(outChunk.AddConstant(val));
-					}
-					else if (arg.type == TokenType::String)
-					{
-						auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
-						outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
-					}
-					else
-					{
-						std::cerr << "Expected number after CONST\n";
-						return false;
-					}
-				}
-			}
-			else if (hash == "SET"_hs)
-			{
-				const auto argOpt = lexer.next();
-				if (!argOpt)
-				{
-					return false;
-				}
-				const auto& arg = *argOpt;
-
-				if (arg.type != TokenType::Identifier)
-				{
-					std::cerr << "Expected variable name after SET\n";
-					return false;
-				}
-
-				std::string varName(arg.lexeme);
-				const std::uint8_t slot = DeclareVariable(varName);
-
-				outChunk.Write(static_cast<uint8_t>(OpCode::SetLocal));
-				outChunk.Write(slot);
-			}
-			else if (hash == "GET"_hs)
-			{
-				const auto argOpt = lexer.next();
-				if (!argOpt)
-				{
-					return false;
-				}
-				const auto& arg = *argOpt;
-
-				if (arg.type != TokenType::Identifier)
-				{
-					std::cerr << "Expected variable name after GET\n";
-					return false;
-				}
-
-				std::string varName(arg.lexeme);
-				auto slotOpt = ResolveVariable(varName);
-
-				if (!slotOpt.has_value())
-				{
-					std::cerr << "Undefined variable: " << varName << "\n";
-					return false;
-				}
-
-				outChunk.Write(static_cast<std::uint8_t>(OpCode::GetLocal));
-				outChunk.Write(slotOpt.value());
-			}
-			else if (hash == "DEF"_hs)
-			{
-				const auto funcNameOpt = lexer.next();
-				if (!funcNameOpt.has_value())
-				{
-					return false;
-				}
-				const auto& funcName = String(funcNameOpt->lexeme);
-				auto hs = funcName.Hash();
-				labels[hs] = outChunk.Size();
-			}
-			else if (hash == "CALL"_hs)
-			{
-				const auto funcNameOpt = lexer.next();
-				if (!funcNameOpt.has_value())
-				{
-					return false;
-				}
-				const auto& funcName = String(funcNameOpt->lexeme);
-
-				outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
-				fixups.push_back({ outChunk.Size(), funcName });
-				outChunk.Write(0);
-			}
-			else if (hash == "NATIVE"_hs)
-			{
-				const auto funcNameOpt = lexer.next();
-				if (!funcNameOpt.has_value())
-				{
-					return false;
-				}
-				const auto argsOpt = lexer.next();
-				if (!argsOpt.has_value())
-				{
-					return false;
-				}
-				auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
-				const auto funcName = String(ProcessEscapeSequences(rawStr));
-
-				const auto& argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
-
-				outChunk.Write(static_cast<std::uint8_t>(OpCode::Native));
-				outChunk.Write(outChunk.AddConstant(funcName));
-				outChunk.Write(argCount);
-			}
-			else
-			{
-				std::cerr << "Unknown instruction: " << token.lexeme << "\n";
-
-				return false;
-			}
+		if (const auto& arg = *argOpt; arg.type == TokenType::Integer)
+		{
+			std::int64_t val = std::stoll(std::string(arg.lexeme));
+			outChunk.Write(outChunk.AddConstant(val));
+		}
+		else if (arg.type == TokenType::Double)
+		{
+			double val = std::stod(std::string(arg.lexeme));
+			outChunk.Write(outChunk.AddConstant(val));
+		}
+		else if (arg.type == TokenType::String)
+		{
+			auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
+			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
 		else
 		{
-			std::cerr << "Unexpected token: " << token.lexeme << "\n";
+			std::cerr << "Expected number or string after CONST\n";
+			return false;
+		}
 
+		return true;
+	};
+
+	auto parseSet = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+
+		if (argOpt->type != TokenType::Identifier)
+		{
+			std::cerr << "Expected variable name after SET\n";
+			return false;
+		}
+
+		const std::string varName(argOpt->lexeme);
+		outChunk.Write(static_cast<uint8_t>(OpCode::SetLocal));
+		outChunk.Write(DeclareVariable(varName));
+
+		return true;
+	};
+
+	auto parseGet = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+
+		if (argOpt->type != TokenType::Identifier)
+		{
+			std::cerr << "Expected variable name after GET\n";
+			return false;
+		}
+
+		const std::string varName(argOpt->lexeme);
+		const auto slotOpt = ResolveVariable(varName);
+		if (!slotOpt)
+		{
+			std::cerr << "Undefined variable: " << varName << "\n";
+			return false;
+		}
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::GetLocal));
+		outChunk.Write(slotOpt.value());
+
+		return true;
+	};
+
+	auto parseDef = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+
+		labels[String(funcNameOpt->lexeme).Hash()] = outChunk.Size();
+
+		return true;
+	};
+
+	auto parseCall = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
+		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		outChunk.Write(0);
+
+		return true;
+	};
+
+	auto parseNative = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+		const auto argsOpt = lexer.next();
+		if (!argsOpt)
+		{
+			return false;
+		}
+
+		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto funcName = String(ProcessEscapeSequences(rawStr));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::Native));
+		outChunk.Write(outChunk.AddConstant(funcName));
+		outChunk.Write(argCount);
+
+		return true;
+	};
+
+	while (const auto tokenOpt = lexer.next())
+	{
+		const auto& token = *tokenOpt;
+		if (token.type != TokenType::Identifier)
+		{
+			std::cerr << "Unexpected token: " << token.lexeme << "\n";
+			return false;
+		}
+
+		switch (HashedString(token.lexeme))
+		{
+			// clang-format off
+          case "ADD"_hs:    outChunk.Write(static_cast<uint8_t>(OpCode::Add)); break;
+          case "SUB"_hs:    outChunk.Write(static_cast<uint8_t>(OpCode::Sub)); break;
+          case "MUL"_hs:    outChunk.Write(static_cast<uint8_t>(OpCode::Mul)); break;
+          case "DIV"_hs:    outChunk.Write(static_cast<uint8_t>(OpCode::Div)); break;
+          case "POP"_hs:    outChunk.Write(static_cast<uint8_t>(OpCode::Pop)); break;
+          case "RETURN"_hs: outChunk.Write(static_cast<uint8_t>(OpCode::Return)); break;
+
+          case "CONST"_hs:  if (!parseConst())  return false; break;
+          case "SET"_hs:    if (!parseSet())    return false; break;
+          case "GET"_hs:    if (!parseGet())    return false; break;
+          case "DEF"_hs:    if (!parseDef())    return false; break;
+          case "CALL"_hs:   if (!parseCall())   return false; break;
+          case "NATIVE"_hs: if (!parseNative()) return false; break;
+			// clang-format on
+		default:
+			std::cerr << "Unknown instruction: " << token.lexeme << "\n";
 			return false;
 		}
 	}
@@ -264,14 +268,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		if (!labels.contains(hash))
 		{
 			std::cerr << "Error: Undefined function '" << funcName << "'\n";
-
 			return false;
 		}
 
-		std::int64_t offset = labels[hash];
-		std::uint8_t constIdx = outChunk.AddConstant(offset);
-
-		outChunk.Patch(codeOffset, constIdx);
+		outChunk.Patch(codeOffset, outChunk.AddConstant(labels[hash]));
 	}
 
 	return true;
