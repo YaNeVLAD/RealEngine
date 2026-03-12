@@ -1,8 +1,10 @@
 #pragma once
 
+#include <Core/Meta/TypeInfo.hpp>
 #include <ECS/ComponentArray/IComponentArray.hpp>
 
 #include <cassert>
+#include <format>
 #include <vector>
 
 namespace re::ecs

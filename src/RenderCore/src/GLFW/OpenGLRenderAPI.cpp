@@ -259,7 +259,7 @@ void OpenGLRenderAPI::Init()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeEbo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // DRAW LINES
 }
 
 void OpenGLRenderAPI::SetClearColor(const Color& color)
