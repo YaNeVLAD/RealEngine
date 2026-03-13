@@ -73,6 +73,8 @@ std::string ProcessEscapeSequences(std::string_view raw)
 	return result;
 }
 
+constexpr std::uint8_t PATCH_VALUE = 0;
+
 } // namespace
 
 namespace re::rvm
@@ -212,7 +214,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
 		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
-		outChunk.Write(0);
+		outChunk.Write(PATCH_VALUE);
 		outChunk.Write(argCount);
 
 		return true;
@@ -260,7 +262,19 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 		outChunk.Write(static_cast<std::uint8_t>(op));
 		fixups.push_back({ outChunk.Size(), String(nameOpt->lexeme) });
-		outChunk.Write(0); // Дырка
+		outChunk.Write(PATCH_VALUE);
+
+		return true;
+	};
+
+	auto parseCallIndirect = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+		outChunk.Write(static_cast<uint8_t>(OpCode::CallIndirect));
+		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
 
 		return true;
 	};
@@ -277,34 +291,29 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		switch (HashedString(token.lexeme))
 		{
 			// clang-format off
-          case "ADD"_hs:    	  outChunk.Write(static_cast<uint8_t>(OpCode::Add)); break;
-          case "SUB"_hs:    	  outChunk.Write(static_cast<uint8_t>(OpCode::Sub)); break;
-          case "MUL"_hs:    	  outChunk.Write(static_cast<uint8_t>(OpCode::Mul)); break;
-          case "DIV"_hs:    	  outChunk.Write(static_cast<uint8_t>(OpCode::Div)); break;
-          case "POP"_hs:    	  outChunk.Write(static_cast<uint8_t>(OpCode::Pop)); break;
-          case "RETURN"_hs: 	  outChunk.Write(static_cast<uint8_t>(OpCode::Return)); break;
+          case "ADD"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Add)); break;
+          case "SUB"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Sub)); break;
+          case "MUL"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Mul)); break;
+          case "DIV"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Div)); break;
+          case "POP"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Pop)); break;
+          case "RETURN"_hs: 	   outChunk.Write(static_cast<uint8_t>(OpCode::Return)); break;
 
-		  case "LESS"_hs:   	  outChunk.Write(static_cast<uint8_t>(OpCode::Less)); break;
-		  case "EQUAL"_hs:  	  outChunk.Write(static_cast<uint8_t>(OpCode::Equal)); break;
+		  case "LESS"_hs:   	   outChunk.Write(static_cast<uint8_t>(OpCode::Less)); break;
+		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<uint8_t>(OpCode::Equal)); break;
 
-		  case "LABEL"_hs:		  if (!parseLabel()) return false; break;
-		  case "JMP"_hs:		  if (!parseJump(OpCode::Jmp)) return false; break;
-		  case "JMP_IF_FALSE"_hs: if (!parseJump(OpCode::JmpIfFalse)) return false; break;
+		  case "LABEL"_hs:		   if (!parseLabel()) return false; break;
+		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
+		  case "JMP_IF_FALSE"_hs:  if (!parseJump(OpCode::JmpIfFalse)) return false; break;
 
-          case "CONST"_hs:  	  if (!parseConst())  return false; break;
-          case "SET"_hs:    	  if (!parseSet())    return false; break;
-          case "GET"_hs:    	  if (!parseGet())    return false; break;
-          case "FUN"_hs:    	  if (!parseDef())    return false; break;
+          case "CONST"_hs:  	   if (!parseConst())  return false; break;
+          case "SET"_hs:    	   if (!parseSet())    return false; break;
+          case "GET"_hs:    	   if (!parseGet())    return false; break;
+          case "FUN"_hs:    	   if (!parseDef())    return false; break;
 
-		  case "CALL"_hs:   	  if (!parseCall())   return false; break;
-          case "NATIVE"_hs: 	  if (!parseNative()) return false; break;
-		  case "LOAD_FUN"_hs:     if (!parseJump(OpCode::Const)) return false; break;
-		  case "CALL_INDIRECT"_hs: {
-			const auto argOpt = lexer.next();
-			outChunk.Write(static_cast<uint8_t>(OpCode::CallIndirect));
-			outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
-			break;
-		  }
+		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
+          case "NATIVE"_hs: 	   if (!parseNative()) return false; break;
+		  case "LOAD_FUN"_hs:      if (!parseJump(OpCode::Const)) return false; break;
+		  case "CALL_INDIRECT"_hs: if (!parseCallIndirect()) return false; break;
 			// clang-format on
 		default:
 			std::cerr << "Unknown instruction: " << token.lexeme << "\n";
