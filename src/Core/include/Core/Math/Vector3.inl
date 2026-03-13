@@ -41,7 +41,7 @@ template <typename T>
 	requires std::floating_point<T>
 {
 	const T len = Length();
-	assert(len != 0 && "Vector3::Normalize cannot divide by 0");
+	RE_ASSERT(len != 0, "Vector3::Normalize cannot divide by 0");
 
 	return *this / len;
 }
