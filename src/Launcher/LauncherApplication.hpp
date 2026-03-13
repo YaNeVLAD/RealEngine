@@ -36,7 +36,7 @@ struct MenuLayout final : re::Layout
 		m_cube = cube.GetEntity();
 	}
 
-	void OnUpdate(re::core::TimeDelta dt) override
+	void OnUpdate(const re::core::TimeDelta dt) override
 	{
 		auto& scene = GetScene();
 
