@@ -6,15 +6,15 @@
 
 #define READ_BYTE() (*m_ip++)
 #define READ_CONSTANT() (m_chunk->GetConstants()[READ_BYTE()])
-#define BINARY_OP(op_char)                                                     \
+#define BINARY_OP(op_func, op_name)                                            \
 	do                                                                         \
 	{                                                                          \
-		Value b = Pop();                                                       \
-		Value a = Pop();                                                       \
-		Value res = a op_char b;                                               \
+		Value _b = Pop();                                                      \
+		Value _a = Pop();                                                      \
+		Value res = op_func(_a, _b);                                           \
 		if (std::holds_alternative<std::monostate>(res))                       \
 		{                                                                      \
-			std::cerr << "Runtime Error: Invalid operands for " #op_char "\n"; \
+			std::cerr << "Runtime Error: Invalid operands for " #op_name "\n"; \
 			return InterpreterResult::RuntimeError;                            \
 		}                                                                      \
 		Push(res);                                                             \
@@ -57,10 +57,12 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 			// clang-format off
-		case OpCode::Add: BINARY_OP(+); break;
-		case OpCode::Sub: BINARY_OP(-); break;
-		case OpCode::Mul: BINARY_OP(*); break;
-		case OpCode::Div: BINARY_OP(/); break;
+		case OpCode::Add:   BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
+		case OpCode::Sub:   BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
+		case OpCode::Mul:   BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
+		case OpCode::Div:   BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
+		case OpCode::Equal: BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
+		case OpCode::Less:  BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
 			// clang-format on
 
 		case OpCode::Pop: {
@@ -101,7 +103,7 @@ InterpreterResult VirtualMachine::Run()
 
 			std::uint8_t argCount = READ_BYTE();
 
-			CallFrame frame;
+			CallFrame frame{};
 			frame.returnAddress = m_ip;
 
 			frame.stackBase = m_stack.size() - argCount;
@@ -134,6 +136,41 @@ InterpreterResult VirtualMachine::Run()
 
 			Value result = it->second(args);
 			Push(result);
+			break;
+		}
+
+		case OpCode::JmpIfFalse: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+			if (!IsTruthy(Pop()))
+			{
+				m_ip = m_chunk->GetCode().data() + offset;
+			}
+			break;
+		}
+
+		case OpCode::Jmp: {
+			Value offsetVal = READ_CONSTANT();
+			m_ip = m_chunk->GetCode().data() + std::get<std::int64_t>(offsetVal);
+			break;
+		}
+
+		case OpCode::CallIndirect: {
+			std::uint8_t argCount = READ_BYTE();
+
+			// Stack: [FuncAddr] [Arg1][Arg2]
+			Value offsetVal = m_stack[m_stack.size() - 1 - argCount];
+			auto offset = std::get<std::int64_t>(offsetVal);
+
+			CallFrame frame{};
+			frame.returnAddress = m_ip;
+
+			frame.stackBase = m_stack.size() - argCount - 1;
+			frame.localsBase = m_currentLocalsBase;
+
+			m_callStack.push_back(frame);
+			m_currentLocalsBase = m_variables.size();
+			m_ip = m_chunk->GetCode().data() + offset;
 			break;
 		}
 

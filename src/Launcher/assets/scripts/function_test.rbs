@@ -1,4 +1,4 @@
-DEF main
+FUN main
     CONST "Hello from RVM!\nNew Line\n\tNew Line wit tab"
     NATIVE "print" 1
 
@@ -19,7 +19,7 @@ DEF main
 
     RETURN
 
-DEF math_magic
+FUN math_magic
     SET x
     SET y
 

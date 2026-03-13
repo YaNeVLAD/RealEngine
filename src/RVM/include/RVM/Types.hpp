@@ -1,5 +1,7 @@
 #pragma once
 
+#include <RVM/Export.hpp>
+
 #include <Core/String.hpp>
 
 #include <cstdint>
@@ -77,8 +79,22 @@ enum class OpCode : std::uint8_t
 	Div,
 
 	// ---------------------------------------------------------
-	// CONTROL FLOW (FUNCTION CALLS)
+	// COMPARISON
 	// ---------------------------------------------------------
+
+	// Pop B, Pop A -> Push (A < B ? 1 : 0)
+	Less,
+
+	// Pop B, Pop A -> Push (A == B ? 1 : 0)
+	Equal,
+
+	// ---------------------------------------------------------
+	// CONTROL FLOW
+	// ---------------------------------------------------------
+
+	JmpIfFalse,
+
+	Jmp,
 
 	// Bytecode: [Call, const_index]
 	// Stack: ..., [arg1], [arg2] -> ..., [arg1], [arg2] (remain on stack)
@@ -93,6 +109,8 @@ enum class OpCode : std::uint8_t
 	// and pushes the return value back onto the stack.
 	Native,
 
+	CallIndirect,
+
 	// ---------------------------------------------------------
 	// TERMINATION
 	// ---------------------------------------------------------
@@ -104,11 +122,16 @@ enum class OpCode : std::uint8_t
 	Return = std::numeric_limits<std::uint8_t>::max(),
 };
 
-Value operator+(const Value& lhs, const Value& rhs);
-Value operator-(const Value& lhs, const Value& rhs);
-Value operator*(const Value& lhs, const Value& rhs);
-Value operator/(const Value& lhs, const Value& rhs);
+RE_RVM_API Value operator+(Value const& lhs, Value const& rhs);
+RE_RVM_API Value operator-(Value const& lhs, Value const& rhs);
+RE_RVM_API Value operator*(Value const& lhs, Value const& rhs);
+RE_RVM_API Value operator/(Value const& lhs, Value const& rhs);
 
-std::ostream& operator<<(std::ostream& os, const Value& val);
+RE_RVM_API Value OpLess(Value const& lhs, Value const& rhs);
+RE_RVM_API Value OpEqual(Value const& lhs, Value const& rhs);
+
+RE_RVM_API bool IsTruthy(Value const& val);
+
+RE_RVM_API std::ostream& operator<<(std::ostream& os, Value const& val);
 
 } // namespace re::rvm

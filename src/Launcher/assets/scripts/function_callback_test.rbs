@@ -1,0 +1,38 @@
+// Псевдокод:
+// void execute_twice(func, value) { func(value); func(value); }
+// void print_double(val) { print(val * 2); }
+// execute_twice(print_double, 15);
+
+FUN main
+    LOAD_FUN print_double   // Кладем АДРЕС функции на стек (как переменную)
+    CONST 15                 // Кладем значение на стек
+    CALL execute_twice 2     // Вызываем. На стеке: [Addr] [15]
+    RETURN
+
+FUN execute_twice
+    SET val
+    SET my_callback          // Забираем АДРЕС функции в переменную!
+
+    // Первый вызов
+    GET my_callback          // Кладем адрес на стек
+    GET val                  // Кладем аргумент
+    CALL_INDIRECT 1          // Магия! Вызываем функцию по адресу
+
+    // Второй вызов
+    GET my_callback
+    GET val
+    CALL_INDIRECT 1
+
+    RETURN
+
+FUN print_double
+    SET x
+
+    CONST "Callback result: "
+    GET x
+    CONST 2
+    MUL
+
+    NATIVE "print" 2
+
+    RETURN

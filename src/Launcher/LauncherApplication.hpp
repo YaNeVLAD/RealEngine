@@ -49,17 +49,16 @@ struct MenuLayout final : re::Layout
 			return re::String(input);
 		});
 
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/test.rbc"))
+		if (const auto chunk = m_manager.Get<Chunk>("scripts/fibb_recursion_test.rbc"))
 		{
-			std::cout << "scripts/test.rbc\n";
+			std::cout << "scripts/fibb_recursion_test.rbc\n";
 			std::cout << "==============================\n";
 			vm.Interpret(*chunk);
 			std::cout << "==============================" << std::endl;
 		}
-
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/native_read_test.rbc"))
+		if (const auto chunk = m_manager.Get<Chunk>("scripts/function_callback_test.rbc"))
 		{
-			std::cout << "scripts/native_read_test.rbc\n";
+			std::cout << "scripts/function_callback_test.rbc\n";
 			std::cout << "==============================\n";
 			vm.Interpret(*chunk);
 			std::cout << "==============================" << std::endl;

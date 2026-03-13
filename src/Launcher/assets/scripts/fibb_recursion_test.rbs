@@ -1,0 +1,45 @@
+// C-подобный псевдокод:
+// int fib(int n) {
+//     if (n < 2) return n;
+//     return fib(n - 1) + fib(n - 2);
+// }
+
+FUN main
+    CONST 11
+    CALL fib 1
+    SET result
+
+    CONST "Fibonacci(11) is:"
+    GET result
+    NATIVE "print" 2
+    RETURN
+
+FUN fib
+    SET n           // Забираем аргумент N
+
+    // if (n < 2)
+    GET n
+    CONST 2
+    LESS
+    JMP_IF_FALSE fib_recursive
+
+    // return n;
+    GET n
+    RETURN
+
+LABEL fib_recursive
+    // fib(n - 1)
+    GET n
+    CONST 1
+    SUB
+    CALL fib 1
+
+    // fib(n - 2)
+    GET n
+    CONST 2
+    SUB
+    CALL fib 1
+
+    // складываем оба результата
+    ADD
+    RETURN

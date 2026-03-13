@@ -1,4 +1,4 @@
-DEF main
+FUN main
     CONST "Hello"
     SET hello_str            // Локальная hello_str (слот 0 в main)
 
@@ -31,7 +31,7 @@ DEF main
 
 // Вызываемая функция.
 // При входе аргументы (10 и 5) лежат на вершине стека
-DEF subtract_nums
+FUN subtract_nums
     SET b    // Забираем 5 в локальную b (слот 0 в subtract_nums)
     SET a    // Забираем 10 в локальную a (слот 1 в subtract_nums)
 
