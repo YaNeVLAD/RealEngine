@@ -1,6 +1,7 @@
 #include <RVM/VirtualMachine.hpp>
 
-#include <cassert>
+#include <Core/Assert.hpp>
+
 #include <iostream>
 
 #define READ_BYTE() (*m_ip++)
@@ -69,26 +70,28 @@ InterpreterResult VirtualMachine::Run()
 
 		case OpCode::GetLocal: {
 			const std::uint8_t slot = READ_BYTE();
-			if (slot >= m_variables.size())
-			{ // Error
-				Push(std::monostate{});
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+			if (actualIndex >= m_variables.size())
+			{
+				Push(Null);
 			}
 			else [[likely]]
 			{
-				Push(m_variables[slot]);
+				Push(m_variables[actualIndex]);
 			}
 			break;
 		}
 
 		case OpCode::SetLocal: {
-			std::uint8_t slot = READ_BYTE();
+			const std::uint8_t slot = READ_BYTE();
 			Value val = Pop();
 
-			if (m_variables.size() <= slot)
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+			if (m_variables.size() <= actualIndex)
 			{
-				m_variables.resize(slot + 1);
+				m_variables.resize(actualIndex + 1);
 			}
-			m_variables[slot] = val;
+			m_variables[actualIndex] = std::move(val);
 			break;
 		}
 
@@ -96,7 +99,18 @@ InterpreterResult VirtualMachine::Run()
 			Value offsetVal = READ_CONSTANT();
 			auto offset = std::get<std::int64_t>(offsetVal);
 
-			m_callStack.push_back(m_ip);
+			std::uint8_t argCount = READ_BYTE();
+
+			CallFrame frame;
+			frame.returnAddress = m_ip;
+
+			frame.stackBase = m_stack.size() - argCount;
+			frame.localsBase = m_currentLocalsBase;
+
+			m_callStack.push_back(frame);
+
+			m_currentLocalsBase = m_variables.size();
+
 			m_ip = m_chunk->GetCode().data() + offset;
 			break;
 		}
@@ -124,10 +138,25 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 		case OpCode::Return: {
+			Value retVal = Null;
+			if (!m_stack.empty())
+			{
+				retVal = Pop();
+			}
+
 			if (!m_callStack.empty())
 			{
-				m_ip = m_callStack.back();
+				const auto& [returnAddress, stackBase, localsBase] = m_callStack.back();
+				m_ip = returnAddress;
+
+				m_stack.resize(stackBase);
+
+				m_variables.resize(m_currentLocalsBase);
+				m_currentLocalsBase = localsBase;
+
 				m_callStack.pop_back();
+
+				Push(retVal);
 			}
 			else
 			{
@@ -144,7 +173,7 @@ InterpreterResult VirtualMachine::Run()
 
 Value VirtualMachine::Pop()
 {
-	assert(!m_stack.empty());
+	RE_ASSERT(!m_stack.empty(), "You should not call VirtualMachine::Pop on empty stack");
 
 	const Value val = m_stack.back();
 	m_stack.pop_back();

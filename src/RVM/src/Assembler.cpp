@@ -122,7 +122,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 		else if (arg.type == TokenType::String)
 		{
-			auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
+			const auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
 			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
 		else
@@ -188,6 +188,9 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
+		m_locals.clear();
+		m_localsCount = 0;
+
 		labels[String(funcNameOpt->lexeme).Hash()] = outChunk.Size();
 
 		return true;
@@ -200,9 +203,17 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
+		const auto argCountOpt = lexer.next();
+		if (!argCountOpt || argCountOpt->type != TokenType::Integer)
+		{
+			return false;
+		}
+		const std::uint8_t argCount = static_cast<std::uint8_t>(std::stoul(std::string(argCountOpt->lexeme)));
+
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
 		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
 		outChunk.Write(0);
+		outChunk.Write(argCount);
 
 		return true;
 	};

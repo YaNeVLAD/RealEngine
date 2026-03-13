@@ -41,6 +41,29 @@ struct MenuLayout final : re::Layout
 
 			return Null;
 		});
+
+		vm.RegisterNative("read", [](std::vector<Value> const&) -> Value {
+			std::string input;
+			std::getline(std::cin, input);
+
+			return re::String(input);
+		});
+
+		if (const auto chunk = m_manager.Get<Chunk>("scripts/test.rbc"))
+		{
+			std::cout << "scripts/test.rbc\n";
+			std::cout << "==============================\n";
+			vm.Interpret(*chunk);
+			std::cout << "==============================" << std::endl;
+		}
+
+		if (const auto chunk = m_manager.Get<Chunk>("scripts/native_read_test.rbc"))
+		{
+			std::cout << "scripts/native_read_test.rbc\n";
+			std::cout << "==============================\n";
+			vm.Interpret(*chunk);
+			std::cout << "==============================" << std::endl;
+		}
 	}
 
 private:

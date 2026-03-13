@@ -8,7 +8,9 @@ DEF main
     CONST 3.5
     SET y
 
-    CALL math_magic
+    GET x
+    GET y
+    CALL math_magic 2
     SET result
 
     CONST "Calculation result:"
@@ -18,9 +20,14 @@ DEF main
     RETURN
 
 DEF math_magic
+    SET x
+    SET y
+
     GET x
     GET y
     MUL
+
     CONST 100
     ADD
+
     RETURN

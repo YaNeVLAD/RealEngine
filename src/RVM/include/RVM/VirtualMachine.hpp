@@ -22,6 +22,13 @@ enum class InterpreterResult : std::uint8_t
 
 using NativeFn = std::function<Value(std::vector<Value> const&)>;
 
+struct CallFrame
+{
+	const std::uint8_t* returnAddress;
+	std::size_t stackBase;
+	std::size_t localsBase;
+};
+
 class RE_RVM_API VirtualMachine
 {
 public:
@@ -44,8 +51,10 @@ private:
 	std::vector<Value> m_stack;
 	std::vector<Value> m_variables;
 
-	std::vector<const std::uint8_t*> m_callStack;
+	std::vector<CallFrame> m_callStack;
 	std::unordered_map<Hash_t, NativeFn> m_natives;
+
+	std::size_t m_currentLocalsBase = 0;
 };
 
 } // namespace re::rvm

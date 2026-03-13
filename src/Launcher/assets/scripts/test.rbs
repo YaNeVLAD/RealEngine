@@ -1,97 +1,45 @@
 DEF main
-    // --- 1. ТЕСТ NATIVE И СТРОК ---
-    CONST "=== RVM Test Suite Start ===\n"
-    NATIVE "print" 1
+    CONST "Hello"
+    SET hello_str            // Локальная hello_str (слот 0 в main)
 
-    // --- 2. ТЕСТ АРИФМЕТИКИ И ПЕРЕМЕННЫХ ---
-    // Сложение
-    CONST 15
-    CONST 5
+    CONST ", World!"
+    SET world_str
+
+    GET hello_str
+    GET world_str
     ADD
-    SET sum_result
+    SET message
 
-    // Вычитание (с дробными числами)
-    CONST 10.5
-    CONST 3.0
-    SUB
-    SET sub_result
+    // Готовим аргументы для функции
+    CONST 10
+    CONST 5
 
-    // Умножение
-    CONST 4
-    CONST 4
-    MUL
-    SET mul_result
+    // Вызываем функцию и передаем 2 аргумента
+    CALL subtract_nums 2
 
-    // Деление
-    CONST 20
-    CONST 4
-    DIV
-    SET div_result
+    SET result            // Забираем результат со стека
 
-    // Вывод результатов арифметики
-    CONST "Sum (15 + 5):"
-    GET sum_result
+    // В m_variables сейчас лежат:
+    // [0] = "Hello" (my_str)
+    // [1] = 5 (result)
+
+    GET message
+    GET result
     NATIVE "print" 2
 
-    CONST "Sub (10.5 - 3.0):"
-    GET sub_result
-    NATIVE "print" 2
-
-    CONST "Mul (4 * 4):"
-    GET mul_result
-    NATIVE "print" 2
-
-    CONST "Div (20 / 4):"
-    GET div_result
-    NATIVE "print" 2
-
-    // --- 3. ТЕСТ ВЫЗОВА ФУНКЦИЙ (CALL / RETURN) ---
-    CONST "\n=== Testing Functions ==="
-    NATIVE "print" 1
-
-    // Имитация передачи аргументов через глобальные переменные (слоты)
-    CONST 100
-    SET arg_a
-    CONST 50
-    SET arg_b
-
-    CALL complex_math
-    SET func_result
-
-    CONST "Function result ((100 * 2) + (50 / 2)):"
-    GET func_result
-    NATIVE "print" 2
-
-    // --- 4. ТЕСТ ОЧИСТКИ СТЕКА (POP) ---
-    CONST "\n=== Testing Stack POP ==="
-    NATIVE "print" 1
-
-    CONST "This string MUST be popped and not printed!"
-    POP
-
-    CONST "If you see this, POP works correctly."
-    NATIVE "print" 1
-
-    // Завершение работы программы
-    CONST "\n=== RVM Test Suite End ==="
-    NATIVE "print" 1
     RETURN
 
-// Вспомогательная функция для теста
-// Формула: (arg_a * 2) + (arg_b / 2)
-DEF complex_math
-    // Левая часть: arg_a * 2
-    GET arg_a
-    CONST 2
-    MUL
+// Вызываемая функция.
+// При входе аргументы (10 и 5) лежат на вершине стека
+DEF subtract_nums
+    SET b    // Забираем 5 в локальную b (слот 0 в subtract_nums)
+    SET a    // Забираем 10 в локальную a (слот 1 в subtract_nums)
 
-    // Правая часть: arg_b / 2
-    GET arg_b
-    CONST 2
-    DIV
+    GET a
+    GET b
+    SUB      // 10 - 5 = 5
 
-    // Сложение результатов (они сейчас лежат на вершине стека)
-    ADD
-
-    // Возврат результата (сумма останется на стеке для вызывающей стороны)
+    // На стеке сейчас 5. Команда RETURN заберет её,
+    // очистит стек от мусора, удалит локальные a и b,
+    // и положит 5 обратно вызывающей стороне.
     RETURN
