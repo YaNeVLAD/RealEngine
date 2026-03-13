@@ -21,7 +21,9 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
 	auto [width, height] = m_window.Size();
-	const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+	const auto w = std::max(width, 1u);
+	const auto h = std::max(height, 1u);
+	const float aspectRatio = static_cast<float>(w) / static_cast<float>(h);
 
 	const glm::mat4 viewMatrix = glm::lookAt(
 		glm::vec3(0.f, 0.f, 0.f), // Position

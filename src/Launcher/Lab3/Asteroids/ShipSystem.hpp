@@ -29,16 +29,16 @@ public:
 				continue;
 			}
 
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Left))
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Left) || re::Keyboard::IsKeyPressed(re::Keyboard::Key::A))
 			{
 				vel.angular -= 1000.f * dt;
 			}
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Right))
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Right) || re::Keyboard::IsKeyPressed(re::Keyboard::Key::D))
 			{
 				vel.angular += 1000.f * dt;
 			}
 
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Up))
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Up) || re::Keyboard::IsKeyPressed(re::Keyboard::Key::W))
 			{
 				const re::Vector2f forward = re::Vector2f{ 0.f, -1.f }.Rotate(transform.rotation);
 				vel.linear = vel.linear + forward * 600.f * dt;

@@ -28,8 +28,17 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-		using namespace re::rvm;
 
+		auto cube = scene
+						.CreateEntity()
+						.Add<re::TransformComponent3D>(
+							{ .position = { 0.f, 0.f, -3.f },
+								.rotation = { 45.f, 45.f, 0.f } })
+						.Add<re::CubeComponent>(re::Color::Red);
+
+		m_cube = cube.GetEntity();
+
+		using namespace re::rvm;
 		VirtualMachine vm;
 		vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
 			std::cout << ">>> [SCRIPT]: ";
@@ -65,7 +74,17 @@ struct MenuLayout final : re::Layout
 		}
 	}
 
+	void OnUpdate(re::core::TimeDelta dt) override
+	{
+		auto& scene = GetScene();
+
+		auto& transform = scene.GetComponent<re::TransformComponent3D>(m_cube);
+		transform.rotation.x += 45.0f * dt;
+		transform.rotation.y += 45.0f * dt;
+	}
+
 private:
+	re::ecs::Entity m_cube = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
 
 	re::render::IWindow& m_window;
