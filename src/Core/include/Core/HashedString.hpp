@@ -58,11 +58,6 @@ public:
 	{
 	}
 
-	constexpr BaseHashedString(const std::basic_string_view<TChar> str) noexcept
-		: Base{ hasher({ str.data(), str.length() }) }
-	{
-	}
-
 	template <std::size_t N>
 	consteval BaseHashedString(const TChar (&str)[N]) noexcept
 		: Base{ hasher({ static_cast<const TChar*>(str) }) }

@@ -4,8 +4,8 @@
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
-#include <RVM/VirtualMachine.hpp>
 #include <Core/Math/Vector3.hpp>
+#include <RVM/VirtualMachine.hpp>
 
 #include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/Hangman/HangmanLayout.hpp"
@@ -39,8 +39,8 @@ struct MenuLayout final : re::Layout
 			}
 			std::cout << "\n";
 
-			transform.position = worldPos;
-		};
+			return Null;
+		});
 	}
 
 private:
