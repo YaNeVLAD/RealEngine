@@ -50,6 +50,29 @@ constexpr auto s_FragmentShaderSource = R"(
     }
 )";
 
+constexpr auto s_VertexShader3D = R"(
+    #version 450 core
+    layout(location = 0) in vec3 a_Position;
+
+    uniform mat4 u_ViewProjection;
+    uniform mat4 u_Model;
+
+    void main() {
+        gl_Position = u_ViewProjection * u_Model * vec4(a_Position, 1.0);
+    }
+)";
+
+constexpr auto s_FragmentShader3D = R"(
+    #version 450 core
+    layout(location = 0) out vec4 o_Color;
+
+    uniform vec4 u_Color;
+
+    void main() {
+        o_Color = u_Color;
+    }
+)";
+
 GLuint CreateShader(const char* vertexSrc, const char* fragmentSrc)
 {
 	auto Compile = [](const GLenum type, const char* src) -> GLuint {
@@ -146,26 +169,26 @@ void OpenGLRenderAPI::Init()
 		reinterpret_cast<const void*>(offsetof(InnerVertex, texIndex)));
 
 	// Pattern: 0,1,2, 2,3,0 ...
-	auto* indices = new uint32_t[MaxIndices];
+	auto* indices2d = new uint32_t[MaxIndices];
 	uint32_t offset = 0;
 	for (uint32_t i = 0; i < MaxIndices; i += 6)
 	{
-		indices[i + 0] = offset + 0;
-		indices[i + 1] = offset + 1;
-		indices[i + 2] = offset + 2;
+		indices2d[i + 0] = offset + 0;
+		indices2d[i + 1] = offset + 1;
+		indices2d[i + 2] = offset + 2;
 
-		indices[i + 3] = offset + 2;
-		indices[i + 4] = offset + 3;
-		indices[i + 5] = offset + 0;
+		indices2d[i + 3] = offset + 2;
+		indices2d[i + 4] = offset + 3;
+		indices2d[i + 5] = offset + 0;
 
 		offset += 4;
 	}
 
 	glCreateBuffers(1, &m_indexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndices * sizeof(uint32_t), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndices * sizeof(uint32_t), indices2d, GL_STATIC_DRAW);
 
-	delete[] indices;
+	delete[] indices2d;
 
 	// --- Init Dynamic Geometry ---
 	glCreateVertexArrays(1, &m_dynamicVao);
@@ -197,6 +220,46 @@ void OpenGLRenderAPI::Init()
 	glVertexAttribPointer(3, 1,
 		GL_FLOAT, GL_FALSE, sizeof(InnerVertex),
 		reinterpret_cast<const void*>(offsetof(InnerVertex, texIndex)));
+
+	// 3D
+	glEnable(GL_DEPTH_TEST);
+	m_shader3D = CreateShader(s_VertexShader3D, s_FragmentShader3D);
+	constexpr float vertices[] = {
+		-0.5f, -0.5f, 0.5f, // 0: left-bottom-front
+		0.5f, -0.5f, 0.5f, // 1: right-bottom-front
+		0.5f, 0.5f, 0.5f, // 2: right-top-front
+		-0.5f, 0.5f, 0.5f, // 3: left-top-front
+		-0.5f, -0.5f, -0.5f, // 4: left-bottom-back
+		0.5f, -0.5f, -0.5f, // 5: right-bottom-back
+		0.5f, 0.5f, -0.5f, // 6: right-top-back
+		-0.5f, 0.5f, -0.5f // 7: left-top-back
+	};
+
+	// Cube edges
+	constexpr std::uint32_t indices[] = {
+		0, 1, 2, 2, 3, 0, // Front
+		1, 5, 6, 6, 2, 1, // Right
+		5, 4, 7, 7, 6, 5, // Back
+		4, 0, 3, 3, 7, 4, // Left
+		3, 2, 6, 6, 7, 3, // Top
+		4, 5, 1, 1, 0, 4 // Bottom
+	};
+
+	glGenVertexArrays(1, &m_cubeVao);
+	glBindVertexArray(m_cubeVao);
+
+	glGenBuffers(1, &m_cubeVbo);
+	glBindBuffer(GL_ARRAY_BUFFER, m_cubeVbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+
+	glGenBuffers(1, &m_cubeEbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeEbo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // DRAW LINES
 }
 
 void OpenGLRenderAPI::SetClearColor(const Color& color)
@@ -356,6 +419,49 @@ void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveTyp
 	}
 
 	glDrawArrays(ToOpenGLType(type), 0, static_cast<GLsizei>(glVertices.size()));
+}
+
+void OpenGLRenderAPI::SetDepthTest(bool enabled)
+{
+	if (enabled)
+	{
+		glEnable(GL_DEPTH_TEST);
+	}
+	else
+	{
+		glDisable(GL_DEPTH_TEST);
+	}
+}
+
+void OpenGLRenderAPI::SetCameraPerspective(
+	const float fov,
+	const float aspectRatio,
+	const float nearClip,
+	const float farClip,
+	const glm::mat4& viewMatrix)
+{
+	const glm::mat4 projection = glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip);
+	m_viewProj3D = projection * viewMatrix;
+}
+
+void OpenGLRenderAPI::DrawCube(const glm::mat4& transform, const Color& color)
+{
+	glUseProgram(m_shader3D);
+
+	// Загружаем матрицы
+	const GLint vpLoc = glGetUniformLocation(m_shader3D, "u_ViewProjection");
+	glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &m_viewProj3D[0][0]);
+
+	const GLint modelLoc = glGetUniformLocation(m_shader3D, "u_Model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &transform[0][0]);
+
+	// Загружаем цвет
+	const GLint colorLoc = glGetUniformLocation(m_shader3D, "u_Color");
+	glUniform4f(colorLoc, (float)color.r / 255.f, (float)color.g / 255.f, (float)color.b / 255.f, (float)color.a / 255.f);
+
+	// Рисуем
+	glBindVertexArray(m_cubeVao);
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(

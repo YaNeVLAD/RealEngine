@@ -6,7 +6,6 @@
 #include <ECS/Entity/Signature.hpp>
 #include <ECS/TypeIndex/TypeIndex.hpp>
 
-#include <cassert>
 #include <queue>
 #include <vector>
 

@@ -8,8 +8,9 @@ void ComponentManager::RegisterComponent()
 {
 	const ComponentType componentType = TypeIndex<TComponent>();
 
-	assert(!m_componentArrays.contains(componentType)
-		&& "Can't register the same component more than once");
+	RE_ASSERT(!m_componentArrays.contains(componentType),
+		"Can not register {} more than once",
+		NameOf<TComponent>());
 
 	m_componentArrays[componentType] = std::make_shared<ComponentArray<TComponent>>();
 }
@@ -63,8 +64,7 @@ std::shared_ptr<ComponentArray<TComponent>> ComponentManager::GetComponentArray(
 {
 	const ComponentType componentType = TypeIndex<TComponent>();
 
-	assert(m_componentArrays.contains(componentType)
-		&& "Component is not registered");
+	RE_ASSERT(m_componentArrays.contains(componentType), "Component {} is not registered", NameOf<TComponent>());
 
 	return std::static_pointer_cast<ComponentArray<TComponent>>(m_componentArrays.at(componentType));
 }

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cassert>
+#include <Core/Assert.hpp>
+
 #include <cmath>
 #include <compare>
 #include <concepts>
@@ -12,9 +13,9 @@ template <typename T>
 	requires std::floating_point<T> || std::integral<T>
 struct Vector2
 {
-	Vector2 Rotate(float angle);
+	Vector2 Rotate(float angle) const;
 
-	T Dot(const Vector2& rhs);
+	T Dot(const Vector2& rhs) const;
 
 	T Length();
 

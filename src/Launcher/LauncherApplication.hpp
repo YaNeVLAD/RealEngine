@@ -5,6 +5,7 @@
 #include <Runtime/Components.hpp>
 
 #include <RVM/VirtualMachine.hpp>
+#include <Core/Math/Vector3.hpp>
 
 #include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/Hangman/HangmanLayout.hpp"
@@ -27,17 +28,6 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-		auto triangle = scene.CreateEntity();
-		triangle.Add<re::TransformComponent>(re::Vector2f{ 0, 0 });
-
-		auto type = re::PrimitiveType::Triangles;
-		std::vector<re::Vertex> vertices = {
-			{ { 0.f, -150.f }, re::Color::Red },
-			{ { 150.f, 150.f }, re::Color::Green },
-			{ { -150.f, 150.f }, re::Color::Blue }
-		};
-		triangle.Add<re::MeshComponent>(vertices, type);
-
 		using namespace re::rvm;
 
 		VirtualMachine vm;
@@ -49,13 +39,8 @@ struct MenuLayout final : re::Layout
 			}
 			std::cout << "\n";
 
-			return Null;
-		});
-
-		if (const auto scriptChunk = m_manager.Get<Chunk>("scripts/test.rbc"))
-		{
-			vm.Interpret(*scriptChunk);
-		}
+			transform.position = worldPos;
+		};
 	}
 
 private:

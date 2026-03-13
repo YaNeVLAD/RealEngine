@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <ECS/ComponentArray/IComponentArray.hpp>
 
-#include <cassert>
+#include <format>
 #include <vector>
 
 namespace re::ecs

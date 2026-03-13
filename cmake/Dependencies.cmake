@@ -8,6 +8,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(EnTT)
 
+# GLM
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 1.0.1
+)
+set(GLM_BUILD_LIBRARY OFF CACHE INTERNAL "")
+set(BUILD_SHARED_LIBS_SAVED ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
+
+FetchContent_MakeAvailable(glm)
+
+set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
+
 if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     FetchContent_Declare(
             SFML
@@ -22,24 +36,11 @@ if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
             SFML::Graphics
             SFML::Window
             SFML::System
+            glm::glm
     )
     add_compile_definitions(RE_USE_SFML_RENDER)
 
 elseif (RE_RENDER_BACKEND STREQUAL "GLFW") # GLFW
-    # GLM
-    FetchContent_Declare(
-            glm
-            GIT_REPOSITORY https://github.com/g-truc/glm.git
-            GIT_TAG 1.0.1
-    )
-    set(GLM_BUILD_LIBRARY OFF CACHE INTERNAL "")
-    set(BUILD_SHARED_LIBS_SAVED ${BUILD_SHARED_LIBS})
-    set(BUILD_SHARED_LIBS OFF)
-
-    FetchContent_MakeAvailable(glm)
-
-    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED}) # Возвращаем обратно1
-
     # GLFW
     FetchContent_Declare(
             glfw

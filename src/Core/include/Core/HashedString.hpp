@@ -69,6 +69,11 @@ public:
 	{
 	}
 
+	constexpr BaseHashedString(const std::basic_string_view<ValueType> str) noexcept
+		: Base{ hasher(str) }
+	{
+	}
+
 	[[nodiscard]] static constexpr HashType Value(const TChar* str, const SizeType length) noexcept
 	{
 		return BaseHashedString{ str, length }.hash;

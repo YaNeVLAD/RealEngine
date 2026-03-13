@@ -5,7 +5,7 @@ namespace re
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
-Vector2<T> Vector2<T>::Rotate(const float angle)
+Vector2<T> Vector2<T>::Rotate(const float angle) const
 {
 	const float rad = angle * (3.14f / 180.f);
 	float cos = std::cos(rad);
@@ -19,7 +19,7 @@ Vector2<T> Vector2<T>::Rotate(const float angle)
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
-T Vector2<T>::Dot(const Vector2& rhs)
+T Vector2<T>::Dot(const Vector2& rhs) const
 {
 	return x * rhs.x + y * rhs.y;
 }
@@ -85,7 +85,7 @@ constexpr Vector2<T>& operator*=(Vector2<T>& left, T right)
 template <typename T>
 constexpr Vector2<T> operator/(Vector2<T> left, T right)
 {
-	assert(right != 0 && "Vector2::operator/ cannot divide by 0");
+	RE_ASSERT(right != 0, "Vector2::operator/ cannot divide by 0");
 
 	return Vector2<T>(left.x / right, left.y / right);
 }
@@ -93,7 +93,7 @@ constexpr Vector2<T> operator/(Vector2<T> left, T right)
 template <typename T>
 constexpr Vector2<T>& operator/=(Vector2<T>& left, T right)
 {
-	assert(right != 0 && "Vector2::operator/= cannot divide by 0");
+	RE_ASSERT(right != 0, "Vector2::operator/= cannot divide by 0");
 	left.x /= right;
 	left.y /= right;
 
