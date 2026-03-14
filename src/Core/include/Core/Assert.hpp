@@ -3,7 +3,6 @@
 #include <Core/Logger.hpp>
 
 #include <format>
-#include <iostream>
 #include <source_location>
 
 #if defined(_MSC_VER)
