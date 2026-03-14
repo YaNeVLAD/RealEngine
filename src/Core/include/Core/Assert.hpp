@@ -46,7 +46,7 @@ constexpr void ReportAssertionFailure(
 	std::string userMsg = std::format(message, std::forward<Args>(args)...);
 
 	std::string assertMsg = std::format(
-		"========================================\n"
+		"\n========================================\n"
 		"[RE_ASSERT FAILED]\n"
 		"Expression: {}\n"
 		"Location:   {}:{}\n"
