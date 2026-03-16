@@ -409,7 +409,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "GET_PROPERTY"_hs:  if (!parseGetProperty()) return false; break;
 		  case "SET_PROPERTY"_hs:  if (!parseSetProperty()) return false; break;
 		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<uint8_t>(OpCode::TypeOf)); break;
-		  case "TYPE"_hs:         if (!parseType()) return false; break;
+		  case "TYPE"_hs:          if (!parseType()) return false; break;
 
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	   if (!parseNative()) return false; break;
