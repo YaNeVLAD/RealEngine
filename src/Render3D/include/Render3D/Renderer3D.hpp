@@ -21,11 +21,12 @@ public:
 
 	static void EndScene();
 
-	static void DrawCube(
-		Vector3f const& position,
-		Vector3f const& rotation,
-		Vector3f const& scale,
-		Color const& color);
+	static void DrawMesh(
+		const std::vector<Vertex>& vertices,
+		const std::vector<std::uint32_t>& indices,
+		const Vector3f& pos,
+		const Vector3f& scale,
+		const Vector3f& rotation);
 
 	static void SetViewport(Vector2u size);
 

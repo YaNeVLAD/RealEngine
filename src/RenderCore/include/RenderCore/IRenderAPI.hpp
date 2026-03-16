@@ -29,16 +29,16 @@ public:
 	virtual Vector2f ScreenToWorld(Vector2i const& pixelPos) = 0;
 	virtual void Flush() = 0;
 	virtual void Clear() = 0;
-	virtual void DrawQuad(Vector2f const& pos, Vector2f const& size, float rotation, Color const& color) = 0;
-	virtual void DrawCircle(Vector2f const& center, float radius, Color const& color) = 0;
-	virtual void DrawText(String const& text, Font const& font, Vector2f const& pos, float fontSize, Color const& color) = 0;
-	virtual void DrawTexturedQuad(Vector2f const& pos, Vector2f const& size, Texture* texture, Color const& tint) = 0;
+	virtual void DrawQuad(const Vector3f& pos, const Vector2f& size, float rotation, const Color& color) = 0;
+	virtual void DrawCircle(Vector3f const& center, float radius, Color const& color) = 0;
+	virtual void DrawText(String const& text, Font const& font, Vector3f const& pos, float fontSize, Color const& color) = 0;
+	virtual void DrawTexturedQuad(Vector3f const& pos, Vector2f const& size, Texture* texture, Color const& tint) = 0;
 	virtual void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) = 0;
 
 	// 3D
 	virtual void SetDepthTest(bool enabled) = 0;
 	virtual void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) = 0;
-	virtual void DrawCube(const glm::mat4& transform, const Color& color) = 0;
+	virtual void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform) = 0;
 };
 
 } // namespace re::render

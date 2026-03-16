@@ -28,25 +28,25 @@ public:
 	static void EndScene();
 
 	static void DrawQuad(
-		Vector2f const& pos,
+		Vector3f const& pos,
 		Vector2f const& size,
 		float rotation,
 		Color const& color);
 
 	static void DrawCircle(
-		Vector2f const& center,
+		Vector3f const& center,
 		float radius,
 		Color const& color);
 
 	static void DrawText(
 		String const& text,
 		Font const& font,
-		Vector2f pos,
+		Vector3f pos,
 		float size,
 		Color const& color);
 
 	static void DrawTexturedQuad(
-		Vector2f const& pos,
+		Vector3f const& pos,
 		Vector2f const& size,
 		Texture* texture,
 		Color tint);

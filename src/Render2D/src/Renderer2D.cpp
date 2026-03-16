@@ -45,7 +45,7 @@ void Renderer2D::EndScene()
 }
 
 void Renderer2D::DrawQuad(
-	Vector2f const& pos,
+	Vector3f const& pos,
 	Vector2f const& size,
 	const float rotation,
 	Color const& color)
@@ -54,7 +54,7 @@ void Renderer2D::DrawQuad(
 }
 
 void Renderer2D::DrawCircle(
-	Vector2f const& center,
+	Vector3f const& center,
 	const float radius,
 	Color const& color)
 {
@@ -64,7 +64,7 @@ void Renderer2D::DrawCircle(
 void Renderer2D::DrawText(
 	String const& text,
 	Font const& font,
-	const Vector2f pos,
+	const Vector3f pos,
 	const float size,
 	Color const& color)
 {
@@ -72,7 +72,7 @@ void Renderer2D::DrawText(
 }
 
 void Renderer2D::DrawTexturedQuad(
-	Vector2f const& pos,
+	Vector3f const& pos,
 	Vector2f const& size,
 	Texture* texture,
 	const Color tint)

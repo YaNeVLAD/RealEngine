@@ -1,9 +1,9 @@
-#include "ECS/Scene/Scene.hpp"
-
 #include <Runtime/Internal/RenderSystem3D.hpp>
 
+#include <ECS/Scene/Scene.hpp>
 #include <Render3D/Renderer3D.hpp>
 #include <Runtime/Components.hpp>
+#include <Runtime/Internal/PrimitiveBuilder.hpp>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
@@ -33,13 +33,25 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 
 	render::Renderer3D::BeginScene(45.0f, aspectRatio, viewMatrix);
 
-	for (const auto&& [_, transform, cube] : *scene.CreateView<TransformComponent3D, CubeComponent>())
+	for (auto&& [entity, transform, cube] : *scene.CreateView<TransformComponent, CubeComponent>())
 	{
-		render::Renderer3D::DrawCube(
+		auto [cubeVertices, cubeIndices] = PrimitiveBuilder::CreateCube(cube.color);
+		render::Renderer3D::DrawMesh(
+			cubeVertices,
+			cubeIndices,
 			transform.position,
-			transform.rotation,
 			transform.scale,
-			cube.color);
+			transform.rotation);
+	}
+
+	for (const auto&& [_, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent3D>())
+	{
+		render::Renderer3D::DrawMesh(
+			mesh.vertices,
+			mesh.indices,
+			transform.position,
+			transform.scale,
+			transform.rotation);
 	}
 
 	render::Renderer3D::EndScene();

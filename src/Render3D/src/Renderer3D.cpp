@@ -24,28 +24,25 @@ void Renderer3D::EndScene()
 	m_api->SetDepthTest(false);
 }
 
-void Renderer3D::DrawCube(
-	Vector3f const& position,
-	Vector3f const& rotation,
-	Vector3f const& scale,
-	Color const& color)
+void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const Vector3f& pos, const Vector3f& scale, const Vector3f& rotation)
 {
 	auto transform = glm::mat4(1.0f);
+	transform = glm::translate(transform, { pos.x, pos.y, pos.z });
 
-	transform = glm::translate(transform, { position.x, position.y, position.z });
-
-	transform = glm::rotate(transform, glm::radians(rotation.x), { 1.0f, 0.0f, 0.0f });
-	transform = glm::rotate(transform, glm::radians(rotation.y), { 0.0f, 1.0f, 0.0f });
-	transform = glm::rotate(transform, glm::radians(rotation.z), { 0.0f, 0.0f, 1.0f });
+	// Rotation (Y, X, Z)
+	transform = glm::rotate(transform, glm::radians(rotation.y), { 0.f, 1.f, 0.f });
+	transform = glm::rotate(transform, glm::radians(rotation.x), { 1.f, 0.f, 0.f });
+	transform = glm::rotate(transform, glm::radians(rotation.z), { 0.f, 0.f, 1.f });
 
 	transform = glm::scale(transform, { scale.x, scale.y, scale.z });
 
-	m_api->DrawCube(transform, color);
+	m_api->DrawMesh3D(vertices, indices, transform);
 }
 
 void Renderer3D::SetViewport(const Vector2u size)
 {
-	m_api->SetViewport({ 0, 0 }, { (float)size.x, (float)size.y });
+	m_api->SetViewport({ 0, 0 },
+		{ static_cast<float>(size.x), static_cast<float>(size.y) });
 }
 
 } // namespace re::render

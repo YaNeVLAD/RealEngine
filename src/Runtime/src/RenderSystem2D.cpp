@@ -5,21 +5,7 @@
 #include <Runtime/Components.hpp>
 
 #include <algorithm>
-
-namespace
-{
-
-int GetZIndex(re::ecs::Scene& scene, const re::ecs::Entity entity)
-{
-	if (!scene.HasComponent<re::ZIndexComponent>(entity))
-	{
-		return 0;
-	}
-
-	return scene.GetComponent<re::ZIndexComponent>(entity).value;
-}
-
-} // namespace
+#include <cmath>
 
 namespace re::detail
 {
@@ -32,38 +18,30 @@ RenderSystem2D::RenderSystem2D(render::IWindow& window)
 void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 {
 	m_renderQueue.clear();
+
 	for (auto&& [entity, transform, rect] : *scene.CreateView<TransformComponent, RectangleComponent>())
 	{
-		Vector2f size = {
-			rect.size.x * transform.scale.x,
-			rect.size.y * transform.scale.y
-		};
+		RenderCommand cmd;
+		cmd.z = transform.position.z;
+		cmd.type = RenderCmdType::Quad;
+		cmd.position = transform.position;
+		cmd.size = { rect.size.x * transform.scale.x, rect.size.y * transform.scale.y };
+		cmd.rotation = transform.rotation.z;
+		cmd.color = rect.color;
 
-		render::Renderer2D::DrawQuad(
-			transform.position,
-			size,
-			transform.rotation,
-			rect.color);
-
-		const int z = GetZIndex(scene, entity);
-		m_renderQueue.push_back(
-			{ z, [=] {
-				 render::Renderer2D::DrawQuad(
-					 transform.position, size, transform.rotation, rect.color);
-			 } });
+		m_renderQueue.push_back(std::move(cmd));
 	}
 
 	for (auto&& [entity, transform, circle] : *scene.CreateView<TransformComponent, CircleComponent>())
 	{
-		const int z = GetZIndex(scene, entity);
+		RenderCommand cmd;
+		cmd.z = transform.position.z;
+		cmd.type = RenderCmdType::Circle;
+		cmd.position = transform.position;
+		cmd.size.x = circle.radius * transform.scale.x;
+		cmd.color = circle.color;
 
-		m_renderQueue.push_back(
-			{ z, [=] {
-				 render::Renderer2D::DrawCircle(
-					 transform.position,
-					 circle.radius * transform.scale.x,
-					 circle.color);
-			 } });
+		m_renderQueue.push_back(std::move(cmd));
 	}
 
 	for (auto&& [entity, transform, comp] : *scene.CreateView<TransformComponent, DynamicTextureComponent>())
@@ -80,27 +58,23 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 			}
 
 			comp.texture->SetData(comp.image.Data(), comp.image.Size());
-
 			comp.isDirty = false;
 		}
 
 		if (comp.texture)
 		{
-			const int z = GetZIndex(scene, entity);
-			const auto texPtr = comp.texture;
-			m_renderQueue.push_back(
-				{ z, [=] {
-					 const Vector2f size = {
-						 (float)texPtr->Width() * transform.scale.x,
-						 (float)texPtr->Height() * transform.scale.y
-					 };
+			RenderCommand cmd;
+			cmd.z = transform.position.z;
+			cmd.type = RenderCmdType::TexturedQuad;
+			cmd.position = transform.position;
+			cmd.size = {
+				static_cast<float>(comp.texture->Width()) * transform.scale.x,
+				static_cast<float>(comp.texture->Height()) * transform.scale.y
+			};
+			cmd.texture = comp.texture.get();
+			cmd.color = Color::White;
 
-					 render::Renderer2D::DrawTexturedQuad(
-						 transform.position,
-						 size,
-						 texPtr.get(),
-						 Color::White);
-				 } });
+			m_renderQueue.push_back(std::move(cmd));
 		}
 	}
 
@@ -108,49 +82,56 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 	{
 		if (text.font)
 		{
-			const int z = GetZIndex(scene, entity);
-			m_renderQueue.push_back(
-				{ z, [=] {
-					 render::Renderer2D::DrawText(
-						 text.text, *text.font,
-						 transform.position, text.size * transform.scale.x,
-						 text.color);
-				 } });
+			RenderCommand cmd;
+			cmd.z = transform.position.z;
+			cmd.type = RenderCmdType::Text;
+			cmd.position = transform.position;
+			cmd.size.x = text.size * transform.scale.x;
+			cmd.color = text.color;
+			cmd.font = text.font.get();
+			cmd.text = text.text;
+
+			m_renderQueue.push_back(std::move(cmd));
 		}
 	}
 
 	for (auto&& [entity, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent>())
 	{
-		m_renderQueue.push_back(
-			{ GetZIndex(scene, entity), [&] {
-				 std::vector<Vertex> transformedVertices = mesh.vertices;
+		std::vector<Vertex> transformedVertices = mesh.vertices;
 
-				 const float rad = transform.rotation * (3.14159265f / 180.0f);
-				 const float cosA = std::cos(rad);
-				 const float sinA = std::sin(rad);
+		const float rad = transform.rotation.z * (3.14159265f / 180.0f);
+		const float cosA = std::cos(rad);
+		const float sinA = std::sin(rad);
 
-				 for (auto& v : transformedVertices)
-				 {
-					 const float scaledX = v.position.x * transform.scale.x;
-					 const float scaledY = v.position.y * transform.scale.y;
+		for (auto& v : transformedVertices)
+		{
+			const float scaledX = v.position.x * transform.scale.x;
+			const float scaledY = v.position.y * transform.scale.y;
+			const float scaledZ = v.position.z * transform.scale.z;
 
-					 const float rotatedX = scaledX * cosA - scaledY * sinA;
-					 const float rotatedY = scaledX * sinA + scaledY * cosA;
+			const float rotatedX = scaledX * cosA - scaledY * sinA;
+			const float rotatedY = scaledX * sinA + scaledY * cosA;
 
-					 v.position.x = transform.position.x + rotatedX;
-					 v.position.y = transform.position.y + rotatedY;
-				 }
+			v.position.x = transform.position.x + rotatedX;
+			v.position.y = transform.position.y + rotatedY;
 
-				 render::Renderer2D::DrawMesh(transformedVertices, mesh.type);
-			 } });
+			v.position.z = transform.position.z + scaledZ;
+		}
+
+		RenderCommand cmd;
+		cmd.z = transform.position.z;
+		cmd.type = RenderCmdType::Mesh;
+		cmd.meshVertices = std::move(transformedVertices);
+		cmd.primitiveType = mesh.type;
+
+		m_renderQueue.push_back(std::move(cmd));
 	}
 
 	std::ranges::stable_sort(m_renderQueue,
-		[](const RenderObject& a, const RenderObject& b) {
-			return a.zIndex < b.zIndex;
+		[](const RenderCommand& a, const RenderCommand& b) {
+			return a.z < b.z;
 		});
 
-	// RENDER
 	Vector2f cameraPos = { 0, 0 };
 	float cameraZoom = 1.0f;
 
@@ -158,7 +139,7 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 	{
 		if (camera.isPrimal)
 		{
-			cameraPos = transform.position;
+			cameraPos = { transform.position.x, transform.position.y };
 			cameraZoom = camera.zoom;
 			break;
 		}
@@ -166,9 +147,26 @@ void RenderSystem2D::Update(ecs::Scene& scene, core::TimeDelta)
 
 	render::Renderer2D::BeginScene(cameraPos, cameraZoom);
 
-	for (const auto& [_, drawCall] : m_renderQueue)
+	for (const auto& cmd : m_renderQueue)
 	{
-		drawCall();
+		switch (cmd.type)
+		{
+		case RenderCmdType::Quad:
+			render::Renderer2D::DrawQuad(cmd.position, cmd.size, cmd.rotation, cmd.color);
+			break;
+		case RenderCmdType::Circle:
+			render::Renderer2D::DrawCircle(cmd.position, cmd.size.x, cmd.color);
+			break;
+		case RenderCmdType::TexturedQuad:
+			render::Renderer2D::DrawTexturedQuad(cmd.position, cmd.size, cmd.texture, cmd.color);
+			break;
+		case RenderCmdType::Text:
+			render::Renderer2D::DrawText(cmd.text, *cmd.font, cmd.position, cmd.size.x, cmd.color);
+			break;
+		case RenderCmdType::Mesh:
+			render::Renderer2D::DrawMesh(cmd.meshVertices, cmd.primitiveType);
+			break;
+		}
 	}
 
 	render::Renderer2D::EndScene();

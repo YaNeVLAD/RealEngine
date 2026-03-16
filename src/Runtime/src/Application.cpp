@@ -204,12 +204,11 @@ void Application::GameLoop()
 void Application::SetupScene(Layout& layout) const
 {
 	auto& scene = layout.GetScene();
-	scene.RegisterComponent<ZIndexComponent>();
-
 	scene
 		.AddSystem<detail::RenderSystem3D>(*m_window)
 		.WithRead<
-			TransformComponent3D,
+			TransformComponent,
+			MeshComponent3D,
 			CubeComponent>()
 		.RunOnMainThread();
 
@@ -219,8 +218,7 @@ void Application::SetupScene(Layout& layout) const
 			TransformComponent,
 			RectangleComponent,
 			CircleComponent,
-			DynamicTextureComponent,
-			ZIndexComponent>()
+			DynamicTextureComponent>()
 		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
 

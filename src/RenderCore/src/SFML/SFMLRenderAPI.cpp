@@ -200,7 +200,7 @@ void SFMLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType 
 	{
 		va[i].position = sf::Vector2f(vertices[i].position.x, vertices[i].position.y);
 		va[i].color = sf::Color(vertices[i].color.ToInt());
-		va[i].texCoords = sf::Vector2f(vertices[i].texCoords.x, vertices[i].texCoords.y);
+		va[i].texCoords = sf::Vector2f(vertices[i].texCoord.x, vertices[i].texCoord.y);
 	}
 
 	m_window.draw(va);

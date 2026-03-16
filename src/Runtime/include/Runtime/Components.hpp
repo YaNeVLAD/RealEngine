@@ -17,9 +17,9 @@ namespace re
 
 struct TransformComponent
 {
-	Vector2f position = { 0.f, 0.f };
-	float rotation = 0.f;
-	Vector2f scale = { 1.f, 1.f };
+	Vector3f position = { 0.f, 0.f, 0.f };
+	Vector3f rotation = { 0.f, 0.f, 0.f };
+	Vector3f scale = { 1.f, 1.f, 1.f };
 };
 
 struct CircleComponent
@@ -61,13 +61,6 @@ struct CameraComponent
 	bool isPrimal = true;
 };
 
-struct ZIndexComponent
-{
-	int value = 0;
-
-	auto operator<=>(const ZIndexComponent&) const = default;
-};
-
 struct BoxColliderComponent
 {
 	Vector2f size;
@@ -93,11 +86,10 @@ struct BoxColliderComponent
 	}
 };
 
-struct TransformComponent3D
+struct MeshComponent3D
 {
-	Vector3f position = { 0.f, 0.f, 0.f };
-	Vector3f rotation = { 0.f, 0.f, 0.f };
-	Vector3f scale = { 1.f, 1.f, 1.f };
+	std::vector<Vertex> vertices;
+	std::vector<std::uint32_t> indices;
 };
 
 struct CubeComponent

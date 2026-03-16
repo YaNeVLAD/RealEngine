@@ -1,12 +1,14 @@
 #pragma once
 
 #include <RenderCore/Export.hpp>
-
 #include <RenderCore/IRenderAPI.hpp>
-
+#include <RenderCore/Vertex.hpp> // ╨Т╨░╤И ╨╜╨╛╨▓╤Л╨╣ ╨╡╨┤╨╕╨╜╤Л╨╣ Vertex
 #include <glm/glm.hpp>
-
+#include <memory>
 #include <vector>
+
+#include "Shader.hpp"
+#include "VertexArray.hpp"
 
 namespace re::render
 {
@@ -15,66 +17,50 @@ class RE_RENDER_CORE_API OpenGLRenderAPI final : public IRenderAPI
 public:
 	void Init() override;
 
-	// 2D
 	void SetClearColor(const Color& color) override;
-
 	void Clear() override;
-
 	void Flush() override;
-
 	void SetViewport(Vector2f topLeft, Vector2f size) override;
-
 	Vector2f ScreenToWorld(Vector2i const& pixelPos) override;
-
 	void SetCamera(Vector2f center, Vector2f size) override;
 
-	void DrawQuad(const Vector2f& pos, const Vector2f& size, float rotation, const Color& color) override;
-
-	void DrawCircle(const Vector2f& center, float radius, const Color& color) override;
-
-	void DrawText(const String& text, const Font& font, const Vector2f& pos, float fontSize, const Color& color) override;
-
-	void DrawTexturedQuad(const Vector2f& pos, const Vector2f& size, Texture* texture, const Color& tint) override;
-
+	// 2D
+	void DrawQuad(const Vector3f& pos, const Vector2f& size, float rotation, const Color& color) override;
+	void DrawCircle(const Vector3f& center, float radius, const Color& color) override;
+	void DrawText(const String& text, const Font& font, const Vector3f& pos, float fontSize, const Color& color) override;
+	void DrawTexturedQuad(const Vector3f& pos, const Vector2f& size, Texture* texture, const Color& tint) override;
 	void DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type) override;
 
 	// 3D
 	void SetDepthTest(bool enabled) override;
-
 	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
-
-	void DrawCube(const glm::mat4& transform, const Color& color) override;
-
-private:
-	void DrawTexturedQuadImpl(const Vector2f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
+	void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform) override;
 
 private:
-	// OpenGL Handles
-	std::uint32_t m_vertexArray = 0; // VAO
-	std::uint32_t m_vertexBuffer = 0; // VBO
-	std::uint32_t m_indexBuffer = 0; // EBO
-	std::uint32_t m_shaderProgram = 0;
+	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
 
-	std::uint32_t m_dynamicVao = 0;
-	std::uint32_t m_dynamicVbo = 0;
+private:
+	std::shared_ptr<Shader> m_Shader2D;
+	std::shared_ptr<VertexArray> m_BatchVAO;
+	std::shared_ptr<VertexBuffer> m_BatchVBO;
+	std::shared_ptr<IndexBuffer> m_BatchEBO;
 
-	std::uint32_t m_cubeVao = 0;
-	std::uint32_t m_cubeVbo = 0;
-	std::uint32_t m_cubeEbo = 0;
-	std::uint32_t m_shader3D = 0;
-	glm::mat4 m_viewProj3D = glm::mat4(1.0f);
+	std::shared_ptr<VertexArray> m_DynamicVAO;
+	std::shared_ptr<VertexBuffer> m_DynamicVBO;
 
-	struct InnerVertex
-	{
-		glm::vec3 position;
-		glm::vec4 color;
-		glm::vec2 texCoord;
-		float texIndex;
-	};
+	std::shared_ptr<Shader> m_Shader3D;
+	std::shared_ptr<VertexArray> m_DynamicVAO3D;
+	std::shared_ptr<VertexBuffer> m_DynamicVBO3D;
+	std::shared_ptr<IndexBuffer> m_DynamicEBO3D;
 
-	std::vector<InnerVertex> m_batchBuffer{};
+	std::vector<Vertex> m_batchBuffer{};
 
-	glm::mat4 m_viewProjection{};
+	glm::mat4 m_viewProjection{ 1.0f };
 	glm::vec4 m_viewport{};
+	glm::mat4 m_viewProj3D{ 1.0f };
+
+	std::size_t m_dynamicOffset2D = 0;
+	std::size_t m_dynamicOffsetVbo3D = 0;
+	std::size_t m_dynamicOffsetEbo3D = 0;
 };
 } // namespace re::render

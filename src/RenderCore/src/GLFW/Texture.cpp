@@ -23,7 +23,7 @@ Texture::Texture(const std::uint32_t width, const std::uint32_t height)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-		(int)width, (int)height, 0,
+		static_cast<int>(width), static_cast<int>(height), 0,
 		GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 }
 
@@ -43,7 +43,7 @@ void Texture::SetData(const std::uint8_t* data, const std::uint32_t size)
 
 	glBindTexture(GL_TEXTURE_2D, m_rendererID);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0,
-		0, (int)m_width, (int)m_height,
+		0, static_cast<int>(m_width), static_cast<int>(m_height),
 		GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
