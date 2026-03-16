@@ -14,8 +14,9 @@ public:
 	{
 		for (auto&& [entity, transform, vel] : *scene.CreateView<re::TransformComponent, VelocityComponent>())
 		{
-			transform.position = transform.position + vel.linear * dt;
-			transform.rotation += vel.angular * dt;
+			transform.position.x += vel.linear.x * dt;
+			transform.position.y += vel.linear.y * dt;
+			transform.rotation.z += vel.angular * dt;
 		}
 
 		for (auto&& [entity, transform, wrap] : *scene.CreateView<re::TransformComponent, ScreenWrapComponent>())

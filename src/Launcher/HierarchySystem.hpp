@@ -16,11 +16,19 @@ public:
 			{
 				const auto& [position, rotation, scale] = scene.GetComponent<re::TransformComponent>(parent);
 
-				const re::Vector2f rotatedOffset = child.localPosition.Rotate(rotation);
+				const auto [rotX, rotY] = child.localPosition.Rotate(rotation.z);
 
-				childTransform.position = position + rotatedOffset;
+				childTransform.position = {
+					position.x + rotX,
+					position.y + rotY,
+					position.z
+				};
 
-				childTransform.rotation = rotation + child.localRotation;
+				childTransform.rotation = {
+					rotation.x,
+					rotation.y,
+					rotation.z + child.localRotation
+				};
 
 				childTransform.scale = scale;
 			}

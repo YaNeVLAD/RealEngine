@@ -20,9 +20,9 @@ public:
 				if (ship.respawnTimer <= 0.f)
 				{
 					ship.isInvulnerable = false;
-					transform.position = { 0.f, 0.f };
-					transform.rotation = 0.f;
-					transform.scale = { 1.f, 1.f };
+					transform.position = { 0.f, 0.f, transform.position.z };
+					transform.rotation = { 0.f, 0.f, 0.f };
+					transform.scale = { 1.f, 1.f, 1.f };
 					vel.linear = { 0.f, 0.f };
 					vel.angular = 0.f;
 				}
@@ -40,7 +40,7 @@ public:
 
 			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Up) || re::Keyboard::IsKeyPressed(re::Keyboard::Key::W))
 			{
-				const re::Vector2f forward = re::Vector2f{ 0.f, -1.f }.Rotate(transform.rotation);
+				const re::Vector2f forward = re::Vector2f{ 0.f, -1.f }.Rotate(transform.rotation.z);
 				vel.linear = vel.linear + forward * 600.f * dt;
 			}
 
@@ -55,12 +55,12 @@ public:
 			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Space) && ship.fireCooldown <= 0.f)
 			{
 				ship.fireCooldown = 0.25f;
-				const re::Vector2f forward = re::Vector2f{ 0.f, -1.f }.Rotate(transform.rotation);
-				const re::Vector2f bPos = transform.position + forward * 25.f;
+				const re::Vector2f forward = re::Vector2f{ 0.f, -1.f }.Rotate(transform.rotation.z);
+				const re::Vector2f bPos = { transform.position.x + forward.x * 25.f, transform.position.y + forward.y * 25.f };
 				const re::Vector2f bVel = forward * 1000.f + vel.linear * 0.5f;
 
 				scene.CreateEntity()
-					.Add<re::TransformComponent>(bPos, transform.rotation)
+					.Add<re::TransformComponent>(re::Vector3f{ bPos.x, bPos.y, transform.position.z }, re::Vector3f{ 0.f, 0.f, transform.rotation.z })
 					.Add<VelocityComponent>(bVel, 0.f)
 					.Add<BulletComponent>()
 					.Add<ScreenWrapComponent>(0.f)

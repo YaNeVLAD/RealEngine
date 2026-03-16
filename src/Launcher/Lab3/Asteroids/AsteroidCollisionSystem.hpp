@@ -57,14 +57,14 @@ private:
 		{
 			for (auto&& [aEnt, aTrans, ast] : *scene.CreateView<re::TransformComponent, AsteroidComponent>())
 			{
-				if (CheckPointInAsteroid(bTrans.position, aTrans, ast))
+				if (CheckPointInAsteroid({ bTrans.position.x, bTrans.position.y }, aTrans, ast))
 				{
 					if (gameState)
 					{
 						gameState->score += 100 * (4 - ast.size);
 					}
 
-					SplitAsteroid(ast.size, aTrans.position);
+					SplitAsteroid(ast.size, { aTrans.position.x, aTrans.position.y });
 
 					scene.DestroyEntity(aEnt);
 					scene.DestroyEntity(bEnt);
@@ -85,14 +85,15 @@ private:
 
 			for (auto&& [aEnt, aTrans, ast] : *scene.CreateView<re::TransformComponent, AsteroidComponent>())
 			{
-				const float dist = (sTrans.position - aTrans.position).Length();
-				const float hitRadius = ast.size * 25.0f + 15.0f; // Approximated ship radius
+				const re::Vector2f sPos2D = { sTrans.position.x, sTrans.position.y };
+				const re::Vector2f aPos2D = { aTrans.position.x, aTrans.position.y };
+				const float dist = (sPos2D - aPos2D).Length();
 
-				if (dist < hitRadius)
+				if (const float hitRadius = ast.size * 25.0f + 15.0f; dist < hitRadius)
 				{
 					ship.isInvulnerable = true;
 					ship.respawnTimer = 2.0f;
-					sTrans.scale = { 0.f, 0.f };
+					sTrans.scale = { 0.f, 0.f, 0.f };
 
 					if (gameState)
 					{
@@ -106,10 +107,10 @@ private:
 					for (int k = 0; k < 8; ++k)
 					{
 						const re::Vector2f pVel = { (rand() % 600 - 300) * 1.f, (rand() % 600 - 300) * 1.f };
-						m_spawnParticle(sTrans.position, pVel);
+						m_spawnParticle({ sTrans.position.x, sTrans.position.y }, pVel);
 					}
 
-					SplitAsteroid(ast.size, aTrans.position);
+					SplitAsteroid(ast.size, { aTrans.position.x, aTrans.position.y });
 					scene.DestroyEntity(aEnt);
 					break;
 				}
@@ -124,9 +125,9 @@ private:
 			re::Vector2f p1 = ast.localPoints[i];
 			re::Vector2f p2 = ast.localPoints[(i + 1) % ast.localPoints.size()];
 
-			const re::Vector2f A = aTrans.position;
-			const re::Vector2f B = aTrans.position + p1.Rotate(aTrans.rotation);
-			const re::Vector2f C = aTrans.position + p2.Rotate(aTrans.rotation);
+			const re::Vector2f A = { aTrans.position.x, aTrans.position.y };
+			const re::Vector2f B = A + p1.Rotate(aTrans.rotation.z);
+			const re::Vector2f C = A + p2.Rotate(aTrans.rotation.z);
 
 			if (PointInTriangle(point, A, B, C))
 			{

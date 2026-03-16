@@ -2,7 +2,6 @@
 
 #include <Runtime/Application.hpp>
 
-#include <cstdlib>
 #include <ctime>
 
 #include "AsteroidCollisionSystem.hpp"
@@ -109,26 +108,24 @@ void AsteroidsLayout::CreateShip()
 {
 	auto shipRoot = GetScene().CreateEntity();
 
-	std::vector<re::Vertex> shipVertices = {
-		{ { 0.f, -20.f }, re::Color::Cyan },
-		{ { 15.f, 15.f }, re::Color::Cyan },
-		{ { 0.f, 10.f }, re::Color::Cyan },
-		{ { 0.f, 10.f }, re::Color::Cyan },
-		{ { -15.f, 15.f }, re::Color::Cyan },
-		{ { 0.f, -20.f }, re::Color::Cyan }
+	std::vector shipVertices = {
+		re::Vertex{ .position = { 0.f, -20.f, 0.f }, .color = re::Color::Cyan },
+		re::Vertex{ .position = { 15.f, 15.f, 0.f }, .color = re::Color::Cyan },
+		re::Vertex{ .position = { 0.f, 10.f, 0.f }, .color = re::Color::Cyan },
+		re::Vertex{ .position = { 0.f, 10.f, 0.f }, .color = re::Color::Cyan },
+		re::Vertex{ .position = { -15.f, 15.f, 0.f }, .color = re::Color::Cyan },
+		re::Vertex{ .position = { 0.f, -20.f, 0.f }, .color = re::Color::Cyan }
 	};
 
-	shipRoot.Add<re::TransformComponent>(re::Vector2f{ 0.f, 0.f })
+	shipRoot.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 10.f })
 		.Add<re::MeshComponent>(shipVertices, re::PrimitiveType::Triangles)
 		.Add<VelocityComponent>()
-		.Add<ScreenWrapComponent>(20.f)
-		.Add<re::ZIndexComponent>(10);
+		.Add<ScreenWrapComponent>(20.f);
 
 	auto flame = GetScene().CreateEntity();
 
-	flame.Add<re::TransformComponent>(re::Vector2f{ 0.f, 0.f })
-		.Add<ChildComponent>(shipRoot.GetEntity(), re::Vector2f{ 0.f, 0.f }, 0.f)
-		.Add<re::ZIndexComponent>(9);
+	flame.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 9.f })
+		.Add<ChildComponent>(shipRoot.GetEntity(), re::Vector2f{ 0.f, 0.f }, 0.f);
 
 	ShipComponent shipComp;
 	shipComp.flameEntity = flame.GetEntity();
@@ -140,10 +137,9 @@ void AsteroidsLayout::CreateShip()
 void AsteroidsLayout::SpawnAsteroid(int size, re::Vector2f pos, re::Vector2f vel)
 {
 	auto astEntity = GetScene().CreateEntity();
-	astEntity.Add<re::TransformComponent>(pos)
+	astEntity.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, 5.f })
 		.Add<VelocityComponent>(vel, (rand() % 100 - 50) * 1.5f)
-		.Add<ScreenWrapComponent>(size * 25.f)
-		.Add<re::ZIndexComponent>(5);
+		.Add<ScreenWrapComponent>(size * 25.f);
 
 	AsteroidComponent ast;
 	ast.size = size;
@@ -162,27 +158,26 @@ void AsteroidsLayout::SpawnAsteroid(int size, re::Vector2f pos, re::Vector2f vel
 
 	for (int i = 0; i < segments; ++i)
 	{
-		vertices.push_back({ { 0.f, 0.f }, col });
-		vertices.push_back({ ast.localPoints[i], col });
-		vertices.push_back({ ast.localPoints[(i + 1) % segments], col });
+		vertices.push_back({ .position = { 0.f, 0.f, 0.f }, .color = col });
+		vertices.push_back({ .position = { ast.localPoints[i].x, ast.localPoints[i].y, 0.f }, .color = col });
+		vertices.push_back({ .position = { ast.localPoints[(i + 1) % segments].x, ast.localPoints[(i + 1) % segments].y, 0.f }, .color = col });
 	}
 
 	astEntity.Add<re::MeshComponent>(vertices, re::PrimitiveType::Triangles);
 	astEntity.Add<AsteroidComponent>(ast);
 }
 
-void AsteroidsLayout::SpawnParticle(re::Vector2f pos, re::Vector2f vel)
+void AsteroidsLayout::SpawnParticle(const re::Vector2f pos, re::Vector2f vel)
 {
 	auto e = GetScene().CreateEntity();
-	e.Add<re::TransformComponent>(pos)
+	e.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, 15.f })
 		.Add<VelocityComponent>(vel, (rand() % 400 - 200) * 1.f)
-		.Add<ParticleComponent>(1.0f)
-		.Add<re::ZIndexComponent>(15);
+		.Add<ParticleComponent>(1.0f);
 
-	std::vector<re::Vertex> v = {
-		{ { -5.f, 0.f }, re::Color::White },
-		{ { 5.f, 0.f }, re::Color::White },
-		{ { 0.f, 10.f }, re::Color::White }
+	std::vector v = {
+		re::Vertex{ .position = { -5.f, 0.f, 0.f }, .color = re::Color::White },
+		re::Vertex{ .position = { 5.f, 0.f, 0.f }, .color = re::Color::White },
+		re::Vertex{ .position = { 0.f, 10.f, 0.f }, .color = re::Color::White }
 	};
 	e.Add<re::MeshComponent>(v, re::PrimitiveType::Triangles);
 }
@@ -193,16 +188,14 @@ void AsteroidsLayout::CreateUI()
 
 	m_scoreText = GetScene()
 					  .CreateEntity()
-					  .Add<re::TransformComponent>(re::Vector2f{ -800.f, -500.f })
+					  .Add<re::TransformComponent>(re::Vector3f{ -800.f, -500.f, 50.f })
 					  .Add<re::TextComponent>("Score: 0", font, re::Color::White, 32.f)
-					  .Add<re::ZIndexComponent>(50)
 					  .GetEntity();
 
 	m_livesText = GetScene()
 					  .CreateEntity()
-					  .Add<re::TransformComponent>(re::Vector2f{ 700.f, -500.f })
+					  .Add<re::TransformComponent>(re::Vector3f{ 700.f, -500.f, 50.f })
 					  .Add<re::TextComponent>("Lives: 3", font, re::Color::White, 32.f)
-					  .Add<re::ZIndexComponent>(50)
 					  .GetEntity();
 }
 
@@ -210,11 +203,11 @@ void AsteroidsLayout::UpdateUI()
 {
 	if (GetScene().IsValid(m_gameStateEntity))
 	{
-		const auto& state = GetScene().GetComponent<AsteroidGameStateComponent>(m_gameStateEntity);
-		GetScene().GetComponent<re::TextComponent>(m_scoreText).text = "Score: " + std::to_string(state.score);
-		GetScene().GetComponent<re::TextComponent>(m_livesText).text = "Lives: " + std::to_string(state.lives);
+		const auto& [score, lives, isGameOver] = GetScene().GetComponent<AsteroidGameStateComponent>(m_gameStateEntity);
+		GetScene().GetComponent<re::TextComponent>(m_scoreText).text = "Score: " + std::to_string(score);
+		GetScene().GetComponent<re::TextComponent>(m_livesText).text = "Lives: " + std::to_string(lives);
 
-		if (state.isGameOver && !m_gameOverDialogShown)
+		if (isGameOver && !m_gameOverDialogShown)
 		{
 			ShowGameOverDialog();
 			m_gameOverDialogShown = true;
@@ -228,31 +221,29 @@ void AsteroidsLayout::ShowGameOverDialog()
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0.f, 0.f })
-		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 200), re::Vector2f{ 1920.f, 1080.f })
-		.Add<re::ZIndexComponent>(90);
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 90.f })
+		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 200), re::Vector2f{ 1920.f, 1080.f });
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0.f, -100.f })
-		.Add<re::TextComponent>("GAME OVER", font, re::Color::Red, 80.f)
-		.Add<re::ZIndexComponent>(100);
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, -100.f, 100.f })
+		.Add<re::TextComponent>("GAME OVER", font, re::Color::Red, 80.f);
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0.f, 50.f })
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 50.f, 100.f })
 		.Add<re::TextComponent>("Play Again", font, re::Color::Green, 48.f)
+		.Add<re::RectangleComponent>(re::Color::Green, re::Vector2f{ 300.f, 60.f })
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 300.f, 60.f }, re::Vector2f{ 0.f, 50.f })
-		.Add<AsteroidButtonComponent>(AsteroidButtonComponent::Action::PlayAgain)
-		.Add<re::ZIndexComponent>(100);
+		.Add<AsteroidButtonComponent>(AsteroidButtonComponent::Action::PlayAgain);
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector2f{ 0.f, 150.f })
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 150.f, 100.f })
 		.Add<re::TextComponent>("Quit", font, re::Color::White, 48.f)
+		.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 150.f, 60.f })
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 150.f, 60.f }, re::Vector2f{ 0.f, 150.f })
-		.Add<AsteroidButtonComponent>(AsteroidButtonComponent::Action::Quit)
-		.Add<re::ZIndexComponent>(100);
+		.Add<AsteroidButtonComponent>(AsteroidButtonComponent::Action::Quit);
 }
 
 void AsteroidsLayout::OnUpdate(re::core::TimeDelta dt)

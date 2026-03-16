@@ -1,19 +1,11 @@
 #pragma once
 
+#include <Core/Math/Vector3.hpp>
 #include <Runtime/Application.hpp>
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 
-#include <Core/Math/Vector3.hpp>
-
-// #include "Lab1/Circle/CircleLayout.hpp"
-// #include "Lab1/Hangman/HangmanLayout.hpp"
-// #include "Lab1/House/HouseLayout.hpp"
-// #include "Lab1/Letters/LettersLayout.hpp"
-
-// #include "Lab2/Alchemy/AlchemyLayout.hpp"
-
-// #include "Lab3/Asteroids/AsteroidsLayout.hpp"
+#include "Lab3/Asteroids/AsteroidsLayout.hpp"
 
 struct MenuLayout final : re::Layout
 {
@@ -90,12 +82,7 @@ public:
 	void OnStart() override
 	{
 		AddLayout<MenuLayout>(Window());
-		// AddLayout<LettersLayout>();
-		// AddLayout<HouseLayout>(Window());
-		// AddLayout<CircleLayout>(Window());
-		// AddLayout<HangmanLayout>(Window());
-		// AddLayout<AlchemyLayout>(Window());
-		// AddLayout<AsteroidsLayout>(Window());
+		AddLayout<AsteroidsLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -129,30 +116,10 @@ public:
 			{
 				SwitchLayout<MenuLayout>();
 			}
-			// if (e->key == re::Keyboard::Key::Num2)
-			// {
-			// 	SwitchLayout<LettersLayout>();
-			// }
-			// if (e->key == re::Keyboard::Key::Num3)
-			// {
-			// 	SwitchLayout<HouseLayout>();
-			// }
-			// if (e->key == re::Keyboard::Key::Num4)
-			// {
-			// 	SwitchLayout<CircleLayout>();
-			// }
-			// if (e->key == re::Keyboard::Key::Num5)
-			// {
-			// 	SwitchLayout<HangmanLayout>();
-			// }
-			// if (e->key == re::Keyboard::Key::Num6)
-			// {
-			// 	SwitchLayout<AlchemyLayout>();
-			// }
-			// if (e->key == re::Keyboard::Key::Num7)
-			// {
-			// 	SwitchLayout<AsteroidsLayout>();
-			// }
+			if (e->key == re::Keyboard::Key::Num7)
+			{
+				SwitchLayout<AsteroidsLayout>();
+			}
 		}
 
 		if (const auto* e = event.GetIf<re::Event::MouseWheelScrolled>())

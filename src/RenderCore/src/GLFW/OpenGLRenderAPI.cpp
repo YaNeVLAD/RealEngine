@@ -13,7 +13,7 @@ namespace
 constexpr auto s_VertexShaderSource = UR"(
     #version 450 core
     layout(location = 0) in vec3 a_Position;
-    layout(location = 1) in vec3 a_Normal; // Добавлено, игнорируем в 2D
+    layout(location = 1) in vec3 a_Normal;
     layout(location = 2) in vec4 a_Color;
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
@@ -246,7 +246,7 @@ void OpenGLRenderAPI::SetCamera(const Vector2f center, const Vector2f size)
 	const float bottom = center.y + size.y * 0.5f;
 	const float top = center.y - size.y * 0.5f;
 
-	m_viewProjection = glm::ortho(left, right, bottom, top, -10.0f, 10.0f);
+	m_viewProjection = glm::ortho(left, right, bottom, top, -100.0f, 1000.0f);
 }
 
 void OpenGLRenderAPI::DrawQuad(const Vector3f& pos, const Vector2f& size, const float rotation, const Color& color)
@@ -367,7 +367,9 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)
 {
 	if (m_batchBuffer.size() >= 1000 * 4)
+	{
 		Flush();
+	}
 
 	float texIndex = -1.0f;
 	if (texture)
