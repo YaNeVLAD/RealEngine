@@ -101,7 +101,7 @@ public:
 				frames,
 				timeAccumulator / static_cast<float>(frames) * 1000.0f);
 
-			Window().SetTitle(fps);
+			// Window().SetTitle(fps);
 
 			frames = 0;
 			timeAccumulator = 0.0f;

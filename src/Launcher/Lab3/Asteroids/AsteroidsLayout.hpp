@@ -35,4 +35,6 @@ private:
 	re::ecs::Entity m_livesText = re::ecs::Entity::INVALID_ID;
 
 	bool m_gameOverDialogShown = false;
+	int m_lastScore = -1;
+	int m_lastLives = -1;
 };

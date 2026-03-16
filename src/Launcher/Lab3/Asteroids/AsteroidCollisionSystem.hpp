@@ -1,9 +1,12 @@
 #pragma once
 
-#include "AsteroidsComponents.hpp"
 #include <ECS/Scene/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <Runtime/Components.hpp>
+
+#include "AsteroidsComponents.hpp"
+#include "AsteroidsConstants.hpp"
+
 #include <functional>
 
 inline bool PointInTriangle(const re::Vector2f p, const re::Vector2f a, const re::Vector2f b, const re::Vector2f c)
@@ -53,6 +56,8 @@ public:
 private:
 	void HandleBulletAsteroidCollisions(re::ecs::Scene& scene, AsteroidGameStateComponent* gameState) const
 	{
+		using namespace asteroids;
+
 		for (auto&& [bEnt, bTrans, bullet] : *scene.CreateView<re::TransformComponent, BulletComponent>())
 		{
 			for (auto&& [aEnt, aTrans, ast] : *scene.CreateView<re::TransformComponent, AsteroidComponent>())
@@ -61,7 +66,7 @@ private:
 				{
 					if (gameState)
 					{
-						gameState->score += 100 * (4 - ast.size);
+						gameState->score += AsteroidScoreMultiplier * (4 - ast.size);
 					}
 
 					SplitAsteroid(ast.size, { aTrans.position.x, aTrans.position.y });
@@ -76,9 +81,11 @@ private:
 
 	void HandleShipAsteroidCollisions(re::ecs::Scene& scene, AsteroidGameStateComponent* gameState) const
 	{
+		using namespace asteroids;
+
 		for (auto&& [sEnt, sTrans, ship] : *scene.CreateView<re::TransformComponent, ShipComponent>())
 		{
-			if (ship.isInvulnerable || ship.respawnTimer > 0.f)
+			if (ship.invulnerabilityTimer > 0.f || ship.respawnTimer > 0.f)
 			{
 				continue;
 			}
@@ -89,10 +96,10 @@ private:
 				const re::Vector2f aPos2D = { aTrans.position.x, aTrans.position.y };
 				const float dist = (sPos2D - aPos2D).Length();
 
-				if (const float hitRadius = ast.size * 25.0f + 15.0f; dist < hitRadius)
+				if (const float hitRadius = ast.size * AsteroidBaseRadius + ShipHitRadius; dist < hitRadius)
 				{
-					ship.isInvulnerable = true;
-					ship.respawnTimer = 2.0f;
+					ship.invulnerabilityTimer = 0.0f;
+					ship.respawnTimer = ShipRespawnTimer;
 					sTrans.scale = { 0.f, 0.f, 0.f };
 
 					if (gameState)
@@ -104,7 +111,7 @@ private:
 						}
 					}
 
-					for (int k = 0; k < 8; ++k)
+					for (int k = 0; k < ParticleExplosionCount; ++k)
 					{
 						const re::Vector2f pVel = { (rand() % 600 - 300) * 1.f, (rand() % 600 - 300) * 1.f };
 						m_spawnParticle({ sTrans.position.x, sTrans.position.y }, pVel);
@@ -139,6 +146,8 @@ private:
 
 	void SplitAsteroid(const int currentSize, const re::Vector2f& position) const
 	{
+		using namespace asteroids;
+
 		if (currentSize > 1)
 		{
 			const int newSize = currentSize - 1;

@@ -21,8 +21,8 @@ struct ShipComponent
 {
 	float fireCooldown = 0.f;
 	float respawnTimer = 0.f;
+	float invulnerabilityTimer = 0.f;
 	re::ecs::Entity flameEntity = re::ecs::Entity::INVALID_ID;
-	bool isInvulnerable = false;
 };
 
 struct BulletComponent

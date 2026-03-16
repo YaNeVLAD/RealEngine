@@ -17,6 +17,8 @@ namespace
 constexpr auto FONT_NAME = "Roboto.ttf";
 }
 
+using namespace asteroids;
+
 AsteroidsLayout::AsteroidsLayout(re::Application& app, re::render::IWindow& window)
 	: Layout(app)
 	, m_window(window)
@@ -42,7 +44,7 @@ void AsteroidsLayout::OnCreate()
 		.RunOnMainThread();
 
 	GetScene()
-		.AddSystem<MovementSystem>()
+		.AddSystem<MovementSystem>(m_window)
 		.WithRead<VelocityComponent, ScreenWrapComponent>()
 		.WithWrite<re::TransformComponent>();
 
@@ -93,6 +95,8 @@ void AsteroidsLayout::StartGame()
 	}
 
 	m_gameOverDialogShown = false;
+	m_lastScore = -1;
+	m_lastLives = -1;
 
 	CreateShip();
 
@@ -117,14 +121,14 @@ void AsteroidsLayout::CreateShip()
 		re::Vertex{ .position = { 0.f, -20.f, 0.f }, .color = re::Color::Cyan }
 	};
 
-	shipRoot.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 10.f })
+	shipRoot.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, Z_Ship })
 		.Add<re::MeshComponent>(shipVertices, re::PrimitiveType::Triangles)
 		.Add<VelocityComponent>()
 		.Add<ScreenWrapComponent>(20.f);
 
 	auto flame = GetScene().CreateEntity();
 
-	flame.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 9.f })
+	flame.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, Z_ShipFlame })
 		.Add<ChildComponent>(shipRoot.GetEntity(), re::Vector2f{ 0.f, 0.f }, 0.f);
 
 	ShipComponent shipComp;
@@ -134,25 +138,25 @@ void AsteroidsLayout::CreateShip()
 	m_shipEntity = shipRoot.GetEntity();
 }
 
-void AsteroidsLayout::SpawnAsteroid(int size, re::Vector2f pos, re::Vector2f vel)
+void AsteroidsLayout::SpawnAsteroid(const int size, const re::Vector2f pos, re::Vector2f vel)
 {
 	auto astEntity = GetScene().CreateEntity();
-	astEntity.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, 5.f })
+	astEntity.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, Z_Asteroid })
 		.Add<VelocityComponent>(vel, (rand() % 100 - 50) * 1.5f)
-		.Add<ScreenWrapComponent>(size * 25.f);
+		.Add<ScreenWrapComponent>(size * AsteroidBaseRadius);
 
 	AsteroidComponent ast;
 	ast.size = size;
-	int segments = 8 + size * 2;
-	float baseRadius = size * 25.0f;
+	const int segments = AsteroidBaseSegments + size * 2;
+	const float baseRadius = size * AsteroidBaseRadius;
 	std::vector<re::Vertex> vertices;
-	re::Color col = re::Color::Brown;
+	constexpr re::Color col = re::Color::Brown;
 
 	for (int i = 0; i < segments; ++i)
 	{
-		float angle = (360.0f / segments) * i;
-		float rad = angle * 3.14159f / 180.f;
-		float r = baseRadius * (0.8f + 0.4f * (rand() % 100 / 100.0f));
+		const float angle = (360.0f / segments) * i;
+		const float rad = angle * 3.14159f / 180.f;
+		const float r = baseRadius * (0.8f + 0.4f * (rand() % 100 / 100.0f));
 		ast.localPoints.push_back({ r * std::cos(rad), r * std::sin(rad) });
 	}
 
@@ -170,7 +174,7 @@ void AsteroidsLayout::SpawnAsteroid(int size, re::Vector2f pos, re::Vector2f vel
 void AsteroidsLayout::SpawnParticle(const re::Vector2f pos, re::Vector2f vel)
 {
 	auto e = GetScene().CreateEntity();
-	e.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, 15.f })
+	e.Add<re::TransformComponent>(re::Vector3f{ pos.x, pos.y, Z_Particle })
 		.Add<VelocityComponent>(vel, (rand() % 400 - 200) * 1.f)
 		.Add<ParticleComponent>(1.0f);
 
@@ -204,8 +208,20 @@ void AsteroidsLayout::UpdateUI()
 	if (GetScene().IsValid(m_gameStateEntity))
 	{
 		const auto& [score, lives, isGameOver] = GetScene().GetComponent<AsteroidGameStateComponent>(m_gameStateEntity);
-		GetScene().GetComponent<re::TextComponent>(m_scoreText).text = "Score: " + std::to_string(score);
-		GetScene().GetComponent<re::TextComponent>(m_livesText).text = "Lives: " + std::to_string(lives);
+
+		if (score != m_lastScore || lives != m_lastLives)
+		{
+			m_lastScore = score;
+			m_lastLives = lives;
+
+			re::String title = "Asteroids | Score: " + std::to_string(score) + " | Lives: " + std::to_string(lives);
+
+			if (isGameOver)
+			{
+				title += " [ GAME OVER ]";
+			}
+			m_window.SetTitle(title);
+		}
 
 		if (isGameOver && !m_gameOverDialogShown)
 		{
@@ -218,20 +234,21 @@ void AsteroidsLayout::UpdateUI()
 void AsteroidsLayout::ShowGameOverDialog()
 {
 	auto font = m_assetManager.Get<re::Font>(FONT_NAME);
+	auto [width, height] = m_window.Size();
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, 90.f })
-		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 200), re::Vector2f{ 1920.f, 1080.f });
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, Z_UI_Background })
+		.Add<re::RectangleComponent>(re::Color(0, 0, 0, 200), re::Vector2f{ (float)width, (float)height });
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector3f{ 0.f, -100.f, 100.f })
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, -100.f, Z_UI_Text })
 		.Add<re::TextComponent>("GAME OVER", font, re::Color::Red, 80.f);
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 50.f, 100.f })
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 50.f, Z_UI_Text })
 		.Add<re::TextComponent>("Play Again", font, re::Color::Green, 48.f)
 		.Add<re::RectangleComponent>(re::Color::Green, re::Vector2f{ 300.f, 60.f })
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 300.f, 60.f }, re::Vector2f{ 0.f, 50.f })
@@ -239,7 +256,7 @@ void AsteroidsLayout::ShowGameOverDialog()
 
 	GetScene()
 		.CreateEntity()
-		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 150.f, 100.f })
+		.Add<re::TransformComponent>(re::Vector3f{ 0.f, 150.f, Z_UI_Text })
 		.Add<re::TextComponent>("Quit", font, re::Color::White, 48.f)
 		.Add<re::RectangleComponent>(re::Color::Red, re::Vector2f{ 150.f, 60.f })
 		.Add<re::BoxColliderComponent>(re::Vector2f{ 150.f, 60.f }, re::Vector2f{ 0.f, 150.f })
@@ -249,6 +266,49 @@ void AsteroidsLayout::ShowGameOverDialog()
 void AsteroidsLayout::OnUpdate(re::core::TimeDelta dt)
 {
 	UpdateUI();
+
+	if (GetScene().IsValid(m_gameStateEntity))
+	{
+		const auto& [score, lives, isGameOver] = GetScene().GetComponent<AsteroidGameStateComponent>(m_gameStateEntity);
+		if (!isGameOver)
+		{
+			int largeAsteroidsCount = 0;
+
+			for (auto&& [entity, ast] : *GetScene().CreateView<AsteroidComponent>())
+			{
+				if (ast.size == 3)
+				{
+					largeAsteroidsCount++;
+				}
+			}
+
+			const auto [halfWidth, halfHeight] = m_window.Size();
+			const auto halfWidthF = static_cast<float>(halfWidth);
+			const auto halfHeightF = static_cast<float>(halfHeight);
+			while (largeAsteroidsCount < AsteroidMaxCount)
+			{
+				float x = 0.f;
+				float y = 0.f;
+
+				if (rand() % 2 == 0)
+				{
+					x = (rand() % 2 == 0) ? -halfWidthF : halfWidthF;
+					y = (rand() % halfHeight - halfHeightF) * 1.f;
+				}
+				else
+				{
+					x = (rand() % halfWidth - halfWidthF) * 1.f;
+					y = (rand() % 2 == 0) ? -halfHeightF : halfHeightF;
+				}
+
+				const re::Vector2f pos = { x, y };
+				const re::Vector2f vel = { (rand() % 200 - 100) * 1.f, (rand() % 200 - 100) * 1.f };
+
+				SpawnAsteroid(AsteroidMaxSize, pos, vel);
+				largeAsteroidsCount++;
+			}
+		}
+	}
 }
 
 void AsteroidsLayout::OnEvent(re::Event const& event)

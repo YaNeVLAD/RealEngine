@@ -5,8 +5,6 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <iostream>
-
 namespace
 {
 // 0: Position, 1: Normal, 2: Color, 3: TexCoord, 4: TexIndex
@@ -217,13 +215,6 @@ Vector2f OpenGLRenderAPI::ScreenToWorld(Vector2i const& pixelPos)
 {
 	const float x = static_cast<float>(pixelPos.x) + 0.5f;
 	const float y = static_cast<float>(pixelPos.y) + 0.5f;
-
-	float ndcX = (x - m_viewport.x) / m_viewport.z;
-	float ndcY = (y - m_viewport.y) / m_viewport.w;
-
-	ndcX = ndcX * 2.0f - 1.0f;
-
-	ndcY = 1.0f - ndcY * 2.0f;
 
 	const glm::vec4 clipSpacePos = {
 		(x / m_viewport.z) * 2.0f - 1.0f,
