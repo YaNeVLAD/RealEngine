@@ -1,7 +1,8 @@
 #pragma once
 
+#include <Core/Logger.hpp>
+
 #include <format>
-#include <iostream>
 #include <source_location>
 
 #if defined(_MSC_VER)
@@ -38,34 +39,44 @@ constexpr const char* ExtractFileName(const char* path)
 template <typename... Args>
 constexpr void ReportAssertionFailure(
 	const char* expr,
-	const char* file,
-	const int line,
+	const std::source_location location,
 	std::format_string<Args...> message,
 	Args&&... args)
 {
-	std::cerr << "========================================\n"
-			  << "[RE_ASSERT FAILED]\n"
-			  << "Expression: " << expr << "\n"
-			  << "Location:   " << file << ":" << line << "\n"
-			  << "Message:    " << std::format(message, std::forward<Args>(args)...) << "\n"
-			  << "========================================\n";
+	std::string userMsg = std::format(message, std::forward<Args>(args)...);
+
+	std::string assertMsg = std::format(
+		"\n========================================\n"
+		"[RE_ASSERT FAILED]\n"
+		"Expression: {}\n"
+		"Location:   {}:{}\n"
+		"Function:   {}\n"
+		"Message:    {}\n"
+		"========================================\n",
+		expr,
+		ExtractFileName(location.file_name()),
+		location.line(),
+		location.function_name(),
+		userMsg);
+
+	Logger::Fatal("{}", assertMsg);
 }
 
-#if !defined(NDEBUG)
-#define RE_ASSERT(expr, ...)                                                                                         \
-	do                                                                                                               \
-	{                                                                                                                \
-		if (!(expr))                                                                                                 \
-		{                                                                                                            \
-			re::detail::ReportAssertionFailure(#expr, re::detail::ExtractFileName(__FILE__), __LINE__, __VA_ARGS__); \
-			RE_DEBUG_BREAK();                                                                                        \
-		}                                                                                                            \
+#if defined(RE_DEBUG)
+#define RE_ASSERT(expr, ...)                                                                         \
+	do                                                                                               \
+	{                                                                                                \
+		if (!(expr))                                                                                 \
+		{                                                                                            \
+			re::detail::ReportAssertionFailure(#expr, std::source_location::current(), __VA_ARGS__); \
+			RE_DEBUG_BREAK();                                                                        \
+		}                                                                                            \
 	} while (false)
 #else
 #define RE_ASSERT(expr, ...) \
 	do                       \
 	{                        \
-		(void)(expr);        \
+		(void)sizeof(expr);  \
 	} while (false)
 #endif
 
