@@ -94,8 +94,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 	fsm::lexer<TokenType, fsm::std_regex_matcher> lexer(source);
 	lexer
 		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*)", TokenType::Identifier)
-		.add_rule(R"([0-9]+\.[0-9]+)", TokenType::Double)
-		.add_rule(R"([0-9]+)", TokenType::Integer)
+		.add_rule(R"(\-*[0-9]+\.[0-9]+)", TokenType::Double)
+		.add_rule(R"(\-*[0-9]+)", TokenType::Integer)
 		.add_rule(R"("(?:[^"\\]|\\.)*")", TokenType::String)
 		.add_rule("//.*", TokenType::Comment, true)
 		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
@@ -279,6 +279,101 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseNew = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<uint8_t>(OpCode::New));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+
+		return true;
+	};
+
+	auto parseGetProperty = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<uint8_t>(OpCode::GetProperty));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+		return true;
+	};
+
+	auto parseSetProperty = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<uint8_t>(OpCode::SetProperty));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+		return true;
+	};
+
+	auto parseType = [&]() -> bool {
+		const auto classNameOpt = lexer.next();
+		if (!classNameOpt || classNameOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected string literal for class name\n";
+			return false;
+		}
+
+		const auto rawClassStr = classNameOpt->lexeme.substr(1, classNameOpt->lexeme.size() - 2);
+		String className(ProcessEscapeSequences(rawClassStr));
+
+		std::vector<String> fields;
+		while (const auto tokenOpt = lexer.next())
+		{
+			const auto& token = *tokenOpt;
+			if (auto hash = HashedString(token.lexeme); hash == "END_TYPE"_hs)
+			{
+				break;
+			}
+			else if (hash == "FIELD"_hs)
+			{
+				const auto fieldNameOpt = lexer.next();
+				if (!fieldNameOpt || fieldNameOpt->type != TokenType::String)
+				{
+					std::cerr << "Expected string literal for field name\n";
+					return false;
+				}
+				const auto rawFieldStr = fieldNameOpt->lexeme.substr(1, fieldNameOpt->lexeme.size() - 2);
+				fields.emplace_back(ProcessEscapeSequences(rawFieldStr));
+			}
+			else
+			{
+				std::cerr << "Unexpected token inside TYPE definition: " << token.lexeme << "\n";
+				return false;
+			}
+		}
+
+		for (auto it = fields.rbegin(); it != fields.rend(); ++it)
+		{
+			outChunk.Write(static_cast<std::uint8_t>(OpCode::Const));
+			outChunk.Write(outChunk.AddConstant(*it));
+		}
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::Const));
+		outChunk.Write(outChunk.AddConstant(className));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::Const));
+		outChunk.Write(outChunk.AddConstant(static_cast<Int>(fields.size())));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::DefType));
+
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -305,10 +400,16 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
 		  case "JMP_IF_FALSE"_hs:  if (!parseJump(OpCode::JmpIfFalse)) return false; break;
 
-          case "CONST"_hs:  	   if (!parseConst())  return false; break;
-          case "SET"_hs:    	   if (!parseSet())    return false; break;
-          case "GET"_hs:    	   if (!parseGet())    return false; break;
-          case "FUN"_hs:    	   if (!parseDef())    return false; break;
+          case "CONST"_hs:  	   if (!parseConst()) return false; break;
+          case "SET"_hs:    	   if (!parseSet()) return false; break;
+          case "GET"_hs:    	   if (!parseGet()) return false; break;
+          case "FUN"_hs:    	   if (!parseDef()) return false; break;
+
+		  case "NEW"_hs:           if (!parseNew()) return false; break;
+		  case "GET_PROPERTY"_hs:  if (!parseGetProperty()) return false; break;
+		  case "SET_PROPERTY"_hs:  if (!parseSetProperty()) return false; break;
+		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<uint8_t>(OpCode::TypeOf)); break;
+		  case "TYPE"_hs:         if (!parseType()) return false; break;
 
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	   if (!parseNative()) return false; break;

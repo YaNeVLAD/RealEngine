@@ -2,7 +2,6 @@
 
 #include <RVM/Export.hpp>
 
-#include <Core/HashedString.hpp>
 #include <RVM/Chunk.hpp>
 #include <RVM/Types.hpp>
 
@@ -38,13 +37,18 @@ public:
 
 	void RegisterNative(String const& name, NativeFn fn);
 
+	void RegisterType(TypeInfoPtr typeInfo);
+
 private:
 	InterpreterResult Run();
 
 	Value Pop();
-	void Push(const Value& value);
+	void Push(Value const& value);
 
 private:
+	template <typename T>
+	using HashMap = std::unordered_map<Hash_t, T>;
+
 	const Chunk* m_chunk = nullptr;
 	const std::uint8_t* m_ip = nullptr;
 
@@ -52,7 +56,9 @@ private:
 	std::vector<Value> m_variables;
 
 	std::vector<CallFrame> m_callStack;
-	std::unordered_map<Hash_t, NativeFn> m_natives;
+	HashMap<NativeFn> m_natives;
+
+	HashMap<TypeInfoPtr> m_types;
 
 	std::size_t m_currentLocalsBase = 0;
 };

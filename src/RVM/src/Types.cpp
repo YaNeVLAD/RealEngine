@@ -2,6 +2,8 @@
 
 #include <Core/Utils.hpp>
 
+#include <utility>
+
 namespace
 {
 
@@ -14,6 +16,26 @@ namespace re::rvm
 
 using namespace utils;
 
+TypeInfo::TypeInfo(String name)
+	: name(std::move(name))
+{
+}
+
+void TypeInfo::AddField(String const& fieldName)
+{
+	if (!fieldIndexes.contains(fieldName.Hash()))
+	{
+		fieldIndexes[fieldName.Hash()] = fieldNames.size();
+		fieldNames.push_back(fieldName);
+	}
+}
+
+Instance::Instance(TypeInfoPtr const& typeInfo)
+	: typeInfo(typeInfo)
+{
+	fields.resize(typeInfo->fieldNames.size(), Null);
+}
+
 Value operator+(const Value& lhs, const Value& rhs)
 {
 	// clang-format off
@@ -23,6 +45,8 @@ Value operator+(const Value& lhs, const Value& rhs)
 		[](const Int a, const Double b)    	 -> Value { return static_cast<Double>(a) + b; },
 		[](const Double a, const Int b)    	 -> Value { return a + static_cast<Double>(b); },
 		[](String const& a, String const& b) -> Value { return a + b; },
+		[](String const& a, const Int b)     -> Value { return a + std::to_string(b); },
+		[](String const& a, const Double b)  -> Value { return a + std::to_string(b); },
 		[](const auto&, const auto&)		 -> Value { return Null; }
 	}, lhs, rhs);
 	// clang-format on
@@ -93,6 +117,7 @@ Value OpEqual(Value const& lhs, Value const& rhs)
 						  [](const Int a, const Double b) -> Value { return static_cast<Int>(static_cast<Double>(a) == b ? 1 : 0); },
 						  [](const Double a, const Int b) -> Value { return static_cast<Int>(a == static_cast<Double>(b) ? 1 : 0); },
 						  [](String const& a, String const& b) -> Value { return static_cast<Int>(a.ToString() == b.ToString() ? 1 : 0); },
+						  [](TypeInfoPtr const& a, TypeInfoPtr const& b) -> Value { return static_cast<Int>(a == b ? 1 : 0); },
 						  [](const auto&, const auto&) -> Value { return static_cast<Int>(0); } // Разные типы не равны
 					  },
 		lhs, rhs);
@@ -104,7 +129,10 @@ bool IsTruthy(Value const& val)
 						  [](Null_t) { return false; },
 						  [](const Int v) { return v != 0; },
 						  [](const Double v) { return !IsZero(v); },
-						  [](String const& str) { return !str.ToString().empty(); } },
+						  [](String const& str) { return !str.ToString().empty(); },
+						  [](InstancePtr const& ptr) { return ptr != nullptr; },
+						  [](TypeInfoPtr const& ptr) { return ptr != nullptr; },
+					  },
 		val);
 }
 
@@ -116,9 +144,25 @@ std::ostream& operator<<(std::ostream& os, const Value& val)
 		[&os](const Int v){ os << v; },
 		[&os](const Double v){ os << v; },
 		[&os](String const& str){ os << str.ToString(); },
+			[&os](InstancePtr const& ptr) {
+			if (ptr && ptr->typeInfo) {
+				os << "Instance(" << ptr->typeInfo->name.ToString() << ")";
+			} else {
+				os << "null_instance";
+			}
+		},
+		[&os](TypeInfoPtr const& ptr) {
+			if (ptr) {
+				os << "Class(" << ptr->name.ToString() << ")";
+			} else {
+				os << "null_class";
+			}
+		},
+		[&os](const auto&) { os << "unknown_type"; }
 	}, val);
-	return os;
 	// clang-format on
+
+	return os;
 }
 
 } // namespace re::rvm

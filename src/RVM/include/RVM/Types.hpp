@@ -6,19 +6,46 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <ostream>
+#include <unordered_map>
 #include <variant>
 
 namespace re::rvm
 {
 
+struct TypeInfo;
+struct Instance;
+
 using Null_t = std::monostate;
 using Int = std::int64_t;
 using Double = std::double_t;
 
-using Value = std::variant<Null_t, Int, Double, String>;
+using TypeInfoPtr = std::shared_ptr<TypeInfo>;
+using InstancePtr = std::shared_ptr<Instance>;
+
+using Value = std::variant<Null_t, Int, Double, String, TypeInfoPtr, InstancePtr>;
 
 constexpr auto Null = Value{ Null_t{} };
+
+struct TypeInfo
+{
+	String name;
+	std::unordered_map<Hash_t, std::size_t> fieldIndexes;
+	std::vector<String> fieldNames;
+
+	explicit TypeInfo(String name);
+
+	void AddField(String const& fieldName);
+};
+
+struct Instance
+{
+	TypeInfoPtr typeInfo;
+	std::vector<Value> fields;
+
+	explicit Instance(TypeInfoPtr const& typeInfo);
+};
 
 enum class OpCode : std::uint8_t
 {
@@ -110,6 +137,25 @@ enum class OpCode : std::uint8_t
 	Native,
 
 	CallIndirect,
+
+	// ---------------------------------------------------------
+	// USER DEFINED TYPES AND REFLECTION
+	// ---------------------------------------------------------
+
+	// Stack: ..., [Instance] -> ..., [FieldValue]
+	New,
+
+	// Stack: ..., [Instance] -> ..., [FieldValue]
+	GetProperty,
+
+	// Stack: ..., [Instance], [Value] -> ...
+	SetProperty,
+
+	// Stack: ..., [Instance] -> ..., [ClassInfo]
+	TypeOf,
+
+	// Stack: ..., [Field1], [Field2], [ClassName], [FieldCount] -> ...
+	DefType,
 
 	// ---------------------------------------------------------
 	// TERMINATION

@@ -24,7 +24,7 @@ void Chunk::Write(const std::uint8_t byte)
 	m_code.push_back(byte);
 }
 
-std::uint8_t Chunk::AddConstant(const Value value)
+std::uint8_t Chunk::AddConstant(Value const& value)
 {
 	m_constants.push_back(value);
 
@@ -67,16 +67,16 @@ bool Chunk::SaveToFile(String const& filepath) const
 	for (const auto& val : m_constants)
 	{
 		std::visit(utils::overloaded{
-					   [&out](std::monostate) {
+					   [&out](Null_t) {
 						   constexpr auto tag = static_cast<std::uint8_t>(ConstTag::Null);
 						   out.write(reinterpret_cast<const char*>(&tag), sizeof(tag));
 					   },
-					   [&out](const std::int64_t v) {
+					   [&out](const Int v) {
 						   constexpr auto tag = static_cast<std::uint8_t>(ConstTag::Int);
 						   out.write(reinterpret_cast<const char*>(&tag), sizeof(tag));
 						   out.write(reinterpret_cast<const char*>(&v), sizeof(v));
 					   },
-					   [&out](const double v) {
+					   [&out](const Double v) {
 						   constexpr auto tag = static_cast<std::uint8_t>(ConstTag::Double);
 						   out.write(reinterpret_cast<const char*>(&tag), sizeof(tag));
 						   out.write(reinterpret_cast<const char*>(&v), sizeof(v));
@@ -93,6 +93,9 @@ bool Chunk::SaveToFile(String const& filepath) const
 						   {
 							   out.write(stdStr.data(), strLen);
 						   }
+					   },
+					   [](auto const&) {
+						   throw std::runtime_error("Cannot serialize runtime types (Instance/ClassInfo) into Chunk constant pool!");
 					   } },
 			val);
 	}
@@ -112,9 +115,9 @@ bool Chunk::LoadFromFile(String const& filepath)
 		return false;
 	}
 
-	char magic[5] = {};
-	in.read(magic, 4);
-	if (std::string(magic) != "RVM1")
+	char magic[MAGIC_SIGNATURE_SIZE + 1] = {};
+	in.read(magic, MAGIC_SIGNATURE_SIZE);
+	if (std::string(magic) != MAGIC_SIGNATURE)
 	{
 		std::cerr << "Invalid RVM bytecode file!\n";
 		return false;
@@ -133,16 +136,16 @@ bool Chunk::LoadFromFile(String const& filepath)
 		switch (static_cast<ConstTag>(tag))
 		{
 		case ConstTag::Null:
-			m_constants.emplace_back(std::monostate{});
+			m_constants.emplace_back(Null);
 			break;
 		case ConstTag::Int: {
-			std::int64_t v;
+			Int v;
 			in.read(reinterpret_cast<char*>(&v), sizeof(v));
 			m_constants.emplace_back(v);
 			break;
 		}
 		case ConstTag::Double: {
-			double v;
+			Double v;
 			in.read(reinterpret_cast<char*>(&v), sizeof(v));
 			m_constants.emplace_back(v);
 			break;

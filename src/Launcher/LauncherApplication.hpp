@@ -72,6 +72,13 @@ struct MenuLayout final : re::Layout
 			vm.Interpret(*chunk);
 			std::cout << "==============================" << std::endl;
 		}
+		if (const auto chunk = m_manager.Get<Chunk>("scripts/user_types_test.rbc"))
+		{
+			std::cout << "scripts/user_types_test.rbc\n";
+			std::cout << "==============================\n";
+			vm.Interpret(*chunk);
+			std::cout << "==============================" << std::endl;
+		}
 	}
 
 	void OnUpdate(re::core::TimeDelta dt) override

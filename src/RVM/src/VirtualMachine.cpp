@@ -1,6 +1,8 @@
 #include <RVM/VirtualMachine.hpp>
 
 #include <Core/Assert.hpp>
+#include <Core/HashedString.hpp>
+#include <Core/Meta/TypeInfo.hpp>
 
 #include <iostream>
 
@@ -41,6 +43,11 @@ InterpreterResult VirtualMachine::Interpret(const Chunk& chunk)
 void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
 {
 	m_natives[name.Hash()] = std::move(fn);
+}
+
+void VirtualMachine::RegisterType(TypeInfoPtr typeInfo)
+{
+	m_types[typeInfo->name.Hash()] = std::move(typeInfo);
 }
 
 InterpreterResult VirtualMachine::Run()
@@ -174,6 +181,118 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::New: {
+			Value classNameVal = READ_CONSTANT();
+			auto className = std::get<String>(classNameVal);
+
+			auto it = m_types.find(className.Hash());
+			if (it == m_types.end())
+			{
+				std::cerr << "Runtime Error: Unknown class '" << className.ToString() << "'\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			auto instance = std::make_shared<Instance>(it->second);
+			Push(instance);
+			break;
+		}
+
+		case OpCode::GetProperty: {
+			Value propNameVal = READ_CONSTANT();
+			auto propNameHash = std::get<String>(propNameVal).Hash();
+
+			Value objVal = Pop();
+			if (!std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			{
+				std::cerr << "Runtime Error: Only instances have properties.\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			auto instance = std::get<std::shared_ptr<Instance>>(objVal);
+			auto it = instance->typeInfo->fieldIndexes.find(propNameHash);
+
+			if (it == instance->typeInfo->fieldIndexes.end())
+			{
+				std::cerr << "Runtime Error: Undefined property.\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			Push(instance->fields[it->second]);
+			break;
+		}
+
+		case OpCode::SetProperty: {
+			Value propNameVal = READ_CONSTANT();
+			auto propNameHash = std::get<String>(propNameVal).Hash();
+
+			Value valueToSet = Pop();
+			Value objVal = Pop();
+
+			if (!std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			{
+				std::cerr << "Runtime Error: Only instances have properties.\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			auto instance = std::get<std::shared_ptr<Instance>>(objVal);
+			auto it = instance->typeInfo->fieldIndexes.find(propNameHash);
+
+			if (it == instance->typeInfo->fieldIndexes.end())
+			{
+				std::cerr << "Runtime Error: Undefined property.\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			instance->fields[it->second] = std::move(valueToSet);
+			break;
+		}
+
+		case OpCode::TypeOf: {
+			if (Value objVal = Pop(); std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			{
+				auto instance = std::get<std::shared_ptr<Instance>>(objVal);
+				Push(instance->typeInfo);
+			}
+			else
+			{
+				// TODO: Implement base TypeInfo for predefined VM types
+				Push(Null);
+			}
+			break;
+		}
+
+		case OpCode::DefType: {
+			Value countVal = Pop();
+			Value nameVal = Pop();
+
+			if (!std::holds_alternative<Int>(countVal) || !std::holds_alternative<String>(nameVal))
+			{
+				std::cerr << "Runtime Error: Invalid arguments for DefType\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			auto fieldCount = std::get<Int>(countVal);
+			auto className = std::get<String>(nameVal);
+
+			auto classInfo = std::make_shared<TypeInfo>(className);
+
+			for (Int i = 0; i < fieldCount; ++i)
+			{
+				if (Value fieldVal = Pop(); std::holds_alternative<String>(fieldVal))
+				{
+					classInfo->AddField(std::get<String>(fieldVal));
+				}
+				else
+				{
+					std::cerr << "Runtime Error: Field name must be a string\n";
+					return InterpreterResult::RuntimeError;
+				}
+			}
+
+			m_types[className.Hash()] = classInfo;
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())
@@ -218,7 +337,7 @@ Value VirtualMachine::Pop()
 	return val;
 }
 
-void VirtualMachine::Push(const Value& value)
+void VirtualMachine::Push(Value const& value)
 {
 	m_stack.push_back(value);
 }

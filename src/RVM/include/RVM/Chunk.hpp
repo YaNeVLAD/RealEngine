@@ -17,7 +17,7 @@ class RE_RVM_API Chunk final : public IAsset
 public:
 	void Write(std::uint8_t byte);
 
-	std::uint8_t AddConstant(Value value);
+	std::uint8_t AddConstant(Value const& value);
 
 	[[nodiscard]] const std::vector<uint8_t>& GetCode() const;
 	[[nodiscard]] const std::vector<Value>& GetConstants() const;
