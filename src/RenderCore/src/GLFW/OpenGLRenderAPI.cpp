@@ -123,11 +123,10 @@ void OpenGLRenderAPI::Init()
 	m_Shader2D = std::make_shared<Shader>(s_VertexShaderSource, s_FragmentShaderSource);
 	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3D);
 
-	// --- ЕДИНЫЙ ЛЕЙАУТ ---
 	BufferLayout unifiedLayout;
 	unifiedLayout.Push<Vector3f>("a_Position");
 	unifiedLayout.Push<Vector3f>("a_Normal");
-	unifiedLayout.Push<Color>("a_Color", true); // Нормализация 0-255 -> 0.0-1.0
+	unifiedLayout.Push<Color>("a_Color", true);
 	unifiedLayout.Push<Vector2f>("a_TexCoord");
 	unifiedLayout.Push<float>("a_TexIndex");
 

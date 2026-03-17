@@ -22,6 +22,19 @@ public:
 			vertices.push_back(vertex);
 		};
 
+		/*
+			Front Face, Z = 0.5:
+			(y)
+			 ^
+			 |  3----------2  (0.5, 0.5)
+			 |  |          |
+			 |  |    +Z    |
+			 |  |          |
+			 |  0----------1  (0.5, -0.5)
+			 +---------------------------> (x)
+		  (-0.5, -0.5)
+		*/
+
 		// Front face
 		addVertex(-0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
 		addVertex(0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f);
@@ -80,6 +93,19 @@ public:
 		std::vector<std::uint32_t> indices;
 		vertices.reserve(24);
 		indices.reserve(24);
+
+		/*
+				 Top (0, 1, 0)
+					^
+				   / \
+				  /   \
+		   Back--/-----Right (1, 0, 0)
+			/   /     /
+		  Left-------Front (0, 0, 1)
+			 \       /
+			  \     /
+			   Bottom (0, -1, 0)
+		*/
 
 		constexpr Vector3f top = { 0.0f, 1.0f, 0.0f };
 		constexpr Vector3f bottom = { 0.0f, -1.0f, 0.0f };
