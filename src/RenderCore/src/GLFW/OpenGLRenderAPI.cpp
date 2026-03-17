@@ -165,11 +165,6 @@ void OpenGLRenderAPI::Init()
 	m_DynamicVAO3D->SetIndexBuffer(m_DynamicEBO3D);
 }
 
-void OpenGLRenderAPI::SetClearColor(const Color& color)
-{
-	glClearColor(color.r, color.g, color.b, color.a);
-}
-
 void OpenGLRenderAPI::Clear()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -312,6 +307,19 @@ void OpenGLRenderAPI::SetDepthMask(const bool writeEnabled)
 	glDepthMask(writeEnabled ? GL_TRUE : GL_FALSE);
 }
 
+void OpenGLRenderAPI::SetCullMode(const CullMode mode)
+{
+	if (mode == CullMode::None)
+	{
+		glDisable(GL_CULL_FACE);
+	}
+	else
+	{
+		glEnable(GL_CULL_FACE);
+		glCullFace(mode == CullMode::Front ? GL_FRONT : GL_BACK);
+	}
+}
+
 void OpenGLRenderAPI::SetCameraPerspective(
 	const float fov,
 	const float aspectRatio,
@@ -321,6 +329,10 @@ void OpenGLRenderAPI::SetCameraPerspective(
 {
 	const glm::mat4 projection = glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip);
 	m_viewProj3D = projection * viewMatrix;
+
+	m_Shader3D->Bind();
+	m_Shader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_Shader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
 }
 
 void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, const bool wireframe)
@@ -330,10 +342,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		return;
 	}
 
-	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_ViewProjection", m_viewProj3D);
 	m_Shader3D->SetMat4("u_Model", transform);
-	m_Shader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
 	const std::size_t eboCountNeeded = indices.size();
@@ -355,6 +364,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glEnable(GL_POLYGON_OFFSET_LINE);
 		glPolygonOffset(-1.0f, -1.0f);
+		glLineWidth(5.0f);
 	}
 
 	const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
@@ -364,6 +374,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 
 	if (wireframe)
 	{
+		glLineWidth(1.0f);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDisable(GL_POLYGON_OFFSET_LINE);
 	}

@@ -217,7 +217,6 @@ void GLFWWindow::Init(const std::string& title)
 		const bool alt = (mods & GLFW_MOD_ALT);
 		const bool ctrl = (mods & GLFW_MOD_CONTROL);
 		const bool shift = (mods & GLFW_MOD_SHIFT);
-		// system/super клавишу можно достать через GLFW_MOD_SUPER
 
 		if (action == GLFW_PRESS)
 		{
@@ -369,6 +368,21 @@ void GLFWWindow::SetIcon(const Image& image)
 		icon[0].pixels = const_cast<unsigned char*>(image.Data());
 		glfwSetWindowIcon(m_window, 1, icon);
 	}
+}
+
+void GLFWWindow::SetCursorLocked(const bool locked)
+{
+	glfwSetInputMode(m_window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+}
+
+Color GLFWWindow::GetBackgroundColor() const
+{
+	return m_data.bgColor;
+}
+
+void GLFWWindow::SetBackgroundColor(const Color color)
+{
+	glClearColor(color.r, color.g, color.b, color.a);
 }
 
 Vector2f GLFWWindow::ToWorldPos(const Vector2i& pixelPos)

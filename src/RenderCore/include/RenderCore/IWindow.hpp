@@ -24,6 +24,9 @@ public:
 	virtual Vector2f ToWorldPos(Vector2i const& pixelPos) = 0;
 	virtual std::optional<Event> PollEvent() = 0;
 	virtual Vector2u Size() = 0;
+	virtual void SetBackgroundColor(Color color) = 0;
+	virtual void SetCursorLocked(bool locked) = 0;
+	virtual Color GetBackgroundColor() const = 0;
 	virtual void Clear() = 0;
 	virtual void Display() = 0;
 	virtual void* GetNativeHandle() = 0;

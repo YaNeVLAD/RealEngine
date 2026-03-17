@@ -1,6 +1,7 @@
 add_executable(ReLauncher main.cpp
         Components.hpp
         HierarchySystem.hpp
+        CameraControlSystem.hpp
 
         Lab3/Asteroids/AsteroidsLayout.hpp
         Lab3/Asteroids/AsteroidsLayout.cpp

@@ -24,24 +24,36 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 
 	auto glmCamPos = glm::vec3{ 0.f, 0.f, 0.f };
 	auto viewMatrix = glm::mat4(1.0f);
-	constexpr float fov = 45.0f;
+
+	float fov = 45.0f;
+	float nearClip = 0.1f;
+	float farClip = 1000.0f;
+
 	auto [width, height] = m_window.Size();
 
 	const float aspect = (float)width / (float)height;
-
 	for (auto&& [entity, transform, camera] : *scene.CreateView<TransformComponent, CameraComponent>())
 	{
 		if (camera.isPrimal)
 		{
 			glmCamPos = { transform.position.x, transform.position.y, transform.position.z };
 
-			auto camTransform = glm::mat4(1.0f);
-			camTransform = glm::translate(camTransform, glmCamPos);
-			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+			fov = camera.fov;
+			nearClip = camera.nearClip;
+			farClip = camera.farClip;
 
-			viewMatrix = glm::inverse(camTransform);
+			// (transform.rotation.y = Yaw, transform.rotation.x = Pitch)
+			glm::vec3 front;
+			float yaw = transform.rotation.y;
+			float pitch = transform.rotation.x;
+
+			front.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+			front.y = std::sin(glm::radians(pitch));
+			front.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+			front = glm::normalize(front);
+
+			auto up = glm::vec3{ 0.f, 1.f, 0.f };
+			viewMatrix = glm::lookAt(glmCamPos, glmCamPos + front, up);
 			break;
 		}
 	}
@@ -80,7 +92,7 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 		}
 	}
 
-	render::Renderer3D::BeginScene(fov, aspect, viewMatrix);
+	render::Renderer3D::BeginScene(fov, aspect, nearClip, farClip, viewMatrix);
 
 	for (const auto& cmd : m_opaqueQueue)
 	{
@@ -94,7 +106,13 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 		});
 
 		render::Renderer3D::SetDepthMask(false);
+		render::Renderer3D::SetCullMode(render::CullMode::Front);
+		for (const auto& cmd : m_transparentQueue)
+		{
+			render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
+		}
 
+		render::Renderer3D::SetCullMode(render::CullMode::Back);
 		for (const auto& cmd : m_transparentQueue)
 		{
 			render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);

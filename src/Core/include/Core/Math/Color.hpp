@@ -15,6 +15,11 @@ public:
 
 	constexpr explicit Color(uint32_t color);
 
+	[[nodiscard]] constexpr Color WithR(uint8_t val) const;
+	[[nodiscard]] constexpr Color WithG(uint8_t val) const;
+	[[nodiscard]] constexpr Color WithB(uint8_t val) const;
+	[[nodiscard]] constexpr Color WithA(uint8_t val) const;
+
 	[[nodiscard]] constexpr uint32_t ToInt() const;
 
 	static const Color Black;

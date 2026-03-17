@@ -32,6 +32,12 @@ public:
 
 	void SetIcon(const Image& image) override;
 
+	void SetCursorLocked(bool locked) override;
+
+	Color GetBackgroundColor() const override;
+
+	void SetBackgroundColor(Color color) override;
+
 	Vector2f ToWorldPos(const Vector2i& pixelPos) override;
 
 	void Clear() override;
@@ -50,6 +56,7 @@ private:
 	struct WindowData
 	{
 		String title;
+		Color bgColor;
 		std::uint32_t width;
 		std::uint32_t height;
 		bool vsync;

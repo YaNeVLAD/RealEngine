@@ -17,7 +17,7 @@ class RE_RENDER_3D_API Renderer3D
 public:
 	static void Init(std::unique_ptr<IRenderAPI> api);
 
-	static void BeginScene(float fov, float aspect, const glm::mat4& viewMatrix);
+	static void BeginScene(float fov, float aspect, float nearClip, float farClip, const glm::mat4& viewMatrix);
 
 	static void EndScene();
 
@@ -38,6 +38,8 @@ public:
 	static void SetViewport(Vector2u size);
 
 	static void SetDepthMask(bool enable);
+
+	static void SetCullMode(CullMode mode);
 
 private:
 	static std::unique_ptr<IRenderAPI> m_api;

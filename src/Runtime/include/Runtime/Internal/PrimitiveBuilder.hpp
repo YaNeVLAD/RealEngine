@@ -87,25 +87,12 @@ public:
 		return { std::move(vertices), std::move(indices) };
 	}
 
-	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateOctahedron(const Color& color)
+	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateOctahedron(const bool isWireframe = false)
 	{
 		std::vector<Vertex> vertices;
 		std::vector<std::uint32_t> indices;
 		vertices.reserve(24);
 		indices.reserve(24);
-
-		/*
-				 Top (0, 1, 0)
-					^
-				   / \
-				  /   \
-		   Back--/-----Right (1, 0, 0)
-			/   /     /
-		  Left-------Front (0, 0, 1)
-			 \       /
-			  \     /
-			   Bottom (0, -1, 0)
-		*/
 
 		constexpr Vector3f top = { 0.0f, 1.0f, 0.0f };
 		constexpr Vector3f bottom = { 0.0f, -1.0f, 0.0f };
@@ -122,9 +109,11 @@ public:
 			const glm::vec3 n = glm::normalize(glm::cross(u, v));
 			const Vector3f normal = { n.x, n.y, n.z };
 
-			vertices.push_back({ p1, normal, c, { 0.f, 0.f }, -1.f });
-			vertices.push_back({ p2, normal, c, { 1.f, 0.f }, -1.f });
-			vertices.push_back({ p3, normal, c, { 0.f, 1.f }, -1.f });
+			const Color finalColor = isWireframe ? Color(0, 0, 0, 255) : c;
+
+			vertices.push_back({ p1, normal, finalColor, { 0.f, 0.f }, -1.f });
+			vertices.push_back({ p2, normal, finalColor, { 1.f, 0.f }, -1.f });
+			vertices.push_back({ p3, normal, finalColor, { 0.f, 1.f }, -1.f });
 
 			indices.push_back(indexOffset + 0);
 			indices.push_back(indexOffset + 1);
@@ -132,16 +121,29 @@ public:
 			indexOffset += 3;
 		};
 
-		addFace(right, front, top, color);
-		addFace(front, left, top, color);
-		addFace(left, back, top, color);
-		addFace(back, right, top, color);
+		constexpr std::uint8_t alpha = 215;
+		addFace(left, front, top, Color(85, 160, 75, alpha));
+		addFace(front, right, top, Color(210, 140, 70, alpha));
+		addFace(front, left, bottom, Color(45, 110, 65, alpha));
+		addFace(right, front, bottom, Color(190, 150, 170, alpha));
 
-		addFace(front, right, bottom, color);
-		addFace(left, front, bottom, color);
-		addFace(back, left, bottom, color);
-		addFace(right, back, bottom, color);
+		addFace(back, left, top, Color(40, 90, 40, alpha));
+		addFace(right, back, top, Color(150, 90, 40, alpha));
+		addFace(left, back, bottom, Color(30, 70, 40, alpha));
+		addFace(back, right, bottom, Color(130, 90, 100, alpha));
 
+		return { std::move(vertices), std::move(indices) };
+	}
+
+	static std::pair<std::vector<Vertex>, std::vector<uint32_t>> CreateQuad3D(const Color& color)
+	{
+		std::vector<Vertex> vertices = {
+			{ { -1.f, -1.f, 0.f }, { 0.f, 0.f, 1.f }, color, { 0.f, 0.f }, -1.f },
+			{ { 1.f, -1.f, 0.f }, { 0.f, 0.f, 1.f }, color, { 1.f, 0.f }, -1.f },
+			{ { 1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, color, { 1.f, 1.f }, -1.f },
+			{ { -1.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, color, { 0.f, 1.f }, -1.f }
+		};
+		std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 		return { std::move(vertices), std::move(indices) };
 	}
 };

@@ -57,8 +57,15 @@ struct MeshComponent
 
 struct CameraComponent
 {
-	float zoom = 1.f;
 	bool isPrimal = true;
+
+	float fov = 45.f;
+	float nearClip = 0.1f;
+	float farClip = 1000.f;
+
+	float zoom = 1.f;
+
+	Vector2f mouseDelta = { 0.f, 0.f };
 };
 
 struct BoxColliderComponent

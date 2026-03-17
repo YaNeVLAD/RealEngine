@@ -224,8 +224,8 @@ void Application::SetupScene(Layout& layout) const
 
 	scene
 		.CreateEntity()
-		.Add<CameraComponent>()
-		.Add<TransformComponent>();
+		.Add<TransformComponent>({ .rotation = Vector3f{ 0.f, -90.f, 0.f } })
+		.Add<CameraComponent>();
 
 	scene.BuildSystemGraph();
 }

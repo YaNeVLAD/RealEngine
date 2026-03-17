@@ -12,12 +12,12 @@
 
 namespace re::render
 {
+
 class RE_RENDER_CORE_API OpenGLRenderAPI final : public IRenderAPI
 {
 public:
 	void Init() override;
 
-	void SetClearColor(const Color& color) override;
 	void Clear() override;
 	void Flush() override;
 	void SetViewport(Vector2f topLeft, Vector2f size) override;
@@ -34,6 +34,7 @@ public:
 	// 3D
 	void SetDepthTest(bool enabled) override;
 	void SetDepthMask(bool writeEnabled) override;
+	void SetCullMode(CullMode mode) override;
 	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
 	void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, bool wireframe) override;
 
@@ -64,4 +65,5 @@ private:
 	std::size_t m_dynamicOffsetVbo3D = 0;
 	std::size_t m_dynamicOffsetEbo3D = 0;
 };
+
 } // namespace re::render

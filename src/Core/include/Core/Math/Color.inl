@@ -23,6 +23,38 @@ constexpr Color::Color(const uint32_t color)
 {
 }
 
+constexpr Color Color::WithR(const uint8_t val) const
+{
+	Color c = *this;
+	c.r = val;
+
+	return c;
+}
+
+constexpr Color Color::WithG(const uint8_t val) const
+{
+	Color c = *this;
+	c.g = val;
+
+	return c;
+}
+
+constexpr Color Color::WithB(const uint8_t val) const
+{
+	Color c = *this;
+	c.b = val;
+
+	return c;
+}
+
+constexpr Color Color::WithA(const uint8_t val) const
+{
+	Color c = *this;
+	c.a = val;
+
+	return c;
+}
+
 constexpr uint32_t Color::ToInt() const
 {
 	return static_cast<uint32_t>((r << 24) | (g << 16) | (b << 8) | a);

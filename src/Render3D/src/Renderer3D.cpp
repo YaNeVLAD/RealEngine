@@ -13,17 +13,23 @@ void Renderer3D::Init(std::unique_ptr<IRenderAPI> api)
 	m_api->Init();
 }
 
-void Renderer3D::BeginScene(const float fov, const float aspect, const glm::mat4& viewMatrix)
+void Renderer3D::BeginScene(
+	const float fov,
+	const float aspect,
+	const float nearClip,
+	const float farClip,
+	const glm::mat4& viewMatrix)
 {
 	m_api->SetDepthTest(true);
 	m_api->SetDepthMask(true);
-	m_api->SetCameraPerspective(fov, aspect, 0.1f, 1000.0f, viewMatrix);
+	m_api->SetCameraPerspective(fov, aspect, nearClip, farClip, viewMatrix);
 }
 
 void Renderer3D::EndScene()
 {
 	m_api->SetDepthTest(false);
 	m_api->SetDepthMask(true);
+	m_api->SetCullMode(CullMode::None);
 }
 
 void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const Vector3f& pos, const Vector3f& scale, const Vector3f& rotation, const bool wireframe)
@@ -55,6 +61,11 @@ void Renderer3D::SetViewport(const Vector2u size)
 void Renderer3D::SetDepthMask(const bool enable)
 {
 	m_api->SetDepthMask(enable);
+}
+
+void Renderer3D::SetCullMode(const CullMode mode)
+{
+	m_api->SetCullMode(mode);
 }
 
 } // namespace re::render
