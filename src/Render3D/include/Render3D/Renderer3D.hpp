@@ -26,9 +26,18 @@ public:
 		const std::vector<std::uint32_t>& indices,
 		const Vector3f& pos,
 		const Vector3f& scale,
-		const Vector3f& rotation);
+		const Vector3f& rotation,
+		bool wireframe);
+
+	static void DrawMesh(
+		const std::vector<Vertex>& vertices,
+		const std::vector<std::uint32_t>& indices,
+		const glm::mat4& transform,
+		bool wireframe);
 
 	static void SetViewport(Vector2u size);
+
+	static void SetDepthMask(bool enable);
 
 private:
 	static std::unique_ptr<IRenderAPI> m_api;

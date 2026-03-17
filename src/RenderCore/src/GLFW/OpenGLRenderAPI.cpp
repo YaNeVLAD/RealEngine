@@ -308,6 +308,11 @@ void OpenGLRenderAPI::SetDepthTest(const bool enabled)
 	}
 }
 
+void OpenGLRenderAPI::SetDepthMask(const bool writeEnabled)
+{
+	glDepthMask(writeEnabled ? GL_TRUE : GL_FALSE);
+}
+
 void OpenGLRenderAPI::SetCameraPerspective(
 	const float fov,
 	const float aspectRatio,
@@ -319,7 +324,7 @@ void OpenGLRenderAPI::SetCameraPerspective(
 	m_viewProj3D = projection * viewMatrix;
 }
 
-void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform)
+void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, const bool wireframe)
 {
 	if (vertices.empty() || indices.empty())
 	{
@@ -346,10 +351,23 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 	m_DynamicVBO3D->SetData(vertices.data(), vboBytesNeeded, m_dynamicOffsetVbo3D);
 	m_DynamicEBO3D->SetData(indices.data(), eboCountNeeded, m_dynamicOffsetEbo3D);
 
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glEnable(GL_POLYGON_OFFSET_LINE);
+		glPolygonOffset(-1.0f, -1.0f);
+	}
+
 	const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
 	const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(uint32_t));
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_POLYGON_OFFSET_LINE);
+	}
 
 	m_dynamicOffsetVbo3D += vboBytesNeeded;
 	m_dynamicOffsetEbo3D += eboCountNeeded;

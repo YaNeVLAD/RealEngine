@@ -90,6 +90,7 @@ struct MeshComponent3D
 {
 	std::vector<Vertex> vertices;
 	std::vector<std::uint32_t> indices;
+	bool wireframe = false;
 };
 
 struct CubeComponent

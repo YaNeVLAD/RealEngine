@@ -16,15 +16,17 @@ void Renderer3D::Init(std::unique_ptr<IRenderAPI> api)
 void Renderer3D::BeginScene(const float fov, const float aspect, const glm::mat4& viewMatrix)
 {
 	m_api->SetDepthTest(true);
+	m_api->SetDepthMask(true);
 	m_api->SetCameraPerspective(fov, aspect, 0.1f, 1000.0f, viewMatrix);
 }
 
 void Renderer3D::EndScene()
 {
 	m_api->SetDepthTest(false);
+	m_api->SetDepthMask(true);
 }
 
-void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const Vector3f& pos, const Vector3f& scale, const Vector3f& rotation)
+void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const Vector3f& pos, const Vector3f& scale, const Vector3f& rotation, const bool wireframe)
 {
 	auto transform = glm::mat4(1.0f);
 	transform = glm::translate(transform, { pos.x, pos.y, pos.z });
@@ -36,13 +38,23 @@ void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector
 
 	transform = glm::scale(transform, { scale.x, scale.y, scale.z });
 
-	m_api->DrawMesh3D(vertices, indices, transform);
+	m_api->DrawMesh3D(vertices, indices, transform, wireframe);
+}
+
+void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const glm::mat4& transform, bool wireframe)
+{
+	m_api->DrawMesh3D(vertices, indices, transform, wireframe);
 }
 
 void Renderer3D::SetViewport(const Vector2u size)
 {
 	m_api->SetViewport({ 0, 0 },
 		{ static_cast<float>(size.x), static_cast<float>(size.y) });
+}
+
+void Renderer3D::SetDepthMask(const bool enable)
+{
+	m_api->SetDepthMask(enable);
 }
 
 } // namespace re::render

@@ -3,12 +3,11 @@
 #include <ECS/Scene/Scene.hpp>
 #include <Render3D/Renderer3D.hpp>
 #include <Runtime/Components.hpp>
-#include <Runtime/Internal/PrimitiveBuilder.hpp>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
-#include <iostream>
+#include <algorithm>
 
 namespace re::detail
 {
@@ -20,38 +19,86 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 
 void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
+	m_opaqueQueue.clear();
+	m_transparentQueue.clear();
+
+	auto glmCamPos = glm::vec3{ 0.f, 0.f, 0.f };
+	auto viewMatrix = glm::mat4(1.0f);
+	constexpr float fov = 45.0f;
 	auto [width, height] = m_window.Size();
-	const auto w = std::max(width, 1u);
-	const auto h = std::max(height, 1u);
-	const float aspectRatio = static_cast<float>(w) / static_cast<float>(h);
 
-	const glm::mat4 viewMatrix = glm::lookAt(
-		glm::vec3(0.f, 0.f, 0.f), // Position
-		glm::vec3(0.f, 0.f, -1.f), // View to -Z
-		glm::vec3(0.f, 1.f, 0.f) // Up vector
-	);
+	const float aspect = (float)width / (float)height;
 
-	render::Renderer3D::BeginScene(45.0f, aspectRatio, viewMatrix);
-
-	for (auto&& [entity, transform, cube] : *scene.CreateView<TransformComponent, CubeComponent>())
+	for (auto&& [entity, transform, camera] : *scene.CreateView<TransformComponent, CameraComponent>())
 	{
-		auto [cubeVertices, cubeIndices] = PrimitiveBuilder::CreateCube(cube.color);
-		render::Renderer3D::DrawMesh(
-			cubeVertices,
-			cubeIndices,
-			transform.position,
-			transform.scale,
-			transform.rotation);
+		if (camera.isPrimal)
+		{
+			glmCamPos = { transform.position.x, transform.position.y, transform.position.z };
+
+			auto camTransform = glm::mat4(1.0f);
+			camTransform = glm::translate(camTransform, glmCamPos);
+			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+			camTransform = glm::rotate(camTransform, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+
+			viewMatrix = glm::inverse(camTransform);
+			break;
+		}
 	}
 
-	for (const auto&& [_, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent3D>())
+	for (auto&& [entity, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent3D>())
 	{
-		render::Renderer3D::DrawMesh(
-			mesh.vertices,
-			mesh.indices,
-			transform.position,
-			transform.scale,
-			transform.rotation);
+		if (mesh.vertices.empty() || mesh.indices.empty())
+		{
+			continue;
+		}
+
+		auto modelMatrix = glm::mat4(1.0f);
+		modelMatrix = glm::translate(modelMatrix, glm::vec3(transform.position.x, transform.position.y, transform.position.z));
+		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+		modelMatrix = glm::scale(modelMatrix, glm::vec3(transform.scale.x, transform.scale.y, transform.scale.z));
+
+		const bool isTransparent = mesh.vertices[0].color.a < 255;
+
+		RenderCommand3D cmd{
+			.transform = modelMatrix,
+			.vertices = &mesh.vertices,
+			.indices = &mesh.indices,
+			.wireframe = mesh.wireframe,
+		};
+		if (isTransparent)
+		{
+			auto worldPos = glm::vec3(modelMatrix[3]);
+			cmd.distanceToCamera = glm::distance(glmCamPos, worldPos);
+			m_transparentQueue.push_back(cmd);
+		}
+		else
+		{
+			m_opaqueQueue.push_back(cmd);
+		}
+	}
+
+	render::Renderer3D::BeginScene(fov, aspect, viewMatrix);
+
+	for (const auto& cmd : m_opaqueQueue)
+	{
+		render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
+	}
+
+	if (!m_transparentQueue.empty())
+	{
+		std::ranges::sort(m_transparentQueue, [](const RenderCommand3D& a, const RenderCommand3D& b) {
+			return a.distanceToCamera > b.distanceToCamera;
+		});
+
+		render::Renderer3D::SetDepthMask(false);
+
+		for (const auto& cmd : m_transparentQueue)
+		{
+			render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
+		}
 	}
 
 	render::Renderer3D::EndScene();

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Runtime/Components.hpp>
-
 #include <glm/glm.hpp>
 
 namespace re::detail
@@ -10,16 +8,11 @@ namespace re::detail
 class PrimitiveBuilder
 {
 public:
-	// Возвращает готовые вершины и индексы для куба заданного цвета
 	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateCube(const Color& color)
 	{
 		std::vector<Vertex> vertices;
 		vertices.reserve(24);
 
-		const auto [r, g, b, a] = color;
-		const glm::vec4 c = { r / 255.f, g / 255.f, b / 255.f, a / 255.f };
-
-		// Helper для быстрого добавления вершины
 		auto addVertex = [&](float px, float py, float pz, float nx, float ny, float nz, float u, float v) {
 			Vertex vertex;
 			vertex.position = { px, py, pz };
@@ -77,6 +70,51 @@ public:
 			indices.push_back(offset + 3);
 			indices.push_back(offset + 0);
 		}
+
+		return { std::move(vertices), std::move(indices) };
+	}
+
+	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateOctahedron(const Color& color)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<std::uint32_t> indices;
+		vertices.reserve(24);
+		indices.reserve(24);
+
+		constexpr Vector3f top = { 0.0f, 1.0f, 0.0f };
+		constexpr Vector3f bottom = { 0.0f, -1.0f, 0.0f };
+		constexpr Vector3f right = { 1.0f, 0.0f, 0.0f };
+		constexpr Vector3f front = { 0.0f, 0.0f, 1.0f };
+		constexpr Vector3f left = { -1.0f, 0.0f, 0.0f };
+		constexpr Vector3f back = { 0.0f, 0.0f, -1.0f };
+
+		std::uint32_t indexOffset = 0;
+
+		auto addFace = [&](const Vector3f& p1, const Vector3f& p2, const Vector3f& p3, const Color& c) {
+			const glm::vec3 u = { p2.x - p1.x, p2.y - p1.y, p2.z - p1.z };
+			const glm::vec3 v = { p3.x - p1.x, p3.y - p1.y, p3.z - p1.z };
+			const glm::vec3 n = glm::normalize(glm::cross(u, v));
+			const Vector3f normal = { n.x, n.y, n.z };
+
+			vertices.push_back({ p1, normal, c, { 0.f, 0.f }, -1.f });
+			vertices.push_back({ p2, normal, c, { 1.f, 0.f }, -1.f });
+			vertices.push_back({ p3, normal, c, { 0.f, 1.f }, -1.f });
+
+			indices.push_back(indexOffset + 0);
+			indices.push_back(indexOffset + 1);
+			indices.push_back(indexOffset + 2);
+			indexOffset += 3;
+		};
+
+		addFace(right, front, top, color);
+		addFace(front, left, top, color);
+		addFace(left, back, top, color);
+		addFace(back, right, top, color);
+
+		addFace(front, right, bottom, color);
+		addFace(left, front, bottom, color);
+		addFace(back, left, bottom, color);
+		addFace(right, back, bottom, color);
 
 		return { std::move(vertices), std::move(indices) };
 	}
