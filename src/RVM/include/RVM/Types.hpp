@@ -16,6 +16,7 @@ namespace re::rvm
 
 struct TypeInfo;
 struct Instance;
+struct ArrayInstance;
 
 using Null_t = std::monostate;
 using Int = std::int64_t;
@@ -23,8 +24,9 @@ using Double = std::double_t;
 
 using TypeInfoPtr = std::shared_ptr<TypeInfo>;
 using InstancePtr = std::shared_ptr<Instance>;
+using ArrayInstancePtr = std::shared_ptr<ArrayInstance>;
 
-using Value = std::variant<Null_t, Int, Double, String, TypeInfoPtr, InstancePtr>;
+using Value = std::variant<Null_t, Int, Double, String, TypeInfoPtr, InstancePtr, ArrayInstancePtr>;
 
 constexpr auto Null = Value{ Null_t{} };
 
@@ -45,6 +47,11 @@ struct Instance
 	std::vector<Value> fields;
 
 	explicit Instance(TypeInfoPtr const& typeInfo);
+};
+
+struct ArrayInstance
+{
+	std::vector<Value> elements;
 };
 
 enum class OpCode : std::uint8_t
@@ -156,6 +163,19 @@ enum class OpCode : std::uint8_t
 
 	// Stack: ..., [Field1], [Field2], [ClassName], [FieldCount] -> ...
 	DefType,
+
+	// ---------------------------------------------------------
+	// ARRAY
+	// ---------------------------------------------------------
+
+	// Stack: [size] -> [Array]
+	MakeArray,
+
+	// Stack: [Array], [index] -> [Value]
+	IndexLoad,
+
+	// Stack: [Array], [index], [Value] -> ...
+	IndexStore,
 
 	// ---------------------------------------------------------
 	// TERMINATION

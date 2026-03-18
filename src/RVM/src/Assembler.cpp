@@ -386,15 +386,15 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		switch (HashedString(token.lexeme))
 		{
 			// clang-format off
-          case "ADD"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Add)); break;
-          case "SUB"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Sub)); break;
-          case "MUL"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Mul)); break;
-          case "DIV"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Div)); break;
-          case "POP"_hs:    	   outChunk.Write(static_cast<uint8_t>(OpCode::Pop)); break;
-          case "RETURN"_hs: 	   outChunk.Write(static_cast<uint8_t>(OpCode::Return)); break;
+          case "ADD"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Add)); break;
+          case "SUB"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Sub)); break;
+          case "MUL"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Mul)); break;
+          case "DIV"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Div)); break;
+          case "POP"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Pop)); break;
+          case "RETURN"_hs: 	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Return)); break;
 
-		  case "LESS"_hs:   	   outChunk.Write(static_cast<uint8_t>(OpCode::Less)); break;
-		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<uint8_t>(OpCode::Equal)); break;
+		  case "LESS"_hs:   	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
+		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;
 
 		  case "LABEL"_hs:		   if (!parseLabel()) return false; break;
 		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
@@ -408,8 +408,12 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "NEW"_hs:           if (!parseNew()) return false; break;
 		  case "GET_PROPERTY"_hs:  if (!parseGetProperty()) return false; break;
 		  case "SET_PROPERTY"_hs:  if (!parseSetProperty()) return false; break;
-		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<uint8_t>(OpCode::TypeOf)); break;
+		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::TypeOf)); break;
 		  case "TYPE"_hs:          if (!parseType()) return false; break;
+
+		  case "MAKE_ARRAY"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeArray)); break;
+		  case "INDEX_LOAD"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexLoad)); break;
+		  case "INDEX_STORE"_hs:   outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexStore)); break;
 
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	   if (!parseNative()) return false; break;

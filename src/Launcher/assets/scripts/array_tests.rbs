@@ -1,0 +1,29 @@
+FUN main
+    // 1. Создаем массив на 3 элемента: arr = new Array(3)
+    CONST 3
+    MAKE_ARRAY
+    SET arr
+
+    // 2. arr[0] = 100
+    GET arr
+    CONST 0
+    CONST 100
+    INDEX_STORE
+
+    // 3. arr[1] = "Hello"
+    GET arr
+    CONST 1
+    CONST "Hello"
+    INDEX_STORE
+
+    // 4. Читаем и выводим arr[0]
+    GET arr
+    CONST 0
+    INDEX_LOAD
+    NATIVE "print" 1
+
+    // 5. Выводим весь массив целиком (благодаря нашему operator<< для ArrayInstance)
+    GET arr
+    NATIVE "print" 1
+
+    RETURN

@@ -293,6 +293,50 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::MakeArray: {
+			Value sizeVal = Pop();
+			auto size = static_cast<std::size_t>(std::get<std::int64_t>(sizeVal));
+
+			auto arr = std::make_shared<ArrayInstance>();
+			arr->elements.resize(size, std::monostate{}); // Заполняем null-ами
+
+			Push(arr);
+			break;
+		}
+
+		case OpCode::IndexLoad: {
+			Value indexVal = Pop();
+			Value arrVal = Pop();
+
+			auto arr = std::get<std::shared_ptr<ArrayInstance>>(arrVal);
+			auto idx = static_cast<std::size_t>(std::get<Int>(indexVal));
+
+			if (idx >= arr->elements.size())
+			{
+				throw std::runtime_error("Array index out of bounds");
+			}
+
+			Push(arr->elements[idx]);
+			break;
+		}
+
+		case OpCode::IndexStore: {
+			Value val = Pop();
+			Value indexVal = Pop();
+			Value arrVal = Pop();
+
+			auto arr = std::get<std::shared_ptr<ArrayInstance>>(arrVal);
+			auto idx = static_cast<std::size_t>(std::get<Int>(indexVal));
+
+			if (idx >= arr->elements.size())
+			{
+				throw std::runtime_error("Array index out of bounds");
+			}
+
+			arr->elements[idx] = std::move(val);
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())

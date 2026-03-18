@@ -132,6 +132,7 @@ bool IsTruthy(Value const& val)
 						  [](String const& str) { return !str.ToString().empty(); },
 						  [](InstancePtr const& ptr) { return ptr != nullptr; },
 						  [](TypeInfoPtr const& ptr) { return ptr != nullptr; },
+						  [](ArrayInstancePtr const& ptr) { return ptr && !ptr->elements.empty(); },
 					  },
 		val);
 }
@@ -144,7 +145,7 @@ std::ostream& operator<<(std::ostream& os, const Value& val)
 		[&os](const Int v){ os << v; },
 		[&os](const Double v){ os << v; },
 		[&os](String const& str){ os << str.ToString(); },
-			[&os](InstancePtr const& ptr) {
+		[&os](InstancePtr const& ptr) {
 			if (ptr && ptr->typeInfo) {
 				os << "Instance(" << ptr->typeInfo->name.ToString() << ")";
 			} else {
@@ -157,6 +158,19 @@ std::ostream& operator<<(std::ostream& os, const Value& val)
 			} else {
 				os << "null_class";
 			}
+		},
+		[&os](ArrayInstancePtr const& ptr) {
+			if (!ptr)
+			{
+				os << "null_array";
+				return;
+			}
+
+			os << "[";
+			for(size_t i = 0; i < ptr->elements.size(); ++i) {
+				os << ptr->elements[i] << (i == ptr->elements.size()-1 ? "" : ", ");
+			}
+			os << "]";
 		},
 		[&os](const auto&) { os << "unknown_type"; }
 	}, val);

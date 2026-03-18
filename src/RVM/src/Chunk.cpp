@@ -61,7 +61,7 @@ bool Chunk::SaveToFile(String const& filepath) const
 
 	out.write(MAGIC_SIGNATURE, MAGIC_SIGNATURE_SIZE);
 
-	const auto constSize = static_cast<uint32_t>(m_constants.size());
+	const auto constSize = static_cast<std::uint32_t>(m_constants.size());
 	out.write(reinterpret_cast<const char*>(&constSize), sizeof(constSize));
 
 	for (const auto& val : m_constants)
@@ -95,14 +95,14 @@ bool Chunk::SaveToFile(String const& filepath) const
 						   }
 					   },
 					   [](auto const&) {
-						   throw std::runtime_error("Cannot serialize runtime types (Instance/ClassInfo) into Chunk constant pool!");
+						   throw std::runtime_error("Cannot serialize runtime types pointer types into Chunk constant pool!");
 					   } },
 			val);
 	}
 
 	const auto codeSize = static_cast<std::uint32_t>(m_code.size());
 	out.write(reinterpret_cast<const char*>(&codeSize), sizeof(codeSize));
-	out.write(reinterpret_cast<const char*>(m_code.data()), m_code.size());
+	out.write(reinterpret_cast<const char*>(m_code.data()), static_cast<long long>(m_code.size()));
 
 	return out.good();
 }
