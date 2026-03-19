@@ -7,6 +7,7 @@
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
 #include <RenderCore/PrimitiveType.hpp>
+#include <RenderCore/StaticMesh.hpp>
 #include <RenderCore/Texture.hpp>
 #include <RenderCore/Vertex.hpp>
 
@@ -20,6 +21,9 @@ struct TransformComponent
 	Vector3f position = { 0.f, 0.f, 0.f };
 	Vector3f rotation = { 0.f, 0.f, 0.f };
 	Vector3f scale = { 1.f, 1.f, 1.f };
+
+	glm::mat4 modelMatrix = glm::mat4(1.0f);
+	bool isDirty = true;
 };
 
 struct CircleComponent
@@ -93,11 +97,29 @@ struct BoxColliderComponent
 	}
 };
 
-struct MeshComponent3D
+struct DynamicMeshComponent3D
 {
 	std::vector<Vertex> vertices;
 	std::vector<std::uint32_t> indices;
 	bool wireframe = false;
+};
+
+struct StaticMeshComponent3D
+{
+	explicit StaticMeshComponent3D(const std::shared_ptr<StaticMesh>& mesh, const bool wireframe = false)
+		: mesh(mesh)
+		, wireframe(wireframe)
+	{
+	}
+
+	StaticMeshComponent3D(std::vector<Vertex> vertices, std::vector<std::uint32_t> indices, const bool wireframe = false)
+		: mesh(std::make_shared<StaticMesh>(vertices, indices))
+		, wireframe(wireframe)
+	{
+	}
+
+	std::shared_ptr<StaticMesh> mesh;
+	bool wireframe;
 };
 
 struct CubeComponent

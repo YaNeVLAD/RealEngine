@@ -2,7 +2,7 @@
 
 #include <RenderCore/Export.hpp>
 #include <RenderCore/IRenderAPI.hpp>
-#include <RenderCore/Vertex.hpp> // ╨Т╨░╤И ╨╜╨╛╨▓╤Л╨╣ ╨╡╨┤╨╕╨╜╤Л╨╣ Vertex
+#include <RenderCore/Vertex.hpp>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
@@ -37,6 +37,8 @@ public:
 	void SetCullMode(CullMode mode) override;
 	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
 	void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, bool wireframe) override;
+	void DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe) override;
+	void DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe) override;
 
 private:
 	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
@@ -54,6 +56,9 @@ private:
 	std::shared_ptr<VertexArray> m_DynamicVAO3D;
 	std::shared_ptr<VertexBuffer> m_DynamicVBO3D;
 	std::shared_ptr<IndexBuffer> m_DynamicEBO3D;
+
+	std::shared_ptr<Shader> m_InstancedShader3D;
+	std::uint32_t m_instanceVBOId = 0;
 
 	std::vector<Vertex> m_batchBuffer{};
 

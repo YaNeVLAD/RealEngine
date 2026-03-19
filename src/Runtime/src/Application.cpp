@@ -208,7 +208,7 @@ void Application::SetupScene(Layout& layout) const
 		.AddSystem<detail::RenderSystem3D>(*m_window)
 		.WithRead<
 			TransformComponent,
-			MeshComponent3D,
+			DynamicMeshComponent3D,
 			CubeComponent>()
 		.RunOnMainThread();
 

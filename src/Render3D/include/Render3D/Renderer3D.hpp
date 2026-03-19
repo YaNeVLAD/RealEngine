@@ -35,6 +35,16 @@ public:
 		const glm::mat4& transform,
 		bool wireframe);
 
+	static void DrawStaticMesh(
+		StaticMesh* mesh,
+		const glm::mat4& transform,
+		bool wireframe);
+
+	static void DrawStaticMeshInstanced(
+		StaticMesh* mesh,
+		const std::vector<glm::mat4>& transforms,
+		bool wireframe);
+
 	static void SetViewport(Vector2u size);
 
 	static void SetDepthMask(bool enable);

@@ -52,6 +52,16 @@ void Renderer3D::DrawMesh(const std::vector<Vertex>& vertices, const std::vector
 	m_api->DrawMesh3D(vertices, indices, transform, wireframe);
 }
 
+void Renderer3D::DrawStaticMesh(StaticMesh* mesh, const glm::mat4& transform, bool wireframe)
+{
+	m_api->DrawStaticMesh3D(mesh, transform, wireframe);
+}
+
+void Renderer3D::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe)
+{
+	m_api->DrawStaticMeshInstanced(mesh, transforms, wireframe);
+}
+
 void Renderer3D::SetViewport(const Vector2u size)
 {
 	m_api->SetViewport({ 0, 0 },

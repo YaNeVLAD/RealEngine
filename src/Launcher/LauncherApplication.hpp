@@ -21,7 +21,7 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-
+		m_window.SetVSyncEnabled(false);
 		scene
 			.AddSystem<CameraControlSystem>()
 			.WithRead<re::CameraComponent, re::TransformComponent>()
@@ -31,22 +31,38 @@ struct MenuLayout final : re::Layout
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
 
-		const auto solid = scene.CreateEntity()
-							   .Add<re::TransformComponent>(
-								   { .position = { 0.f, 0.f, -4.f },
-									   .rotation = { 0.f, 0.f, 0.f },
-									   .scale = { 1.5f, 1.5f, 1.5f } })
-							   .Add<re::MeshComponent3D>(solidV, solidI, false);
+		constexpr std::size_t gridSize = 25;
+		constexpr float spacing = 3.0f;
+		constexpr float offset = (gridSize - 1) * spacing * 0.5f;
 
-		const auto wireframe = scene.CreateEntity()
-								   .Add<re::TransformComponent>(
-									   { .position = { 0.f, 0.f, -4.f },
-										   .rotation = { 0.f, 0.f, 0.f },
-										   .scale = { 1.5f, 1.5f, 1.5f } })
-								   .Add<re::MeshComponent3D>(wireV, wireI, true);
+		auto solidMesh = std::make_shared<re::StaticMesh>(solidV, solidI);
+		auto wireframeMesh = std::make_shared<re::StaticMesh>(wireV, wireI);
+		for (std::size_t x = 0; x < gridSize; ++x)
+		{
+			for (std::size_t y = 0; y < gridSize; ++y)
+			{
+				for (std::size_t z = 0; z < gridSize; ++z)
+				{
+					const float posX = x * spacing - offset;
+					const float posY = y * spacing - offset;
+					const float posZ = (z * spacing - offset) - 10.f;
 
-		m_solid = solid.GetEntity();
-		m_wireframe = wireframe.GetEntity();
+					scene.CreateEntity()
+						.Add<re::TransformComponent>(
+							{ .position = { posX, posY, posZ },
+								.rotation = { 0.f, 0.f, 0.f },
+								.scale = { 1.0f, 1.0f, 1.0f } })
+						.Add<re::StaticMeshComponent3D>(solidMesh, false);
+
+					scene.CreateEntity()
+						.Add<re::TransformComponent>(
+							{ .position = { posX, posY, posZ },
+								.rotation = { 0.f, 0.f, 0.f },
+								.scale = { 1.0f, 1.0f, 1.0f } })
+						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
+				}
+			}
+		}
 	}
 
 	void OnAttach() override

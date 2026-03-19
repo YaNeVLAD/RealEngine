@@ -14,7 +14,7 @@ public:
 		{
 			if (const auto parent = child.parentEntity; scene.IsValid(parent))
 			{
-				const auto& [position, rotation, scale] = scene.GetComponent<re::TransformComponent>(parent);
+				const auto& [position, rotation, scale, _1, _2] = scene.GetComponent<re::TransformComponent>(parent);
 
 				const auto [rotX, rotY] = child.localPosition.Rotate(rotation.z);
 

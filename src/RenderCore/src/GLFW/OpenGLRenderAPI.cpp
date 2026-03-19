@@ -87,6 +87,30 @@ constexpr auto s_FragmentShader3D = UR"(
     }
 )";
 
+constexpr auto s_VertexInstancedShader3D = UR"(
+    #version 450 core
+    layout(location = 0) in vec3 a_Position;
+    layout(location = 1) in vec3 a_Normal;
+    layout(location = 2) in vec4 a_Color;
+    layout(location = 3) in vec2 a_TexCoord;
+    layout(location = 4) in float a_TexIndex;
+	layout(location = 5) in mat4 a_InstanceMatrix;
+
+    uniform mat4 u_ViewProjection;
+    uniform mat4 u_Model;
+
+    out vec4 v_Color;
+    out vec2 v_TexCoord;
+    out vec3 v_Normal;
+
+    void main() {
+        v_Color = a_Color;
+        v_TexCoord = a_TexCoord;
+        v_Normal = mat3(transpose(inverse(u_Model))) * a_Normal;
+		gl_Position = u_ViewProjection * a_InstanceMatrix * vec4(a_Position, 1.0);
+    }
+)";
+
 constexpr GLenum ToOpenGLType(const re::PrimitiveType type)
 {
 	// clang-format off
@@ -113,6 +137,7 @@ void OpenGLRenderAPI::Init()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_DEPTH_TEST);
+	glGenBuffers(1, &m_instanceVBOId);
 
 	constexpr auto MaxQuads = 1000;
 	constexpr auto MaxVertices = MaxQuads * 4;
@@ -122,6 +147,7 @@ void OpenGLRenderAPI::Init()
 
 	m_Shader2D = std::make_shared<Shader>(s_VertexShaderSource, s_FragmentShaderSource);
 	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3D);
+	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3D);
 
 	BufferLayout unifiedLayout;
 	unifiedLayout.Push<Vector3f>("a_Position");
@@ -381,6 +407,85 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 
 	m_dynamicOffsetVbo3D += vboBytesNeeded;
 	m_dynamicOffsetEbo3D += eboCountNeeded;
+}
+
+void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe)
+{
+	if (!mesh)
+	{
+		return;
+	}
+
+	m_Shader3D->SetMat4("u_Model", transform);
+
+	mesh->GetVAO()->Bind();
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glEnable(GL_POLYGON_OFFSET_LINE);
+		glPolygonOffset(-1.0f, -1.0f);
+		glLineWidth(5.0f);
+	}
+
+	glDrawElements(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr);
+
+	if (wireframe)
+	{
+		glLineWidth(1.0f);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_POLYGON_OFFSET_LINE);
+	}
+}
+
+void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe)
+{
+	if (transforms.empty() || !mesh)
+	{
+		return;
+	}
+
+	m_InstancedShader3D->Bind();
+	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+
+	mesh->GetVAO()->Bind();
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBOId);
+	glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
+
+	constexpr std::size_t vec4Size = sizeof(glm::vec4);
+	for (int i = 0; i < 4; i++)
+	{
+		glEnableVertexAttribArray(5 + i);
+		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
+
+		// МАГИЯ ЗДЕСЬ: Divisor=1 означает "обновлять этот атрибут только при переходе к следующему инстансу (мешу)"
+		glVertexAttribDivisor(5 + i, 1);
+	}
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glEnable(GL_POLYGON_OFFSET_LINE);
+		glPolygonOffset(-1.0f, -1.0f);
+		glLineWidth(5.0f);
+	}
+
+	glDrawElementsInstanced(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_POLYGON_OFFSET_LINE);
+		glLineWidth(1.0f);
+	}
+
+	for (int i = 0; i < 4; i++)
+	{
+		glVertexAttribDivisor(5 + i, 0);
+		glDisableVertexAttribArray(5 + i);
+	}
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

@@ -4,10 +4,34 @@
 #include <Render3D/Renderer3D.hpp>
 #include <Runtime/Components.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_INLINE
+#define GLM_FORCE_INTRINSICS
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include <algorithm>
+#include <execution>
+
+namespace
+{
+
+glm::mat4 CalculateModelMatrix(re::TransformComponent const& transform)
+{
+	glm::mat4 result = glm::translate(glm::mat4(1.0f), glm::vec3(transform.position.x, transform.position.y, transform.position.z));
+
+	result *= glm::eulerAngleYXZ(
+		glm::radians(transform.rotation.y),
+		glm::radians(transform.rotation.x),
+		glm::radians(transform.rotation.z));
+
+	result = glm::scale(result, glm::vec3(transform.scale.x, transform.scale.y, transform.scale.z));
+
+	return result;
+}
+
+} // namespace
 
 namespace re::detail
 {
@@ -21,6 +45,8 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
 	m_opaqueQueue.clear();
 	m_transparentQueue.clear();
+	m_instancedOpaque.clear();
+	m_instancedTransparent.clear();
 
 	auto glmCamPos = glm::vec3{ 0.f, 0.f, 0.f };
 	auto viewMatrix = glm::mat4(1.0f);
@@ -30,8 +56,17 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 	float farClip = 1000.0f;
 
 	auto [width, height] = m_window.Size();
-
 	const float aspect = (float)width / (float)height;
+
+	for (auto&& [entity, transform] : *scene.CreateView<TransformComponent>())
+	{
+		if (transform.isDirty)
+		{
+			transform.modelMatrix = CalculateModelMatrix(transform);
+			transform.isDirty = false;
+		}
+	}
+
 	for (auto&& [entity, transform, camera] : *scene.CreateView<TransformComponent, CameraComponent>())
 	{
 		if (camera.isPrimal)
@@ -42,7 +77,6 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 			nearClip = camera.nearClip;
 			farClip = camera.farClip;
 
-			// (transform.rotation.y = Yaw, transform.rotation.x = Pitch)
 			glm::vec3 front;
 			float yaw = transform.rotation.y;
 			float pitch = transform.rotation.x;
@@ -58,32 +92,45 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 		}
 	}
 
-	for (auto&& [entity, transform, mesh] : *scene.CreateView<TransformComponent, MeshComponent3D>())
+	for (auto&& [entity, transform, staticComp] : *scene.CreateView<TransformComponent, StaticMeshComponent3D>())
 	{
-		if (mesh.vertices.empty() || mesh.indices.empty())
+		if (!staticComp.mesh)
 		{
 			continue;
 		}
 
-		auto modelMatrix = glm::mat4(1.0f);
-		modelMatrix = glm::translate(modelMatrix, glm::vec3(transform.position.x, transform.position.y, transform.position.z));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-		modelMatrix = glm::scale(modelMatrix, glm::vec3(transform.scale.x, transform.scale.y, transform.scale.z));
+		glm::mat4 modelMatrix = transform.modelMatrix;
+		auto key = std::make_pair(staticComp.mesh.get(), staticComp.wireframe);
 
-		const bool isTransparent = mesh.vertices[0].color.a < 255;
-
-		RenderCommand3D cmd{
-			.transform = modelMatrix,
-			.vertices = &mesh.vertices,
-			.indices = &mesh.indices,
-			.wireframe = mesh.wireframe,
-		};
-		if (isTransparent)
+		if (staticComp.mesh->IsTransparent())
 		{
-			auto worldPos = glm::vec3(modelMatrix[3]);
-			cmd.distanceToCamera = glm::distance(glmCamPos, worldPos);
+			float dist = glm::distance(glmCamPos, glm::vec3(modelMatrix[3]));
+			m_instancedTransparent[key].emplace_back(dist, modelMatrix);
+		}
+		else
+		{
+			m_instancedOpaque[key].push_back(modelMatrix);
+		}
+	}
+
+	for (auto&& [entity, transform, dynComp] : *scene.CreateView<TransformComponent, DynamicMeshComponent3D>())
+	{
+		if (dynComp.vertices.empty() || dynComp.indices.empty())
+		{
+			continue;
+		}
+
+		glm::mat4 modelMatrix = transform.modelMatrix;
+
+		RenderCommand3D cmd;
+		cmd.transform = modelMatrix;
+		cmd.vertices = &dynComp.vertices;
+		cmd.indices = &dynComp.indices;
+		cmd.wireframe = dynComp.wireframe;
+
+		if (dynComp.vertices[0].color.a < 255)
+		{
+			cmd.distanceToCamera = glm::distance(glmCamPos, glm::vec3(modelMatrix[3]));
 			m_transparentQueue.push_back(cmd);
 		}
 		else
@@ -94,29 +141,72 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 
 	render::Renderer3D::BeginScene(fov, aspect, nearClip, farClip, viewMatrix);
 
-	for (const auto& cmd : m_opaqueQueue)
-	{
-		render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
-	}
-
-	if (!m_transparentQueue.empty())
-	{
-		std::ranges::sort(m_transparentQueue, [](const RenderCommand3D& a, const RenderCommand3D& b) {
-			return a.distanceToCamera > b.distanceToCamera;
-		});
-
-		render::Renderer3D::SetDepthMask(false);
-		render::Renderer3D::SetCullMode(render::CullMode::Front);
-		for (const auto& cmd : m_transparentQueue)
+	auto drawCommand = [&](const RenderCommand3D& cmd) {
+		if (cmd.staticMesh)
+		{
+			render::Renderer3D::DrawStaticMesh(cmd.staticMesh, cmd.transform, cmd.wireframe);
+		}
+		else
 		{
 			render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
+		}
+	};
+
+	for (auto& [key, transforms] : m_instancedOpaque)
+	{
+		render::Renderer3D::DrawStaticMeshInstanced(key.first, transforms, key.second);
+	}
+
+	for (const auto& cmd : m_opaqueQueue)
+	{
+		drawCommand(cmd);
+	}
+
+	if (!m_transparentQueue.empty() || !m_instancedTransparent.empty())
+	{
+		render::Renderer3D::SetDepthMask(false);
+		render::Renderer3D::SetCullMode(render::CullMode::Front);
+
+		for (auto& [key, pairs] : m_instancedTransparent)
+		{
+			std::sort(std::execution::par_unseq, pairs.begin(), pairs.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+			std::vector<glm::mat4> sortedTransforms;
+			sortedTransforms.reserve(pairs.size());
+			for (const auto& val : pairs | std::views::values)
+			{
+				sortedTransforms.push_back(val);
+			}
+
+			render::Renderer3D::DrawStaticMeshInstanced(key.first, sortedTransforms, key.second);
+		}
+
+		std::sort(std::execution::par_unseq, m_transparentQueue.begin(), m_transparentQueue.end(), [](const RenderCommand3D& a, const RenderCommand3D& b) {
+			return a.distanceToCamera > b.distanceToCamera;
+		});
+		for (const auto& cmd : m_transparentQueue)
+		{
+			drawCommand(cmd);
 		}
 
 		render::Renderer3D::SetCullMode(render::CullMode::Back);
+		for (auto& [key, pairs] : m_instancedTransparent)
+		{
+			std::vector<glm::mat4> sortedTransforms;
+			sortedTransforms.reserve(pairs.size());
+			for (const auto& val : pairs | std::views::values)
+			{
+				sortedTransforms.push_back(val);
+			}
+
+			render::Renderer3D::DrawStaticMeshInstanced(key.first, sortedTransforms, key.second);
+		}
+
 		for (const auto& cmd : m_transparentQueue)
 		{
-			render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
+			drawCommand(cmd);
 		}
+
+		render::Renderer3D::SetDepthMask(true);
 	}
 
 	render::Renderer3D::EndScene();
