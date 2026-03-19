@@ -35,10 +35,10 @@ public:
 	template <typename TComponent>
 	[[nodiscard]] bool HasComponent(Entity entity) const;
 
-	void OnEntityDestroyed(Entity entity);
+	void OnEntityDestroyed(Entity entity) const;
 
 private:
-	std::unordered_map<ComponentType, std::shared_ptr<IComponentArray>> m_componentArrays;
+	std::vector<std::shared_ptr<IComponentArray>> m_componentArrays;
 
 	template <typename TComponent>
 	std::shared_ptr<ComponentArray<TComponent>> GetComponentArray() const;
