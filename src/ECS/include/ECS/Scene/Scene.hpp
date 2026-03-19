@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(RE_USE_ENTT)
+#include <ECS/EnttAdapter/Scene_EnTT.hpp>
+#else
+
 #include <ECS/ComponentManager/ComponentManager.hpp>
 #include <ECS/Entity/Entity.hpp>
 #include <ECS/EntityManager/EntityManager.hpp>
@@ -178,3 +182,5 @@ private:
 };
 
 } // namespace re::ecs
+
+#endif

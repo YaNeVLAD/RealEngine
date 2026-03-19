@@ -10,6 +10,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+option(RE_USE_ENTT "Use EnTT for ECS backend" ON)
 
 set(RE_RENDER_BACKEND "SFML" CACHE STRING "Choose the render backend: SFML or GLFW")
 set_property(CACHE RE_RENDER_BACKEND PROPERTY STRINGS "SFML" "GLFW")
@@ -23,6 +24,10 @@ if (NOT BUILD_SHARED_LIBS)
 else ()
     message(STATUS "Building Real Engine as SHARED libraries")
 endif ()
+
+if(RE_USE_ENTT)
+    add_compile_definitions(RE_USE_ENTT)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Dependencies)

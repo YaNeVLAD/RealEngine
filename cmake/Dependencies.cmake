@@ -1,12 +1,5 @@
 include(FetchContent)
 
-# EnTT
-FetchContent_Declare(
-        EnTT
-        GIT_REPOSITORY https://github.com/skypjack/entt.git
-        GIT_TAG v3.15.0
-)
-FetchContent_MakeAvailable(EnTT)
 
 # GLM
 FetchContent_Declare(
@@ -21,6 +14,16 @@ set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(glm)
 
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
+
+# EnTT
+if (RE_USE_ENTT)
+    FetchContent_Declare(
+            EnTT
+            GIT_REPOSITORY https://github.com/skypjack/entt.git
+            GIT_TAG v3.15.0
+    )
+    FetchContent_MakeAvailable(EnTT)
+endif ()
 
 if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     FetchContent_Declare(
