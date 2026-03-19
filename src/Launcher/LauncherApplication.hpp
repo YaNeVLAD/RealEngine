@@ -28,10 +28,25 @@ struct MenuLayout final : re::Layout
 			.WithWrite<re::CameraComponent>()
 			.RunOnMainThread();
 
+		scene.CreateEntity()
+			.Add<re::DirectionalLightComponent>(re::Color{ 255, 230, 200, 255 }, 0.2f)
+			.Add<re::TransformComponent>({ .position = { 0.f, 0.f, 0.f },
+				.rotation = { -35.f, 45.f, 0.f },
+				.scale = { 1.f, 1.f, 1.f } })
+			.Add<re::Dirty<re::TransformComponent>>();
+
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
 
-		constexpr std::size_t gridSize = 25;
+		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Red);
+		scene
+			.CreateEntity()
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::detail::OpaqueTag>()
+			.Add<re::TransformComponent>({ .position = { 3.f, 0.f, -5.f } })
+			.Add<re::StaticMeshComponent3D>(cubeV, cubeI);
+
+		constexpr std::size_t gridSize = 1;
 		constexpr float spacing = 3.0f;
 		constexpr float offset = (gridSize - 1) * spacing * 0.5f;
 
@@ -48,18 +63,22 @@ struct MenuLayout final : re::Layout
 					const float posZ = (z * spacing - offset) - 10.f;
 
 					scene.CreateEntity()
+						.Add<re::detail::TransparentTag>()
+						.Add<re::Dirty<re::TransformComponent>>()
 						.Add<re::TransformComponent>(
 							{ .position = { posX, posY, posZ },
 								.rotation = { 0.f, 0.f, 0.f },
 								.scale = { 1.0f, 1.0f, 1.0f } })
-						.Add<re::StaticMeshComponent3D>(solidMesh, false);
+						.Add<re::StaticMeshComponent3D>(solidV, solidI, false);
 
 					scene.CreateEntity()
+						.Add<re::detail::TransparentTag>()
+						.Add<re::Dirty<re::TransformComponent>>()
 						.Add<re::TransformComponent>(
 							{ .position = { posX, posY, posZ },
 								.rotation = { 0.f, 0.f, 0.f },
 								.scale = { 1.0f, 1.0f, 1.0f } })
-						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
+						.Add<re::StaticMeshComponent3D>(wireV, wireI, true);
 				}
 			}
 		}

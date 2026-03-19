@@ -76,9 +76,11 @@ public:
 		for (std::uint32_t i = 0; i < 6; ++i)
 		{
 			const std::uint32_t offset = i * 4;
+
 			indices.push_back(offset + 0);
 			indices.push_back(offset + 1);
 			indices.push_back(offset + 2);
+
 			indices.push_back(offset + 2);
 			indices.push_back(offset + 3);
 			indices.push_back(offset + 0);

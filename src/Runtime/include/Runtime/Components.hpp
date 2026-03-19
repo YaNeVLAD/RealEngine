@@ -4,6 +4,7 @@
 #include <Core/Math/Vector2.hpp>
 #include <Core/Math/Vector3.hpp>
 #include <Core/String.hpp>
+#include <ECS/Scene/Scene.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
 #include <RenderCore/PrimitiveType.hpp>
@@ -23,7 +24,6 @@ struct TransformComponent
 	Vector3f scale = { 1.f, 1.f, 1.f };
 
 	glm::mat4 modelMatrix = glm::mat4(1.0f);
-	bool isDirty = true;
 };
 
 struct CircleComponent
@@ -70,6 +70,7 @@ struct CameraComponent
 	float zoom = 1.f;
 
 	Vector2f mouseDelta = { 0.f, 0.f };
+	Vector3f up = { 0.f, 1.f, 0.f };
 };
 
 struct BoxColliderComponent
@@ -122,9 +123,13 @@ struct StaticMeshComponent3D
 	bool wireframe;
 };
 
-struct CubeComponent
+struct DirectionalLightComponent
 {
 	Color color = Color::White;
+	float ambientIntensity = 0.3f;
 };
+
+template <typename T>
+using Dirty = detail::DirtyTag<T>;
 
 } // namespace re

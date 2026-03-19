@@ -14,6 +14,8 @@ StaticMesh::StaticMesh(const std::vector<Vertex>& vertices, const std::vector<st
 	}
 
 	m_vao = std::make_shared<VertexArray>();
+	m_vao->Bind();
+
 	m_vbo = std::make_shared<VertexBuffer>(vertices.data(), vertices.size() * sizeof(Vertex));
 	m_ebo = std::make_shared<IndexBuffer>(indices.data(), indices.size());
 
@@ -26,6 +28,10 @@ StaticMesh::StaticMesh(const std::vector<Vertex>& vertices, const std::vector<st
 
 	m_vao->AddVertexBuffer(m_vbo, layout);
 	m_vao->SetIndexBuffer(m_ebo);
+
+	m_vao->Unbind();
+	m_vbo->Unbind();
+	m_ebo->Unbind();
 }
 
 render::VertexArray* StaticMesh::GetVAO() const

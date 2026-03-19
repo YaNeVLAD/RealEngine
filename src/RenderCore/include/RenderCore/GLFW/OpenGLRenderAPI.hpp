@@ -35,10 +35,13 @@ public:
 	void SetDepthTest(bool enabled) override;
 	void SetDepthMask(bool writeEnabled) override;
 	void SetCullMode(CullMode mode) override;
+	void ResetCullingCache() override;
 	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
 	void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, bool wireframe) override;
 	void DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe) override;
 	void DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe) override;
+	void DrawStaticMeshGPUCulled(std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, float boundingRadius, const glm::vec3& cameraPos, bool wireframe) override;
+	void SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity) override;
 
 private:
 	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
@@ -59,6 +62,20 @@ private:
 
 	std::shared_ptr<Shader> m_InstancedShader3D;
 	std::uint32_t m_instanceVBOId = 0;
+
+	std::shared_ptr<Shader> m_CullingComputeShader;
+	struct CullingData
+	{
+		uint32_t inputSsbo = 0;
+		uint32_t outputSsbo = 0;
+		uint32_t cmdBuffer = 0;
+	};
+
+	std::vector<CullingData> m_cullingBatches;
+
+	glm::vec3 m_lightDir = { -0.5f, -1.0f, -0.5f };
+	glm::vec4 m_lightColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float m_lightAmbient = 0.3f;
 
 	std::vector<Vertex> m_batchBuffer{};
 

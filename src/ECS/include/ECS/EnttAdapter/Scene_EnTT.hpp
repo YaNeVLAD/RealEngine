@@ -1,53 +1,19 @@
 #pragma once
 
+#include "ECS/Scene.hpp"
+
 #include <ECS/Entity/Entity.hpp>
 #include <ECS/EntityWrapper/EntityWrapper.hpp>
 #include <ECS/SystemManager/SystemManager.hpp>
 
+#include <ECS/EnttAdapter/EnttViewAdapter.hpp>
+
 #include <entt/entt.hpp>
 #include <memory>
-#include <tuple>
 #include <vector>
 
 namespace re::ecs
 {
-
-template <typename... TComponents>
-class EnttViewAdapter
-{
-public:
-	explicit EnttViewAdapter(entt::registry& registry)
-		: m_view(registry.view<TComponents...>())
-	{
-	}
-
-	struct Iterator
-	{
-		using BaseIterator = decltype(std::declval<entt::view<entt::get_t<TComponents...>>>().each().begin());
-		BaseIterator it;
-
-		auto operator*()
-		{
-			return std::apply([]<typename... T>(entt::entity e, T&... comps) {
-				return std::tuple<Entity, T&...>(Entity{ static_cast<uint32_t>(e) }, comps...);
-			},
-				*it);
-		}
-
-		Iterator& operator++()
-		{
-			++it;
-			return *this;
-		}
-		bool operator!=(const Iterator& other) const { return it != other.it; }
-	};
-
-	Iterator begin() { return { m_view.each().begin() }; }
-	Iterator end() { return { m_view.each().end() }; }
-
-private:
-	entt::view<entt::get_t<TComponents...>> m_view;
-};
 
 class Scene final
 {
@@ -164,9 +130,20 @@ public:
 	}
 
 	template <typename... TComponents>
+	void MakeDirty(const Entity entity)
+	{
+		(AddComponent<detail::DirtyTag<TComponents>>(entity), ...);
+	}
+
+	template <typename... TComponents>
 	std::shared_ptr<EnttViewAdapter<TComponents...>> CreateView()
 	{
 		return std::make_shared<EnttViewAdapter<TComponents...>>(m_registry);
+	}
+
+	entt::registry& GetRegistry()
+	{
+		return m_registry;
 	}
 
 private:

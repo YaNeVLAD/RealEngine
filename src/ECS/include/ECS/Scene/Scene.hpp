@@ -148,6 +148,12 @@ public:
 	}
 
 	template <typename... TComponents>
+	void MarkDirty(const Entity entity)
+	{
+		(AddComponent<detail::DirtyTag<TComponents>(entity)>(entity), ...);
+	}
+
+	template <typename... TComponents>
 	std::shared_ptr<View<TComponents...>> CreateView()
 	{
 		return m_viewManager->CreateView<TComponents...>(*m_componentManager, *m_entityManager);

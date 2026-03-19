@@ -11,26 +11,26 @@ namespace re::ecs
 {
 #ifdef RE_USE_ENTT
 
-template <typename... Components>
+template <typename... TComponents>
 class EnttViewAdapter
 {
 public:
 	explicit EnttViewAdapter(entt::registry& registry)
-		: m_view(registry.view<Components...>())
+		: m_view(registry.view<TComponents...>())
 	{
 	}
 
 	struct Iterator
 	{
-		using BaseIterator = decltype(std::declval<entt::view<entt::get_t<Components...>>>().each().begin());
+		using BaseIterator = decltype(std::declval<entt::view<entt::get_t<TComponents...>>>().each().begin());
 		BaseIterator it;
 
 		auto operator*()
 		{
-			return std::apply([](entt::entity e, Components&... comps) {
-				return std::tuple<Entity, Components&...>(
+			return std::apply([]<typename... T>(entt::entity e, T&&... comps) {
+				return std::tuple<Entity, T...>(
 					Entity{ static_cast<uint32_t>(e) },
-					comps...);
+					std::forward<T>(comps)...);
 			},
 				*it);
 		}
@@ -41,14 +41,24 @@ public:
 			return *this;
 		}
 
-		bool operator!=(const Iterator& other) const { return it != other.it; }
+		bool operator!=(const Iterator& other) const
+		{
+			return it != other.it;
+		}
 	};
 
-	Iterator begin() { return { m_view.each().begin() }; }
-	Iterator end() { return { m_view.each().end() }; }
+	Iterator begin()
+	{
+		return { m_view.each().begin() };
+	}
+
+	Iterator end()
+	{
+		return { m_view.each().end() };
+	}
 
 private:
-	entt::view<entt::get_t<Components...>> m_view;
+	entt::view<entt::get_t<TComponents...>> m_view;
 };
 
 #endif

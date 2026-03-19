@@ -41,8 +41,9 @@ public:
 			front.z = std::sin(glm::radians(transform.rotation.y)) * std::cos(glm::radians(transform.rotation.x));
 			front = glm::normalize(front);
 
-			glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.f, 1.f, 0.f)));
-			glm::vec3 up = glm::normalize(glm::cross(right, front));
+			const glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.f, 1.f, 0.f)));
+			const glm::vec3 up = glm::normalize(glm::cross(right, front));
+			camera.up = { up.x, up.y, up.z };
 
 			const float moveSpeed = 10.0f * dt;
 			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::W))
@@ -95,6 +96,8 @@ public:
 			{
 				camera.fov = 120.0f;
 			}
+
+			scene.MakeDirty<re::TransformComponent>(entity);
 		}
 	}
 };

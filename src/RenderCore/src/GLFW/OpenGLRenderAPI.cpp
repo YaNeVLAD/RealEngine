@@ -1,3 +1,5 @@
+#include "glm/gtc/type_ptr.hpp"
+
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 
 #include <glad/glad.h>
@@ -82,8 +84,21 @@ constexpr auto s_FragmentShader3D = UR"(
 
     uniform vec4 u_Color;
 
+	uniform vec3 u_LightDir;
+	uniform float u_Ambient;
+	uniform vec4 u_LightColor;
+
     void main() {
-        o_Color = v_Color * u_Color;
+		vec3 norm = normalize(v_Normal);
+        vec3 lightDir = normalize(-u_LightDir);
+
+        float diff = max(dot(norm, lightDir), 0.0);
+
+        vec4 objectColor = v_Color * u_Color;
+
+        vec3 finalLight = (u_Ambient + diff) * u_LightColor.rgb;
+
+        o_Color = vec4(finalLight * objectColor.rgb, objectColor.a);
     }
 )";
 
@@ -106,8 +121,66 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     void main() {
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-        v_Normal = mat3(transpose(inverse(u_Model))) * a_Normal;
+		v_Normal = mat3(transpose(inverse(a_InstanceMatrix))) * a_Normal;
 		gl_Position = u_ViewProjection * a_InstanceMatrix * vec4(a_Position, 1.0);
+    }
+)";
+
+constexpr auto s_ComputeCullingShader3D = UR"(
+    #version 430 core
+    layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+    layout(std430, binding = 0) readonly buffer InputInstances { mat4 inputTransforms[]; };
+    layout(std430, binding = 1) writeonly buffer OutputInstances { mat4 outputTransforms[]; };
+
+    struct DrawCommand 
+	{
+        uint count; 
+		uint instanceCount; 
+		uint firstIndex; 
+		uint baseVertex; 
+		uint baseInstance;
+    };
+    layout(std430, binding = 2) buffer CommandBuffer { DrawCommand cmd; };
+
+    uniform vec4 u_FrustumPlanes[6];
+    uniform uint u_TotalInstances;
+    uniform float u_MeshRadius;
+
+    uniform vec3 u_CameraPos;
+    uniform float u_MaxDistance;
+
+    void main()
+    {
+        uint idx = gl_GlobalInvocationID.x;
+        if (idx >= u_TotalInstances) return;
+
+        mat4 model = inputTransforms[idx];
+        vec3 pos = vec3(model[3]);
+
+        // DISTANCE CULLING
+        // Если объект дальше условного горизонта, сразу выбрасываем его!
+        if (distance(u_CameraPos, pos) > u_MaxDistance) return;
+
+        float maxScale = max(max(length(vec3(model[0])), length(vec3(model[1]))), length(vec3(model[2])));
+        float radius = u_MeshRadius * maxScale;
+
+        // FRUSTUM CULLING
+        bool visible = true;
+        for(int i = 0; i < 6; i++)
+        {
+            if (dot(u_FrustumPlanes[i].xyz, pos) + u_FrustumPlanes[i].w < -radius)
+            {
+                visible = false;
+                break;
+            }
+        }
+
+        if (visible)
+        {
+            uint outIdx = atomicAdd(cmd.instanceCount, 1);
+            outputTransforms[outIdx] = model;
+        }
     }
 )";
 
@@ -127,6 +200,36 @@ constexpr GLenum ToOpenGLType(const re::PrimitiveType type)
 	// clang-format on
 }
 
+struct DrawElementsIndirectCommand
+{
+	uint32_t count; // mesh->GetIndexCount()
+	uint32_t instanceCount; // 0 (заполнит Compute Shader)
+	uint32_t firstIndex; // 0
+	uint32_t baseVertex; // 0
+	uint32_t baseInstance; // 0
+};
+
+void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6])
+{
+	// clang-format off
+
+	// Left, Right, Bottom, Top, Near, Far
+	for (int i = 0; i < 4; ++i) planes[0][i] = vp[i][3] + vp[i][0];
+	for (int i = 0; i < 4; ++i) planes[1][i] = vp[i][3] - vp[i][0];
+	for (int i = 0; i < 4; ++i) planes[2][i] = vp[i][3] + vp[i][1];
+	for (int i = 0; i < 4; ++i) planes[3][i] = vp[i][3] - vp[i][1];
+	for (int i = 0; i < 4; ++i) planes[4][i] = vp[i][3] + vp[i][2];
+	for (int i = 0; i < 4; ++i) planes[5][i] = vp[i][3] - vp[i][2];
+
+	// clang-format on
+
+	for (int i = 0; i < 6; i++)
+	{
+		float length = glm::length(glm::vec3(planes[i]));
+		planes[i] /= length;
+	}
+}
+
 } // namespace
 
 namespace re::render
@@ -137,7 +240,6 @@ void OpenGLRenderAPI::Init()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_DEPTH_TEST);
-	glGenBuffers(1, &m_instanceVBOId);
 
 	constexpr auto MaxQuads = 1000;
 	constexpr auto MaxVertices = MaxQuads * 4;
@@ -147,7 +249,11 @@ void OpenGLRenderAPI::Init()
 
 	m_Shader2D = std::make_shared<Shader>(s_VertexShaderSource, s_FragmentShaderSource);
 	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3D);
+
 	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3D);
+	glGenBuffers(1, &m_instanceVBOId);
+
+	m_CullingComputeShader = std::make_shared<Shader>(s_ComputeCullingShader3D);
 
 	BufferLayout unifiedLayout;
 	unifiedLayout.Push<Vector3f>("a_Position");
@@ -346,6 +452,17 @@ void OpenGLRenderAPI::SetCullMode(const CullMode mode)
 	}
 }
 
+void OpenGLRenderAPI::ResetCullingCache()
+{
+	for (auto& [inputSsbo, outputSsbo, cmdBuffer] : m_cullingBatches)
+	{
+		glDeleteBuffers(1, &inputSsbo);
+		glDeleteBuffers(1, &outputSsbo);
+		glDeleteBuffers(1, &cmdBuffer);
+	}
+	m_cullingBatches.clear();
+}
+
 void OpenGLRenderAPI::SetCameraPerspective(
 	const float fov,
 	const float aspectRatio,
@@ -368,6 +485,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		return;
 	}
 
+	m_Shader3D->Bind();
 	m_Shader3D->SetMat4("u_Model", transform);
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
@@ -416,6 +534,7 @@ void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transf
 		return;
 	}
 
+	m_Shader3D->Bind();
 	m_Shader3D->SetMat4("u_Model", transform);
 
 	mesh->GetVAO()->Bind();
@@ -488,6 +607,145 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	}
 }
 
+void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, const float boundingRadius, const glm::vec3& cameraPos, const bool wireframe)
+{
+	if (transforms.empty() || !mesh)
+	{
+		return;
+	}
+
+	const std::uint32_t totalInstances = static_cast<uint32_t>(transforms.size());
+
+	// Увеличиваем массив буферов, если пришел новый батч
+	if (batchIndex >= m_cullingBatches.size())
+	{
+		m_cullingBatches.resize(batchIndex + 1);
+	}
+	auto& batch = m_cullingBatches[batchIndex];
+
+	// 1. ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА ДАННЫХ (ТОЛЬКО ОДИН РАЗ!)
+	if (batch.inputSsbo == 0)
+	{
+		glGenBuffers(1, &batch.inputSsbo);
+		glGenBuffers(1, &batch.outputSsbo);
+		glGenBuffers(1, &batch.cmdBuffer);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.inputSsbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), transforms.data(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.outputSsbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+	}
+
+	// 2. ОБНУЛЕНИЕ СЧЕТЧИКА (Каждый кадр)
+	DrawElementsIndirectCommand cmd{};
+	cmd.count = mesh->GetIndexCount();
+	cmd.instanceCount = 0;
+	cmd.firstIndex = 0;
+	cmd.baseVertex = 0;
+	cmd.baseInstance = 0;
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.cmdBuffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(DrawElementsIndirectCommand), &cmd, GL_DYNAMIC_DRAW);
+
+	// 3. НАСТРОЙКА COMPUTE SHADER
+
+	glm::vec4 planes[6];
+	ExtractFrustumPlanes(m_viewProj3D, planes);
+
+	m_CullingComputeShader->Bind();
+	m_CullingComputeShader->SetFloat4Array("u_FrustumPlanes", planes, 6);
+	m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
+	m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
+	m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
+	m_CullingComputeShader->SetFloat("u_MaxDistance", 150.0f);
+
+	// ИСПОЛЬЗУЕМ БУФЕРЫ КОНКРЕТНОГО БАТЧА
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, batch.inputSsbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, batch.outputSsbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, batch.cmdBuffer);
+
+	GLuint numGroups = (totalInstances + 63) / 64;
+	glDispatchCompute(numGroups, 1, 1);
+
+	glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+	// 4. ОТРИСОВКА (Early-Z и Color)
+	m_InstancedShader3D->Bind();
+	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+
+	mesh->GetVAO()->Bind();
+
+	glBindBuffer(GL_ARRAY_BUFFER, batch.outputSsbo);
+	constexpr std::size_t vec4Size = sizeof(glm::vec4);
+	for (int i = 0; i < 4; i++)
+	{
+		glEnableVertexAttribArray(5 + i);
+		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
+		glVertexAttribDivisor(5 + i, 1);
+	}
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glEnable(GL_POLYGON_OFFSET_LINE);
+		glPolygonOffset(-1.0f, -1.0f);
+		glLineWidth(5.0f);
+	}
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, batch.cmdBuffer);
+
+	// --- ПРОХОД 1: DEPTH PRE-PASS ---
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glDepthFunc(GL_LESS);
+	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
+
+	// --- ПРОХОД 2: COLOR PASS ---
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_FALSE);
+	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
+
+	// --- УБОРКА ---
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_POLYGON_OFFSET_LINE);
+		glLineWidth(1.0f);
+	}
+
+	for (int i = 0; i < 4; i++)
+	{
+		glVertexAttribDivisor(5 + i, 0);
+		glDisableVertexAttribArray(5 + i);
+	}
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+}
+
+void OpenGLRenderAPI::SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity)
+{
+	m_lightDir = direction;
+	m_lightColor = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
+	m_lightAmbient = ambientIntensity;
+
+	m_InstancedShader3D->Bind();
+	m_InstancedShader3D->SetFloat3("u_LightDir", m_lightDir);
+	m_InstancedShader3D->SetFloat4("u_LightColor", m_lightColor);
+	m_InstancedShader3D->SetFloat("u_Ambient", m_lightAmbient);
+
+	m_Shader3D->Bind();
+	m_Shader3D->SetFloat3("u_LightDir", m_lightDir);
+	m_Shader3D->SetFloat4("u_LightColor", m_lightColor);
+	m_Shader3D->SetFloat("u_Ambient", m_lightAmbient);
+}
+
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)
 {
 	if (m_batchBuffer.size() >= 1000 * 4)
@@ -500,7 +758,7 @@ void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& 
 	{
 		Flush(); // TODO: Add Texture batching
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, *static_cast<uint32_t*>(texture->GetNativeHandle()));
+		glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(texture->GetNativeHandle()));
 		texIndex = 0.0f;
 	}
 

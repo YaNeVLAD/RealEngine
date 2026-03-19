@@ -46,10 +46,13 @@ public:
 	virtual void SetDepthTest(bool enabled) = 0;
 	virtual void SetDepthMask(bool writeEnabled) = 0;
 	virtual void SetCullMode(CullMode mode) = 0;
+	virtual void ResetCullingCache() = 0;
 	virtual void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) = 0;
-	virtual void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, bool wireframe) = 0;
+	virtual void DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const glm::mat4& transform, bool wireframe) = 0;
 	virtual void DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe) = 0;
 	virtual void DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe) = 0;
+	virtual void DrawStaticMeshGPUCulled(std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, float boundingRadius, const glm::vec3& cameraPos, bool wireframe) = 0;
+	virtual void SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity) = 0;
 };
 
 } // namespace re::render

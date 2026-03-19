@@ -115,7 +115,7 @@
       "displayName": "Windows Release (Static + GLFW)",
       "inherits": "windows-debug-static-glfw",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {

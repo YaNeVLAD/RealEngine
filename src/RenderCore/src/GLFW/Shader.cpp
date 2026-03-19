@@ -8,6 +8,35 @@
 namespace re::render
 {
 
+Shader::Shader(String const& computeSrc)
+{
+	const std::uint32_t computeShader = CompileShader(GL_COMPUTE_SHADER, computeSrc);
+
+	m_rendererId = glCreateProgram();
+	glAttachShader(m_rendererId, computeShader);
+	glLinkProgram(m_rendererId);
+
+	int isLinked = 0;
+	glGetProgramiv(m_rendererId, GL_LINK_STATUS, &isLinked);
+	if (isLinked == GL_FALSE)
+	{
+		int maxLength = 0;
+		glGetProgramiv(m_rendererId, GL_INFO_LOG_LENGTH, &maxLength);
+		std::vector<char> infoLog(maxLength);
+		glGetProgramInfoLog(m_rendererId, maxLength, &maxLength, &infoLog[0]);
+
+		std::cerr << "Compute Shader linking failed:\n"
+				  << infoLog.data() << std::endl;
+
+		glDeleteProgram(m_rendererId);
+		glDeleteShader(computeShader);
+		return;
+	}
+
+	glDetachShader(m_rendererId, computeShader);
+	glDeleteShader(computeShader);
+}
+
 Shader::Shader(String const& vertexSrc, String const& fragmentSrc)
 {
 	const std::uint32_t vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSrc);
@@ -84,7 +113,12 @@ void Shader::Unbind() const
 	glUseProgram(0);
 }
 
-int Shader::GetUniformLocation(std::string_view name)
+void* Shader::GetNativeHandle() const
+{
+	return (void*)&m_rendererId;
+}
+
+int Shader::GetUniformLocation(const std::string_view name)
 {
 	std::string nameStr(name);
 	if (m_uniformLocationCache.contains(nameStr))
@@ -103,29 +137,39 @@ int Shader::GetUniformLocation(std::string_view name)
 	return location;
 }
 
-void Shader::SetInt(std::string_view name, const int value)
+void Shader::SetInt(const std::string_view name, const int value)
 {
 	glUniform1i(GetUniformLocation(name), value);
 }
 
-void Shader::SetFloat(std::string_view name, const float value)
+void Shader::SetFloat(const std::string_view name, const float value)
 {
 	glUniform1f(GetUniformLocation(name), value);
 }
 
-void Shader::SetFloat3(std::string_view name, const glm::vec3& value)
+void Shader::SetFloat3(const std::string_view name, const glm::vec3& value)
 {
 	glUniform3f(GetUniformLocation(name), value.x, value.y, value.z);
 }
 
-void Shader::SetFloat4(std::string_view name, const glm::vec4& value)
+void Shader::SetFloat4(const std::string_view name, const glm::vec4& value)
 {
 	glUniform4f(GetUniformLocation(name), value.x, value.y, value.z, value.w);
 }
 
-void Shader::SetMat4(std::string_view name, const glm::mat4& value)
+void Shader::SetMat4(const std::string_view name, const glm::mat4& value)
 {
 	glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
+void Shader::SetUInt(const std::string_view name, const std::uint32_t value)
+{
+	glUniform1ui(GetUniformLocation(name), value);
+}
+
+void Shader::SetFloat4Array(const std::string_view name, const glm::vec4* values, const std::uint32_t count)
+{
+	glUniform4fv(GetUniformLocation(name), static_cast<int>(count), glm::value_ptr(values[0]));
 }
 
 } // namespace re::render

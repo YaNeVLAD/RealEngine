@@ -45,6 +45,21 @@ public:
 		const std::vector<glm::mat4>& transforms,
 		bool wireframe);
 
+	static void DrawStaticMeshGPUCulled(
+		std::uint32_t batchIndex,
+		StaticMesh* mesh,
+		const std::vector<glm::mat4>& transforms,
+		float boundingRadius,
+		const glm::vec3& cameraPos,
+		bool wireframe);
+
+	static void SetDirectionalLight(
+		const glm::vec3& direction,
+		const Color& color,
+		float ambientIntensity);
+
+	static void ResetCullingCache();
+
 	static void SetViewport(Vector2u size);
 
 	static void SetDepthMask(bool enable);

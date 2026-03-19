@@ -8,9 +8,10 @@ namespace re::ecs
 template <typename TComponent>
 void ComponentArray<TComponent>::AddComponent(const Entity entity, TComponent const& component)
 {
-	RE_ASSERT(!HasComponent(entity),
-		"Component {} already exists for entity ID: {}",
-		NameOf<TComponent>(), entity.Id());
+	if (HasComponent(entity))
+	{
+		return;
+	}
 
 	const auto index = entity.Index();
 

@@ -209,7 +209,8 @@ void Application::SetupScene(Layout& layout) const
 		.WithRead<
 			TransformComponent,
 			DynamicMeshComponent3D,
-			CubeComponent>()
+			StaticMeshComponent3D,
+			detail::DirtyTag<TransformComponent>>()
 		.RunOnMainThread();
 
 	scene
@@ -224,6 +225,7 @@ void Application::SetupScene(Layout& layout) const
 
 	scene
 		.CreateEntity()
+		.Add<detail::DirtyTag<TransformComponent>>()
 		.Add<TransformComponent>({ .rotation = Vector3f{ 0.f, -90.f, 0.f } })
 		.Add<CameraComponent>();
 
