@@ -37,7 +37,7 @@ target_compile_definitions(ReLauncher
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:Dist>>:RE_DIST>"
 )
 
-target_link_libraries(ReLauncher PRIVATE ReRuntime ReRVM)
+target_link_libraries(ReLauncher PRIVATE ReRuntime ReRVM IgniLang)
 
 if (WIN32 AND RENDER_LIBS)
     foreach (lib ${RENDER_LIBS})

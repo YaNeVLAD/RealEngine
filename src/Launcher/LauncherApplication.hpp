@@ -15,7 +15,17 @@
 #include "Lab2/Alchemy/AlchemyLayout.hpp"
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 
+#include <filesystem>
 #include <iostream>
+
+#include <IgniLang/AstBuilder.hpp>
+#include <IgniLang/BuildCst.hpp>
+#include <IgniLang/LexerFactory.hpp>
+
+#include <fsm/cfg.hpp>
+#include <fsm/ll1/table_builder.hpp>
+#include <fsm/ll1/table_io.hpp>
+#include <fsm/string_symbol_generator.hpp>
 
 struct MenuLayout final : re::Layout
 {
@@ -23,6 +33,37 @@ struct MenuLayout final : re::Layout
 		: Layout(app)
 		, m_window(window)
 	{
+		auto lexer = igni::CreateLexer();
+
+		constexpr auto OUT_TABLE_FILE = "assets/out_igni_grammar.txt";
+
+		fsm::ll1::table<std::string> table;
+		if (std::filesystem::exists(OUT_TABLE_FILE))
+		{
+			std::ifstream file(OUT_TABLE_FILE);
+			table = fsm::ll1::io::load_from_text<std::string>(file);
+		}
+		else
+		{
+			std::ifstream file("assets/igni_grammar.txt");
+			auto grammar = fsm::cfg_load(file)
+				| fsm::transforms::remove_left_recursion
+				| fsm::transforms::left_factor;
+
+			table = fsm::ll1::table_builder<std::string>(grammar, "#", "$")
+						.with_collision_strategy(fsm::ll1::collision_strategy::keep_first)
+						.build();
+			std::ofstream out(OUT_TABLE_FILE);
+			fsm::ll1::io::save_to_text(table, out);
+		}
+
+		std::string src = "package main; val _a = true && false; val _b = (a+b)<=a*-b; val _c = true && false || (a>b+c)";
+		lexer.change_source(src);
+		auto cst = igni::BuildCst(table, "Program", lexer);
+
+		cst->Print();
+
+		auto ast = igni::AstBuilder().BuildAnyExpr(cst.get());
 	}
 
 	void OnCreate() override
