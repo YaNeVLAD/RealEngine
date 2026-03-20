@@ -59,8 +59,8 @@ constexpr auto s_VertexShader3D = UR"(
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
 
-    uniform mat4 u_ViewProjection;
-    uniform mat4 u_Model;
+	uniform mat4 u_ModelViewProjection;
+	uniform mat3 u_NormalMatrix;
 
     out vec4 v_Color;
     out vec2 v_TexCoord;
@@ -69,8 +69,9 @@ constexpr auto s_VertexShader3D = UR"(
     void main() {
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-        v_Normal = mat3(transpose(inverse(u_Model))) * a_Normal;
-        gl_Position = u_ViewProjection * u_Model * vec4(a_Position, 1.0);
+
+		v_Normal = u_NormalMatrix * a_Normal;
+		gl_Position = u_ModelViewProjection * vec4(a_Position, 1.0);
     }
 )";
 
@@ -82,21 +83,20 @@ constexpr auto s_FragmentShader3D = UR"(
     in vec2 v_TexCoord;
     in vec3 v_Normal;
 
-    uniform vec4 u_Color;
+    uniform vec4 u_TintColor;
 
-	uniform vec3 u_LightDir;
-	uniform float u_Ambient;
-	uniform vec4 u_LightColor;
+	uniform vec3 u_ReverseLightDir;
+	uniform vec3 u_AmbientColor;
+	uniform vec3 u_DiffuseColor;
 
     void main() {
 		vec3 norm = normalize(v_Normal);
-        vec3 lightDir = normalize(-u_LightDir);
 
-        float diff = max(dot(norm, lightDir), 0.0);
+        float diff = max(dot(norm, u_ReverseLightDir), 0.0);
 
-        vec4 objectColor = v_Color * u_Color;
+        vec4 objectColor = v_Color * u_TintColor;
 
-        vec3 finalLight = (u_Ambient + diff) * u_LightColor.rgb;
+        vec3 finalLight = u_AmbientColor + diff * u_DiffuseColor;
 
         o_Color = vec4(finalLight * objectColor.rgb, objectColor.a);
     }
@@ -112,17 +112,18 @@ constexpr auto s_VertexInstancedShader3D = UR"(
 	layout(location = 5) in mat4 a_InstanceMatrix;
 
     uniform mat4 u_ViewProjection;
-    uniform mat4 u_Model;
 
     out vec4 v_Color;
     out vec2 v_TexCoord;
     out vec3 v_Normal;
 
     void main() {
-        v_Color = a_Color;
+		v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-		v_Normal = mat3(transpose(inverse(a_InstanceMatrix))) * a_Normal;
-		gl_Position = u_ViewProjection * a_InstanceMatrix * vec4(a_Position, 1.0);
+
+        v_Normal = mat3(transpose(inverse(a_InstanceMatrix))) * a_Normal;
+
+        gl_Position = u_ViewProjection * (a_InstanceMatrix * vec4(a_Position, 1.0));
     }
 )";
 
@@ -159,7 +160,6 @@ constexpr auto s_ComputeCullingShader3D = UR"(
         vec3 pos = vec3(model[3]);
 
         // DISTANCE CULLING
-        // Если объект дальше условного горизонта, сразу выбрасываем его!
         if (distance(u_CameraPos, pos) > u_MaxDistance) return;
 
         float maxScale = max(max(length(vec3(model[0])), length(vec3(model[1]))), length(vec3(model[2])));
@@ -202,11 +202,11 @@ constexpr GLenum ToOpenGLType(const re::PrimitiveType type)
 
 struct DrawElementsIndirectCommand
 {
-	uint32_t count; // mesh->GetIndexCount()
-	uint32_t instanceCount; // 0 (заполнит Compute Shader)
-	uint32_t firstIndex; // 0
-	uint32_t baseVertex; // 0
-	uint32_t baseInstance; // 0
+	uint32_t count;
+	uint32_t instanceCount;
+	uint32_t firstIndex;
+	uint32_t baseVertex;
+	uint32_t baseInstance;
 };
 
 void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6])
@@ -225,7 +225,7 @@ void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6])
 
 	for (int i = 0; i < 6; i++)
 	{
-		float length = glm::length(glm::vec3(planes[i]));
+		const float length = glm::length(glm::vec3(planes[i]));
 		planes[i] /= length;
 	}
 }
@@ -262,7 +262,6 @@ void OpenGLRenderAPI::Init()
 	unifiedLayout.Push<Vector2f>("a_TexCoord");
 	unifiedLayout.Push<float>("a_TexIndex");
 
-	// 1. Batching
 	m_BatchVAO = std::make_shared<VertexArray>();
 	m_BatchVBO = std::make_shared<VertexBuffer>(MaxVertices * sizeof(Vertex));
 	m_BatchVAO->AddVertexBuffer(m_BatchVBO, unifiedLayout);
@@ -283,12 +282,10 @@ void OpenGLRenderAPI::Init()
 	m_BatchVAO->SetIndexBuffer(m_BatchEBO);
 	delete[] indices2d;
 
-	// 2. Dynamic 2D
 	m_DynamicVAO = std::make_shared<VertexArray>();
 	m_DynamicVBO = std::make_shared<VertexBuffer>(4096 * sizeof(Vertex));
 	m_DynamicVAO->AddVertexBuffer(m_DynamicVBO, unifiedLayout);
 
-	// 3. Dynamic 3D
 	m_DynamicVAO3D = std::make_shared<VertexArray>();
 	m_DynamicVBO3D = std::make_shared<VertexBuffer>(10000 * sizeof(Vertex));
 	m_DynamicVAO3D->AddVertexBuffer(m_DynamicVBO3D, unifiedLayout);
@@ -474,8 +471,10 @@ void OpenGLRenderAPI::SetCameraPerspective(
 	m_viewProj3D = projection * viewMatrix;
 
 	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_Shader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+	m_Shader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
+
+	m_InstancedShader3D->Bind();
+	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
 }
 
 void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, const bool wireframe)
@@ -485,8 +484,12 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		return;
 	}
 
+	const glm::mat4 mvp = m_viewProj3D * transform;
+	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+
 	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_Model", transform);
+	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
 	const std::size_t eboCountNeeded = indices.size();
@@ -534,8 +537,12 @@ void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transf
 		return;
 	}
 
+	const glm::mat4 mvp = m_viewProj3D * transform;
+	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+
 	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_Model", transform);
+	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
 
 	mesh->GetVAO()->Bind();
 
@@ -566,7 +573,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+	m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	mesh->GetVAO()->Bind();
 
@@ -579,7 +586,6 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 		glEnableVertexAttribArray(5 + i);
 		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
 
-		// МАГИЯ ЗДЕСЬ: Divisor=1 означает "обновлять этот атрибут только при переходе к следующему инстансу (мешу)"
 		glVertexAttribDivisor(5 + i, 1);
 	}
 
@@ -614,30 +620,27 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		return;
 	}
 
-	const std::uint32_t totalInstances = static_cast<uint32_t>(transforms.size());
+	const auto totalInstances = static_cast<uint32_t>(transforms.size());
 
-	// Увеличиваем массив буферов, если пришел новый батч
 	if (batchIndex >= m_cullingBatches.size())
 	{
 		m_cullingBatches.resize(batchIndex + 1);
 	}
-	auto& batch = m_cullingBatches[batchIndex];
+	auto& [inputSsbo, outputSsbo, cmdBuffer] = m_cullingBatches[batchIndex];
 
-	// 1. ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА ДАННЫХ (ТОЛЬКО ОДИН РАЗ!)
-	if (batch.inputSsbo == 0)
+	if (inputSsbo == 0)
 	{
-		glGenBuffers(1, &batch.inputSsbo);
-		glGenBuffers(1, &batch.outputSsbo);
-		glGenBuffers(1, &batch.cmdBuffer);
+		glGenBuffers(1, &inputSsbo);
+		glGenBuffers(1, &outputSsbo);
+		glGenBuffers(1, &cmdBuffer);
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.inputSsbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, inputSsbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), transforms.data(), GL_STATIC_DRAW);
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.outputSsbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputSsbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 	}
 
-	// 2. ОБНУЛЕНИЕ СЧЕТЧИКА (Каждый кадр)
 	DrawElementsIndirectCommand cmd{};
 	cmd.count = mesh->GetIndexCount();
 	cmd.instanceCount = 0;
@@ -645,10 +648,8 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	cmd.baseVertex = 0;
 	cmd.baseInstance = 0;
 
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, batch.cmdBuffer);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, cmdBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(DrawElementsIndirectCommand), &cmd, GL_DYNAMIC_DRAW);
-
-	// 3. НАСТРОЙКА COMPUTE SHADER
 
 	glm::vec4 planes[6];
 	ExtractFrustumPlanes(m_viewProj3D, planes);
@@ -660,24 +661,22 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
 	m_CullingComputeShader->SetFloat("u_MaxDistance", 150.0f);
 
-	// ИСПОЛЬЗУЕМ БУФЕРЫ КОНКРЕТНОГО БАТЧА
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, batch.inputSsbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, batch.outputSsbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, batch.cmdBuffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cmdBuffer);
 
-	GLuint numGroups = (totalInstances + 63) / 64;
+	const GLuint numGroups = (totalInstances + 63) / 64;
 	glDispatchCompute(numGroups, 1, 1);
 
 	glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
-	// 4. ОТРИСОВКА (Early-Z и Color)
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+	m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	mesh->GetVAO()->Bind();
 
-	glBindBuffer(GL_ARRAY_BUFFER, batch.outputSsbo);
+	glBindBuffer(GL_ARRAY_BUFFER, outputSsbo);
 	constexpr std::size_t vec4Size = sizeof(glm::vec4);
 	for (int i = 0; i < 4; i++)
 	{
@@ -694,20 +693,20 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glLineWidth(5.0f);
 	}
 
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, batch.cmdBuffer);
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, cmdBuffer);
 
-	// --- ПРОХОД 1: DEPTH PRE-PASS ---
+	// DEPTH PRE-PASS
 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 	glDepthFunc(GL_LESS);
 	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
 
-	// --- ПРОХОД 2: COLOR PASS ---
+	// COLOR PASS
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDepthFunc(GL_LEQUAL);
 	glDepthMask(GL_FALSE);
 	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
 
-	// --- УБОРКА ---
+	// CLEANUP
 	glDepthFunc(GL_LESS);
 	glDepthMask(GL_TRUE);
 
@@ -735,15 +734,19 @@ void OpenGLRenderAPI::SetDirectionalLight(const glm::vec3& direction, const Colo
 	m_lightColor = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
 	m_lightAmbient = ambientIntensity;
 
+	const auto reverseDir = glm::normalize(-m_lightDir);
+	const auto diffuseCol = glm::vec3(m_lightColor);
+	const auto ambientCol = diffuseCol * m_lightAmbient;
+
 	m_InstancedShader3D->Bind();
-	m_InstancedShader3D->SetFloat3("u_LightDir", m_lightDir);
-	m_InstancedShader3D->SetFloat4("u_LightColor", m_lightColor);
-	m_InstancedShader3D->SetFloat("u_Ambient", m_lightAmbient);
+	m_InstancedShader3D->SetFloat3("u_ReverseLightDir", reverseDir);
+	m_InstancedShader3D->SetFloat3("u_AmbientColor", ambientCol);
+	m_InstancedShader3D->SetFloat3("u_DiffuseColor", diffuseCol);
 
 	m_Shader3D->Bind();
-	m_Shader3D->SetFloat3("u_LightDir", m_lightDir);
-	m_Shader3D->SetFloat4("u_LightColor", m_lightColor);
-	m_Shader3D->SetFloat("u_Ambient", m_lightAmbient);
+	m_Shader3D->SetFloat3("u_ReverseLightDir", reverseDir);
+	m_Shader3D->SetFloat3("u_AmbientColor", ambientCol);
+	m_Shader3D->SetFloat3("u_DiffuseColor", diffuseCol);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

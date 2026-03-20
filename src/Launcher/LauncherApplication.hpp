@@ -69,7 +69,7 @@ struct MenuLayout final : re::Layout
 							{ .position = { posX, posY, posZ },
 								.rotation = { 0.f, 0.f, 0.f },
 								.scale = { 1.0f, 1.0f, 1.0f } })
-						.Add<re::StaticMeshComponent3D>(solidV, solidI, false);
+						.Add<re::StaticMeshComponent3D>(solidMesh, false);
 
 					scene.CreateEntity()
 						.Add<re::detail::TransparentTag>()
@@ -78,7 +78,7 @@ struct MenuLayout final : re::Layout
 							{ .position = { posX, posY, posZ },
 								.rotation = { 0.f, 0.f, 0.f },
 								.scale = { 1.0f, 1.0f, 1.0f } })
-						.Add<re::StaticMeshComponent3D>(wireV, wireI, true);
+						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
 				}
 			}
 		}
