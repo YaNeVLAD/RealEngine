@@ -67,17 +67,16 @@ struct MenuLayout final : re::Layout
 	{
 		auto& scene = GetScene();
 
-		auto cube = scene
-						.CreateEntity()
-						.Add<re::TransformComponent3D>(
-							{ .position = { 0.f, 0.f, -3.f },
-								.rotation = { 45.f, 45.f, 0.f } })
-						.Add<re::CubeComponent>(re::Color::Red);
+		const auto cube = scene
+							  .CreateEntity()
+							  .Add<re::TransformComponent3D>(
+								  { .position = { 0.f, 0.f, -3.f },
+									  .rotation = { 45.f, 45.f, 0.f } })
+							  .Add<re::CubeComponent>(re::Color::Red);
 
 		m_cube = cube.GetEntity();
 
 		using namespace re::rvm;
-		VirtualMachine vm;
 		vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
 			std::cout << ">>> [SCRIPT]: ";
 			for (const auto& arg : args)
@@ -96,44 +95,18 @@ struct MenuLayout final : re::Layout
 			return re::String(input);
 		});
 
-		// if (const auto chunk = m_manager.Get<Chunk>("scripts/fibb_recursion_test.rbc"))
-		// {
-		// 	std::cout << "scripts/fibb_recursion_test.rbc\n";
-		// 	std::cout << "==============================\n";
-		// 	vm.Interpret(*chunk);
-		// 	std::cout << "==============================" << std::endl;
-		// }
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/function_callback_test.rbc"))
-		{
-			std::cout << "scripts/function_callback_test.rbc\n";
-			std::cout << "==============================\n";
-			vm.Interpret(*chunk);
-			std::cout << "==============================" << std::endl;
-		}
-		// if (const auto chunk = m_manager.Get<Chunk>("scripts/user_types_test.rbc"))
-		// {
-		// 	std::cout << "scripts/user_types_test.rbc\n";
-		// 	std::cout << "==============================\n";
-		// 	vm.Interpret(*chunk);
-		// 	std::cout << "==============================" << std::endl;
-		// }
-		// if (const auto chunk = m_manager.Get<Chunk>("scripts/array_tests.rbc"))
-		// {
-		// 	std::cout << "scripts/array_tests.rbc\n";
-		// 	std::cout << "==============================\n";
-		// 	vm.Interpret(*chunk);
-		// 	std::cout << "==============================" << std::endl;
-		// }
-		// if (const auto chunk = m_manager.Get<Chunk>("scripts/closure_tests.rbc"))
-		// {
-		// 	std::cout << "scripts/closure_tests.rbc\n";
-		// 	std::cout << "==============================\n";
-		// 	vm.Interpret(*chunk);
-		// 	std::cout << "==============================" << std::endl;
-		// }
+		RunRVMTest("scripts/fibb_recursion_test.rbc");
+
+		RunRVMTest("scripts/function_callback_test.rbc");
+
+		RunRVMTest("scripts/user_types_test.rbc");
+
+		RunRVMTest("scripts/array_tests.rbc");
+
+		RunRVMTest("scripts/closure_tests.rbc");
 	}
 
-	void OnUpdate(re::core::TimeDelta dt) override
+	void OnUpdate(const re::core::TimeDelta dt) override
 	{
 		auto& scene = GetScene();
 
@@ -143,6 +116,19 @@ struct MenuLayout final : re::Layout
 	}
 
 private:
+	void RunRVMTest(const char* file)
+	{
+		if (const auto chunk = m_manager.Get<re::rvm::Chunk>(file))
+		{
+			std::cout << file << "\n";
+			std::cout << "==============================\n";
+			vm.Interpret(*chunk);
+			std::cout << "==============================" << std::endl;
+		}
+	}
+
+	re::rvm::VirtualMachine vm;
+
 	re::ecs::Entity m_cube = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
 
