@@ -374,6 +374,74 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseMakeClosure = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+		const auto argCountOpt = lexer.next();
+		if (!argCountOpt || argCountOpt->type != TokenType::Integer)
+		{
+			return false;
+		}
+
+		const std::uint8_t upvCount = static_cast<std::uint8_t>(std::stoul(std::string(argCountOpt->lexeme)));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeClosure));
+		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		outChunk.Write(0);
+		outChunk.Write(upvCount);
+
+		return true;
+	};
+
+	auto parseLoadNative = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		const auto argsOpt = lexer.next();
+		if (!funcNameOpt || !argsOpt || funcNameOpt->type != TokenType::String)
+		{
+			return false;
+		}
+
+		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto funcName = String(ProcessEscapeSequences(rawStr));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::LoadNative));
+		outChunk.Write(outChunk.AddConstant(funcName));
+		outChunk.Write(argCount);
+		return true;
+	};
+
+	auto parseGetUpValue = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		outChunk.Write(static_cast<uint8_t>(OpCode::GetUpvalue));
+		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		return true;
+	};
+
+	auto parseSetUpValue = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		outChunk.Write(static_cast<uint8_t>(OpCode::SetUpvalue));
+		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		return true;
+	};
+	auto parseLoadFun = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeClosure));
+		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		outChunk.Write(0);
+		outChunk.Write(0);
+
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -415,9 +483,19 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "INDEX_LOAD"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexLoad)); break;
 		  case "INDEX_STORE"_hs:   outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexStore)); break;
 
+		  case "BOX"_hs:           outChunk.Write(static_cast<uint8_t>(OpCode::Box)); break;
+		  case "UNBOX"_hs:         outChunk.Write(static_cast<uint8_t>(OpCode::Unbox)); break;
+		  case "STORE_BOX"_hs:     outChunk.Write(static_cast<uint8_t>(OpCode::StoreBox)); break;
+
+		  case "GET_UPVALUE"_hs:   parseGetUpValue(); break;
+		  case "SET_UPVALUE"_hs:   parseSetUpValue(); break;
+
+		  case "MAKE_CLOSURE"_hs:  if (!parseMakeClosure()) return false; break;
+		  case "LOAD_NATIVE"_hs:   if (!parseLoadNative()) return false; break;
+
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	   if (!parseNative()) return false; break;
-		  case "LOAD_FUN"_hs:      if (!parseJump(OpCode::Const)) return false; break;
+		  case "LOAD_FUN"_hs:      if (!parseLoadFun()) return false; break;
 		  case "CALL_INDIRECT"_hs: if (!parseCallIndirect()) return false; break;
 			// clang-format on
 		default:

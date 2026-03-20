@@ -130,9 +130,8 @@ bool IsTruthy(Value const& val)
 						  [](const Int v) { return v != 0; },
 						  [](const Double v) { return !IsZero(v); },
 						  [](String const& str) { return !str.ToString().empty(); },
-						  [](InstancePtr const& ptr) { return ptr != nullptr; },
-						  [](TypeInfoPtr const& ptr) { return ptr != nullptr; },
 						  [](ArrayInstancePtr const& ptr) { return ptr && !ptr->elements.empty(); },
+						  []<typename T>(const Ptr<T>& ptr) { return ptr == nullptr; },
 					  },
 		val);
 }

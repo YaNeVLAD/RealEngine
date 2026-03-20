@@ -17,11 +17,13 @@ FUN execute_twice
     GET my_callback          // Кладем адрес на стек
     GET val                  // Кладем аргумент
     CALL_INDIRECT 1          // Магия! Вызываем функцию по адресу
+    POP
 
     // Второй вызов
     GET my_callback
     GET val
     CALL_INDIRECT 1
+    POP
 
     RETURN
 

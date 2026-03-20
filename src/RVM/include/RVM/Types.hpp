@@ -5,6 +5,7 @@
 #include <Core/String.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -14,19 +15,40 @@
 namespace re::rvm
 {
 
+template <typename T>
+using Ptr = std::shared_ptr<T>;
+
 struct TypeInfo;
 struct Instance;
 struct ArrayInstance;
+
+struct Upvalue;
+struct Closure;
+struct NativeObject;
 
 using Null_t = std::monostate;
 using Int = std::int64_t;
 using Double = std::double_t;
 
-using TypeInfoPtr = std::shared_ptr<TypeInfo>;
-using InstancePtr = std::shared_ptr<Instance>;
-using ArrayInstancePtr = std::shared_ptr<ArrayInstance>;
+using TypeInfoPtr = Ptr<TypeInfo>;
+using InstancePtr = Ptr<Instance>;
+using ArrayInstancePtr = Ptr<ArrayInstance>;
 
-using Value = std::variant<Null_t, Int, Double, String, TypeInfoPtr, InstancePtr, ArrayInstancePtr>;
+using UpvaluePtr = Ptr<Upvalue>;
+using ClosurePtr = Ptr<Closure>;
+using NativeObjectPtr = Ptr<NativeObject>;
+
+using Value = std::variant<
+	Null_t,
+	Int,
+	Double,
+	String,
+	TypeInfoPtr,
+	InstancePtr,
+	ArrayInstancePtr,
+	UpvaluePtr,
+	ClosurePtr,
+	NativeObjectPtr>;
 
 constexpr auto Null = Value{ Null_t{} };
 
@@ -52,6 +74,26 @@ struct Instance
 struct ArrayInstance
 {
 	std::vector<Value> elements;
+};
+
+struct Upvalue
+{
+	Value value;
+};
+
+struct Closure
+{
+	std::int64_t ipOffset;
+	std::vector<std::shared_ptr<Upvalue>> captured;
+};
+
+using NativeFn = std::function<Value(std::vector<Value> const&)>;
+
+struct NativeObject
+{
+	String name;
+	std::uint8_t argCount;
+	NativeFn function;
 };
 
 enum class OpCode : std::uint8_t
@@ -88,6 +130,10 @@ enum class OpCode : std::uint8_t
 	// from the stack and stores it in the variable array (m_variables[slot_index] = value).
 	SetLocal,
 
+	// [LoadNative, const_index(name), uint8(argCount)]
+	// Находит нативную функцию в реестре, создает NativeObject и кладет на стек.
+	LoadNative,
+
 	// ---------------------------------------------------------
 	// ARITHMETIC
 	// ---------------------------------------------------------
@@ -121,6 +167,34 @@ enum class OpCode : std::uint8_t
 
 	// Pop B, Pop A -> Push (A == B ? 1 : 0)
 	Equal,
+
+	// ---------------------------------------------------------
+	// CLOSURE AND UPVALUE
+	// ---------------------------------------------------------
+
+	// [MakeClosure, const_index(offset), uint8(upvalue_count)]
+	// Removes the upvalue_count of cells (Upvalue) from the stack, creates a Closure and puts it on the stack.
+	MakeClosure,
+
+	// [Box]
+	// Removes the Value, packs it into an Upvalue, puts it on the stack.
+	Box,
+
+	// [Unbox]
+	// Removes the Upvalue, removes the Value from it, puts it on the stack.
+	Unbox,
+
+	// [StoreBox]
+	// Removes the Value, then removes the Upvalue. Writes the Value inside the Upvalue.
+	StoreBox,
+
+	// [GetUpvalue, uint8(index)]
+	// Takes the value from the current closure and puts it on the stack.
+	GetUpvalue,
+
+	// [SetUpvalue, uint8(index)]
+	// Removes Value and writes it to the captured closure variable.
+	SetUpvalue,
 
 	// ---------------------------------------------------------
 	// CONTROL FLOW

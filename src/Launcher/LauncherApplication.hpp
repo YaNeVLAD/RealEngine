@@ -18,7 +18,6 @@
 #include <filesystem>
 #include <iostream>
 
-#include <IgniLang/AstBuilder.hpp>
 #include <IgniLang/BuildCst.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
@@ -59,11 +58,9 @@ struct MenuLayout final : re::Layout
 
 		std::string src = "package main; val _a = true && false; val _b = (a+b)<=a*-b; val _c = true && false || (a>b+c)";
 		lexer.change_source(src);
-		auto cst = igni::BuildCst(table, "Program", lexer);
+		// auto cst = igni::BuildCst(table, "Program", lexer);
 
-		cst->Print();
-
-		auto ast = igni::AstBuilder().BuildAnyExpr(cst.get());
+		// cst->Print();
 	}
 
 	void OnCreate() override
@@ -99,13 +96,13 @@ struct MenuLayout final : re::Layout
 			return re::String(input);
 		});
 
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/fibb_recursion_test.rbc"))
-		{
-			std::cout << "scripts/fibb_recursion_test.rbc\n";
-			std::cout << "==============================\n";
-			vm.Interpret(*chunk);
-			std::cout << "==============================" << std::endl;
-		}
+		// if (const auto chunk = m_manager.Get<Chunk>("scripts/fibb_recursion_test.rbc"))
+		// {
+		// 	std::cout << "scripts/fibb_recursion_test.rbc\n";
+		// 	std::cout << "==============================\n";
+		// 	vm.Interpret(*chunk);
+		// 	std::cout << "==============================" << std::endl;
+		// }
 		if (const auto chunk = m_manager.Get<Chunk>("scripts/function_callback_test.rbc"))
 		{
 			std::cout << "scripts/function_callback_test.rbc\n";
@@ -113,20 +110,27 @@ struct MenuLayout final : re::Layout
 			vm.Interpret(*chunk);
 			std::cout << "==============================" << std::endl;
 		}
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/user_types_test.rbc"))
-		{
-			std::cout << "scripts/user_types_test.rbc\n";
-			std::cout << "==============================\n";
-			vm.Interpret(*chunk);
-			std::cout << "==============================" << std::endl;
-		}
-		if (const auto chunk = m_manager.Get<Chunk>("scripts/array_tests.rbc"))
-		{
-			std::cout << "scripts/array_tests.rbc\n";
-			std::cout << "==============================\n";
-			vm.Interpret(*chunk);
-			std::cout << "==============================" << std::endl;
-		}
+		// if (const auto chunk = m_manager.Get<Chunk>("scripts/user_types_test.rbc"))
+		// {
+		// 	std::cout << "scripts/user_types_test.rbc\n";
+		// 	std::cout << "==============================\n";
+		// 	vm.Interpret(*chunk);
+		// 	std::cout << "==============================" << std::endl;
+		// }
+		// if (const auto chunk = m_manager.Get<Chunk>("scripts/array_tests.rbc"))
+		// {
+		// 	std::cout << "scripts/array_tests.rbc\n";
+		// 	std::cout << "==============================\n";
+		// 	vm.Interpret(*chunk);
+		// 	std::cout << "==============================" << std::endl;
+		// }
+		// if (const auto chunk = m_manager.Get<Chunk>("scripts/closure_tests.rbc"))
+		// {
+		// 	std::cout << "scripts/closure_tests.rbc\n";
+		// 	std::cout << "==============================\n";
+		// 	vm.Interpret(*chunk);
+		// 	std::cout << "==============================" << std::endl;
+		// }
 	}
 
 	void OnUpdate(re::core::TimeDelta dt) override

@@ -19,13 +19,13 @@ enum class InterpreterResult : std::uint8_t
 	RuntimeError,
 };
 
-using NativeFn = std::function<Value(std::vector<Value> const&)>;
-
 struct CallFrame
 {
 	const std::uint8_t* returnAddress;
 	std::size_t stackBase;
 	std::size_t localsBase;
+
+	ClosurePtr closure;
 };
 
 class RE_RVM_API VirtualMachine

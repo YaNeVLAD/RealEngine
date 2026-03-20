@@ -165,19 +165,43 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::CallIndirect: {
 			std::uint8_t argCount = READ_BYTE();
 
-			// Stack: [FuncAddr] [Arg1][Arg2]
-			Value offsetVal = m_stack[m_stack.size() - 1 - argCount];
-			auto offset = std::get<std::int64_t>(offsetVal);
+			Value callableVal = m_stack[m_stack.size() - 1 - argCount];
+			if (auto* closurePtr = std::get_if<std::shared_ptr<Closure>>(&callableVal))
+			{
+				auto closure = *closurePtr;
+				CallFrame frame;
+				frame.returnAddress = m_ip;
+				frame.stackBase = m_stack.size() - argCount - 1;
+				frame.localsBase = m_currentLocalsBase;
+				frame.closure = closure;
 
-			CallFrame frame{};
-			frame.returnAddress = m_ip;
+				m_callStack.push_back(frame);
+				m_currentLocalsBase = m_variables.size();
+				m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+			}
+			else if (auto* nativePtr = std::get_if<std::shared_ptr<NativeObject>>(&callableVal))
+			{
+				auto native = *nativePtr;
+				if (native->argCount != argCount)
+				{
+					return InterpreterResult::RuntimeError;
+				}
 
-			frame.stackBase = m_stack.size() - argCount - 1;
-			frame.localsBase = m_currentLocalsBase;
+				std::vector<Value> args(argCount);
+				for (int i = argCount - 1; i >= 0; --i)
+				{
+					args[i] = Pop();
+				}
+				Pop();
 
-			m_callStack.push_back(frame);
-			m_currentLocalsBase = m_variables.size();
-			m_ip = m_chunk->GetCode().data() + offset;
+				Value result = native->function(args);
+				Push(result);
+			}
+			else
+			{
+				std::cerr << "Runtime Error: Attempt to call a non-callable object\n";
+				return InterpreterResult::RuntimeError;
+			}
 			break;
 		}
 
@@ -337,6 +361,95 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::Box: {
+			Value val = Pop();
+			auto upvalue = std::make_shared<Upvalue>();
+			upvalue->value = std::move(val);
+			Push(upvalue);
+			break;
+		}
+
+		case OpCode::Unbox: {
+			Value boxVal = Pop();
+			if (auto* ptr = std::get_if<UpvaluePtr>(&boxVal))
+			{
+				Push((*ptr)->value);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
+		case OpCode::StoreBox: {
+			Value val = Pop();
+			Value boxVal = Pop();
+			if (auto* ptr = std::get_if<UpvaluePtr>(&boxVal))
+			{
+				(*ptr)->value = std::move(val);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
+		case OpCode::GetUpvalue: {
+			std::uint8_t index = READ_BYTE();
+			const auto& closure = m_callStack.back().closure;
+			Push(closure->captured[index]->value);
+			break;
+		}
+
+		case OpCode::SetUpvalue: {
+			std::uint8_t index = READ_BYTE();
+			Value val = Pop();
+			const auto& closure = m_callStack.back().closure;
+			closure->captured[index]->value = std::move(val);
+			break;
+		}
+
+		case OpCode::MakeClosure: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+			std::uint8_t upvalueCount = READ_BYTE();
+
+			auto closure = std::make_shared<Closure>();
+			closure->ipOffset = offset;
+			closure->captured.resize(upvalueCount);
+
+			for (int i = upvalueCount - 1; i >= 0; --i)
+			{
+				Value val = Pop();
+				closure->captured[i] = std::get<std::shared_ptr<Upvalue>>(val);
+			}
+
+			Push(closure);
+			break;
+		}
+
+		case OpCode::LoadNative: {
+			Value nameVal = READ_CONSTANT();
+			auto funcName = std::get<String>(nameVal);
+			std::uint8_t argCount = READ_BYTE();
+
+			auto it = m_natives.find(funcName.Hash());
+			if (it == m_natives.end())
+			{
+				throw std::runtime_error("Unknown native function " + funcName.ToString());
+			}
+
+			auto nativeObj = std::make_shared<NativeObject>();
+			nativeObj->name = funcName;
+			nativeObj->argCount = argCount;
+			nativeObj->function = it->second;
+
+			Push(nativeObj);
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())
@@ -346,7 +459,7 @@ InterpreterResult VirtualMachine::Run()
 
 			if (!m_callStack.empty())
 			{
-				const auto& [returnAddress, stackBase, localsBase] = m_callStack.back();
+				const auto& [returnAddress, stackBase, localsBase, _] = m_callStack.back();
 				m_ip = returnAddress;
 
 				m_stack.resize(stackBase);
