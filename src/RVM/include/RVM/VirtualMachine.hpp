@@ -49,6 +49,15 @@ private:
 	template <typename T>
 	using HashMap = std::unordered_map<Hash_t, T>;
 
+	TypeInfoPtr GetTypeInfo(Value const& value) const;
+	void InitBuiltinTypes();
+
+	TypeInfoPtr m_typeInt;
+	TypeInfoPtr m_typeDouble;
+	TypeInfoPtr m_typeString;
+	TypeInfoPtr m_typeArray;
+	TypeInfoPtr m_typeNull;
+
 	const Chunk* m_chunk = nullptr;
 	const std::uint8_t* m_ip = nullptr;
 

@@ -38,8 +38,8 @@ namespace igni
     TOKEN(Neq,          R"(!=)",               "!=") \
     TOKEN(LessEq,       R"(<=)",               "<=") \
     TOKEN(GreaterEq,    R"(>=)",               ">=") \
-    TOKEN(And,          R"(&&)",               "&&") \
-    TOKEN(Or,           R"(\|\|)",             "||") \
+    TOKEN(And,          R"(&&)",               "and") \
+    TOKEN(Or,           R"(\|\|)",             "or") \
     TOKEN(Range,        R"(\.\.)",             "..") \
     TOKEN(QuestionDot,  R"(\?\.)",             "?.") \
     /* Single char operations */ \
@@ -76,7 +76,7 @@ enum class TokenType
 #undef DEFINE_ENUM
 };
 
-inline std::string ToTerminalString(const TokenType type)
+inline re::String ToTerminalString(const TokenType type)
 {
 	switch (type)
 	{

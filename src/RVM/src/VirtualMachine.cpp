@@ -1,3 +1,5 @@
+#include "Core/Utils.hpp"
+
 #include <RVM/VirtualMachine.hpp>
 
 #include <Core/Assert.hpp>
@@ -223,25 +225,67 @@ InterpreterResult VirtualMachine::Run()
 
 		case OpCode::GetProperty: {
 			Value propNameVal = READ_CONSTANT();
-			auto propNameHash = std::get<String>(propNameVal).Hash();
+			auto propName = std::get<String>(propNameVal);
+			auto propHash = propName.Hash();
 
 			Value objVal = Pop();
-			if (!std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			auto typeInfo = GetTypeInfo(objVal);
+
+			if (!typeInfo)
 			{
-				std::cerr << "Runtime Error: Only instances have properties.\n";
+				std::cerr << "Runtime Error: Value has no type info\n";
 				return InterpreterResult::RuntimeError;
 			}
 
-			auto instance = std::get<std::shared_ptr<Instance>>(objVal);
-			auto it = instance->typeInfo->fieldIndexes.find(propNameHash);
-
-			if (it == instance->typeInfo->fieldIndexes.end())
+			if (auto it = typeInfo->methods.find(propHash); it != typeInfo->methods.end())
 			{
-				std::cerr << "Runtime Error: Undefined property.\n";
-				return InterpreterResult::RuntimeError;
+				Push(it->second);
+				break;
 			}
 
-			Push(instance->fields[it->second]);
+			if (auto* instPtr = std::get_if<InstancePtr>(&objVal))
+			{
+				auto& instance = *instPtr;
+				auto it = instance->typeInfo->fieldIndexes.find(propHash);
+				if (it != instance->typeInfo->fieldIndexes.end())
+				{
+					Push(instance->fields[it->second]);
+				}
+				else
+				{
+					std::cerr << "Runtime Error: Undefined property '" << propName.ToString() << "'\n";
+					return InterpreterResult::RuntimeError;
+				}
+			}
+			else if (auto* arrPtr = std::get_if<ArrayInstancePtr>(&objVal))
+			{
+				if (propHash == "length"_hs)
+				{
+					Push(static_cast<Int>((*arrPtr)->elements.size()));
+				}
+				else
+				{
+					std::cerr << "Runtime Error: Undefined property on Array\n";
+					return InterpreterResult::RuntimeError;
+				}
+			}
+			else if (auto* strPtr = std::get_if<String>(&objVal))
+			{
+				if (propHash == "length"_hs)
+				{
+					Push(static_cast<Int>(strPtr->Length()));
+				}
+				else
+				{
+					std::cerr << "Runtime Error: Undefined property on String\n";
+					return InterpreterResult::RuntimeError;
+				}
+			}
+			else
+			{
+				std::cerr << "Runtime Error: Primitive types have no fields\n";
+				return InterpreterResult::RuntimeError;
+			}
 			break;
 		}
 
@@ -252,13 +296,13 @@ InterpreterResult VirtualMachine::Run()
 			Value valueToSet = Pop();
 			Value objVal = Pop();
 
-			if (!std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			if (!std::holds_alternative<InstancePtr>(objVal))
 			{
 				std::cerr << "Runtime Error: Only instances have properties.\n";
 				return InterpreterResult::RuntimeError;
 			}
 
-			auto instance = std::get<std::shared_ptr<Instance>>(objVal);
+			auto instance = std::get<InstancePtr>(objVal);
 			auto it = instance->typeInfo->fieldIndexes.find(propNameHash);
 
 			if (it == instance->typeInfo->fieldIndexes.end())
@@ -272,14 +316,13 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 		case OpCode::TypeOf: {
-			if (Value objVal = Pop(); std::holds_alternative<std::shared_ptr<Instance>>(objVal))
+			Value objVal = Pop();
+			if (auto typeInfo = GetTypeInfo(objVal))
 			{
-				auto instance = std::get<std::shared_ptr<Instance>>(objVal);
-				Push(instance->typeInfo);
+				Push(typeInfo);
 			}
 			else
-			{
-				// TODO: Implement base TypeInfo for predefined VM types
+			{ // Undefined type
 				Push(Null);
 			}
 			break;
@@ -322,7 +365,8 @@ InterpreterResult VirtualMachine::Run()
 			auto size = static_cast<std::size_t>(std::get<std::int64_t>(sizeVal));
 
 			auto arr = std::make_shared<ArrayInstance>();
-			arr->elements.resize(size, std::monostate{}); // Заполняем null-ами
+			arr->typeInfo = m_typeArray;
+			arr->elements.resize(size, std::monostate{});
 
 			Push(arr);
 			break;
@@ -497,6 +541,32 @@ Value VirtualMachine::Pop()
 void VirtualMachine::Push(Value const& value)
 {
 	m_stack.push_back(value);
+}
+
+TypeInfoPtr VirtualMachine::GetTypeInfo(Value const& value) const
+{
+	return std::visit(utils::overloaded{
+						  [this](Null_t) { return m_typeNull; },
+						  [this](const Int) { return m_typeInt; },
+						  [this](const Double) { return m_typeDouble; },
+						  [this](String const&) { return m_typeString; }, [](InstancePtr const& inst) { return inst ? inst->typeInfo : nullptr; }, [](std::shared_ptr<ArrayInstance> const& arr) { return arr ? arr->typeInfo : nullptr; },
+						  [](const auto&) -> std::shared_ptr<TypeInfo> { return nullptr; } },
+		value);
+}
+
+void VirtualMachine::InitBuiltinTypes()
+{
+	m_typeInt = std::make_shared<TypeInfo>(String("Int"));
+	m_typeDouble = std::make_shared<TypeInfo>(String("Double"));
+	m_typeString = std::make_shared<TypeInfo>(String("String"));
+	m_typeNull = std::make_shared<TypeInfo>(String("Null"));
+	m_typeArray = std::make_shared<TypeInfo>(String("Array"));
+
+	// Мы также сохраняем их в глобальный реестр типов, чтобы к ним можно было обратиться
+	m_types[m_typeInt->name.Hash()] = m_typeInt;
+	m_types[m_typeDouble->name.Hash()] = m_typeDouble;
+	m_types[m_typeString->name.Hash()] = m_typeString;
+	m_types[m_typeArray->name.Hash()] = m_typeArray;
 }
 
 } // namespace re::rvm

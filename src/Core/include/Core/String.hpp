@@ -13,8 +13,11 @@ namespace re
 class RE_CORE_API String
 {
 public:
-	using Iterator = std::u32string::iterator;
-	using ConstIterator = std::u32string::const_iterator;
+	using value_type = std::u32string::value_type;
+	using size_type = std::u32string::size_type;
+
+	using iterator = std::u32string::iterator;
+	using const_iterator = std::u32string::const_iterator;
 
 	static constexpr std::size_t NPos = std::u32string::npos;
 
@@ -29,6 +32,7 @@ public:
 	String& operator=(String&&) = default;
 
 	String(const char32_t* u32Str);
+	String(const char32_t* u32Str, std::size_t size);
 	String(std::u32string u32Str);
 	String(char32_t ch);
 
@@ -54,11 +58,11 @@ public:
 
 	[[nodiscard]] const char32_t* Data() const;
 
-	[[nodiscard]] Iterator begin();
-	[[nodiscard]] ConstIterator begin() const;
+	[[nodiscard]] iterator begin();
+	[[nodiscard]] const_iterator begin() const;
 
-	[[nodiscard]] Iterator end();
-	[[nodiscard]] ConstIterator end() const;
+	[[nodiscard]] iterator end();
+	[[nodiscard]] const_iterator end() const;
 
 	[[nodiscard]] std::size_t Length() const;
 	[[nodiscard]] std::size_t Size() const;
@@ -93,6 +97,10 @@ public:
 
 	String& operator+=(const String& other);
 
+	String& operator+=(const char32_t* raw_ptr);
+
+	String& operator+=(char32_t ch);
+
 	auto operator<=>(const String&) const = default;
 
 private:
@@ -107,5 +115,9 @@ private:
 };
 
 [[nodiscard]] RE_CORE_API String operator+(const String& left, const String& right);
+
+[[nodiscard]] RE_CORE_API String operator+(const String& left, const char32_t* right);
+
+[[nodiscard]] RE_CORE_API String operator+(const String& left, char32_t right);
 
 } // namespace re

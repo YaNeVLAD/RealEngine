@@ -58,6 +58,8 @@ struct TypeInfo
 	std::unordered_map<Hash_t, std::size_t> fieldIndexes;
 	std::vector<String> fieldNames;
 
+	std::unordered_map<Hash_t, Value> methods;
+
 	explicit TypeInfo(String name);
 
 	void AddField(String const& fieldName);
@@ -73,6 +75,7 @@ struct Instance
 
 struct ArrayInstance
 {
+	TypeInfoPtr typeInfo;
 	std::vector<Value> elements;
 };
 
@@ -84,7 +87,7 @@ struct Upvalue
 struct Closure
 {
 	std::int64_t ipOffset;
-	std::vector<std::shared_ptr<Upvalue>> captured;
+	std::vector<UpvaluePtr> captured;
 };
 
 using NativeFn = std::function<Value(std::vector<Value> const&)>;

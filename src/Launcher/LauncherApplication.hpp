@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IgniLang/TextCompiler.hpp"
+
 #include <Runtime/Application.hpp>
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
@@ -14,17 +16,112 @@
 
 #include "Lab2/Alchemy/AlchemyLayout.hpp"
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
+#include "RVM/Assembler.hpp"
 
 #include <filesystem>
 #include <iostream>
 
-#include <IgniLang/BuildCst.hpp>
+#include <IgniLang/AstConverter.hpp>
+#include <IgniLang/CstBuilder.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
 #include <fsm/cfg.hpp>
-#include <fsm/ll1/table_builder.hpp>
-#include <fsm/ll1/table_io.hpp>
+#include <fsm/slr/parser.hpp>
+#include <fsm/slr/table.hpp>
+#include <fsm/slr/table_builder.hpp>
 #include <fsm/string_symbol_generator.hpp>
+
+struct CompilerLayout final : re::Layout
+{
+	explicit CompilerLayout(re::Application& app)
+		: Layout(app)
+	{
+		using namespace re::rvm;
+		m_vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
+			std::cout << ">>> [SCRIPT]: ";
+			for (const auto& arg : args)
+			{
+				std::cout << arg << " ";
+			}
+			std::cout << "\n";
+
+			return Null;
+		});
+
+		m_vm.RegisterNative("read", [](std::vector<Value> const&) -> Value {
+			std::string input;
+			std::getline(std::cin, input);
+
+			return re::String(input);
+		});
+
+		RunRVMTest("scripts/function_test.rbc");
+
+		RunRVMTest("scripts/fibb_recursion_test.rbc");
+
+		RunRVMTest("scripts/function_callback_test.rbc");
+
+		RunRVMTest("scripts/user_types_test.rbc");
+
+		RunRVMTest("scripts/array_tests.rbc");
+
+		RunRVMTest("scripts/closure_tests.rbc");
+	}
+
+	void OnCreate() override
+	{
+		std::ifstream file("assets/igni_grammar.txt");
+		auto grammar = fsm::cfg_load<re::String>(file);
+
+		fsm::slr::table_builder builder(grammar);
+		auto table = builder
+						 .with_epsilon("<EPSILON>")
+						 .with_end_marker("<EOF>")
+						 .build(fsm::slr::collision_policy::prefer_shift);
+
+		std::string src = R"(
+			package main;
+
+			fun main() {
+				for (iter in 1..5) {
+				    print("Iteration:", iter);
+				}
+			}
+		)";
+		auto tokens = igni::CreateLexer(src).tokenize();
+
+		fsm::slr::parser parser(table, "<EPSILON>");
+		auto cstRoot = igni::CstBuilder(parser, "<EPSILON>").Build(tokens);
+
+		auto astRoot = igni::AstConverter().Convert(cstRoot.get());
+
+		igni::compiler::TextCompiler textCompiler;
+		auto asmCode = textCompiler.Compile(astRoot.get());
+
+		std::cout << asmCode << std::endl;
+
+		re::rvm::Chunk chunk;
+		if (re::rvm::Assembler assembler; assembler.Compile(asmCode, chunk))
+		{
+			m_vm.Interpret(chunk);
+		}
+	}
+
+private:
+	re::AssetManager m_manager;
+	re::rvm::VirtualMachine m_vm;
+
+	void RunRVMTest(const char* file)
+	{
+		if (const auto chunk = m_manager.Get<re::rvm::Chunk>(file))
+		{
+			std::cout << file << "\n";
+			std::cout << "==============================\n";
+			m_vm.Interpret(*chunk);
+			std::cout << "==============================" << std::endl;
+		}
+	}
+};
 
 struct MenuLayout final : re::Layout
 {
@@ -32,35 +129,6 @@ struct MenuLayout final : re::Layout
 		: Layout(app)
 		, m_window(window)
 	{
-		auto lexer = igni::CreateLexer();
-
-		constexpr auto OUT_TABLE_FILE = "assets/out_igni_grammar.txt";
-
-		fsm::ll1::table<std::string> table;
-		if (std::filesystem::exists(OUT_TABLE_FILE))
-		{
-			std::ifstream file(OUT_TABLE_FILE);
-			table = fsm::ll1::io::load_from_text<std::string>(file);
-		}
-		else
-		{
-			std::ifstream file("assets/igni_grammar.txt");
-			auto grammar = fsm::cfg_load(file)
-				| fsm::transforms::remove_left_recursion
-				| fsm::transforms::left_factor;
-
-			table = fsm::ll1::table_builder<std::string>(grammar, "#", "$")
-						.with_collision_strategy(fsm::ll1::collision_strategy::keep_first)
-						.build();
-			std::ofstream out(OUT_TABLE_FILE);
-			fsm::ll1::io::save_to_text(table, out);
-		}
-
-		std::string src = "package main; val _a = true && false; val _b = (a+b)<=a*-b; val _c = true && false || (a>b+c)";
-		lexer.change_source(src);
-		// auto cst = igni::BuildCst(table, "Program", lexer);
-
-		// cst->Print();
 	}
 
 	void OnCreate() override
@@ -75,35 +143,6 @@ struct MenuLayout final : re::Layout
 							  .Add<re::CubeComponent>(re::Color::Red);
 
 		m_cube = cube.GetEntity();
-
-		using namespace re::rvm;
-		vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
-			std::cout << ">>> [SCRIPT]: ";
-			for (const auto& arg : args)
-			{
-				std::cout << arg << " ";
-			}
-			std::cout << "\n";
-
-			return Null;
-		});
-
-		vm.RegisterNative("read", [](std::vector<Value> const&) -> Value {
-			std::string input;
-			std::getline(std::cin, input);
-
-			return re::String(input);
-		});
-
-		RunRVMTest("scripts/fibb_recursion_test.rbc");
-
-		RunRVMTest("scripts/function_callback_test.rbc");
-
-		RunRVMTest("scripts/user_types_test.rbc");
-
-		RunRVMTest("scripts/array_tests.rbc");
-
-		RunRVMTest("scripts/closure_tests.rbc");
 	}
 
 	void OnUpdate(const re::core::TimeDelta dt) override
@@ -116,17 +155,6 @@ struct MenuLayout final : re::Layout
 	}
 
 private:
-	void RunRVMTest(const char* file)
-	{
-		if (const auto chunk = m_manager.Get<re::rvm::Chunk>(file))
-		{
-			std::cout << file << "\n";
-			std::cout << "==============================\n";
-			vm.Interpret(*chunk);
-			std::cout << "==============================" << std::endl;
-		}
-	}
-
 	re::rvm::VirtualMachine vm;
 
 	re::ecs::Entity m_cube = re::ecs::Entity::INVALID_ID;
@@ -145,6 +173,7 @@ public:
 
 	void OnStart() override
 	{
+		AddLayout<CompilerLayout>();
 		AddLayout<MenuLayout>(Window());
 		AddLayout<LettersLayout>();
 		AddLayout<HouseLayout>(Window());
@@ -153,7 +182,7 @@ public:
 		AddLayout<AlchemyLayout>(Window());
 		AddLayout<AsteroidsLayout>(Window());
 
-		SwitchLayout<MenuLayout>();
+		SwitchLayout<CompilerLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override

@@ -20,12 +20,12 @@ FUN main
     RETURN
 
 FUN math_magic
-    SET x
     SET y
+    SET x
 
     GET x
     GET y
-    MUL
+    SUB
 
     CONST 100
     ADD

@@ -12,6 +12,11 @@ String::String(const char32_t* u32Str)
 {
 }
 
+String::String(const char32_t* u32Str, const std::size_t size)
+	: m_string(u32Str ? u32Str : U"", size)
+{
+}
+
 String::String(std::u32string u32Str)
 	: m_string(std::move(u32Str))
 {
@@ -94,22 +99,22 @@ const char32_t* String::Data() const
 	return m_string.data();
 }
 
-String::Iterator String::begin()
+String::iterator String::begin()
 {
 	return m_string.begin();
 }
 
-String::ConstIterator String::begin() const
+String::const_iterator String::begin() const
 {
 	return m_string.begin();
 }
 
-String::Iterator String::end()
+String::iterator String::end()
 {
 	return m_string.end();
 }
 
-String::ConstIterator String::end() const
+String::const_iterator String::end() const
 {
 	return m_string.end();
 }
@@ -245,6 +250,21 @@ Hash_t String::Hash() const
 String& String::operator+=(const String& other)
 {
 	m_string += other.m_string;
+
+	return *this;
+}
+
+String& String::operator+=(const char32_t* raw_ptr)
+{
+	m_string += raw_ptr;
+
+	return *this;
+}
+
+String& String::operator+=(const char32_t ch)
+{
+	m_string += ch;
+
 	return *this;
 }
 
@@ -395,6 +415,19 @@ std::wstring String::EncodeWide(std::u32string const& u32Str)
 String operator+(const String& left, const String& right)
 {
 	auto out(left);
+
+	return out += right;
+}
+
+String operator+(const String& left, const char32_t* right)
+{
+	return left + String(right);
+}
+
+String operator+(const String& left, const char32_t right)
+{
+	String out(left);
+
 	return out += right;
 }
 
