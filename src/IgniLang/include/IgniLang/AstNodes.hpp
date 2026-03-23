@@ -24,6 +24,59 @@ protected:
 	}
 };
 
+struct TypeNode : Node
+{
+	bool isNullable = false;
+};
+
+struct SimpleTypeNode final : TypeNode
+{
+	re::String name; // Int, Float, Array
+	std::vector<std::unique_ptr<TypeNode>> typeArgs; // <T1, T2>
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "SimpleType [name: '" << name.ToString() << "'"
+				  << (isNullable ? ", nullable" : "") << "]\n";
+		for (const auto& arg : typeArgs)
+		{
+			if (arg)
+				arg->Print(depth + 1);
+		}
+	}
+};
+
+struct FunctionTypeNode final : TypeNode
+{
+	std::vector<std::unique_ptr<TypeNode>> paramTypes;
+	std::unique_ptr<TypeNode> returnType;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "FunctionType" << (isNullable ? " [nullable]" : "") << "\n";
+
+		PrintIndent(depth + 1);
+		std::cout << "Params:\n";
+		for (const auto& pt : paramTypes)
+			if (pt)
+				pt->Print(depth + 2);
+
+		PrintIndent(depth + 1);
+		std::cout << "Return:\n";
+		if (returnType)
+			returnType->Print(depth + 2);
+	}
+};
+
+// --- Обновляем параметры функции ---
+struct Parameter
+{
+	re::String name;
+	std::unique_ptr<TypeNode> type;
+};
+
 // --- Выражения ---
 struct Expr : Node
 {
@@ -93,6 +146,22 @@ struct CallExpr final : Expr
 					arg->Print(depth + 2);
 			}
 		}
+	}
+};
+
+struct AssignExpr final : Expr
+{
+	std::unique_ptr<Expr> target; // Кому присваиваем (IdentifierExpr или IndexExpr)
+	std::unique_ptr<Expr> value; // Что присваиваем
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "AssignExpr\n";
+		if (target)
+			target->Print(depth + 1);
+		if (value)
+			value->Print(depth + 1);
 	}
 };
 
@@ -233,6 +302,7 @@ struct ValDecl final : Decl
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
+	std::unique_ptr<TypeNode> type;
 
 	void Print(int depth = 0) const override
 	{
@@ -240,6 +310,9 @@ struct ValDecl final : Decl
 		std::cout << "ValDecl [name: '" << name.ToString() << "']\n";
 		if (initializer)
 			initializer->Print(depth + 1);
+
+		if (type)
+			type->Print(depth + 1);
 	}
 };
 
@@ -247,6 +320,7 @@ struct VarDecl final : Decl
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
+	std::unique_ptr<TypeNode> type;
 
 	void Print(int depth = 0) const override
 	{
@@ -254,14 +328,18 @@ struct VarDecl final : Decl
 		std::cout << "VarDecl [name: '" << name.ToString() << "']\n";
 		if (initializer)
 			initializer->Print(depth + 1);
+
+		if (type)
+			type->Print(depth + 1);
 	}
 };
 
 struct FunDecl final : Decl
 {
 	re::String name;
-	std::vector<re::String> parameters;
+	std::vector<Parameter> parameters;
 	std::unique_ptr<Block> body;
+	std::unique_ptr<TypeNode> returnType;
 
 	void Print(int depth = 0) const override
 	{
@@ -269,9 +347,17 @@ struct FunDecl final : Decl
 		std::cout << "FunDecl [name: '" << name.ToString() << "']\n";
 		PrintIndent(depth + 1);
 		std::cout << "Params: ";
-		for (const auto& p : parameters)
-			std::cout << p.ToString() << " ";
+		for (const auto& [name, type] : parameters)
+		{
+			std::cout << name.ToString() << " ";
+
+			if (type)
+				type->Print(depth);
+		}
 		std::cout << "\n";
+
+		if (returnType)
+			returnType->Print(depth + 1);
 
 		if (body)
 			body->Print(depth + 1);

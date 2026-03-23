@@ -64,15 +64,26 @@ private:
 				? std::unique_ptr<ast::Decl>(std::make_unique<ast::ValDecl>())
 				: std::unique_ptr<ast::Decl>(std::make_unique<ast::VarDecl>());
 
+			// ValDecl -> val ident OptColonType = Expr ;
+			// Индексы:   [0]  [1]       [2]    [3]  [4] [5]
+			const auto& optColon = actualDecl->children[2];
 			if (const auto val = dynamic_cast<ast::ValDecl*>(decl.get()))
 			{
 				val->name = actualDecl->children[1]->token->lexeme;
 				val->initializer = ConvertExpr(actualDecl->children[4].get());
+				if (optColon->children.size() == 2) // : Type
+				{
+					val->type = ConvertType(optColon->children[1].get());
+				}
 			}
 			else if (const auto var = dynamic_cast<ast::VarDecl*>(decl.get()))
 			{
 				var->name = actualDecl->children[1]->token->lexeme;
 				var->initializer = ConvertExpr(actualDecl->children[4].get());
+				if (optColon->children.size() == 2) // : Type
+				{
+					val->type = ConvertType(optColon->children[1].get());
+				}
 			}
 			return decl;
 		}
@@ -91,6 +102,12 @@ private:
 			else
 			{
 				funDecl->name = funNameNode->children.back()->token->lexeme;
+			}
+
+			const auto& optColon = actualDecl->children[6];
+			if (optColon->children.size() == 2)
+			{
+				funDecl->returnType = ConvertType(optColon->children[1].get());
 			}
 
 			// 2. Параметры [5]
@@ -189,7 +206,7 @@ private:
 			const auto& stmtNode = listNode->children[1];
 			const auto& actualStmt = stmtNode->children[0];
 
-			if (actualStmt->symbol == "ValDecl" || actualStmt->symbol == "VarDecl")
+			if (actualStmt->symbol == "ValDecl" || actualStmt->symbol == "VarDecl" || actualStmt->symbol == "FunDecl")
 			{
 				// Statement -> VarDecl (у него нет обертки TopLevelDecl, парсим напрямую)
 				outStmts.push_back(ConvertActualDecl(actualStmt.get()));
@@ -284,6 +301,15 @@ private:
 			return ConvertExpr(exprNode->children[0].get());
 		}
 
+		// Правило: Expr -> LogOrExpr = Expr
+		if (exprNode->children.size() == 3 && exprNode->children[1]->symbol == "=")
+		{
+			auto assign = std::make_unique<ast::AssignExpr>();
+			assign->target = ConvertExpr(exprNode->children[0].get());
+			assign->value = ConvertExpr(exprNode->children[2].get());
+			return assign;
+		}
+
 		// 3. Бинарные операции
 		if (exprNode->children.size() == 3)
 		{
@@ -349,23 +375,84 @@ private:
 		return stmt;
 	}
 
-	static void ExtractParameters(const CstNode* optFormPars, std::vector<re::String>& outParams)
+	static std::unique_ptr<ast::TypeNode> ConvertType(const CstNode* typeNode)
+	{
+		if (!typeNode)
+			return nullptr;
+
+		// Type -> ident OptTypeArgs OptQuestion
+		if (typeNode->children[0]->symbol == "ident")
+		{
+			auto simpleType = std::make_unique<ast::SimpleTypeNode>();
+			simpleType->name = typeNode->children[0]->token->lexeme;
+
+			// Парсим OptTypeArgs [1]
+			const auto& optTypeArgs = typeNode->children[1];
+			if (optTypeArgs->children.size() == 3) // < TypeList >
+			{
+				ExtractTypeList(optTypeArgs->children[1].get(), simpleType->typeArgs);
+			}
+
+			// Парсим OptQuestion [2]
+			simpleType->isNullable = (typeNode->children[2]->children.size() > 0 && typeNode->children[2]->children[0]->symbol == "?");
+
+			return simpleType;
+		}
+		// Type -> ( OptTypeList ) -> Type OptQuestion
+		//         [0]    [1]     [2][3] [4]     [5]
+		else if (typeNode->children[0]->symbol == "(")
+		{
+			auto funType = std::make_unique<ast::FunctionTypeNode>();
+
+			const auto& optTypeList = typeNode->children[1];
+			if (optTypeList->children.size() == 1 && optTypeList->children[0]->symbol != "e")
+			{
+				ExtractTypeList(optTypeList->children[0].get(), funType->paramTypes);
+			}
+
+			funType->returnType = ConvertType(typeNode->children[4].get());
+			funType->isNullable = (!typeNode->children[5]->children.empty() && typeNode->children[5]->children[0]->symbol == "?");
+
+			return funType;
+		}
+
+		return nullptr;
+	}
+
+	// Вспомогательный метод для списков типов (TypeList -> TypeList , Type | Type)
+	static void ExtractTypeList(const CstNode* typeList, std::vector<std::unique_ptr<ast::TypeNode>>& outTypes)
+	{
+		if (typeList->children.size() == 3)
+		{
+			ExtractTypeList(typeList->children[0].get(), outTypes);
+			outTypes.push_back(ConvertType(typeList->children[2].get()));
+		}
+		else if (typeList->children.size() == 1)
+		{
+			outTypes.push_back(ConvertType(typeList->children[0].get()));
+		}
+	}
+
+	static void ExtractParameters(const CstNode* optFormPars, std::vector<ast::Parameter>& outParams)
 	{
 		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol == "e")
 			return;
 		FlattenFormPars(optFormPars->children[0].get(), outParams);
 	}
 
-	static void FlattenFormPars(const CstNode* formPars, std::vector<re::String>& outParams)
+	static void FlattenFormPars(const CstNode* formPars, std::vector<ast::Parameter>& outParams)
 	{
 		if (formPars->children.size() == 3)
-		{ // FormPars , FormPar
+		{
 			FlattenFormPars(formPars->children[0].get(), outParams);
-			outParams.push_back(formPars->children[2]->children[0]->token->lexeme); // FormPar -> ident : Type
+			// FormPar -> ident : Type
+			const auto& parNode = formPars->children[2];
+			outParams.push_back({ parNode->children[0]->token->lexeme, ConvertType(parNode->children[2].get()) });
 		}
 		else if (formPars->children.size() == 1)
-		{ // FormPar
-			outParams.push_back(formPars->children[0]->children[0]->token->lexeme);
+		{
+			const auto& parNode = formPars->children[0];
+			outParams.push_back({ parNode->children[0]->token->lexeme, ConvertType(parNode->children[2].get()) });
 		}
 	}
 
