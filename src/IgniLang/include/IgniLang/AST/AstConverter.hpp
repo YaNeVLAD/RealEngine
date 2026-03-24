@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/HashedString.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/CST/CstNode.hpp>
 
@@ -9,12 +10,14 @@
 namespace igni
 {
 
+using namespace re::literals;
+
 class AstConverter
 {
 public:
 	std::unique_ptr<ast::Program> Convert(const CstNode* root)
 	{
-		if (!root || root->symbol != "Program")
+		if (!root || root->symbol.Hashed() != "Program"_hs)
 		{
 			return nullptr;
 		}
@@ -24,7 +27,7 @@ public:
 		const auto& optPkg = root->children[0];
 		const auto& decls = root->children[2]; // TopLevelDeclList
 
-		if (!optPkg->children.empty() && optPkg->children[0]->symbol != "e")
+		if (!optPkg->children.empty() && optPkg->children[0]->symbol.Hashed() != "e"_hs)
 		{
 			program->packageName = optPkg->children[0]->children[1]->children[0]->token->lexeme;
 		}
@@ -36,7 +39,7 @@ public:
 private:
 	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
-		if (listNode->symbol == "e" || listNode->children.empty())
+		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -45,7 +48,6 @@ private:
 		{
 			FlattenTopLevelDecls(listNode->children[0].get(), outStmts);
 
-			// Вызываем правильный метод для TopLevelDecl
 			if (auto decl = ConvertTopLevelDecl(listNode->children[1].get()))
 			{
 				outStmts.push_back(std::move(decl));
@@ -57,26 +59,27 @@ private:
 	{
 		const auto& declNode = topLevelDecl->children[2]; // TopLevelDecl -> AnnotationList OptVisibility Decl
 		const auto& actualDecl = declNode->children[0]; // Decl -> ValDecl | FunDecl
+
 		return ConvertActualDecl(actualDecl.get());
 	}
 
 	std::unique_ptr<ast::Decl> ConvertActualDecl(const CstNode* actualDecl)
 	{
-		// --- VAL / VAR ---
-		if (actualDecl->symbol == "ValDecl" || actualDecl->symbol == "VarDecl")
+		switch (actualDecl->symbol.Hashed())
 		{
-			auto decl = actualDecl->symbol == "ValDecl"
+		case "ValDecl"_hs:
+		case "VarDecl"_hs: {
+			auto decl = actualDecl->symbol.Hashed() == "ValDecl"_hs
 				? std::unique_ptr<ast::Decl>(std::make_unique<ast::ValDecl>())
 				: std::unique_ptr<ast::Decl>(std::make_unique<ast::VarDecl>());
 
-			// ValDecl -> val ident OptColonType = Expr ;
-			// Индексы:   [0]  [1]       [2]    [3]  [4] [5]
 			const auto& optColon = actualDecl->children[2];
+
 			if (const auto val = dynamic_cast<ast::ValDecl*>(decl.get()))
 			{
 				val->name = actualDecl->children[1]->token->lexeme;
 				val->initializer = ConvertExpr(actualDecl->children[4].get());
-				if (optColon->children.size() == 2) // : Type
+				if (optColon->children.size() == 2)
 				{
 					val->type = ConvertType(optColon->children[1].get());
 				}
@@ -85,17 +88,14 @@ private:
 			{
 				var->name = actualDecl->children[1]->token->lexeme;
 				var->initializer = ConvertExpr(actualDecl->children[4].get());
-				if (optColon->children.size() == 2) // : Type
+				if (optColon->children.size() == 2)
 				{
 					var->type = ConvertType(optColon->children[1].get());
 				}
 			}
 			return decl;
 		}
-
-		// --- FUN ---
-		if (actualDecl->symbol == "FunDecl")
-		{
+		case "FunDecl"_hs: {
 			auto funDecl = std::make_unique<ast::FunDecl>();
 
 			// 1. Имя функции [2]
@@ -116,75 +116,17 @@ private:
 			// 2. Параметры [5]
 			ExtractParameters(actualDecl->children[5].get(), funDecl->parameters);
 
-			// 3. Тело функции (ИСПРАВЛЕНО: ТЕПЕРЬ ИНДЕКС 8)
-			if (const auto& funBody = actualDecl->children[8]; funBody->children[0]->symbol == "Block")
+			// 3. Тело функции [8]
+			if (const auto& funBody = actualDecl->children[8]; funBody->children[0]->symbol.Hashed() == "Block"_hs)
 			{
 				funDecl->body = ConvertBlock(funBody->children[0].get());
 			}
+
 			return funDecl;
 		}
-
-		return nullptr;
-	}
-
-	std::unique_ptr<ast::Decl> ConvertDecl(const CstNode* topLevelDecl)
-	{
-		const auto& declNode = topLevelDecl->children[2];
-		const auto& actualDecl = declNode->children[0];
-
-		// --- VAL / VAR ---
-		if (actualDecl->symbol == "ValDecl" || actualDecl->symbol == "VarDecl")
-		{
-			auto decl = actualDecl->symbol == "ValDecl"
-				? std::unique_ptr<ast::Decl>(std::make_unique<ast::ValDecl>())
-				: std::unique_ptr<ast::Decl>(std::make_unique<ast::VarDecl>());
-
-			if (const auto val = dynamic_cast<ast::ValDecl*>(decl.get()))
-			{
-				val->name = actualDecl->children[1]->token->lexeme;
-				val->initializer = ConvertExpr(actualDecl->children[4].get());
-			}
-			else if (const auto var = dynamic_cast<ast::VarDecl*>(decl.get()))
-			{
-				var->name = actualDecl->children[1]->token->lexeme;
-				var->initializer = ConvertExpr(actualDecl->children[4].get());
-			}
-			return decl;
+		default:
+			return nullptr;
 		}
-
-		// --- FUN ---
-		if (actualDecl->symbol == "FunDecl")
-		{
-			auto funDecl = std::make_unique<ast::FunDecl>();
-
-			// FunDecl -> OptFunMod fun FunName OptTypeParams ( OptFormPars ) OptColonType FunBody
-			// Индексы:    [0]     [1]    [2]       [3]      [4]      [5]       [6]        [7]
-
-			// 1. Извлекаем имя функции из узла FunName [2]
-			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
-			{
-				// FunName -> ident
-				funDecl->name = funNameNode->children[0]->token->lexeme;
-			}
-			else
-			{
-				// FunName -> Type . ident | Type ? . ident
-				// Имя всегда лежит в самом последнем ребенке
-				funDecl->name = funNameNode->children.back()->token->lexeme;
-			}
-
-			// 2. Извлекаем параметры из OptFormPars [5]
-			ExtractParameters(actualDecl->children[5].get(), funDecl->parameters);
-
-			// 3. Извлекаем тело из FunBody [7]
-			if (const auto& funBody = actualDecl->children[7]; funBody->children[0]->symbol == "Block")
-			{
-				funDecl->body = ConvertBlock(funBody->children[0].get());
-			}
-			return funDecl;
-		}
-
-		return nullptr;
 	}
 
 	std::unique_ptr<ast::Block> ConvertBlock(const CstNode* blockNode)
@@ -196,7 +138,7 @@ private:
 
 	void FlattenStatements(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
-		if (listNode->symbol == "e" || listNode->children.empty())
+		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -208,42 +150,43 @@ private:
 			const auto& stmtNode = listNode->children[1];
 			const auto& actualStmt = stmtNode->children[0];
 
-			if (actualStmt->symbol == "ValDecl" || actualStmt->symbol == "VarDecl" || actualStmt->symbol == "FunDecl")
+			switch (actualStmt->symbol.Hashed())
 			{
-				// Statement -> VarDecl (у него нет обертки TopLevelDecl, парсим напрямую)
+			case "ValDecl"_hs:
+			case "VarDecl"_hs:
+			case "FunDecl"_hs:
 				outStmts.push_back(ConvertActualDecl(actualStmt.get()));
-			}
-			else if (actualStmt->symbol == "return")
-			{
+				break;
+			case "return"_hs: {
 				auto ret = std::make_unique<ast::ReturnStmt>();
-				if (stmtNode->children[1]->symbol != "e")
+				if (stmtNode->children[1]->symbol.Hashed() != "e"_hs)
 				{
 					ret->expr = ConvertExpr(stmtNode->children[1]->children[0].get());
 				}
 				outStmts.push_back(std::move(ret));
+				break;
 			}
-			else if (actualStmt->symbol == "Expr")
-			{
+			case "Expr"_hs: {
 				auto exprStmt = std::make_unique<ast::ExprStmt>();
 				exprStmt->expr = ConvertExpr(actualStmt.get());
 				outStmts.push_back(std::move(exprStmt));
+				break;
 			}
-			else if (actualStmt->symbol == "IfStmt")
-			{
+			case "IfStmt"_hs:
 				outStmts.push_back(ConvertIfStmt(actualStmt.get()));
-			}
-			else if (actualStmt->symbol == "WhileStmt")
-			{
+				break;
+			case "WhileStmt"_hs:
 				outStmts.push_back(ConvertWhileStmt(actualStmt.get()));
-			}
-			else if (actualStmt->symbol == "ForStmt")
-			{
+				break;
+			case "ForStmt"_hs:
 				outStmts.push_back(ConvertForStmt(actualStmt.get()));
+				break;
+			default:
+				throw std::invalid_argument("Invalid statement");
 			}
 		}
 	}
 
-	// Универсальный конвертер для каскада выражений
 	static std::unique_ptr<ast::Expr> ConvertExpr(const CstNode* exprNode)
 	{
 		if (!exprNode)
@@ -251,96 +194,96 @@ private:
 			return nullptr;
 		}
 
-		// 1. СНАЧАЛА проверяем конкретные типы узлов
-		if (exprNode->symbol == "Designator")
+		switch (exprNode->symbol.Hashed())
 		{
-			// Правило: Designator -> ident
+		case "Designator"_hs: {
 			if (exprNode->children.size() == 1)
 			{
 				auto id = std::make_unique<ast::IdentifierExpr>();
 				id->name = exprNode->children[0]->token->lexeme;
 				return id;
 			}
-			// Правило: Designator -> Designator ( OptActPars )
-			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol == "(")
+			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "("_hs)
 			{
 				auto call = std::make_unique<ast::CallExpr>();
-				call->callee = ConvertExpr(exprNode->children[0].get()); // Что вызываем
-
-				// Извлекаем аргументы
+				call->callee = ConvertExpr(exprNode->children[0].get());
 				ExtractArguments(exprNode->children[2].get(), call->arguments);
 				return call;
 			}
+			break;
 		}
-
-		// --- 2. Обработка PrimaryExpr ---
-		if (exprNode->symbol == "PrimaryExpr")
-		{
+		case "PrimaryExpr"_hs: {
 			const auto& child = exprNode->children[0];
-
-			if (child->symbol == "true" || child->symbol == "false" || child->symbol == "intCon" || child->symbol == "floatCon" || child->symbol == "stringCon")
+			switch (child->symbol.Hashed())
 			{
+			case "true"_hs:
+			case "false"_hs:
+			case "intCon"_hs:
+			case "floatCon"_hs:
+			case "stringCon"_hs: {
 				auto lit = std::make_unique<ast::LiteralExpr>();
 				lit->token = *child->token;
 				return lit;
 			}
-			if (child->symbol == "(")
-			{
+			case "("_hs:
 				return ConvertExpr(exprNode->children[1].get());
-			}
-			if (child->symbol == "Designator")
-			{
-				// ПЕРЕДАЕМ УПРАВЛЕНИЕ БЛОКУ ВЫШЕ!
+			case "Designator"_hs:
 				return ConvertExpr(child.get());
+			default:
+				throw std::invalid_argument("Invalid primary expression");
 			}
 		}
+		case "PostfixExpr"_hs: {
+			if (exprNode->children.size() == 2)
+			{
+				auto unExpr = std::make_unique<ast::UnaryExpr>();
+				unExpr->operand = ConvertExpr(exprNode->children[0].get());
+				unExpr->op = exprNode->children[1]->symbol;
+				unExpr->isPostfix = true;
+				return unExpr;
+			}
+			break;
+		}
+		case "UnaryExpr"_hs: {
+			if (exprNode->children.size() == 2)
+			{
+				auto unExpr = std::make_unique<ast::UnaryExpr>();
+				unExpr->op = exprNode->children[0]->symbol;
+				unExpr->operand = ConvertExpr(exprNode->children[1].get());
+				unExpr->isPostfix = false;
+				return unExpr;
+			}
+			break;
+		}
+		default:
+			break;
+		}
 
-		// 2. ЗАТЕМ делаем "проброс" для транзитных узлов (AddExpr -> MulExpr и т.д.)
 		if (exprNode->children.size() == 1)
 		{
-			if (exprNode->children[0]->symbol == "e")
+			if (exprNode->children[0]->symbol.Hashed() == "e"_hs)
 			{
 				return nullptr;
 			}
 			return ConvertExpr(exprNode->children[0].get());
 		}
 
-		// Правило: Expr -> LogOrExpr = Expr
-		if (exprNode->children.size() == 3 && exprNode->children[1]->symbol == "=")
-		{
-			auto assign = std::make_unique<ast::AssignExpr>();
-			assign->target = ConvertExpr(exprNode->children[0].get());
-			assign->value = ConvertExpr(exprNode->children[2].get());
-			return assign;
-		}
-
-		// 3. Бинарные операции
 		if (exprNode->children.size() == 3)
 		{
+			if (exprNode->children[1]->symbol.Hashed() == "="_hs)
+			{
+				auto assign = std::make_unique<ast::AssignExpr>();
+				assign->target = ConvertExpr(exprNode->children[0].get());
+				assign->value = ConvertExpr(exprNode->children[2].get());
+				return assign;
+			}
+
 			auto binExpr = std::make_unique<ast::BinaryExpr>();
 			binExpr->left = ConvertExpr(exprNode->children[0].get());
-			binExpr->op = exprNode->children[1]->symbol; // Оператор всегда посередине
+			binExpr->op = exprNode->children[1]->symbol;
 			binExpr->right = ConvertExpr(exprNode->children[2].get());
+
 			return binExpr;
-		}
-
-		if (exprNode->symbol == "PostfixExpr" && exprNode->children.size() == 2)
-		{
-			auto unExpr = std::make_unique<ast::UnaryExpr>();
-			unExpr->operand = ConvertExpr(exprNode->children[0].get()); // Designator
-			unExpr->op = exprNode->children[1]->symbol; // ++ или --
-			unExpr->isPostfix = true;
-			return unExpr;
-		}
-
-		// 2. Обработка UnaryExpr (Префиксы: -x, !x, ++x)
-		if (exprNode->symbol == "UnaryExpr" && exprNode->children.size() == 2)
-		{
-			auto unExpr = std::make_unique<ast::UnaryExpr>();
-			unExpr->op = exprNode->children[0]->symbol; // -, !, ~, ++, --
-			unExpr->operand = ConvertExpr(exprNode->children[1].get()); // UnaryExpr / Designator
-			unExpr->isPostfix = false;
-			return unExpr;
 		}
 
 		std::cerr << "Unhandled Expr node: " << exprNode->symbol << "\n";
@@ -350,25 +293,22 @@ private:
 	std::unique_ptr<ast::IfStmt> ConvertIfStmt(const CstNode* ifNode)
 	{
 		auto ifStmt = std::make_unique<ast::IfStmt>();
-
-		// if ( Expr ) Block OptElse
-		// [0] [1] [2] [3]  [4]    [5]
 		ifStmt->condition = ConvertExpr(ifNode->children[2].get());
+		ifStmt->thenBranch = ConvertBlock(ifNode->children[4].get());
 
-		const auto& blockNode = ifNode->children[4];
-		ifStmt->thenBranch = ConvertBlock(blockNode.get());
-
-		// Разбираем OptElse
-		if (const auto& optElse = ifNode->children[5]; optElse->children.size() == 2) // else ElseBody
+		if (const auto& optElse = ifNode->children[5]; optElse->children.size() == 2)
 		{
 			const auto& elseBody = optElse->children[1]->children[0];
-			if (elseBody->symbol == "IfStmt")
+			switch (elseBody->symbol.Hashed())
 			{
-				ifStmt->elseBranch = ConvertIfStmt(elseBody.get()); // else if
-			}
-			else if (elseBody->symbol == "Block")
-			{
-				ifStmt->elseBranch = ConvertBlock(elseBody.get()); // else { ... }
+			case "IfStmt"_hs:
+				ifStmt->elseBranch = ConvertIfStmt(elseBody.get());
+				break;
+			case "Block"_hs:
+				ifStmt->elseBranch = ConvertBlock(elseBody.get());
+				break;
+			default:
+				throw std::runtime_error("Unhandled IfStmt");
 			}
 		}
 
@@ -378,22 +318,20 @@ private:
 	std::unique_ptr<ast::WhileStmt> ConvertWhileStmt(const CstNode* whileNode)
 	{
 		auto stmt = std::make_unique<ast::WhileStmt>();
-		// while ( Expr ) Block
-		// [0]   [1] [2] [3] [4]
 		stmt->condition = ConvertExpr(whileNode->children[2].get());
 		stmt->body = ConvertBlock(whileNode->children[4].get());
+
 		return stmt;
 	}
 
 	std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
 		auto stmt = std::make_unique<ast::ForStmt>();
-		// for ( ident in Expr .. Expr ) Block
-		// [0] [1] [2]  [3] [4] [5] [6] [7] [8]
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
 		stmt->startExpr = ConvertExpr(forNode->children[4].get());
 		stmt->endExpr = ConvertExpr(forNode->children[6].get());
 		stmt->body = ConvertBlock(forNode->children[8].get());
+
 		return stmt;
 	}
 
@@ -404,45 +342,35 @@ private:
 			return nullptr;
 		}
 
-		// Type -> ident OptTypeArgs OptQuestion
-		if (typeNode->children[0]->symbol == "ident")
+		switch (typeNode->children[0]->symbol.Hashed())
 		{
+		case "ident"_hs: {
 			auto simpleType = std::make_unique<ast::SimpleTypeNode>();
 			simpleType->name = typeNode->children[0]->token->lexeme;
 
-			// Парсим OptTypeArgs [1]
-			if (const auto& optTypeArgs = typeNode->children[1]; optTypeArgs->children.size() == 3) // < TypeList >
-			{
+			if (const auto& optTypeArgs = typeNode->children[1]; optTypeArgs->children.size() == 3)
 				ExtractTypeList(optTypeArgs->children[1].get(), simpleType->typeArgs);
-			}
 
-			// Парсим OptQuestion [2]
-			simpleType->isNullable = (typeNode->children[2]->children.size() > 0 && typeNode->children[2]->children[0]->symbol == "?");
-
+			simpleType->isNullable = (!typeNode->children[2]->children.empty() && typeNode->children[2]->children[0]->symbol.Hashed() == "?"_hs);
 			return simpleType;
 		}
-		// Type -> ( OptTypeList ) -> Type OptQuestion
-		//         [0]    [1]     [2][3] [4]     [5]
-		if (typeNode->children[0]->symbol == "(")
-		{
+		case "("_hs: {
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
 
-			const auto& optTypeList = typeNode->children[1];
-			if (optTypeList->children.size() == 1 && optTypeList->children[0]->symbol != "e")
+			if (const auto& optTypeList = typeNode->children[1]; optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "e"_hs)
 			{
 				ExtractTypeList(optTypeList->children[0].get(), funType->paramTypes);
 			}
 
 			funType->returnType = ConvertType(typeNode->children[4].get());
-			funType->isNullable = (!typeNode->children[5]->children.empty() && typeNode->children[5]->children[0]->symbol == "?");
-
+			funType->isNullable = (!typeNode->children[5]->children.empty() && typeNode->children[5]->children[0]->symbol.Hashed() == "?"_hs);
 			return funType;
 		}
-
-		return nullptr;
+		default:
+			throw std::runtime_error("Unhandled Type node: " + typeNode->symbol.ToString());
+		}
 	}
 
-	// Вспомогательный метод для списков типов (TypeList -> TypeList , Type | Type)
 	static void ExtractTypeList(const CstNode* typeList, std::vector<std::unique_ptr<ast::TypeNode>>& outTypes)
 	{
 		if (typeList->children.size() == 3)
@@ -458,7 +386,7 @@ private:
 
 	static void ExtractParameters(const CstNode* optFormPars, std::vector<ast::Parameter>& outParams)
 	{
-		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol == "e")
+		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol.Hashed() == "e"_hs)
 		{
 			return;
 		}
@@ -470,7 +398,6 @@ private:
 		if (formPars->children.size() == 3)
 		{
 			FlattenFormPars(formPars->children[0].get(), outParams);
-			// FormPar -> ident : Type
 			const auto& parNode = formPars->children[2];
 			outParams.push_back({ parNode->children[0]->token->lexeme, ConvertType(parNode->children[2].get()) });
 		}
@@ -483,7 +410,7 @@ private:
 
 	static void ExtractArguments(const CstNode* optActPars, std::vector<std::unique_ptr<ast::Expr>>& outArgs)
 	{
-		if (optActPars->children.size() == 1 && optActPars->children[0]->symbol == "e")
+		if (optActPars->children.size() == 1 && optActPars->children[0]->symbol.Hashed() == "e"_hs)
 		{
 			return;
 		}

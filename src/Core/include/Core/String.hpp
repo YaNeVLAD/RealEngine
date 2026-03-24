@@ -1,10 +1,13 @@
 #pragma once
 
+#include "HashedString.hpp"
+
 #include <Core/Export.hpp>
 
 #include <Core/Hash.hpp>
 
 #include <compare>
+#include <ostream>
 #include <string>
 
 namespace re
@@ -95,6 +98,8 @@ public:
 
 	[[nodiscard]] Hash_t Hash() const;
 
+	[[nodiscard]] HashedString Hashed() const;
+
 	String& operator+=(const String& other);
 
 	String& operator+=(const char32_t* raw_ptr);
@@ -119,5 +124,9 @@ private:
 [[nodiscard]] RE_CORE_API String operator+(const String& left, const char32_t* right);
 
 [[nodiscard]] RE_CORE_API String operator+(const String& left, char32_t right);
+
+RE_CORE_API std::ostream& operator<<(std::ostream& os, const String& str);
+
+RE_CORE_API std::wostream& operator<<(std::wostream& os, const String& str);
 
 } // namespace re

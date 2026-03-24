@@ -247,6 +247,11 @@ Hash_t String::Hash() const
 	return HashedU32String::Value(m_string);
 }
 
+HashedString String::Hashed() const
+{
+	return HashedString(ToString());
+}
+
 String& String::operator+=(const String& other)
 {
 	m_string += other.m_string;
@@ -429,6 +434,16 @@ String operator+(const String& left, const char32_t right)
 	String out(left);
 
 	return out += right;
+}
+
+std::ostream& operator<<(std::ostream& os, const String& str)
+{
+	return os << str.ToString();
+}
+
+std::wostream& operator<<(std::wostream& os, const String& str)
+{
+	return os << str.ToWString();
 }
 
 } // namespace re

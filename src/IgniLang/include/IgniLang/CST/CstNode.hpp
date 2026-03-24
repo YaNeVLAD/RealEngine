@@ -14,13 +14,13 @@ namespace igni
 
 struct CstNode
 {
-	std::string symbol;
+	re::String symbol;
 
 	std::optional<fsm::token<TokenType>> token;
 
 	std::vector<std::unique_ptr<CstNode>> children;
 
-	explicit CstNode(std::string symbol)
+	explicit CstNode(re::String symbol)
 		: symbol(std::move(symbol))
 	{
 	}
