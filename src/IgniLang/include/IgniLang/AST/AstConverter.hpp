@@ -24,19 +24,56 @@ public:
 
 		auto program = std::make_unique<ast::Program>();
 
+		// Program -> OptPackageDecl ImportDeclList TopLevelDeclList
 		const auto& optPkg = root->children[0];
-		const auto& decls = root->children[2]; // TopLevelDeclList
+		const auto& importsList = root->children[1];
+		const auto& decls = root->children[2];
 
 		if (!optPkg->children.empty() && optPkg->children[0]->symbol.Hashed() != "e"_hs)
 		{
-			program->packageName = optPkg->children[0]->children[1]->children[0]->token->lexeme;
+			// PackageDecl -> package PackagePath ;
+			program->packageName = ExtractPathString(optPkg->children[0]->children[1].get());
 		}
 
+		ExtractImports(importsList.get(), program->imports);
+
 		FlattenTopLevelDecls(decls.get(), program->statements);
+
 		return program;
 	}
 
 private:
+	static std::string ExtractPathString(const CstNode* pathNode)
+	{
+		if (pathNode->children.size() == 1)
+		{
+			return std::string(pathNode->children[0]->token->lexeme);
+		}
+
+		return ExtractPathString(pathNode->children[0].get()) + "." + std::string(pathNode->children[2]->token->lexeme);
+	}
+
+	void ExtractImports(const CstNode* listNode, std::vector<std::unique_ptr<ast::ImportDecl>>& outImports)
+	{
+		// ImportDeclList -> ImportDeclList ImportDecl | \e
+		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		{
+			return;
+		}
+
+		ExtractImports(listNode->children[0].get(), outImports);
+
+		const auto& declNode = listNode->children[1]; // ImportDecl -> import ImportPath OptDotStar ;
+		auto importDecl = std::make_unique<ast::ImportDecl>();
+
+		importDecl->path = ExtractPathString(declNode->children[1].get());
+
+		const auto& optStar = declNode->children[2];
+		importDecl->isStar = (!optStar->children.empty() && optStar->children[0]->symbol.Hashed() == "."_hs);
+
+		outImports.push_back(std::move(importDecl));
+	}
+
 	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
 		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
@@ -219,6 +256,13 @@ private:
 				idx->array = ConvertExpr(exprNode->children[0].get()); // Что индексируем
 				idx->index = ConvertExpr(exprNode->children[2].get()); // Сам индекс
 				return idx;
+			}
+			if (exprNode->children.size() == 3 && exprNode->children[1]->symbol.Hashed() == "."_hs)
+			{
+				auto memberAccess = std::make_unique<ast::MemberAccessExpr>();
+				memberAccess->object = ConvertExpr(exprNode->children[0].get()); // то, что слева от точки
+				memberAccess->member = exprNode->children[2]->token->lexeme; // идентификатор справа
+				return memberAccess;
 			}
 			break;
 		}

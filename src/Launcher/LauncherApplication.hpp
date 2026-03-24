@@ -157,24 +157,21 @@ private:
 	{
 		using namespace re::rvm;
 		using namespace re::literals;
-		// 1. Создаем TypeInfo так же, как это сделал бы компилятор
 		auto typeArray = std::make_shared<TypeInfo>("Array");
 
-		// 2. Подшиваем C++ реализацию для метода get
 		auto getMethod = std::make_shared<NativeObject>();
 		getMethod->name = "get";
-		getMethod->argCount = 1; // 1 аргумент (индекс). 'self' передается скрыто.
+		getMethod->argCount = 1;
 		getMethod->function = [](const std::vector<Value>& args) -> Value {
-			const auto arr = std::get<ArrayInstancePtr>(args[0]); // args[0] это всегда self!
-			const auto index = std::get<Int>(args[1]); // args[1] это index
+			const auto arr = std::get<ArrayInstancePtr>(args[0]);
+			const auto index = std::get<Int>(args[1]);
 			return arr->elements[index];
 		};
 		typeArray->methods["get"_hs] = getMethod;
 
-		// 3. Подшиваем set
 		auto setMethod = std::make_shared<NativeObject>();
 		setMethod->name = "set";
-		setMethod->argCount = 2; // индекс, значение
+		setMethod->argCount = 2;
 		setMethod->function = [](const std::vector<Value>& args) -> Value {
 			const auto arr = std::get<ArrayInstancePtr>(args[0]);
 			const auto index = std::get<Int>(args[1]);
@@ -183,10 +180,7 @@ private:
 		};
 		typeArray->methods["set"_hs] = setMethod;
 
-		// 4. Регистрируем тип в ВМ
 		vm.RegisterType(typeArray);
-
-		// Регистрируем глобальный make_array
 		vm.RegisterNative("make_array", [typeArray](const std::vector<Value>& args) -> Value {
 			auto arr = std::make_shared<ArrayInstance>();
 			arr->typeInfo = typeArray;

@@ -43,6 +43,16 @@ public:
 		}
 	}
 
+	void Visit(const ast::MemberAccessExpr* node) override
+	{
+		if (node->object)
+		{
+			node->object->Accept(*this);
+		}
+
+		m_out << "GET_PROPERTY \"" << node->member << "\"\n";
+	}
+
 	void Visit(const ast::IndexExpr* node) override
 	{
 		if (node->array)

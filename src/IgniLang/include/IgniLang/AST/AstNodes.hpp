@@ -29,6 +29,8 @@ namespace igni::ast
 	V(VarDecl)          \
 	V(ValDecl)          \
 	V(FunDecl)          \
+	V(ImportDecl)       \
+	V(MemberAccessExpr) \
 	V(Program)
 
 #define FORWARD_DECLARE_AST_NODE(Name) struct Name;
@@ -264,6 +266,22 @@ struct UnaryExpr final : Visitable<UnaryExpr, Expr>
 		if (operand)
 		{
 			operand->Print(depth + 1);
+		}
+	}
+};
+
+struct MemberAccessExpr final : Visitable<MemberAccessExpr, Expr>
+{
+	std::unique_ptr<Expr> object;
+	re::String member;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "MemberAccessExpr [member: '" << member.ToString() << "']\n";
+		if (object)
+		{
+			object->Print(depth + 1);
 		}
 	}
 };
@@ -504,17 +522,42 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 };
 
 // ==========================================
+// IMPORTS
+// ==========================================
+struct ImportDecl final : Visitable<ImportDecl>
+{
+	re::String path;
+	bool isStar = false;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "ImportDecl [path: '" << path.ToString() << "'"
+				  << (isStar ? ".*" : "") << "]\n";
+	}
+};
+
+// ==========================================
 // PROGRAM ROOT
 // ==========================================
 struct Program final : Visitable<Program>
 {
 	re::String packageName;
+	std::vector<std::unique_ptr<ImportDecl>> imports;
 	std::vector<std::unique_ptr<Statement>> statements;
 
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
 		std::cout << "Program [package: '" << packageName.ToString() << "']\n";
+		for (const auto& import : imports)
+		{
+			if (import)
+			{
+				import->Print(depth + 1);
+			}
+		}
+
 		for (const auto& stmt : statements)
 		{
 			if (stmt)
