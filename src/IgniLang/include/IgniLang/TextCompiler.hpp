@@ -88,33 +88,41 @@ private:
 	// ==========================================
 	// БЛОК 1: СЕМАНТИЧЕСКИЙ АНАЛИЗАТОР ЗАМЫКАНИЙ
 	// ==========================================
-	void ScanExpr(const ast::Expr* expr, const std::unordered_set<std::string>& localScope, std::unordered_set<std::string>& freeVars)
+	static void ScanExpr(const ast::Expr* expr, const std::unordered_set<std::string>& localScope, std::unordered_set<std::string>& freeVars)
 	{
 		if (!expr)
-			return;
-
-		if (auto id = dynamic_cast<const ast::IdentifierExpr*>(expr))
 		{
-			if (!localScope.count(id->name.ToString()))
+			return;
+		}
+
+		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(expr))
+		{
+			if (!localScope.contains(id->name.ToString()))
 			{
 				freeVars.insert(id->name.ToString());
 			}
 		}
-		else if (auto bin = dynamic_cast<const ast::BinaryExpr*>(expr))
+		else if (const auto bin = dynamic_cast<const ast::BinaryExpr*>(expr))
 		{
 			ScanExpr(bin->left.get(), localScope, freeVars);
 			ScanExpr(bin->right.get(), localScope, freeVars);
 		}
-		else if (auto call = dynamic_cast<const ast::CallExpr*>(expr))
+		else if (const auto call = dynamic_cast<const ast::CallExpr*>(expr))
 		{
 			ScanExpr(call->callee.get(), localScope, freeVars);
 			for (const auto& arg : call->arguments)
+			{
 				ScanExpr(arg.get(), localScope, freeVars);
+			}
 		}
-		else if (auto asgn = dynamic_cast<const ast::AssignExpr*>(expr))
+		else if (const auto assign = dynamic_cast<const ast::AssignExpr*>(expr))
 		{
-			ScanExpr(asgn->target.get(), localScope, freeVars);
-			ScanExpr(asgn->value.get(), localScope, freeVars);
+			ScanExpr(assign->target.get(), localScope, freeVars);
+			ScanExpr(assign->value.get(), localScope, freeVars);
+		}
+		else if (const auto un = dynamic_cast<const ast::UnaryExpr*>(expr))
+		{
+			ScanExpr(un->operand.get(), localScope, freeVars);
 		}
 		// else if (auto idx = dynamic_cast<const ast::IndexExpr*>(expr))
 		// {
@@ -126,27 +134,29 @@ private:
 	void ScanStatement(const ast::Statement* stmt, std::unordered_set<std::string>& localScope, std::unordered_set<std::string>& freeVars, const std::unordered_set<std::string>& globalScope, const ast::FunDecl* currentFunContext)
 	{
 		if (!stmt)
+		{
 			return;
+		}
 
-		if (auto v = dynamic_cast<const ast::ValDecl*>(stmt))
+		if (const auto val = dynamic_cast<const ast::ValDecl*>(stmt))
 		{
-			ScanExpr(v->initializer.get(), localScope, freeVars);
-			localScope.insert(v->name.ToString());
+			ScanExpr(val->initializer.get(), localScope, freeVars);
+			localScope.insert(val->name.ToString());
 		}
-		else if (auto v = dynamic_cast<const ast::VarDecl*>(stmt))
+		else if (const auto var = dynamic_cast<const ast::VarDecl*>(stmt))
 		{
-			ScanExpr(v->initializer.get(), localScope, freeVars);
-			localScope.insert(v->name.ToString());
+			ScanExpr(var->initializer.get(), localScope, freeVars);
+			localScope.insert(var->name.ToString());
 		}
-		else if (auto e = dynamic_cast<const ast::ExprStmt*>(stmt))
+		else if (const auto e = dynamic_cast<const ast::ExprStmt*>(stmt))
 		{
 			ScanExpr(e->expr.get(), localScope, freeVars);
 		}
-		else if (auto r = dynamic_cast<const ast::ReturnStmt*>(stmt))
+		else if (const auto r = dynamic_cast<const ast::ReturnStmt*>(stmt))
 		{
 			ScanExpr(r->expr.get(), localScope, freeVars);
 		}
-		else if (auto block = dynamic_cast<const ast::Block*>(stmt))
+		else if (const auto block = dynamic_cast<const ast::Block*>(stmt))
 		{
 			std::unordered_set<std::string> blockScope = localScope;
 			for (const auto& s : block->statements)
@@ -154,18 +164,17 @@ private:
 				ScanStatement(s.get(), blockScope, freeVars, globalScope, currentFunContext);
 			}
 		}
-		else if (auto fun = dynamic_cast<const ast::FunDecl*>(stmt))
+		else if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt))
 		{
-			// ИСПРАВЛЕНИЕ 1: Добавляем саму функцию в родительский Scope
 			localScope.insert(fun->name.ToString());
 
-			// ИСПРАВЛЕНИЕ 2: Вложенная функция НЕ наследует родительские переменные как локальные!
-			// У неё абсолютно чистый scope, только параметры и её собственное имя (для рекурсии).
 			std::unordered_set<std::string> funLocals;
 			funLocals.insert(fun->name.ToString());
 
 			for (const auto& p : fun->parameters)
+			{
 				funLocals.insert(p.name.ToString());
+			}
 
 			std::unordered_set<std::string> funFreeVars;
 			if (fun->body)
@@ -173,52 +182,60 @@ private:
 				ScanStatement(fun->body.get(), funLocals, funFreeVars, globalScope, fun);
 			}
 
-			std::vector<std::string> upvals;
+			std::vector<std::string> upvalues;
 			for (const auto& uv : funFreeVars)
 			{
-				if (!globalScope.count(uv))
+				if (!globalScope.contains(uv))
 				{
-					upvals.push_back(uv); // Сохраняем порядок Upvalues
+					upvalues.push_back(uv);
 
-					// Просим РОДИТЕЛЯ запаковать эту переменную в BOX
 					if (currentFunContext)
 					{
 						m_functionBoxedVars[currentFunContext].insert(uv);
 					}
 
-					// Если родитель сам не владеет этой переменной, пробрасываем выше
-					if (!localScope.count(uv))
+					if (!localScope.contains(uv))
+					{
 						freeVars.insert(uv);
+					}
 				}
 			}
 
-			m_functionUpvalues[fun] = upvals;
+			m_functionUpvalues[fun] = upvalues;
 			m_flatFunctions.push_back(fun);
 		}
-		else if (auto ifs = dynamic_cast<const ast::IfStmt*>(stmt))
+		else if (const auto ifs = dynamic_cast<const ast::IfStmt*>(stmt))
 		{
 			ScanExpr(ifs->condition.get(), localScope, freeVars);
 			if (ifs->thenBranch)
+			{
 				ScanStatement(ifs->thenBranch.get(), localScope, freeVars, globalScope, currentFunContext);
+			}
 			if (ifs->elseBranch)
+			{
 				ScanStatement(ifs->elseBranch.get(), localScope, freeVars, globalScope, currentFunContext);
+			}
 		}
-		else if (auto whl = dynamic_cast<const ast::WhileStmt*>(stmt))
+		else if (const auto whl = dynamic_cast<const ast::WhileStmt*>(stmt))
 		{
 			ScanExpr(whl->condition.get(), localScope, freeVars);
 			if (whl->body)
+			{
 				ScanStatement(whl->body.get(), localScope, freeVars, globalScope, currentFunContext);
+			}
 		}
-		else if (auto fr = dynamic_cast<const ast::ForStmt*>(stmt))
+		else if (const auto fr = dynamic_cast<const ast::ForStmt*>(stmt))
 		{
 			ScanExpr(fr->startExpr.get(), localScope, freeVars);
 			ScanExpr(fr->endExpr.get(), localScope, freeVars);
 
 			std::unordered_set<std::string> forScope = localScope;
-			forScope.insert(fr->iteratorName.ToString()); // Итератор виден только внутри For
+			forScope.insert(fr->iteratorName.ToString());
 
 			if (fr->body)
+			{
 				ScanStatement(fr->body.get(), forScope, freeVars, globalScope, currentFunContext);
+			}
 		}
 	}
 
@@ -237,7 +254,7 @@ private:
 		for (auto it = fun->parameters.rbegin(); it != fun->parameters.rend(); ++it)
 		{
 			std::string paramName = it->name.ToString();
-			if (boxedVars.count(paramName))
+			if (boxedVars.contains(paramName))
 			{
 				m_out << "BOX\n";
 			}
@@ -249,7 +266,9 @@ private:
 		if (fun->body)
 		{
 			for (const auto& s : fun->body->statements)
+			{
 				CompileStatement(s.get());
+			}
 		}
 		m_isTopLevel = true;
 
@@ -261,17 +280,40 @@ private:
 		if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(stmt))
 		{
 			if (varDecl->initializer)
+			{
 				CompileExpr(varDecl->initializer.get());
+			}
 			else
+			{
 				m_out << "CONST 0\n";
+			}
 
-			if (m_functionBoxedVars[m_currentFunction].count(varDecl->name.ToString()))
+			if (m_functionBoxedVars[m_currentFunction].contains(varDecl->name.ToString()))
 			{
 				m_out << "BOX\n";
 			}
 
 			m_out << "SET " << varDecl->name.ToString() << "\n";
 			m_currentLocals.push_back(varDecl->name.ToString());
+		}
+		else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(stmt))
+		{
+			if (valDecl->initializer)
+			{
+				CompileExpr(valDecl->initializer.get());
+			}
+			else
+			{
+				m_out << "CONST 0\n";
+			}
+
+			if (m_functionBoxedVars[m_currentFunction].contains(valDecl->name.ToString()))
+			{
+				m_out << "BOX\n";
+			}
+
+			m_out << "SET " << valDecl->name.ToString() << "\n";
+			m_currentLocals.push_back(valDecl->name.ToString());
 		}
 		else if (const auto exprStmt = dynamic_cast<const ast::ExprStmt*>(stmt))
 		{
@@ -283,29 +325,35 @@ private:
 				if (auto id = dynamic_cast<const ast::IdentifierExpr*>(call->callee.get()))
 				{
 					if (id->name.ToString() == "print")
+					{
 						shouldPop = false;
+					}
 				}
 			}
 			if (shouldPop)
+			{
 				m_out << "POP\n";
+			}
 		}
 		else if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(stmt))
 		{
 			if (retStmt->expr)
+			{
 				CompileExpr(retStmt->expr.get());
+			}
 			else
+			{
 				m_out << "CONST 0\n";
+			}
 			m_out << "RETURN\n";
 		}
 		else if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(stmt))
 		{
-			const auto& upvals = m_functionUpvalues[funDecl];
+			const auto& upvalues = m_functionUpvalues[funDecl];
 
-			// Собираем ячейки для замыкания
-			for (const auto& uv : upvals)
+			for (const auto& uv : upvalues)
 			{
-				auto upIt = std::find(m_currentUpvalues.begin(), m_currentUpvalues.end(), uv);
-				if (upIt != m_currentUpvalues.end())
+				if (auto upIt = std::ranges::find(m_currentUpvalues, uv); upIt != m_currentUpvalues.end())
 				{
 					m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 				}
@@ -315,20 +363,55 @@ private:
 				}
 			}
 
-			m_out << "MAKE_CLOSURE " << funDecl->name.ToString() << " " << upvals.size() << "\n";
+			m_out << "MAKE_CLOSURE " << funDecl->name.ToString() << " " << upvalues.size() << "\n";
 			m_out << "SET " << funDecl->name.ToString() << "\n";
 			m_currentLocals.push_back(funDecl->name.ToString());
 		}
 		else if (const auto blockStmt = dynamic_cast<const ast::Block*>(stmt))
 		{
 			for (const auto& s : blockStmt->statements)
+			{
 				CompileStatement(s.get());
+			}
+		}
+		else if (const auto ifStmt = dynamic_cast<const ast::IfStmt*>(stmt))
+		{
+			auto currentLabelId = m_labelCount++;
+			std::string elseLabel = "L_else_" + std::to_string(currentLabelId);
+			std::string endLabel = "L_end_" + std::to_string(currentLabelId);
+
+			m_out << "// --- if ---\n";
+			CompileExpr(ifStmt->condition.get());
+
+			if (ifStmt->elseBranch)
+			{
+				m_out << "JMP_IF_FALSE " << elseLabel << "\n";
+			}
+			else
+			{
+				m_out << "JMP_IF_FALSE " << endLabel << "\n";
+			}
+
+			if (ifStmt->thenBranch)
+			{
+				for (const auto& s : ifStmt->thenBranch->statements)
+					CompileStatement(s.get());
+			}
+
+			if (ifStmt->elseBranch)
+			{
+				m_out << "JMP " << endLabel << "\n";
+				m_out << "LABEL " << elseLabel << "\n";
+				CompileStatement(ifStmt->elseBranch.get());
+			}
+
+			m_out << "LABEL " << endLabel << "\n";
 		}
 		else if (const auto whileStmt = dynamic_cast<const ast::WhileStmt*>(stmt))
 		{
-			int labelId = m_labelCount++;
-			std::string startLabel = "L_while_start_" + std::to_string(labelId);
-			std::string endLabel = "L_while_end_" + std::to_string(labelId);
+			auto labelId = m_labelCount++;
+			auto startLabel = "L_while_start_" + std::to_string(labelId);
+			auto endLabel = "L_while_end_" + std::to_string(labelId);
 
 			m_out << "LABEL " << startLabel << "\n";
 			CompileExpr(whileStmt->condition.get());
@@ -337,7 +420,9 @@ private:
 			if (whileStmt->body)
 			{
 				for (const auto& s : whileStmt->body->statements)
+				{
 					CompileStatement(s.get());
+				}
 			}
 
 			m_out << "JMP " << startLabel << "\n";
@@ -345,21 +430,21 @@ private:
 		}
 		else if (const auto forStmt = dynamic_cast<const ast::ForStmt*>(stmt))
 		{
-			int labelId = m_labelCount++;
-			std::string startLabel = "L_for_start_" + std::to_string(labelId);
-			std::string endLabel = "L_for_end_" + std::to_string(labelId);
+			auto labelId = m_labelCount++;
+			auto startLabel = "L_for_start_" + std::to_string(labelId);
+			auto endLabel = "L_for_end_" + std::to_string(labelId);
 
-			std::string iterName = forStmt->iteratorName.ToString();
-			std::string limitName = "_for_limit_" + std::to_string(labelId);
+			auto iterName = forStmt->iteratorName.ToString();
+			auto limitName = "_for_limit_" + std::to_string(labelId);
 
 			m_out << "// --- for (" << iterName << ") ---\n";
 			CompileExpr(forStmt->startExpr.get());
 			m_out << "SET " << iterName << "\n";
-			m_currentLocals.push_back(iterName);
+			m_currentLocals.emplace_back(iterName);
 
 			CompileExpr(forStmt->endExpr.get());
 			m_out << "SET " << limitName << "\n";
-			m_currentLocals.push_back(limitName);
+			m_currentLocals.emplace_back(limitName);
 
 			m_out << "LABEL " << startLabel << "\n";
 			m_out << "CONST 1\n";
@@ -372,7 +457,9 @@ private:
 			if (forStmt->body)
 			{
 				for (const auto& s : forStmt->body->statements)
+				{
 					CompileStatement(s.get());
+				}
 			}
 
 			m_out << "GET " << iterName << "\n";
@@ -382,33 +469,50 @@ private:
 			m_out << "JMP " << startLabel << "\n";
 			m_out << "LABEL " << endLabel << "\n";
 		}
+		else
+		{
+			throw std::runtime_error("TextCompiler: Unhandled Statement type!");
+		}
 	}
 
 	void CompileExpr(const ast::Expr* expr)
 	{
 		if (!expr)
+		{
 			return;
+		}
 
 		if (const auto litExpr = dynamic_cast<const ast::LiteralExpr*>(expr))
 		{
+			if (litExpr->token.type == TokenType::KwTrue)
+			{
+				m_out << "CONST 1\n"; // Или m_out << "TRUE\n" если добавите опкоды True/False в ВМ
+				return;
+			}
+			if (litExpr->token.type == TokenType::KwFalse)
+			{
+				m_out << "CONST 0\n"; // Или m_out << "FALSE\n"
+				return;
+			}
 			m_out << "CONST " << litExpr->token.lexeme << "\n";
 			return;
 		}
 
 		if (const auto idExpr = dynamic_cast<const ast::IdentifierExpr*>(expr))
 		{
-			std::string name = idExpr->name.ToString();
+			const std::string name = idExpr->name.ToString();
 
-			auto upIt = std::find(m_currentUpvalues.begin(), m_currentUpvalues.end(), name);
-			if (upIt != m_currentUpvalues.end())
+			if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 			{
 				m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 			}
-			else if (std::find(m_currentLocals.begin(), m_currentLocals.end(), name) != m_currentLocals.end())
+			else if (std::ranges::find(m_currentLocals, name) != m_currentLocals.end())
 			{
 				m_out << "GET " << name << "\n";
-				if (m_functionBoxedVars[m_currentFunction].count(name))
+				if (m_functionBoxedVars[m_currentFunction].contains(name))
+				{
 					m_out << "UNBOX\n";
+				}
 			}
 			else
 			{
@@ -421,17 +525,15 @@ private:
 		{
 			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(assignExpr->target.get()))
 			{
-				std::string name = id->name.ToString();
-				auto upIt = std::find(m_currentUpvalues.begin(), m_currentUpvalues.end(), name);
-
-				if (upIt != m_currentUpvalues.end())
+				const std::string name = id->name.ToString();
+				if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 				{
 					CompileExpr(assignExpr->value.get());
 					m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 				}
 				else
 				{
-					if (m_functionBoxedVars[m_currentFunction].count(name))
+					if (m_functionBoxedVars[m_currentFunction].contains(name))
 					{
 						m_out << "GET " << name << "\n";
 						CompileExpr(assignExpr->value.get());
@@ -452,12 +554,14 @@ private:
 		{
 			bool isDirectCall = false;
 			std::string directFuncName = "";
-			if (auto id = dynamic_cast<const ast::IdentifierExpr*>(callExpr->callee.get()))
+			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(callExpr->callee.get()))
 			{
 				directFuncName = id->name.ToString();
 				if (directFuncName == "print" || directFuncName == "make_array" || directFuncName == "len")
+				{
 					isDirectCall = true;
-				else if (std::find(m_currentLocals.begin(), m_currentLocals.end(), directFuncName) == m_currentLocals.end() && std::find(m_currentUpvalues.begin(), m_currentUpvalues.end(), directFuncName) == m_currentUpvalues.end())
+				}
+				else if (std::ranges::find(m_currentLocals, directFuncName) == m_currentLocals.end() && std::ranges::find(m_currentUpvalues, directFuncName) == m_currentUpvalues.end())
 				{
 					isDirectCall = true;
 				}
@@ -466,20 +570,116 @@ private:
 			if (isDirectCall)
 			{
 				for (const auto& arg : callExpr->arguments)
+				{
 					CompileExpr(arg.get());
+				}
 				if (directFuncName == "print" || directFuncName == "len")
+				{
 					m_out << "NATIVE \"" << directFuncName << "\" " << callExpr->arguments.size() << "\n";
+				}
 				else
+				{
 					m_out << "CALL " << directFuncName << " " << callExpr->arguments.size() << "\n";
+				}
 			}
 			else
 			{
 				CompileExpr(callExpr->callee.get());
 				for (const auto& arg : callExpr->arguments)
+				{
 					CompileExpr(arg.get());
+				}
 				m_out << "CALL_INDIRECT " << callExpr->arguments.size() << "\n";
 			}
 			return;
+		}
+
+		if (const auto unExpr = dynamic_cast<const ast::UnaryExpr*>(expr))
+		{
+			std::string op = unExpr->op.ToString();
+
+			// 1. Простые унарные операторы
+			if (op == "-")
+			{
+				m_out << "CONST 0\n";
+				CompileExpr(unExpr->operand.get());
+				m_out << "SUB\n";
+				return;
+			}
+			if (op == "+")
+			{
+				CompileExpr(unExpr->operand.get());
+				return;
+			}
+			if (op == "!")
+			{
+				CompileExpr(unExpr->operand.get());
+				m_out << "CONST 0\n";
+				m_out << "EQUAL\n"; // Инверсия: если x было 1, то 1 == 0 -> 0. Идеально!
+				return;
+			}
+			if (op == "~")
+			{
+				CompileExpr(unExpr->operand.get());
+				m_out << "BIT_NOT\n"; // Убедитесь, что в RVM есть опкод BIT_NOT
+				return;
+			}
+
+			// 2. Инкремент (++) и Декремент (--)
+			if (op == "++" || op == "--")
+			{
+				std::string vmOp = (op == "++") ? "INC" : "DEC";
+				std::string revOp = (op == "++") ? "DEC" : "INC"; // Для отката в Postfix
+
+				if (auto id = dynamic_cast<const ast::IdentifierExpr*>(unExpr->operand.get()))
+				{
+					std::string name = id->name.ToString();
+					auto upIt = std::ranges::find(m_currentUpvalues, name);
+
+					// ШАГ 1: Читаем, делаем INC/DEC, сохраняем
+					if (upIt != m_currentUpvalues.end())
+					{
+						m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+						m_out << vmOp << "\n";
+						m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+					}
+					else if (m_functionBoxedVars[m_currentFunction].contains(name))
+					{
+						m_out << "GET " << name << "\n";
+						m_out << "GET " << name << "\n";
+						m_out << "UNBOX\n";
+						m_out << vmOp << "\n";
+						m_out << "STORE_BOX\n";
+					}
+					else
+					{
+						m_out << "GET " << name << "\n";
+						m_out << vmOp << "\n";
+						m_out << "SET " << name << "\n";
+					}
+
+					// ШАГ 2: Возвращаем результат на стек
+					if (upIt != m_currentUpvalues.end())
+					{
+						m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+					}
+					else
+					{
+						m_out << "GET " << name << "\n";
+						if (m_functionBoxedVars[m_currentFunction].contains(name))
+						{
+							m_out << "UNBOX\n";
+						}
+					}
+
+					// Для постфикса (x++) просто откатываем значение НА СТЕКЕ (в памяти остается новое!)
+					if (unExpr->isPostfix)
+					{
+						m_out << revOp << "\n";
+					}
+				}
+				return;
+			}
 		}
 
 		if (const auto binExpr = dynamic_cast<const ast::BinaryExpr*>(expr))
@@ -487,10 +687,8 @@ private:
 			CompileExpr(binExpr->left.get());
 			CompileExpr(binExpr->right.get());
 
-			const std::string op = binExpr->op.ToString();
-
 			// clang-format off
-          	if (op == "+")       m_out << "ADD\n";
+          	if (const std::string op = binExpr->op.ToString();op == "+")       m_out << "ADD\n";
           	else if (op == "-")  m_out << "SUB\n";
           	else if (op == "*")  m_out << "MUL\n";
           	else if (op == "/")  m_out << "DIV\n";

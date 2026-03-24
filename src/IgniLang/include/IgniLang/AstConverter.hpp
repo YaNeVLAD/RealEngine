@@ -14,7 +14,9 @@ public:
 	std::unique_ptr<ast::Program> Convert(const CstNode* root)
 	{
 		if (!root || root->symbol != "Program")
+		{
 			return nullptr;
+		}
 
 		auto program = std::make_unique<ast::Program>();
 
@@ -34,7 +36,9 @@ private:
 	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
 		if (listNode->symbol == "e" || listNode->children.empty())
+		{
 			return;
+		}
 
 		if (listNode->children.size() == 2)
 		{
@@ -82,7 +86,7 @@ private:
 				var->initializer = ConvertExpr(actualDecl->children[4].get());
 				if (optColon->children.size() == 2) // : Type
 				{
-					val->type = ConvertType(optColon->children[1].get());
+					var->type = ConvertType(optColon->children[1].get());
 				}
 			}
 			return decl;
@@ -94,8 +98,7 @@ private:
 			auto funDecl = std::make_unique<ast::FunDecl>();
 
 			// 1. Имя функции [2]
-			const auto& funNameNode = actualDecl->children[2];
-			if (funNameNode->children.size() == 1)
+			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
 			{
 				funDecl->name = funNameNode->children[0]->token->lexeme;
 			}
@@ -104,8 +107,7 @@ private:
 				funDecl->name = funNameNode->children.back()->token->lexeme;
 			}
 
-			const auto& optColon = actualDecl->children[6];
-			if (optColon->children.size() == 2)
+			if (const auto& optColon = actualDecl->children[6]; optColon->children.size() == 2)
 			{
 				funDecl->returnType = ConvertType(optColon->children[1].get());
 			}
@@ -114,8 +116,7 @@ private:
 			ExtractParameters(actualDecl->children[5].get(), funDecl->parameters);
 
 			// 3. Тело функции (ИСПРАВЛЕНО: ТЕПЕРЬ ИНДЕКС 8)
-			const auto& funBody = actualDecl->children[8];
-			if (funBody->children[0]->symbol == "Block")
+			if (const auto& funBody = actualDecl->children[8]; funBody->children[0]->symbol == "Block")
 			{
 				funDecl->body = ConvertBlock(funBody->children[0].get());
 			}
@@ -159,8 +160,7 @@ private:
 			// Индексы:    [0]     [1]    [2]       [3]      [4]      [5]       [6]        [7]
 
 			// 1. Извлекаем имя функции из узла FunName [2]
-			const auto& funNameNode = actualDecl->children[2];
-			if (funNameNode->children.size() == 1)
+			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
 			{
 				// FunName -> ident
 				funDecl->name = funNameNode->children[0]->token->lexeme;
@@ -176,8 +176,7 @@ private:
 			ExtractParameters(actualDecl->children[5].get(), funDecl->parameters);
 
 			// 3. Извлекаем тело из FunBody [7]
-			const auto& funBody = actualDecl->children[7];
-			if (funBody->children[0]->symbol == "Block")
+			if (const auto& funBody = actualDecl->children[7]; funBody->children[0]->symbol == "Block")
 			{
 				funDecl->body = ConvertBlock(funBody->children[0].get());
 			}
@@ -197,7 +196,9 @@ private:
 	void FlattenStatements(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
 		if (listNode->symbol == "e" || listNode->children.empty())
+		{
 			return;
+		}
 
 		if (listNode->children.size() == 2)
 		{
@@ -245,7 +246,9 @@ private:
 	static std::unique_ptr<ast::Expr> ConvertExpr(const CstNode* exprNode)
 	{
 		if (!exprNode)
+		{
 			return nullptr;
+		}
 
 		// 1. СНАЧАЛА проверяем конкретные типы узлов
 		if (exprNode->symbol == "Designator")
@@ -320,6 +323,25 @@ private:
 			return binExpr;
 		}
 
+		if (exprNode->symbol == "PostfixExpr" && exprNode->children.size() == 2)
+		{
+			auto unExpr = std::make_unique<ast::UnaryExpr>();
+			unExpr->operand = ConvertExpr(exprNode->children[0].get()); // Designator
+			unExpr->op = exprNode->children[1]->symbol; // ++ или --
+			unExpr->isPostfix = true;
+			return unExpr;
+		}
+
+		// 2. Обработка UnaryExpr (Префиксы: -x, !x, ++x)
+		if (exprNode->symbol == "UnaryExpr" && exprNode->children.size() == 2)
+		{
+			auto unExpr = std::make_unique<ast::UnaryExpr>();
+			unExpr->op = exprNode->children[0]->symbol; // -, !, ~, ++, --
+			unExpr->operand = ConvertExpr(exprNode->children[1].get()); // UnaryExpr / Designator
+			unExpr->isPostfix = false;
+			return unExpr;
+		}
+
 		std::cerr << "Unhandled Expr node: " << exprNode->symbol << "\n";
 		return nullptr;
 	}
@@ -336,8 +358,7 @@ private:
 		ifStmt->thenBranch = ConvertBlock(blockNode.get());
 
 		// Разбираем OptElse
-		const auto& optElse = ifNode->children[5];
-		if (optElse->children.size() == 2) // else ElseBody
+		if (const auto& optElse = ifNode->children[5]; optElse->children.size() == 2) // else ElseBody
 		{
 			const auto& elseBody = optElse->children[1]->children[0];
 			if (elseBody->symbol == "IfStmt")
@@ -378,7 +399,9 @@ private:
 	static std::unique_ptr<ast::TypeNode> ConvertType(const CstNode* typeNode)
 	{
 		if (!typeNode)
+		{
 			return nullptr;
+		}
 
 		// Type -> ident OptTypeArgs OptQuestion
 		if (typeNode->children[0]->symbol == "ident")
@@ -387,8 +410,7 @@ private:
 			simpleType->name = typeNode->children[0]->token->lexeme;
 
 			// Парсим OptTypeArgs [1]
-			const auto& optTypeArgs = typeNode->children[1];
-			if (optTypeArgs->children.size() == 3) // < TypeList >
+			if (const auto& optTypeArgs = typeNode->children[1]; optTypeArgs->children.size() == 3) // < TypeList >
 			{
 				ExtractTypeList(optTypeArgs->children[1].get(), simpleType->typeArgs);
 			}
@@ -400,7 +422,7 @@ private:
 		}
 		// Type -> ( OptTypeList ) -> Type OptQuestion
 		//         [0]    [1]     [2][3] [4]     [5]
-		else if (typeNode->children[0]->symbol == "(")
+		if (typeNode->children[0]->symbol == "(")
 		{
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
 
@@ -436,7 +458,9 @@ private:
 	static void ExtractParameters(const CstNode* optFormPars, std::vector<ast::Parameter>& outParams)
 	{
 		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol == "e")
+		{
 			return;
+		}
 		FlattenFormPars(optFormPars->children[0].get(), outParams);
 	}
 
@@ -459,7 +483,9 @@ private:
 	static void ExtractArguments(const CstNode* optActPars, std::vector<std::unique_ptr<ast::Expr>>& outArgs)
 	{
 		if (optActPars->children.size() == 1 && optActPars->children[0]->symbol == "e")
+		{
 			return;
+		}
 		FlattenActPars(optActPars->children[0].get(), outArgs);
 	}
 

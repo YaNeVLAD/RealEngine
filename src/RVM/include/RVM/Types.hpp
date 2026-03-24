@@ -161,6 +161,15 @@ enum class OpCode : std::uint8_t
 	// Description: Pops 2 values. Divides the lower value (a) by the top value (b).
 	Div,
 
+	// Stack: ..., [a] -> ..., [a + 1]
+	Inc,
+
+	// Stack: ..., [a] -> ..., [a - 1]
+	Dec,
+
+	// Stack: ..., [a] -> ..., [~a]
+	BitNot,
+
 	// ---------------------------------------------------------
 	// COMPARISON
 	// ---------------------------------------------------------

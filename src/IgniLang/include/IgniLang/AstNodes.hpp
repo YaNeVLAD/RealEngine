@@ -99,6 +99,22 @@ struct BinaryExpr final : Expr
 	}
 };
 
+struct UnaryExpr final : Expr
+{
+	re::String op;
+	std::unique_ptr<Expr> operand;
+	bool isPostfix = false; // true для (x++), false для (++x) и (-x)
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "UnaryExpr [op: '" << op.ToString() << "'"
+				  << (isPostfix ? ", postfix" : ", prefix") << "]\n";
+		if (operand)
+			operand->Print(depth + 1);
+	}
+};
+
 struct LiteralExpr final : Expr
 {
 	fsm::token<TokenType> token;

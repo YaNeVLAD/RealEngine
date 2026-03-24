@@ -82,22 +82,12 @@ struct CompilerLayout final : re::Layout
 		std::string src = R"(
 			package main;
 
-			fun makeCounter(): (Unit) -> Unit {
-			    var count = 0;
-
-			    // Вложенная функция! Захватывает count
-			    fun increment() {
-			        count = count + 1;
-			        print("Counter is: ", count);
-			    }
-
-			    return increment; // Возвращаем замыкание
-			}
-
 			fun main() {
-			    var my_inc = makeCounter();
-			    my_inc(); // Выведет 1
-			    my_inc(); // Выведет 2
+				print(!true);
+				print(!false);
+				val y = 10;
+				var x = ++y;
+				print("y:", y, "x:", x);
 			}
 		)";
 		auto tokens = igni::CreateLexer(src).tokenize();

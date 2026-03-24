@@ -34,7 +34,9 @@ namespace igni
     TOKEN(StringConst,  R"("[^"]*")",          "stringCon") \
     TOKEN(Identifier,   R"([a-zA-Z_]\w*)",     "ident") \
     /* Double char operations */ \
-    TOKEN(Arrow,        R"(->)",               "->")\
+	TOKEN(Decrement,    R"(\-\-)",             "--") \
+	TOKEN(Increment,    R"(\+\+)",             "++") \
+    TOKEN(Arrow,        R"(->)",               "->") \
     TOKEN(Eq,           R"(==)",               "==") \
     TOKEN(Neq,          R"(!=)",               "!=") \
     TOKEN(LessEq,       R"(<=)",               "<=") \
@@ -44,6 +46,8 @@ namespace igni
     TOKEN(Range,        R"(\.\.)",             "..") \
     TOKEN(QuestionDot,  R"(\?\.)",             "?.") \
     /* Single char operations */ \
+	TOKEN(Nor,          R"(\~)",               "~") \
+    TOKEN(Not,          R"(!)",                "!") \
     TOKEN(Assign,       R"(=)",                "=") \
     TOKEN(Less,         R"(<)",                "<") \
     TOKEN(Greater,      R"(>)",                ">") \

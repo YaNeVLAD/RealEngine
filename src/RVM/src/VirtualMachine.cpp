@@ -74,6 +74,51 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::Less:  BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
 			// clang-format on
 
+		case OpCode::Inc: {
+			Value a = Pop();
+			if (auto* i = std::get_if<Int>(&a))
+			{
+				Push(*i + 1);
+			}
+			else if (auto* d = std::get_if<Double>(&a))
+			{
+				Push(*d + 1.0);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+		case OpCode::Dec: {
+			Value a = Pop();
+			if (auto* i = std::get_if<Int>(&a))
+			{
+				Push(*i - 1);
+			}
+			else if (auto* d = std::get_if<Double>(&a))
+			{
+				Push(*d - 1.0);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+		case OpCode::BitNot: {
+			Value a = Pop();
+			if (auto* i = std::get_if<Int>(&a))
+			{
+				Push(~(*i));
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
 		case OpCode::Pop: {
 			Pop();
 			break;
