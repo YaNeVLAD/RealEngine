@@ -133,8 +133,10 @@ enum class OpCode : std::uint8_t
 	// from the stack and stores it in the variable array (m_variables[slot_index] = value).
 	SetLocal,
 
-	// [LoadNative, const_index(name), uint8(argCount)]
-	// Находит нативную функцию в реестре, создает NativeObject и кладет на стек.
+	// Bytecode: [LoadNative, const_index, arg_count]
+	// Stack: ... -> ..., [NativeObjectPtr]
+	// Description: Reads 1 byte (name index) and 1 byte (arg count). Finds the
+	// function in the registry by name and pushes a new NativeObject onto the stack.
 	LoadNative,
 
 	// ---------------------------------------------------------
@@ -161,59 +163,87 @@ enum class OpCode : std::uint8_t
 	// Description: Pops 2 values. Divides the lower value (a) by the top value (b).
 	Div,
 
+	// Bytecode: [Inc]
 	// Stack: ..., [a] -> ..., [a + 1]
+	// Description: Pops the top value, increments it by 1, and pushes it back.
 	Inc,
 
+	// Bytecode: [Dec]
 	// Stack: ..., [a] -> ..., [a - 1]
+	// Description: Pops the top value, decrements it by 1, and pushes it back.
 	Dec,
 
+	// Bytecode: [BitNot]
 	// Stack: ..., [a] -> ..., [~a]
+	// Description: Performs bitwise NOT on the top stack value.
 	BitNot,
 
 	// ---------------------------------------------------------
 	// COMPARISON
 	// ---------------------------------------------------------
 
-	// Pop B, Pop A -> Push (A < B ? 1 : 0)
+	// Bytecode: [Less]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A < B, else 0 (false).
 	Less,
 
-	// Pop B, Pop A -> Push (A == B ? 1 : 0)
+	// Bytecode: [Equal]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A == B, else 0 (false).
 	Equal,
 
 	// ---------------------------------------------------------
 	// CLOSURE AND UPVALUE
 	// ---------------------------------------------------------
 
-	// [MakeClosure, const_index(offset), uint8(upvalue_count)]
-	// Removes the upvalue_count of cells (Upvalue) from the stack, creates a Closure and puts it on the stack.
+	// Bytecode: [MakeClosure, const_index, upvalue_count]
+	// Stack: ..., [uv1], ..., [uvN] -> ..., [ClosurePtr]
+	// Description: Reads 1 byte (IP offset index) and 1 byte (count). Pops N UpvaluePtrs
+	// from the stack to create a new Closure. Pushes the Closure back.
 	MakeClosure,
 
-	// [Box]
-	// Removes the Value, packs it into an Upvalue, puts it on the stack.
+	// Bytecode: [Box]
+	// Stack: ..., [value] -> ..., [UpvaluePtr]
+	// Description: Pops a Value, wraps it into a heap-allocated Upvalue,
+	// and pushes the pointer back onto the stack.
 	Box,
 
-	// [Unbox]
-	// Removes the Upvalue, removes the Value from it, puts it on the stack.
+	// Bytecode: [Unbox]
+	// Stack: ..., [UpvaluePtr] -> ..., [value]
+	// Description: Pops an UpvaluePtr, extracts the inner Value, and pushes it onto the stack.
 	Unbox,
 
-	// [StoreBox]
-	// Removes the Value, then removes the Upvalue. Writes the Value inside the Upvalue.
+	// Bytecode: [StoreBox]
+	// Stack: ..., [UpvaluePtr], [value] -> ...
+	// Description: Pops a Value and an UpvaluePtr. Updates the value stored
+	// inside the referenced Upvalue.
 	StoreBox,
 
-	// [GetUpvalue, uint8(index)]
-	// Takes the value from the current closure and puts it on the stack.
+	// Bytecode: [GetUpvalue, index]
+	// Stack: ... -> ..., [value]
+	// Description: Reads 1 byte (index). Accesses the Upvalue at the given index
+	// in the current closure and pushes its current value onto the stack.
 	GetUpvalue,
 
-	// [SetUpvalue, uint8(index)]
-	// Removes Value and writes it to the captured closure variable.
+	// Bytecode: [SetUpvalue, index]
+	// Stack: ..., [value] -> ...
+	// Description: Reads 1 byte (index). Pops a value and writes it into the
+	// Upvalue at the given index in the current closure.
 	SetUpvalue,
 
 	// ---------------------------------------------------------
 	// CONTROL FLOW
 	// ---------------------------------------------------------
 
+	// Bytecode: [JmpIfFalse, offset]
+	// Stack: ..., [condition] -> ...
+	// Description: Pops the condition. If it is "falsy", moves the IP by the
+	// provided offset. Otherwise, continues execution from the next instruction.
 	JmpIfFalse,
 
+	// Bytecode: [Jmp, offset]
+	// Stack: ... -> ...
+	// Description: Unconditionally moves the IP by the provided offset.
 	Jmp,
 
 	// Bytecode: [Call, const_index]
@@ -229,38 +259,62 @@ enum class OpCode : std::uint8_t
 	// and pushes the return value back onto the stack.
 	Native,
 
+	// Bytecode: [CallIndirect]
+	// Stack: ..., [function_ptr], [args...] -> ...
+	// Description: Similar to Call, but the target function is popped from the stack.
+	// And can be any Callable object like NativeObjectPtr or ClosurePtr
 	CallIndirect,
 
 	// ---------------------------------------------------------
 	// USER DEFINED TYPES AND REFLECTION
 	// ---------------------------------------------------------
 
-	// Stack: ..., [Instance] -> ..., [FieldValue]
+	// Bytecode: [New]
+	// Stack: ..., [TypeInfoPtr] -> ..., [InstancePtr]
+	// Description: Pops a TypeInfo, creates a new Instance of that type
+	// with default-initialized fields, and pushes it onto the stack.
 	New,
 
-	// Stack: ..., [Instance] -> ..., [FieldValue]
+	// Bytecode: [GetProperty, name_hash]
+	// Stack: ..., [InstancePtr] -> ..., [value]
+	// Description: Reads a hash (usually 4-8 bytes). Pops the instance,
+	// looks up the field by hash, and pushes the field's value.
 	GetProperty,
 
-	// Stack: ..., [Instance], [Value] -> ...
+	// Bytecode: [SetProperty, name_hash]
+	// Stack: ..., [InstancePtr], [value] -> ...
+	// Description: Reads a hash. Pops the value and the instance, then
+	// assigns the value to the specified field of the instance.
 	SetProperty,
 
-	// Stack: ..., [Instance] -> ..., [ClassInfo]
+	// Bytecode: [TypeOf]
+	// Stack: ..., [value] -> ..., [TypeInfoPtr]
+	// Description: Pops a value and pushes its corresponding TypeInfo object.
 	TypeOf,
 
-	// Stack: ..., [Field1], [Field2], [ClassName], [FieldCount] -> ...
+	// Bytecode: [DefType, field_count]
+	// Stack: ..., [field_nameN], ..., [type_name] -> ...
+	// Description: Reads 1 byte (fields count). Pops field names and the type name
+	// to register a new TypeInfo structure in the VM.
 	DefType,
 
 	// ---------------------------------------------------------
 	// ARRAY
 	// ---------------------------------------------------------
 
-	// Stack: [size] -> [Array]
+	// Bytecode: [MakeArray]
+	// Stack: ..., [size] -> ..., [ArrayInstancePtr]
+	// Description: Pops an integer size and pushes a new ArrayInstance with that size.
 	MakeArray,
 
-	// Stack: [Array], [index] -> [Value]
+	// Bytecode: [IndexLoad]
+	// Stack: ..., [ArrayInstancePtr], [index] -> ..., [value]
+	// Description: Pops index and array. Pushes the value at that array index.
 	IndexLoad,
 
-	// Stack: [Array], [index], [Value] -> ...
+	// Bytecode: [IndexStore]
+	// Stack: ..., [ArrayInstancePtr], [index], [value] -> ...
+	// Description: Pops value, index, and array. Stores the value at the array index.
 	IndexStore,
 
 	// ---------------------------------------------------------
