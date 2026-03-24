@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Hash.hpp"
-
 #include <Core/Export.hpp>
+
+#include <Core/Hash.hpp>
 
 #include <compare>
 #include <string>

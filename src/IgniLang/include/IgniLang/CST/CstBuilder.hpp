@@ -1,6 +1,6 @@
 #pragma once
 
-#include <IgniLang/CstNode.hpp>
+#include <IgniLang/CST/CstNode.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
 #include <fsm/slr/parser.hpp>

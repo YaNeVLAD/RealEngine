@@ -1,7 +1,5 @@
 #pragma once
 
-#include "IgniLang/TextCompiler.hpp"
-
 #include <Runtime/Application.hpp>
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
@@ -21,8 +19,9 @@
 #include <filesystem>
 #include <iostream>
 
-#include <IgniLang/AstConverter.hpp>
-#include <IgniLang/CstBuilder.hpp>
+#include <IgniLang/AST/AstConverter.hpp>
+#include <IgniLang/CST/CstBuilder.hpp>
+#include <IgniLang/Compiler/TextCompiler.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
 #include <fsm/cfg.hpp>

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "AstNodes.hpp"
-#include <IgniLang/CstNode.hpp>
+#include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/CST/CstNode.hpp>
+
 #include <iostream>
 #include <stdexcept>
 
@@ -23,7 +24,7 @@ public:
 		const auto& optPkg = root->children[0];
 		const auto& decls = root->children[2]; // TopLevelDeclList
 
-		if (optPkg->children.size() > 0 && optPkg->children[0]->symbol != "e")
+		if (!optPkg->children.empty() && optPkg->children[0]->symbol != "e")
 		{
 			program->packageName = optPkg->children[0]->children[1]->children[0]->token->lexeme;
 		}

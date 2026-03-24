@@ -10,26 +10,93 @@
 namespace igni::ast
 {
 
+#define AST_NODES(V)    \
+	V(SimpleTypeNode)   \
+	V(FunctionTypeNode) \
+	V(BinaryExpr)       \
+	V(LiteralExpr)      \
+	V(IdentifierExpr)   \
+	V(CallExpr)         \
+	V(IndexExpr)        \
+	V(AssignExpr)       \
+	V(UnaryExpr)        \
+	V(ExprStmt)         \
+	V(ReturnStmt)       \
+	V(Block)            \
+	V(IfStmt)           \
+	V(WhileStmt)        \
+	V(ForStmt)          \
+	V(VarDecl)          \
+	V(ValDecl)          \
+	V(FunDecl)          \
+	V(Program)
+
+#define FORWARD_DECLARE_AST_NODE(Name) struct Name;
+AST_NODES(FORWARD_DECLARE_AST_NODE)
+#undef FORWARD_DECLARE_AST_NODE
+
+class IAstVisitor
+{
+public:
+	virtual ~IAstVisitor() = default;
+
+#define DECLARE_VISITOR_METHOD(Name) virtual void Visit(const Name* node) = 0;
+	AST_NODES(DECLARE_VISITOR_METHOD)
+#undef DECLARE_VISITOR_METHOD
+};
+
+class BaseAstVisitor : public IAstVisitor
+{
+public:
+	~BaseAstVisitor() override = default;
+
+#define DECLARE_VISITOR_METHOD(Name) virtual void Visit(const Name* node) override {};
+	AST_NODES(DECLARE_VISITOR_METHOD)
+#undef DECLARE_VISITOR_METHOD
+};
+
 // Базовый узел
 struct Node
 {
 	virtual ~Node() = default;
 
 	virtual void Print(int depth = 0) const = 0;
+	virtual void Accept(IAstVisitor& visitor) const = 0;
 
 protected:
-	void PrintIndent(int depth) const
+	static void PrintIndent(const int depth)
 	{
 		std::cout << std::string(depth * 2, ' ');
 	}
 };
 
+template <typename Derived, typename Base = Node>
+struct Visitable : Base
+{
+	void Accept(IAstVisitor& visitor) const override
+	{
+		visitor.Visit(static_cast<const Derived*>(this));
+	}
+};
+
+struct Expr : Node
+{
+};
+struct Statement : Node
+{
+};
+struct Decl : Statement
+{
+};
 struct TypeNode : Node
 {
 	bool isNullable = false;
 };
 
-struct SimpleTypeNode final : TypeNode
+// ==========================================
+// TYPES
+// ==========================================
+struct SimpleTypeNode final : Visitable<SimpleTypeNode, TypeNode>
 {
 	re::String name; // Int, Float, Array
 	std::vector<std::unique_ptr<TypeNode>> typeArgs; // <T1, T2>
@@ -39,15 +106,18 @@ struct SimpleTypeNode final : TypeNode
 		PrintIndent(depth);
 		std::cout << "SimpleType [name: '" << name.ToString() << "'"
 				  << (isNullable ? ", nullable" : "") << "]\n";
+
 		for (const auto& arg : typeArgs)
 		{
 			if (arg)
+			{
 				arg->Print(depth + 1);
+			}
 		}
 	}
 };
 
-struct FunctionTypeNode final : TypeNode
+struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
 {
 	std::vector<std::unique_ptr<TypeNode>> paramTypes;
 	std::unique_ptr<TypeNode> returnType;
@@ -60,29 +130,26 @@ struct FunctionTypeNode final : TypeNode
 		PrintIndent(depth + 1);
 		std::cout << "Params:\n";
 		for (const auto& pt : paramTypes)
+		{
 			if (pt)
+			{
 				pt->Print(depth + 2);
+			}
+		}
 
 		PrintIndent(depth + 1);
 		std::cout << "Return:\n";
 		if (returnType)
+		{
 			returnType->Print(depth + 2);
+		}
 	}
 };
 
-// --- Обновляем параметры функции ---
-struct Parameter
-{
-	re::String name;
-	std::unique_ptr<TypeNode> type;
-};
-
-// --- Выражения ---
-struct Expr : Node
-{
-};
-
-struct BinaryExpr final : Expr
+// ==========================================
+// EXPRESSIONS
+// ==========================================
+struct BinaryExpr final : Visitable<BinaryExpr, Expr>
 {
 	std::unique_ptr<Expr> left;
 	re::String op;
@@ -93,29 +160,17 @@ struct BinaryExpr final : Expr
 		PrintIndent(depth);
 		std::cout << "BinaryExpr [op: '" << op.ToString() << "']\n";
 		if (left)
+		{
 			left->Print(depth + 1);
+		}
 		if (right)
+		{
 			right->Print(depth + 1);
+		}
 	}
 };
 
-struct UnaryExpr final : Expr
-{
-	re::String op;
-	std::unique_ptr<Expr> operand;
-	bool isPostfix = false; // true для (x++), false для (++x) и (-x)
-
-	void Print(int depth = 0) const override
-	{
-		PrintIndent(depth);
-		std::cout << "UnaryExpr [op: '" << op.ToString() << "'"
-				  << (isPostfix ? ", postfix" : ", prefix") << "]\n";
-		if (operand)
-			operand->Print(depth + 1);
-	}
-};
-
-struct LiteralExpr final : Expr
+struct LiteralExpr final : Visitable<LiteralExpr, Expr>
 {
 	fsm::token<TokenType> token;
 
@@ -126,7 +181,7 @@ struct LiteralExpr final : Expr
 	}
 };
 
-struct IdentifierExpr final : Expr
+struct IdentifierExpr final : Visitable<IdentifierExpr, Expr>
 {
 	re::String name;
 
@@ -137,7 +192,7 @@ struct IdentifierExpr final : Expr
 	}
 };
 
-struct CallExpr final : Expr
+struct CallExpr final : Visitable<CallExpr, Expr>
 {
 	std::unique_ptr<Expr> callee;
 	std::vector<std::unique_ptr<Expr>> arguments;
@@ -159,34 +214,64 @@ struct CallExpr final : Expr
 			for (const auto& arg : arguments)
 			{
 				if (arg)
+				{
 					arg->Print(depth + 2);
+				}
 			}
 		}
 	}
 };
 
-struct AssignExpr final : Expr
+struct IndexExpr final : Visitable<IndexExpr, Expr>
 {
-	std::unique_ptr<Expr> target; // Кому присваиваем (IdentifierExpr или IndexExpr)
-	std::unique_ptr<Expr> value; // Что присваиваем
+	std::unique_ptr<Expr> array;
+	std::unique_ptr<Expr> index;
+
+	void Print(int depth = 0) const override { /* ... */ }
+};
+
+struct AssignExpr final : Visitable<AssignExpr, Expr>
+{
+	std::unique_ptr<Expr> target;
+	std::unique_ptr<Expr> value;
 
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
 		std::cout << "AssignExpr\n";
 		if (target)
+		{
 			target->Print(depth + 1);
+		}
 		if (value)
+		{
 			value->Print(depth + 1);
+		}
 	}
 };
 
-// --- Инструкции (Statements) ---
-struct Statement : Node
+struct UnaryExpr final : Visitable<UnaryExpr, Expr>
 {
+	re::String op;
+	std::unique_ptr<Expr> operand;
+	bool isPostfix = false; // true для (x++), false для (++x) и (-x)
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "UnaryExpr [op: '" << op.ToString() << "'"
+				  << (isPostfix ? ", postfix" : ", prefix") << "]\n";
+		if (operand)
+		{
+			operand->Print(depth + 1);
+		}
+	}
 };
 
-struct ExprStmt final : Statement
+// ==========================================
+// STATEMENTS
+// ==========================================
+struct ExprStmt final : Visitable<ExprStmt, Statement>
 {
 	std::unique_ptr<Expr> expr;
 
@@ -195,11 +280,13 @@ struct ExprStmt final : Statement
 		PrintIndent(depth);
 		std::cout << "ExprStmt\n";
 		if (expr)
+		{
 			expr->Print(depth + 1);
+		}
 	}
 };
 
-struct ReturnStmt final : Statement
+struct ReturnStmt final : Visitable<ReturnStmt, Statement>
 {
 	std::unique_ptr<Expr> expr; // Может быть nullptr
 
@@ -208,11 +295,13 @@ struct ReturnStmt final : Statement
 		PrintIndent(depth);
 		std::cout << "ReturnStmt\n";
 		if (expr)
+		{
 			expr->Print(depth + 1);
+		}
 	}
 };
 
-struct Block final : Statement
+struct Block final : Visitable<Block, Statement>
 {
 	std::vector<std::unique_ptr<Statement>> statements;
 
@@ -223,12 +312,14 @@ struct Block final : Statement
 		for (const auto& stmt : statements)
 		{
 			if (stmt)
+			{
 				stmt->Print(depth + 1);
+			}
 		}
 	}
 };
 
-struct IfStmt final : Statement
+struct IfStmt final : Visitable<IfStmt, Statement>
 {
 	std::unique_ptr<Expr> condition;
 	std::unique_ptr<Block> thenBranch;
@@ -242,12 +333,16 @@ struct IfStmt final : Statement
 		PrintIndent(depth + 1);
 		std::cout << "[Condition]:\n";
 		if (condition)
+		{
 			condition->Print(depth + 2);
+		}
 
 		PrintIndent(depth + 1);
 		std::cout << "[Then]:\n";
 		if (thenBranch)
+		{
 			thenBranch->Print(depth + 2);
+		}
 
 		if (elseBranch)
 		{
@@ -258,7 +353,7 @@ struct IfStmt final : Statement
 	}
 };
 
-struct WhileStmt final : Statement
+struct WhileStmt final : Visitable<WhileStmt, Statement>
 {
 	std::unique_ptr<Expr> condition;
 	std::unique_ptr<Block> body;
@@ -271,16 +366,20 @@ struct WhileStmt final : Statement
 		PrintIndent(depth + 1);
 		std::cout << "[Condition]:\n";
 		if (condition)
+		{
 			condition->Print(depth + 2);
+		}
 
 		PrintIndent(depth + 1);
 		std::cout << "[Body]:\n";
 		if (body)
+		{
 			body->Print(depth + 2);
+		}
 	}
 };
 
-struct ForStmt final : Statement
+struct ForStmt final : Visitable<ForStmt, Statement>
 {
 	re::String iteratorName;
 	std::unique_ptr<Expr> startExpr;
@@ -295,26 +394,36 @@ struct ForStmt final : Statement
 		PrintIndent(depth + 1);
 		std::cout << "[Start]:\n";
 		if (startExpr)
+		{
 			startExpr->Print(depth + 2);
+		}
 
 		PrintIndent(depth + 1);
 		std::cout << "[End]:\n";
 		if (endExpr)
+		{
 			endExpr->Print(depth + 2);
+		}
 
 		PrintIndent(depth + 1);
 		std::cout << "[Body]:\n";
 		if (body)
+		{
 			body->Print(depth + 2);
+		}
 	}
 };
 
-// --- Объявления ---
-struct Decl : Statement
+// ==========================================
+// DECLARATIONS
+// ==========================================
+struct Parameter
 {
+	re::String name;
+	std::unique_ptr<TypeNode> type;
 };
 
-struct ValDecl final : Decl
+struct ValDecl final : Visitable<ValDecl, Decl>
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
@@ -325,14 +434,18 @@ struct ValDecl final : Decl
 		PrintIndent(depth);
 		std::cout << "ValDecl [name: '" << name.ToString() << "']\n";
 		if (initializer)
+		{
 			initializer->Print(depth + 1);
+		}
 
 		if (type)
+		{
 			type->Print(depth + 1);
+		}
 	}
 };
 
-struct VarDecl final : Decl
+struct VarDecl final : Visitable<VarDecl, Decl>
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
@@ -343,14 +456,18 @@ struct VarDecl final : Decl
 		PrintIndent(depth);
 		std::cout << "VarDecl [name: '" << name.ToString() << "']\n";
 		if (initializer)
+		{
 			initializer->Print(depth + 1);
+		}
 
 		if (type)
+		{
 			type->Print(depth + 1);
+		}
 	}
 };
 
-struct FunDecl final : Decl
+struct FunDecl final : Visitable<FunDecl, Decl>
 {
 	re::String name;
 	std::vector<Parameter> parameters;
@@ -368,20 +485,28 @@ struct FunDecl final : Decl
 			std::cout << name.ToString() << " ";
 
 			if (type)
+			{
 				type->Print(depth);
+			}
 		}
 		std::cout << "\n";
 
 		if (returnType)
+		{
 			returnType->Print(depth + 1);
+		}
 
 		if (body)
+		{
 			body->Print(depth + 1);
+		}
 	}
 };
 
-// --- Корень программы ---
-struct Program final : Node
+// ==========================================
+// PROGRAM ROOT
+// ==========================================
+struct Program final : Visitable<Program>
 {
 	re::String packageName;
 	std::vector<std::unique_ptr<Statement>> statements;
@@ -393,7 +518,9 @@ struct Program final : Node
 		for (const auto& stmt : statements)
 		{
 			if (stmt)
+			{
 				stmt->Print(depth + 1);
+			}
 		}
 	}
 };

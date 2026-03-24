@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <Core/String.hpp>
 
 namespace igni
 {
