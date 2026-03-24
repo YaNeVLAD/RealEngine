@@ -1,0 +1,48 @@
+package main;
+
+fun bubbleSort(arr: Array, size: Int) {
+    var i = 0;
+    while (i < size - 1) {
+        var j = 0;
+        while (j < size - i - 1) {
+            // Используем новый оператор >
+            // Обращение по индексу arr[j] автоматически сгенерирует CALL_METHOD "get" 1
+            if (arr[j] > arr[j + 1]) {
+                // Меняем элементы местами (автоматически генерируется CALL_METHOD "set" 2)
+                var temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+            j++; // Используем инкремент!
+        }
+        i++;
+    }
+}
+
+fun printArray(arr: Array, size: Int) {
+    var i = 0;
+    while (i < size) {
+        print(arr[i]);
+        i++;
+    }
+}
+
+fun main() {
+    val n = 6;
+    val arr = make_array(n); // Вызов native функции
+
+    arr[0] = 64;
+    arr[1] = 34;
+    arr[2] = 25;
+    arr[3] = 12;
+    arr[4] = 22;
+    arr[5] = 11;
+
+    print("--- Before sorting ---");
+    printArray(arr, n);
+
+    bubbleSort(arr, n);
+
+    print("--- After sorting ---");
+    printArray(arr, n);
+}

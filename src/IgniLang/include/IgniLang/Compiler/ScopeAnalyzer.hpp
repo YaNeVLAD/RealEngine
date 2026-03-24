@@ -43,6 +43,18 @@ public:
 		program->Accept(*this);
 	}
 
+	void Visit(const ast::IndexExpr* node) override
+	{
+		if (node->array)
+		{
+			node->array->Accept(*this);
+		}
+		if (node->index)
+		{
+			node->index->Accept(*this);
+		}
+	}
+
 	void Visit(const ast::IdentifierExpr* node) override
 	{
 		if (!m_scopeStack.back().contains(node->name.ToString()))

@@ -43,6 +43,19 @@ public:
 		}
 	}
 
+	void Visit(const ast::IndexExpr* node) override
+	{
+		if (node->array)
+		{
+			node->array->Accept(*this); // Push self
+		}
+		if (node->index)
+		{
+			node->index->Accept(*this); // Push arg1
+		}
+		m_out << "CALL_METHOD \"get\" 1\n";
+	}
+
 	void Visit(const ast::LiteralExpr* node) override
 	{
 		if (node->token.type == TokenType::KwTrue)
@@ -115,6 +128,23 @@ public:
 			}
 			m_out << "CONST 0\n";
 		}
+		else if (const auto idx = dynamic_cast<const ast::IndexExpr*>(node->target.get()))
+		{
+			if (idx->array)
+			{
+				idx->array->Accept(*this); // self
+			}
+			if (idx->index)
+			{
+				idx->index->Accept(*this); // arg1
+			}
+			if (node->value)
+			{
+				node->value->Accept(*this); // arg2
+			}
+			m_out << "CALL_METHOD \"set\" 2\n";
+			m_out << "CONST 0\n";
+		}
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -146,7 +176,7 @@ public:
 				}
 			}
 
-			if (directFuncName == "print" || directFuncName == "len")
+			if (directFuncName == "print" || directFuncName == "make_array" || directFuncName == "len")
 			{
 				m_out << "NATIVE \"" << directFuncName << "\" " << node->arguments.size() << "\n";
 			}
@@ -275,7 +305,11 @@ public:
 		case "*"_hs:  m_out << "MUL\n"; break;
 		case "/"_hs:  m_out << "DIV\n"; break;
 		case "<"_hs:  m_out << "LESS\n"; break;
+		case ">"_hs:  m_out << "GREATER\n"; break;
+		case "<="_hs: m_out << "LESS_EQUAL\n"; break;
+		case ">="_hs: m_out << "GREATER_EQUAL\n"; break;
 		case "=="_hs: m_out << "EQUAL\n"; break;
+		case "!="_hs: m_out << "NOT_EQUAL\n"; break;
 		case "&&"_hs: m_out << "AND\n"; break;
 		case "||"_hs: m_out << "OR\n"; break;
 		default: throw std::runtime_error("TextCompiler: Unsupported binary operator '" + node->op.ToString() + "'");

@@ -66,12 +66,16 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 			// clang-format off
-		case OpCode::Add:   BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
-		case OpCode::Sub:   BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
-		case OpCode::Mul:   BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
-		case OpCode::Div:   BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
-		case OpCode::Equal: BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
-		case OpCode::Less:  BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
+		case OpCode::Add:     BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
+		case OpCode::Sub:     BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
+		case OpCode::Mul:     BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
+		case OpCode::Div:     BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
+		case OpCode::Equal:   BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
+		case OpCode::Less:    BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
+		case OpCode::Greater: BINARY_OP([](const Value& a, const Value& b) { return OpLess(b, a); }, GREATER); break;
+		case OpCode::NotEqual: BINARY_OP([](const Value& a, const Value& b) { return IsTruthy(OpEqual(a, b)) ? Value(static_cast<Int>(0)) : Value(static_cast<Int>(1)); }, NOT_EQUAL); break;
+		case OpCode::LessEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(a, b); }, LESS_EQUAL); break;
+		case OpCode::GreaterEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(b, a); }, GREATER_EQUAL); break;
 			// clang-format on
 
 		case OpCode::Inc: {
@@ -252,6 +256,77 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::CallMethod: {
+			Value nameVal = READ_CONSTANT();
+			auto methodName = std::get<String>(nameVal);
+			auto methodHash = methodName.Hash();
+
+			std::uint8_t argCount = READ_BYTE();
+
+			// Stack layout: [Self] [Arg1] ... [ArgN] (Top)
+			// We need to look at the 'Self' object without popping everything yet
+			Value selfVal = m_stack[m_stack.size() - 1 - argCount];
+
+			auto typeInfo = GetTypeInfo(selfVal);
+			if (!typeInfo)
+			{
+				std::cerr << "Runtime Error: Value has no type info\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			auto methodIt = typeInfo->methods.find(methodHash);
+			if (methodIt == typeInfo->methods.end())
+			{
+				std::cerr << "Runtime Error: Undefined method '" << methodName.ToString() << "'\n";
+				return InterpreterResult::RuntimeError;
+			}
+
+			Value callableVal = methodIt->second;
+
+			// Now execute the callable (Closure or NativeObject)
+			if (auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
+			{
+				auto closure = *closurePtr;
+				CallFrame frame;
+				frame.returnAddress = m_ip;
+
+				// The stack base starts AT 'Self', so local variable 0 will be 'this'
+				frame.stackBase = m_stack.size() - argCount - 1;
+				frame.localsBase = m_currentLocalsBase;
+				frame.closure = closure;
+
+				m_callStack.push_back(frame);
+				m_currentLocalsBase = m_variables.size();
+				m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+			}
+			else if (auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
+			{
+				auto native = *nativePtr;
+				if (native->argCount != argCount)
+				{
+					std::cerr << "Runtime Error: Method '" << methodName.ToString() << "' expects " << (int)native->argCount << " arguments.\n";
+					return InterpreterResult::RuntimeError;
+				}
+
+				// Collect arguments INCLUDING 'self' as the first argument
+				std::vector<Value> args(argCount + 1);
+				for (int i = argCount; i > 0; --i)
+				{
+					args[i] = Pop();
+				}
+				args[0] = Pop(); // Pop 'self'
+
+				Value result = native->function(args);
+				Push(result);
+			}
+			else
+			{
+				std::cerr << "Runtime Error: Method is not callable\n";
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
 		case OpCode::New: {
 			Value classNameVal = READ_CONSTANT();
 			auto className = std::get<String>(classNameVal);
@@ -405,51 +480,6 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
-		case OpCode::MakeArray: {
-			Value sizeVal = Pop();
-			auto size = static_cast<std::size_t>(std::get<std::int64_t>(sizeVal));
-
-			auto arr = std::make_shared<ArrayInstance>();
-			arr->typeInfo = m_typeArray;
-			arr->elements.resize(size, std::monostate{});
-
-			Push(arr);
-			break;
-		}
-
-		case OpCode::IndexLoad: {
-			Value indexVal = Pop();
-			Value arrVal = Pop();
-
-			auto arr = std::get<std::shared_ptr<ArrayInstance>>(arrVal);
-			auto idx = static_cast<std::size_t>(std::get<Int>(indexVal));
-
-			if (idx >= arr->elements.size())
-			{
-				throw std::runtime_error("Array index out of bounds");
-			}
-
-			Push(arr->elements[idx]);
-			break;
-		}
-
-		case OpCode::IndexStore: {
-			Value val = Pop();
-			Value indexVal = Pop();
-			Value arrVal = Pop();
-
-			auto arr = std::get<std::shared_ptr<ArrayInstance>>(arrVal);
-			auto idx = static_cast<std::size_t>(std::get<Int>(indexVal));
-
-			if (idx >= arr->elements.size())
-			{
-				throw std::runtime_error("Array index out of bounds");
-			}
-
-			arr->elements[idx] = std::move(val);
-			break;
-		}
-
 		case OpCode::Box: {
 			Value val = Pop();
 			auto upvalue = std::make_shared<Upvalue>();
@@ -594,7 +624,9 @@ TypeInfoPtr VirtualMachine::GetTypeInfo(Value const& value) const
 						  [this](Null_t) { return m_typeNull; },
 						  [this](const Int) { return m_typeInt; },
 						  [this](const Double) { return m_typeDouble; },
-						  [this](String const&) { return m_typeString; }, [](InstancePtr const& inst) { return inst ? inst->typeInfo : nullptr; }, [](std::shared_ptr<ArrayInstance> const& arr) { return arr ? arr->typeInfo : nullptr; },
+						  [this](String const&) { return m_typeString; },
+						  [](InstancePtr const& inst) { return inst ? inst->typeInfo : nullptr; },
+						  [](std::shared_ptr<ArrayInstance> const& arr) { return arr ? arr->typeInfo : nullptr; },
 						  [](const auto&) -> std::shared_ptr<TypeInfo> { return nullptr; } },
 		value);
 }
@@ -607,7 +639,6 @@ void VirtualMachine::InitBuiltinTypes()
 	m_typeNull = std::make_shared<TypeInfo>(String("Null"));
 	m_typeArray = std::make_shared<TypeInfo>(String("Array"));
 
-	// Мы также сохраняем их в глобальный реестр типов, чтобы к ним можно было обратиться
 	m_types[m_typeInt->name.Hash()] = m_typeInt;
 	m_types[m_typeDouble->name.Hash()] = m_typeDouble;
 	m_types[m_typeString->name.Hash()] = m_typeString;

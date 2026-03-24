@@ -192,6 +192,18 @@ enum class OpCode : std::uint8_t
 	// Description: Pops B and A. Pushes 1 (true) if A == B, else 0 (false).
 	Equal,
 
+	// A > B
+	Greater,
+
+	// A <= B
+	LessEqual,
+
+	// A >= B
+	GreaterEqual,
+
+	// A != B
+	NotEqual,
+
 	// ---------------------------------------------------------
 	// CLOSURE AND UPVALUE
 	// ---------------------------------------------------------
@@ -265,6 +277,13 @@ enum class OpCode : std::uint8_t
 	// And can be any Callable object like NativeObjectPtr or ClosurePtr
 	CallIndirect,
 
+	// Bytecode: [CallMethod, const_index(name_hash), uint8(arg_count)]
+	// Stack: ..., [InstancePtr], [arg1], ..., [argN] -> ..., [return_value]
+	// Description: Reads 1 constant (method name string) and 1 byte (arg count).
+	// Pops N arguments, then pops the object instance (self).
+	// Looks up the method by name in the object's TypeInfo and invokes it.
+	CallMethod,
+
 	// ---------------------------------------------------------
 	// USER DEFINED TYPES AND REFLECTION
 	// ---------------------------------------------------------
@@ -297,25 +316,6 @@ enum class OpCode : std::uint8_t
 	// Description: Reads 1 byte (fields count). Pops field names and the type name
 	// to register a new TypeInfo structure in the VM.
 	DefType,
-
-	// ---------------------------------------------------------
-	// ARRAY
-	// ---------------------------------------------------------
-
-	// Bytecode: [MakeArray]
-	// Stack: ..., [size] -> ..., [ArrayInstancePtr]
-	// Description: Pops an integer size and pushes a new ArrayInstance with that size.
-	MakeArray,
-
-	// Bytecode: [IndexLoad]
-	// Stack: ..., [ArrayInstancePtr], [index] -> ..., [value]
-	// Description: Pops index and array. Pushes the value at that array index.
-	IndexLoad,
-
-	// Bytecode: [IndexStore]
-	// Stack: ..., [ArrayInstancePtr], [index], [value] -> ...
-	// Description: Pops value, index, and array. Stores the value at the array index.
-	IndexStore,
 
 	// ---------------------------------------------------------
 	// TERMINATION

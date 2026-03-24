@@ -36,6 +36,7 @@ struct CompilerLayout final : re::Layout
 		: Layout(app)
 	{
 		using namespace re::rvm;
+		InitStdLib(m_vm);
 		m_vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
 			std::cout << ">>> [SCRIPT]: ";
 			for (const auto& arg : args)
@@ -62,8 +63,6 @@ struct CompilerLayout final : re::Layout
 
 		RunRVMTest("scripts/user_types_test.rbc");
 
-		RunRVMTest("scripts/array_tests.rbc");
-
 		RunRVMTest("scripts/closure_tests.rbc");
 	}
 
@@ -81,12 +80,53 @@ struct CompilerLayout final : re::Layout
 		std::string src = R"(
 			package main;
 
+			fun sieve(n: Int) {
+			    // 1. Создаем массив размером n + 1 (чтобы индексы совпадали с числами)
+			    val is_prime = make_array(n + 1);
+
+			    // 2. Инициализируем массив значениями true
+			    var i = 0;
+			    while (i <= n) {
+			        is_prime[i] = true;
+			        i++;
+			    }
+
+			    // 0 и 1 не являются простыми числами
+			    is_prime[0] = false;
+			    is_prime[1] = false;
+
+			    // 3. Основной алгоритм
+			    var p = 2;
+			    // Используем p * p <= n вместо вычисления квадратного корня!
+			    while (p * p <= n) {
+
+			        // Если p осталось true, значит это простое число
+			        if (is_prime[p] == true) {
+
+			            // Вычеркиваем все кратные p, начиная с p^2
+			            var j = p * p;
+			            while (j <= n) {
+			                is_prime[j] = false;
+			                j = j + p; // Шагаем на p!
+			            }
+			        }
+			        p++;
+			    }
+
+			    // 4. Выводим результаты
+			    print("Prime numbers up to", n, ":");
+			    var k = 2;
+			    while (k <= n) {
+			        if (is_prime[k] == true) {
+			            print(k);
+			        }
+			        k++;
+			    }
+			}
+
 			fun main() {
-				print(!true);
-				print(!false);
-				val y = 10;
-				var x = ++y;
-				print("y:", y, "x:", x);
+			    // Найдем все простые числа до 50
+			    sieve(50);
 			}
 		)";
 		auto tokens = igni::CreateLexer(src).tokenize();
@@ -112,6 +152,48 @@ struct CompilerLayout final : re::Layout
 private:
 	re::AssetManager m_manager;
 	re::rvm::VirtualMachine m_vm;
+
+	static void InitStdLib(re::rvm::VirtualMachine& vm)
+	{
+		using namespace re::rvm;
+		using namespace re::literals;
+		// 1. Создаем TypeInfo так же, как это сделал бы компилятор
+		auto typeArray = std::make_shared<TypeInfo>("Array");
+
+		// 2. Подшиваем C++ реализацию для метода get
+		auto getMethod = std::make_shared<NativeObject>();
+		getMethod->name = "get";
+		getMethod->argCount = 1; // 1 аргумент (индекс). 'self' передается скрыто.
+		getMethod->function = [](const std::vector<Value>& args) -> Value {
+			const auto arr = std::get<ArrayInstancePtr>(args[0]); // args[0] это всегда self!
+			const auto index = std::get<Int>(args[1]); // args[1] это index
+			return arr->elements[index];
+		};
+		typeArray->methods["get"_hs] = getMethod;
+
+		// 3. Подшиваем set
+		auto setMethod = std::make_shared<NativeObject>();
+		setMethod->name = "set";
+		setMethod->argCount = 2; // индекс, значение
+		setMethod->function = [](const std::vector<Value>& args) -> Value {
+			const auto arr = std::get<ArrayInstancePtr>(args[0]);
+			const auto index = std::get<Int>(args[1]);
+			arr->elements[index] = args[2];
+			return Null;
+		};
+		typeArray->methods["set"_hs] = setMethod;
+
+		// 4. Регистрируем тип в ВМ
+		vm.RegisterType(typeArray);
+
+		// Регистрируем глобальный make_array
+		vm.RegisterNative("make_array", [typeArray](const std::vector<Value>& args) -> Value {
+			auto arr = std::make_shared<ArrayInstance>();
+			arr->typeInfo = typeArray;
+			arr->elements.resize(std::get<Int>(args[0]));
+			return arr;
+		});
+	}
 
 	void RunRVMTest(const char* file)
 	{

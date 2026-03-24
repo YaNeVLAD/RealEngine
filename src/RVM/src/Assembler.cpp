@@ -279,6 +279,29 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseCallMethod = [&]() -> bool {
+		const auto funcNameOpt = lexer.next();
+		if (!funcNameOpt)
+		{
+			return false;
+		}
+		const auto argsOpt = lexer.next();
+		if (!argsOpt)
+		{
+			return false;
+		}
+
+		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto funcName = String(ProcessEscapeSequences(rawStr));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::CallMethod));
+		outChunk.Write(outChunk.AddConstant(funcName));
+		outChunk.Write(argCount);
+
+		return true;
+	};
+
 	auto parseNew = [&]() -> bool {
 		const auto argOpt = lexer.next();
 		if (!argOpt)
@@ -466,6 +489,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		  case "LESS"_hs:   	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
 		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;
+		  case "GREATER"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::Greater)); break;
+		  case "LESS_EQUAL"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::LessEqual)); break;
 
 		  case "LABEL"_hs:		   if (!parseLabel()) return false; break;
 		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
@@ -482,10 +507,6 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::TypeOf)); break;
 		  case "TYPE"_hs:          if (!parseType()) return false; break;
 
-		  case "MAKE_ARRAY"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeArray)); break;
-		  case "INDEX_LOAD"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexLoad)); break;
-		  case "INDEX_STORE"_hs:   outChunk.Write(static_cast<std::uint8_t>(OpCode::IndexStore)); break;
-
 		  case "BOX"_hs:           outChunk.Write(static_cast<uint8_t>(OpCode::Box)); break;
 		  case "UNBOX"_hs:         outChunk.Write(static_cast<uint8_t>(OpCode::Unbox)); break;
 		  case "STORE_BOX"_hs:     outChunk.Write(static_cast<uint8_t>(OpCode::StoreBox)); break;
@@ -496,6 +517,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "MAKE_CLOSURE"_hs:  if (!parseMakeClosure()) return false; break;
 		  case "LOAD_NATIVE"_hs:   if (!parseLoadNative()) return false; break;
 
+		  case "CALL_METHOD"_hs:   if (!parseCallMethod()) return false; break;
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	   if (!parseNative()) return false; break;
 		  case "LOAD_FUN"_hs:      if (!parseLoadFun()) return false; break;
@@ -535,8 +557,7 @@ std::uint8_t Assembler::DeclareVariable(const std::string& name)
 
 std::optional<std::uint8_t> Assembler::ResolveVariable(const std::string& name)
 {
-	const auto hash = HashedString{ name };
-	if (m_locals.contains(hash))
+	if (const auto hash = HashedString(name); m_locals.contains(hash))
 	{
 		return m_locals[hash];
 	}

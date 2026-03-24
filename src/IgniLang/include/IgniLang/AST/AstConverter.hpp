@@ -197,18 +197,28 @@ private:
 		switch (exprNode->symbol.Hashed())
 		{
 		case "Designator"_hs: {
+			// Rule 1: Designator -> ident
 			if (exprNode->children.size() == 1)
 			{
 				auto id = std::make_unique<ast::IdentifierExpr>();
 				id->name = exprNode->children[0]->token->lexeme;
 				return id;
 			}
+			// Rule 2: Designator -> Designator(OptActPars)
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "("_hs)
 			{
 				auto call = std::make_unique<ast::CallExpr>();
 				call->callee = ConvertExpr(exprNode->children[0].get());
 				ExtractArguments(exprNode->children[2].get(), call->arguments);
 				return call;
+			}
+			// Rule 3: Designator -> Designator[Expr]
+			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "["_hs)
+			{
+				auto idx = std::make_unique<ast::IndexExpr>();
+				idx->array = ConvertExpr(exprNode->children[0].get()); // Что индексируем
+				idx->index = ConvertExpr(exprNode->children[2].get()); // Сам индекс
+				return idx;
 			}
 			break;
 		}
