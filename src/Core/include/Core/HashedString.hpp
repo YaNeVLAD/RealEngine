@@ -135,22 +135,22 @@ inline namespace literals
 	return HashedString{ str, size };
 }
 
-[[nodiscard]] consteval HashedWString operator"" _hws(const wchar_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedWString operator"" _hs(const wchar_t* str, const std::size_t size) noexcept
 {
 	return HashedWString{ str, size };
 }
 
-[[nodiscard]] consteval HashedU8String operator"" _h8s(const char8_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU8String operator"" _hs(const char8_t* str, const std::size_t size) noexcept
 {
 	return HashedU8String{ str, size };
 }
 
-[[nodiscard]] consteval HashedU16String operator"" _h16s(const char16_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU16String operator"" _hs(const char16_t* str, const std::size_t size) noexcept
 {
 	return HashedU16String{ str, size };
 }
 
-[[nodiscard]] consteval HashedU32String operator"" _h32s(const char32_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU32String operator"" _hs(const char32_t* str, const std::size_t size) noexcept
 {
 	return HashedU32String{ str, size };
 }
