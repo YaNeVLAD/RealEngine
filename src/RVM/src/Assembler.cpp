@@ -136,7 +136,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
-	auto parseSet = [&]() -> bool {
+	auto parseSetLocal = [&]() -> bool {
 		const auto argOpt = lexer.next();
 		if (!argOpt)
 		{
@@ -156,7 +156,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
-	auto parseGet = [&]() -> bool {
+	auto parseGetLocal = [&]() -> bool {
 		const auto argOpt = lexer.next();
 		if (!argOpt)
 		{
@@ -179,6 +179,46 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::GetLocal));
 		outChunk.Write(slotOpt.value());
+
+		return true;
+	};
+
+	auto parseSetGlobal = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+
+		if (argOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected string literal after SET_GLOBAL\n";
+			return false;
+		}
+
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::SetGlobal));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+
+		return true;
+	};
+
+	auto parseGetGlobal = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+			return false;
+
+		if (argOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected string literal after GET_GLOBAL\n";
+			return false;
+		}
+
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::GetGlobal));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 
 		return true;
 	};
@@ -497,8 +537,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "JMP_IF_FALSE"_hs:  if (!parseJump(OpCode::JmpIfFalse)) return false; break;
 
           case "CONST"_hs:  	   if (!parseConst()) return false; break;
-          case "SET"_hs:    	   if (!parseSet()) return false; break;
-          case "GET"_hs:    	   if (!parseGet()) return false; break;
+          case "SET"_hs:    	   if (!parseSetLocal()) return false; break;
+          case "GET"_hs:    	   if (!parseGetLocal()) return false; break;
+		  case "SET_GLOBAL"_hs:    if (!parseSetGlobal()) return false; break;
+		  case "GET_GLOBAL"_hs:    if (!parseGetGlobal()) return false; break;
           case "FUN"_hs:    	   if (!parseDef()) return false; break;
 
 		  case "NEW"_hs:           if (!parseNew()) return false; break;

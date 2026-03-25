@@ -17,19 +17,22 @@ namespace igni::compiler
 class TextCompiler
 {
 public:
-	std::string Compile(const ast::Program* program)
+	std::string Compile(
+		const ast::Program* program,
+		const std::unordered_set<re::String>& globalNames,
+		const std::unordered_map<re::String, re::String>& importAliases)
 	{
 		std::vector<const ast::FunDecl*> flatFunctions;
-		std::unordered_map<const ast::FunDecl*, std::vector<std::string>> functionUpvalues;
-		std::unordered_map<const ast::FunDecl*, std::unordered_set<std::string>> functionBoxedVars;
+		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;
+		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>> functionBoxedVars;
 
 		// Pass 1
-		ScopeAnalyzer analyzer(flatFunctions, functionUpvalues, functionBoxedVars);
+		ScopeAnalyzer analyzer(flatFunctions, functionUpvalues, functionBoxedVars, globalNames);
 		analyzer.Analyze(program);
 
 		// Pass 2
 		std::stringstream out;
-		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars);
+		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases);
 		generator.Generate(program);
 
 		return out.str();

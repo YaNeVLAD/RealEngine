@@ -52,7 +52,7 @@ class BaseAstVisitor : public IAstVisitor
 public:
 	~BaseAstVisitor() override = default;
 
-#define DECLARE_VISITOR_METHOD(Name) virtual void Visit(const Name* node) override {};
+#define DECLARE_VISITOR_METHOD(Name) virtual void Visit(const Name*) override {};
 	AST_NODES(DECLARE_VISITOR_METHOD)
 #undef DECLARE_VISITOR_METHOD
 };
@@ -229,7 +229,7 @@ struct IndexExpr final : Visitable<IndexExpr, Expr>
 	std::unique_ptr<Expr> array;
 	std::unique_ptr<Expr> index;
 
-	void Print(int depth = 0) const override { /* ... */ }
+	void Print(int = 0) const override { /* ... */ }
 };
 
 struct AssignExpr final : Visitable<AssignExpr, Expr>
@@ -498,9 +498,9 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 		std::cout << "FunDecl [name: '" << name.ToString() << "']\n";
 		PrintIndent(depth + 1);
 		std::cout << "Params: ";
-		for (const auto& [name, type] : parameters)
+		for (const auto& [paramName, type] : parameters)
 		{
-			std::cout << name.ToString() << " ";
+			std::cout << paramName.ToString() << " ";
 
 			if (type)
 			{

@@ -130,3 +130,12 @@ RE_CORE_API std::ostream& operator<<(std::ostream& os, const String& str);
 RE_CORE_API std::wostream& operator<<(std::wostream& os, const String& str);
 
 } // namespace re
+
+template <>
+struct std::hash<re::String>
+{
+	std::size_t operator()(re::String const& str) const noexcept
+	{
+		return str.Hash();
+	}
+};

@@ -1,0 +1,10 @@
+package main;
+
+import stdlib.*;
+import math.sqrt;
+
+fun main()
+{
+    val result = sqrt(36);
+    print(result);
+}

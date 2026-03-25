@@ -1,0 +1,84 @@
+Program -> OptPackageDecl ImportDeclList TopLevelDeclList
+
+OptPackageDecl -> PackageDecl | \e
+PackageDecl -> package PackagePath ;
+PackagePath -> PackagePath . ident | ident
+
+ImportDeclList -> ImportDeclList ImportDecl | \e
+ImportDecl -> import ImportPath OptDotStar ;
+ImportPath -> ImportPath . ident | ident
+OptDotStar -> . * | \e
+
+TopLevelDeclList -> TopLevelDeclList TopLevelDecl | \e
+TopLevelDecl -> AnnotationList OptVisibility Decl
+Decl -> VarDecl | ValDecl | ClassDecl | FunDecl
+
+AnnotationList -> AnnotationList Annotation | \e
+Annotation -> @ ident OptParenExpr
+OptParenExpr -> ( Expr ) | \e
+
+OptVisibility -> public | private | internal | \e
+
+VarDecl -> var ident OptColonType = Expr ;
+ValDecl -> val ident OptColonType = Expr ;
+OptColonType -> : Type | \e
+
+ClassDecl -> class ident OptTypeParams { ClassMemberList }
+OptTypeParams -> < TypeParams > | \e
+TypeParams -> TypeParams , ident | ident
+
+ClassMemberList -> ClassMemberList ClassMember | \e
+ClassMember -> AnnotationList OptVisibility ClassMemberDecl
+ClassMemberDecl -> VarDecl | ValDecl | FunDecl
+
+FunDecl -> OptFunMod fun FunName OptTypeParams ( OptFormPars ) OptColonType FunBody
+FunName -> ident | Type . ident | Type ? . ident
+OptFunMod -> external | compile_time | \e
+OptFormPars -> FormPars | \e
+FormPars -> FormPars , FormPar | FormPar
+FormPar -> ident : Type
+FunBody -> Block | = Expr ;
+
+Type -> ident OptTypeArgs OptQuestion | ( OptTypeList ) -> Type OptQuestion
+OptTypeList -> TypeList | \e
+TypeList -> TypeList , Type | Type
+
+OptTypeArgs -> < TypeList > | \e
+OptQuestion -> ? | \e
+
+Block -> { StatementList }
+StatementList -> StatementList Statement | \e
+
+Statement -> VarDecl | ValDecl | FunDecl | Expr ; | IfStmt | WhileStmt | ForStmt | return OptExpr ; | break ;
+OptExpr -> Expr | \e
+
+IfStmt -> if ( Expr ) Block OptElse
+OptElse -> else ElseBody | \e
+ElseBody -> IfStmt | Block
+
+WhileStmt -> while ( Expr ) Block
+ForStmt -> for ( ident in Expr .. Expr ) Block
+
+Expr -> LogOrExpr = Expr | LogOrExpr
+
+LogOrExpr -> LogOrExpr or LogAndExpr | LogAndExpr
+LogAndExpr -> LogAndExpr and EqExpr | EqExpr
+EqExpr -> EqExpr == RelExpr | EqExpr != RelExpr | RelExpr
+RelExpr -> RelExpr < AddExpr | RelExpr <= AddExpr | RelExpr > AddExpr | RelExpr >= AddExpr | AddExpr
+AddExpr -> AddExpr + MulExpr | AddExpr - MulExpr | MulExpr
+MulExpr -> MulExpr * UnaryExpr | MulExpr / UnaryExpr | MulExpr % UnaryExpr | UnaryExpr
+
+UnaryExpr -> + UnaryExpr | - UnaryExpr | ! UnaryExpr | ~ UnaryExpr
+           | ++ Designator | -- Designator
+           | PostfixExpr
+
+PostfixExpr -> Designator ++
+             | Designator --
+             | PrimaryExpr
+
+PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr ) | Designator
+
+Designator -> ident | Designator . ident | Designator [ Expr ] | Designator ?. ident | Designator ( OptActPars )
+
+OptActPars -> ActPars | \e
+ActPars -> ActPars , Expr | Expr

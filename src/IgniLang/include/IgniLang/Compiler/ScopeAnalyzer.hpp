@@ -16,30 +16,18 @@ class ScopeAnalyzer final : public ast::BaseAstVisitor
 public:
 	ScopeAnalyzer(
 		std::vector<const ast::FunDecl*>& flatFuncs,
-		std::unordered_map<const ast::FunDecl*, std::vector<std::string>>& funcUpvalues,
-		std::unordered_map<const ast::FunDecl*, std::unordered_set<std::string>>& funcBoxedVars)
+		std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvalues,
+		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
+		const std::unordered_set<re::String>& globalNames)
 		: m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvalues)
 		, m_functionBoxedVars(funcBoxedVars)
 	{
-		m_scopeStack.emplace_back(); // Global scope
+		m_scopeStack.emplace_back(globalNames); // Global scope
 	}
 
 	void Analyze(const ast::Program* program)
 	{
-		for (const auto& stmt : program->statements)
-		{
-			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
-			{
-				m_globalScope.insert(fun->name.ToString());
-			}
-		}
-		m_globalScope.insert("print");
-		m_globalScope.insert("make_array");
-		m_globalScope.insert("len");
-
-		m_scopeStack.back() = m_globalScope;
-
 		program->Accept(*this);
 	}
 
@@ -57,9 +45,9 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
-		if (!m_scopeStack.back().contains(node->name.ToString()))
+		if (!m_scopeStack.back().contains(node->name))
 		{
-			m_freeVars.insert(node->name.ToString());
+			m_freeVars.insert(node->name);
 		}
 	}
 
@@ -178,8 +166,8 @@ public:
 			node->endExpr->Accept(*this);
 		}
 
-		m_scopeStack.push_back(m_scopeStack.back());
-		m_scopeStack.back().insert(node->iteratorName.ToString());
+		m_scopeStack.emplace_back(m_scopeStack.back());
+		m_scopeStack.back().insert(node->iteratorName);
 
 		if (node->body)
 		{
@@ -196,7 +184,7 @@ public:
 		{
 			node->initializer->Accept(*this);
 		}
-		m_scopeStack.back().insert(node->name.ToString());
+		m_scopeStack.back().insert(node->name);
 	}
 
 	void Visit(const ast::ValDecl* node) override
@@ -205,37 +193,36 @@ public:
 		{
 			node->initializer->Accept(*this);
 		}
-		m_scopeStack.back().insert(node->name.ToString());
+		m_scopeStack.back().insert(node->name);
 	}
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		m_scopeStack.back().insert(node->name.ToString());
+		m_scopeStack.back().insert(node->name);
 		m_functionBoxedVars[node];
 
-		ScopeAnalyzer childAnalyzer(m_flatFunctions, m_functionUpvalues, m_functionBoxedVars);
-		childAnalyzer.m_globalScope = m_globalScope;
+		ScopeAnalyzer childAnalyzer(m_flatFunctions, m_functionUpvalues, m_functionBoxedVars, m_scopeStack.front());
 		childAnalyzer.m_currentFunContext = node;
 
-		std::unordered_set<std::string> funLocals;
-		funLocals.insert(node->name.ToString());
-		for (const auto& p : node->parameters)
+		std::unordered_set<re::String> funLocals;
+		funLocals.insert(node->name);
+		for (const auto& [name, type] : node->parameters)
 		{
-			funLocals.insert(p.name.ToString());
+			funLocals.insert(name);
 		}
-		childAnalyzer.m_scopeStack.push_back(funLocals);
+		childAnalyzer.m_scopeStack.emplace_back(funLocals);
 
 		if (node->body)
 		{
 			node->body->Accept(childAnalyzer);
 		}
 
-		std::vector<std::string> upvalues;
+		std::vector<re::String> upvalues;
 		for (const auto& uv : childAnalyzer.m_freeVars)
 		{
-			if (!m_globalScope.contains(uv))
+			if (!m_scopeStack.front().contains(uv))
 			{
-				upvalues.push_back(uv);
+				upvalues.emplace_back(uv);
 				if (m_currentFunContext)
 				{
 					m_functionBoxedVars[m_currentFunContext].insert(uv);
@@ -248,7 +235,7 @@ public:
 		}
 
 		m_functionUpvalues[node] = upvalues;
-		m_flatFunctions.push_back(node);
+		m_flatFunctions.emplace_back(node);
 	}
 
 	void Visit(const ast::Program* node) override
@@ -263,14 +250,13 @@ public:
 	}
 
 private:
-	std::unordered_set<std::string> m_globalScope;
-	std::vector<std::unordered_set<std::string>> m_scopeStack; // Стек областей видимости
-	std::unordered_set<std::string> m_freeVars; // Свободные переменные текущей функции
+	std::vector<std::unordered_set<re::String>> m_scopeStack;
+	std::unordered_set<re::String> m_freeVars;
 	const ast::FunDecl* m_currentFunContext = nullptr;
 
 	std::vector<const ast::FunDecl*>& m_flatFunctions;
-	std::unordered_map<const ast::FunDecl*, std::vector<std::string>>& m_functionUpvalues;
-	std::unordered_map<const ast::FunDecl*, std::unordered_set<std::string>>& m_functionBoxedVars;
+	std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& m_functionUpvalues;
+	std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& m_functionBoxedVars;
 };
 
 } // namespace igni

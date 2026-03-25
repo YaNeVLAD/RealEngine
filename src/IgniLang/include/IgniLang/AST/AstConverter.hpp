@@ -43,35 +43,50 @@ public:
 	}
 
 private:
-	static std::string ExtractPathString(const CstNode* pathNode)
+	static re::String ExtractPathString(const CstNode* pathNode)
 	{
+		// Path -> ident
 		if (pathNode->children.size() == 1)
 		{
-			return std::string(pathNode->children[0]->token->lexeme);
+			return pathNode->children[0]->token->lexeme;
+		}
+		// Path -> Path . ident
+		if (pathNode->children.size() == 3)
+		{
+			const re::String leftPath = ExtractPathString(pathNode->children[0].get());
+			const re::String rightIdent = pathNode->children[2]->token->lexeme;
+			return leftPath + '.' + rightIdent;
 		}
 
-		return ExtractPathString(pathNode->children[0].get()) + "." + std::string(pathNode->children[2]->token->lexeme);
+		return re::String{};
 	}
 
-	void ExtractImports(const CstNode* listNode, std::vector<std::unique_ptr<ast::ImportDecl>>& outImports)
+	static void ExtractImports(const CstNode* listNode, std::vector<std::unique_ptr<ast::ImportDecl>>& outImports)
 	{
-		// ImportDeclList -> ImportDeclList ImportDecl | \e
-		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		if (!listNode || listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
 		{
 			return;
 		}
 
-		ExtractImports(listNode->children[0].get(), outImports);
+		// ImportDeclList -> ImportDeclList ImportDecl
+		if (listNode->children.size() == 2)
+		{
+			ExtractImports(listNode->children[0].get(), outImports);
 
-		const auto& declNode = listNode->children[1]; // ImportDecl -> import ImportPath OptDotStar ;
-		auto importDecl = std::make_unique<ast::ImportDecl>();
+			const auto& declNode = listNode->children[1];
 
-		importDecl->path = ExtractPathString(declNode->children[1].get());
+			auto importDecl = std::make_unique<ast::ImportDecl>();
 
-		const auto& optStar = declNode->children[2];
-		importDecl->isStar = (!optStar->children.empty() && optStar->children[0]->symbol.Hashed() == "."_hs);
+			// declNode->children[0] = "import"
+			// declNode->children[1] = ImportPath
+			importDecl->path = ExtractPathString(declNode->children[1].get());
 
-		outImports.push_back(std::move(importDecl));
+			// declNode->children[2] = OptDotStar
+			const auto& optStar = declNode->children[2];
+			importDecl->isStar = (!optStar->children.empty() && optStar->children[0]->symbol.Hashed() == "."_hs);
+
+			outImports.push_back(std::move(importDecl));
+		}
 	}
 
 	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)

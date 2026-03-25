@@ -52,6 +52,11 @@ void VirtualMachine::RegisterType(TypeInfoPtr typeInfo)
 	m_types[typeInfo->name.Hash()] = std::move(typeInfo);
 }
 
+void VirtualMachine::RegisterGlobal(const String& name, Value value)
+{
+	m_globals[name] = std::move(value);
+}
+
 InterpreterResult VirtualMachine::Run()
 {
 	for (;;)
@@ -80,15 +85,14 @@ InterpreterResult VirtualMachine::Run()
 
 		case OpCode::Inc: {
 			Value a = Pop();
-			if (auto* i = std::get_if<Int>(&a))
-			{
-				Push(*i + 1);
-			}
-			else if (auto* d = std::get_if<Double>(&a))
-			{
-				Push(*d + 1.0);
-			}
-			else
+			bool result = std::visit(
+				utils::overloaded{
+					[this](const Int& i) { Push(i + 1); return true; },
+					[this](const Double& d) { Push(d + 1.0); return true; },
+					[this](auto&) { return false; },
+				},
+				a);
+			if (!result)
 			{
 				return InterpreterResult::RuntimeError;
 			}
@@ -152,6 +156,24 @@ InterpreterResult VirtualMachine::Run()
 				m_variables.resize(actualIndex + 1);
 			}
 			m_variables[actualIndex] = std::move(val);
+			break;
+		}
+
+		case OpCode::GetGlobal: {
+			Value nameVal = READ_CONSTANT();
+			auto it = m_globals.find(std::get<String>(nameVal));
+			if (it == m_globals.end())
+			{
+				std::cerr << "Runtime Error: Undefined global variable/module." + nameVal + "\n";
+				return InterpreterResult::RuntimeError;
+			}
+			Push(it->second);
+			break;
+		}
+
+		case OpCode::SetGlobal: {
+			Value nameVal = READ_CONSTANT();
+			m_globals[std::get<String>(nameVal)] = Pop();
 			break;
 		}
 
@@ -304,7 +326,11 @@ InterpreterResult VirtualMachine::Run()
 				auto native = *nativePtr;
 				if (native->argCount != argCount)
 				{
-					std::cerr << "Runtime Error: Method '" << methodName.ToString() << "' expects " << (int)native->argCount << " arguments.\n";
+					std::cerr << "Runtime Error: Method '"
+							  << methodName.ToString()
+							  << "' expects " << static_cast<int>(native->argCount)
+							  << " arguments.\n";
+
 					return InterpreterResult::RuntimeError;
 				}
 

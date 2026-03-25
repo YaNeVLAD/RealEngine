@@ -39,6 +39,8 @@ public:
 
 	void RegisterType(TypeInfoPtr typeInfo);
 
+	void RegisterGlobal(const String& name, Value value);
+
 private:
 	InterpreterResult Run();
 
@@ -68,6 +70,8 @@ private:
 	HashMap<NativeFn> m_natives;
 
 	HashMap<TypeInfoPtr> m_types;
+
+	std::unordered_map<String, Value> m_globals;
 
 	std::size_t m_currentLocalsBase = 0;
 };

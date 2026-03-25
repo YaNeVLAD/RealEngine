@@ -139,6 +139,12 @@ enum class OpCode : std::uint8_t
 	// function in the registry by name and pushes a new NativeObject onto the stack.
 	LoadNative,
 
+	// Reads hash, pushes value from m_globals
+	GetGlobal,
+
+	// Reads hash, pops value, stores in m_globals
+	SetGlobal,
+
 	// ---------------------------------------------------------
 	// ARITHMETIC
 	// ---------------------------------------------------------

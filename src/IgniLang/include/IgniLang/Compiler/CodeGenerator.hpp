@@ -19,12 +19,14 @@ public:
 	CodeGenerator(
 		std::ostream& out,
 		const std::vector<const ast::FunDecl*>& flatFuncs,
-		const std::unordered_map<const ast::FunDecl*, std::vector<std::string>>& funcUpvals,
-		const std::unordered_map<const ast::FunDecl*, std::unordered_set<std::string>>& funcBoxedVars)
+		const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvals,
+		const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
+		const std::unordered_map<re::String, re::String>& importAliases)
 		: m_out(out)
 		, m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvals)
 		, m_functionBoxedVars(funcBoxedVars)
+		, m_importAliases(importAliases)
 	{
 	}
 
@@ -32,7 +34,7 @@ public:
 	{
 		m_out << "// ==========================================\n";
 		m_out << "// Auto-generated RVM Assembly\n";
-		m_out << "// Package: " << program->packageName.ToString() << "\n";
+		m_out << "// Package: " << program->packageName << "\n";
 		m_out << "// ==========================================\n\n";
 		m_out << "// --- Entry Point ---\n";
 		m_out << "CALL main 0\nRETURN\n\n";
@@ -84,7 +86,14 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
-		const auto name = node->name.ToString();
+		const auto& name = node->name;
+		if (m_importAliases.contains(name))
+		{
+			m_out << "GET_GLOBAL \"" << m_importAliases.at(name) << "\"\n";
+			m_out << "GET_PROPERTY \"" << name << "\"\n";
+			return;
+		}
+
 		if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 		{
 			m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
@@ -99,7 +108,17 @@ public:
 		}
 		else
 		{
-			m_out << "LOAD_FUN " << name << "\n";
+			const auto it = std::ranges::find_if(m_flatFunctions, [name](const ast::FunDecl* fun) {
+				return fun->name == name;
+			});
+			if (it != m_flatFunctions.end())
+			{
+				m_out << "LOAD_FUN " << name << "\n";
+			}
+			else
+			{
+				m_out << "GET_GLOBAL \"" << name << "\"\n";
+			}
 		}
 	}
 
@@ -107,7 +126,7 @@ public:
 	{
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->target.get()))
 		{
-			const std::string name = id->name.ToString();
+			const auto& name = id->name;
 			if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 			{
 				if (node->value)
@@ -159,13 +178,49 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		bool isDirectCall = false;
-		std::string directFuncName = "";
+		if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+		{
+			if (memberAccess->object)
+			{
+				memberAccess->object->Accept(*this);
+			}
 
+			for (const auto& arg : node->arguments)
+			{
+				if (arg)
+				{
+					arg->Accept(*this);
+				}
+			}
+
+			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << node->arguments.size() << "\n";
+			return;
+		}
+
+		bool isDirectCall = false;
+		re::String directFuncName;
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
 		{
-			directFuncName = id->name.ToString();
-			if (directFuncName == "print" || directFuncName == "make_array" || directFuncName == "len")
+			directFuncName = id->name;
+			const auto hashed = directFuncName.Hashed();
+			if (m_importAliases.contains(directFuncName))
+			{
+				const auto& moduleName = m_importAliases.at(directFuncName);
+
+				m_out << "GET_GLOBAL \"" << moduleName << "\"\n";
+
+				for (const auto& arg : node->arguments)
+				{
+					if (arg)
+					{
+						arg->Accept(*this);
+					}
+				}
+
+				m_out << "CALL_METHOD \"" << directFuncName << "\" " << node->arguments.size() << "\n";
+				return;
+			}
+			if (hashed == "print"_hs || hashed == "make_array"_hs || hashed == "len"_hs)
 			{
 				isDirectCall = true;
 			}
@@ -214,7 +269,8 @@ public:
 
 	void Visit(const ast::UnaryExpr* node) override
 	{
-		if (const std::string op = node->op.ToString(); op == "-")
+		const auto& op = node->op;
+		if (const auto hashed = op.Hashed(); hashed == "-"_hs)
 		{
 			m_out << "CONST 0\n";
 			if (node->operand)
@@ -223,14 +279,14 @@ public:
 			}
 			m_out << "SUB\n";
 		}
-		else if (op == "+")
+		else if (hashed == "+"_hs)
 		{
 			if (node->operand)
 			{
 				node->operand->Accept(*this);
 			}
 		}
-		else if (op == "!")
+		else if (hashed == "!"_hs)
 		{
 			if (node->operand)
 			{
@@ -238,7 +294,7 @@ public:
 			}
 			m_out << "CONST 0\nEQUAL\n";
 		}
-		else if (op == "~")
+		else if (hashed == "~"_hs)
 		{
 			if (node->operand)
 			{
@@ -246,14 +302,14 @@ public:
 			}
 			m_out << "BIT_NOT\n";
 		}
-		else if (op == "++" || op == "--")
+		else if (hashed == "++"_hs || hashed == "--"_hs)
 		{
-			const auto vmOp = (op == "++") ? "INC" : "DEC";
-			const auto revOp = (op == "++") ? "DEC" : "INC";
+			const auto vmOp = (hashed == "++"_hs) ? "INC" : "DEC";
+			const auto revOp = (hashed == "++"_hs) ? "DEC" : "INC";
 
 			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->operand.get()))
 			{
-				const auto name = id->name.ToString();
+				const auto& name = id->name;
 				const auto upIt = std::ranges::find(m_currentUpvalues, name);
 
 				if (upIt != m_currentUpvalues.end())
@@ -339,7 +395,7 @@ public:
 		{
 			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(call->callee.get()))
 			{
-				if (id->name.ToString() == "print")
+				if (id->name.Hashed() == "print"_hs)
 				{
 					shouldPop = false;
 				}
@@ -378,12 +434,14 @@ public:
 	void Visit(const ast::IfStmt* node) override
 	{
 		const auto currentLabelId = m_labelCount++;
-		const auto elseLabel = "L_else_" + std::to_string(currentLabelId);
-		const auto endLabel = "L_end_" + std::to_string(currentLabelId);
+		const re::String elseLabel = "L_else_" + std::to_string(currentLabelId);
+		const re::String endLabel = "L_end_" + std::to_string(currentLabelId);
 
 		m_out << "// --- if ---\n";
 		if (node->condition)
+		{
 			node->condition->Accept(*this);
+		}
 
 		m_out << "JMP_IF_FALSE " << (node->elseBranch ? elseLabel : endLabel) << "\n";
 
@@ -403,8 +461,8 @@ public:
 	void Visit(const ast::WhileStmt* node) override
 	{
 		const auto labelId = m_labelCount++;
-		const auto startLabel = "L_while_start_" + std::to_string(labelId);
-		const auto endLabel = "L_while_end_" + std::to_string(labelId);
+		const re::String startLabel = "L_while_start_" + std::to_string(labelId);
+		const re::String endLabel = "L_while_end_" + std::to_string(labelId);
 
 		m_out << "LABEL " << startLabel << "\n";
 		if (node->condition)
@@ -424,11 +482,11 @@ public:
 	void Visit(const ast::ForStmt* node) override
 	{
 		const auto labelId = m_labelCount++;
-		const auto startLabel = "L_for_start_" + std::to_string(labelId);
-		const auto endLabel = "L_for_end_" + std::to_string(labelId);
+		const re::String startLabel = "L_for_start_" + std::to_string(labelId);
+		const re::String endLabel = "L_for_end_" + std::to_string(labelId);
 
-		auto iterName = node->iteratorName.ToString();
-		auto limitName = "_for_limit_" + std::to_string(labelId);
+		const auto& iterName = node->iteratorName;
+		re::String limitName = "_for_limit_" + std::to_string(labelId);
 
 		m_out << "// --- for (" << iterName << ") ---\n";
 		if (node->startExpr)
@@ -469,13 +527,13 @@ public:
 			m_out << "CONST 0\n";
 		}
 
-		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name.ToString()))
+		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
 		{
 			m_out << "BOX\n";
 		}
 
-		m_out << "SET " << node->name.ToString() << "\n";
-		m_currentLocals.push_back(node->name.ToString());
+		m_out << "SET " << node->name << "\n";
+		m_currentLocals.emplace_back(node->name);
 	}
 
 	void Visit(const ast::ValDecl* node) override
@@ -489,13 +547,13 @@ public:
 			m_out << "CONST 0\n";
 		}
 
-		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name.ToString()))
+		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
 		{
 			m_out << "BOX\n";
 		}
 
-		m_out << "SET " << node->name.ToString() << "\n";
-		m_currentLocals.push_back(node->name.ToString());
+		m_out << "SET " << node->name << "\n";
+		m_currentLocals.emplace_back(node->name);
 	}
 
 	void Visit(const ast::FunDecl* node) override
@@ -513,9 +571,9 @@ public:
 			}
 		}
 
-		m_out << "MAKE_CLOSURE " << node->name.ToString() << " " << upvalues.size() << "\n";
-		m_out << "SET " << node->name.ToString() << "\n";
-		m_currentLocals.push_back(node->name.ToString());
+		m_out << "MAKE_CLOSURE " << node->name << " " << upvalues.size() << "\n";
+		m_out << "SET " << node->name << "\n";
+		m_currentLocals.emplace_back(node->name);
 	}
 
 private:
@@ -523,17 +581,19 @@ private:
 	std::size_t m_labelCount = 0;
 
 	const ast::FunDecl* m_currentFunction = nullptr;
-	std::vector<std::string> m_currentLocals;
-	std::vector<std::string> m_currentUpvalues;
+	std::vector<re::String> m_currentLocals;
+	std::vector<re::String> m_currentUpvalues;
 
 	const std::vector<const ast::FunDecl*>& m_flatFunctions;
-	const std::unordered_map<const ast::FunDecl*, std::vector<std::string>>& m_functionUpvalues;
-	const std::unordered_map<const ast::FunDecl*, std::unordered_set<std::string>>& m_functionBoxedVars;
+	const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& m_functionUpvalues;
+	const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& m_functionBoxedVars;
+
+	const std::unordered_map<re::String, re::String>& m_importAliases;
 
 	void GenerateFunction(const ast::FunDecl* fun)
 	{
 		m_currentFunction = fun;
-		m_out << "FUN " << fun->name.ToString() << "\n";
+		m_out << "FUN " << fun->name << "\n";
 		m_currentLocals.clear();
 		m_currentUpvalues = m_functionUpvalues.at(fun);
 
@@ -541,13 +601,13 @@ private:
 
 		for (auto it = fun->parameters.rbegin(); it != fun->parameters.rend(); ++it)
 		{
-			std::string paramName = it->name.ToString();
+			auto paramName = it->name;
 			if (boxedVars.contains(paramName))
 			{
 				m_out << "BOX\n";
 			}
 			m_out << "SET " << paramName << "\n";
-			m_currentLocals.push_back(paramName);
+			m_currentLocals.emplace_back(paramName);
 		}
 
 		if (fun->body)
