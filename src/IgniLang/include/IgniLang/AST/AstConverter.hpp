@@ -150,6 +150,12 @@ private:
 		case "FunDecl"_hs: {
 			auto funDecl = std::make_unique<ast::FunDecl>();
 
+			if (const auto& optFunMod = actualDecl->children[0];
+				!optFunMod->children.empty() && optFunMod->children[0]->symbol.Hashed() == "external"_hs)
+			{
+				funDecl->isExternal = true;
+			}
+
 			// 1. Имя функции [2]
 			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
 			{
@@ -160,7 +166,7 @@ private:
 				funDecl->name = funNameNode->children.back()->token->lexeme;
 			}
 
-			if (const auto& optColon = actualDecl->children[6]; optColon->children.size() == 2)
+			if (const auto& optColon = actualDecl->children[7]; optColon->children.size() == 2)
 			{
 				funDecl->returnType = ConvertType(optColon->children[1].get());
 			}

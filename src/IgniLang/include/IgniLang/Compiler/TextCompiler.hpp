@@ -20,7 +20,8 @@ public:
 	std::string Compile(
 		const ast::Program* program,
 		const std::unordered_set<re::String>& globalNames,
-		const std::unordered_map<re::String, re::String>& importAliases)
+		const std::unordered_map<re::String, re::String>& importAliases,
+		const std::unordered_set<re::String>& externals)
 	{
 		std::vector<const ast::FunDecl*> flatFunctions;
 		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;
@@ -32,7 +33,7 @@ public:
 
 		// Pass 2
 		std::stringstream out;
-		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases);
+		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals);
 		generator.Generate(program);
 
 		return out.str();

@@ -62,6 +62,7 @@ InterpreterResult VirtualMachine::Run()
 	for (;;)
 	{
 		const std::uint8_t instruction = READ_BYTE();
+		// std::cout << "Instruction: " << (int)instruction << " Stack size: " << m_stack.size() << std::endl;
 		switch (static_cast<OpCode>(instruction))
 		{
 		case OpCode::Const: {
@@ -87,13 +88,14 @@ InterpreterResult VirtualMachine::Run()
 			Value a = Pop();
 			bool result = std::visit(
 				utils::overloaded{
-					[this](const Int& i) { Push(i + 1); return true; },
-					[this](const Double& d) { Push(d + 1.0); return true; },
+					[this](const Int i) { Push(i + 1); return true; },
+					[this](const Double d) { Push(d + 1.0); return true; },
 					[this](auto&) { return false; },
 				},
 				a);
 			if (!result)
 			{
+				std::cerr << "Runtime Error (INC): Expected a number, but got type index " << a.index() << "\n";
 				return InterpreterResult::RuntimeError;
 			}
 			break;
@@ -110,6 +112,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
+				std::cerr << "Runtime Error (DEC): Expected a number, but got type index " << a.index() << "\n";
 				return InterpreterResult::RuntimeError;
 			}
 			break;
@@ -122,6 +125,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
+				std::cerr << "Runtime Error (BIT_NOT): Expected a number, but got type index " << a.index() << "\n";
 				return InterpreterResult::RuntimeError;
 			}
 			break;
@@ -392,8 +396,8 @@ InterpreterResult VirtualMachine::Run()
 			if (auto* instPtr = std::get_if<InstancePtr>(&objVal))
 			{
 				auto& instance = *instPtr;
-				auto it = instance->typeInfo->fieldIndexes.find(propHash);
-				if (it != instance->typeInfo->fieldIndexes.end())
+				if (const auto it = instance->typeInfo->fieldIndexes.find(propHash);
+					it != instance->typeInfo->fieldIndexes.end())
 				{
 					Push(instance->fields[it->second]);
 				}
@@ -668,8 +672,8 @@ TypeInfoPtr VirtualMachine::GetTypeInfo(Value const& value) const
 						  [this](const Double) { return m_typeDouble; },
 						  [this](String const&) { return m_typeString; },
 						  [](InstancePtr const& inst) { return inst ? inst->typeInfo : nullptr; },
-						  [](std::shared_ptr<ArrayInstance> const& arr) { return arr ? arr->typeInfo : nullptr; },
-						  [](const auto&) -> std::shared_ptr<TypeInfo> { return nullptr; } },
+						  [](ArrayInstancePtr const& arr) { return arr ? arr->typeInfo : nullptr; },
+						  [](const auto&) -> TypeInfoPtr { return nullptr; } },
 		value);
 }
 

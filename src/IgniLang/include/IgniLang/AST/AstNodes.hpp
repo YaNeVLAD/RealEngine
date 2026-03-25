@@ -493,6 +493,7 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 	re::String name;
 	std::vector<Parameter> parameters;
 	bool isVararg = false;
+	bool isExternal = false;
 
 	std::unique_ptr<Block> body;
 	std::unique_ptr<TypeNode> returnType;

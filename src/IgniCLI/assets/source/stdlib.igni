@@ -1,1 +1,11 @@
 package stdlib;
+
+external fun print(args: Any...): Unit;
+external fun len(arr: Array): Int;
+external fun make_array(size: Int): Array;
+
+// TODO: Add class declaration
+// external class Array {
+//   external fun get(index: Int): Any;
+//   external fun set(index: Int, value: Any): Unit;
+// }

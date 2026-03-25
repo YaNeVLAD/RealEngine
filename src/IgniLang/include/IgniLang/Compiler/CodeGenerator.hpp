@@ -21,12 +21,14 @@ public:
 		const std::vector<const ast::FunDecl*>& flatFuncs,
 		const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvals,
 		const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
-		const std::unordered_map<re::String, re::String>& importAliases)
+		const std::unordered_map<re::String, re::String>& importAliases,
+		const std::unordered_set<re::String>& externals)
 		: m_out(out)
 		, m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvals)
 		, m_functionBoxedVars(funcBoxedVars)
 		, m_importAliases(importAliases)
+		, m_externals(externals)
 	{
 	}
 
@@ -172,7 +174,6 @@ public:
 				node->value->Accept(*this); // arg2
 			}
 			m_out << "CALL_METHOD \"set\" 2\n";
-			m_out << "CONST 0\n";
 		}
 	}
 
@@ -210,8 +211,6 @@ public:
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
 		{
 			directFuncName = id->name;
-			const auto hashed = directFuncName.Hashed();
-
 			if (m_importAliases.contains(directFuncName))
 			{
 				const auto& moduleName = m_importAliases.at(directFuncName);
@@ -220,7 +219,9 @@ public:
 				for (const auto& arg : node->arguments)
 				{
 					if (arg)
+					{
 						arg->Accept(*this);
+					}
 				}
 
 				if (node->isVarargCall)
@@ -235,7 +236,7 @@ public:
 				return;
 			}
 
-			if (hashed == "print"_hs || hashed == "make_array"_hs || hashed == "len"_hs)
+			if (m_externals.contains(directFuncName))
 			{
 				isDirectCall = true;
 			}
@@ -264,7 +265,7 @@ public:
 				? (node->arguments.size() - node->varargCount + 1)
 				: node->arguments.size();
 
-			if (directFuncName == "print" || directFuncName == "make_array" || directFuncName == "len")
+			if (m_externals.contains(directFuncName))
 			{
 				m_out << "NATIVE \"" << directFuncName << "\" " << actualArgs << "\n";
 			}
@@ -429,7 +430,7 @@ public:
 		{
 			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(call->callee.get()))
 			{
-				if (id->name.Hashed() == "print"_hs)
+				if (m_externals.contains(id->name))
 				{
 					shouldPop = false;
 				}
@@ -592,6 +593,11 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
+		if (node->isExternal)
+		{
+			return;
+		}
+
 		const auto& upvalues = m_functionUpvalues.at(node);
 		for (const auto& uv : upvalues)
 		{
@@ -623,6 +629,7 @@ private:
 	const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& m_functionBoxedVars;
 
 	const std::unordered_map<re::String, re::String>& m_importAliases;
+	const std::unordered_set<re::String>& m_externals;
 
 	void GenerateFunction(const ast::FunDecl* fun)
 	{

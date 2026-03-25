@@ -39,7 +39,7 @@ FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
 NormalPars -> NormalPars , FormPar | FormPar
 FormPar -> ident : Type
 VarargPar -> ident : Type ...
-FunBody -> Block | = Expr ;
+FunBody -> Block | = Expr ; | ;
 
 Type -> ident OptTypeArgs OptQuestion | ( OptTypeList ) -> Type OptQuestion
 OptTypeList -> TypeList | \e

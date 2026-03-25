@@ -30,6 +30,11 @@ public:
 		return m_importAliases;
 	}
 
+	[[nodiscard]] const std::unordered_set<re::String>& GetExternalFunctions() const
+	{
+		return m_externalFunctions;
+	}
+
 	// ==========================================
 	// EXPRESSIONS
 	// ==========================================
@@ -114,7 +119,7 @@ public:
 		ExpectAssignable(indexType, m_tInt, "array index");
 
 		// TODO: Replace with generic element type when Generics are introduced
-		m_currentExprType = m_tInt;
+		m_currentExprType = m_tAny;
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -273,6 +278,10 @@ public:
 					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
 				}
 				m_env.Define(fun->name, funType, true);
+				if (fun->isExternal)
+				{
+					m_externalFunctions.insert(fun->name);
+				}
 			}
 		}
 
@@ -299,6 +308,7 @@ private:
 	std::shared_ptr<SemanticType> m_currentReturnType = nullptr;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
+	std::unordered_set<re::String> m_externalFunctions;
 
 	// --- Type Definitions ---
 	std::shared_ptr<PrimitiveType> m_tInt = std::make_shared<PrimitiveType>("Int");
@@ -314,22 +324,13 @@ private:
 	// ==========================================
 	void InitBuiltins()
 	{
-		const auto printType = std::make_shared<FunctionType>("print");
-		printType->returnType = m_tUnit;
-		printType->isVararg = true;
-		printType->paramTypes.emplace_back(m_tAny);
-		m_env.Define("print", printType, true);
-
-		const auto mathModule = std::make_shared<ModuleType>("math");
-		const auto sqrtType = std::make_shared<FunctionType>("sqrt");
-		sqrtType->paramTypes.emplace_back(m_tDouble);
-		sqrtType->returnType = m_tDouble;
-		mathModule->exports["sqrt"] = sqrtType;
-		m_env.Define("math", mathModule, true);
-
-		const auto makeArrayType = std::make_shared<FunctionType>("make_array");
-		makeArrayType->returnType = m_tArray;
-		m_env.Define("make_array", makeArrayType, true);
+		m_env.Define("Int", m_tInt, true);
+		m_env.Define("Double", m_tDouble, true);
+		m_env.Define("Bool", m_tBool, true);
+		m_env.Define("String", m_tString, true);
+		m_env.Define("Unit", m_tUnit, true);
+		m_env.Define("Any", m_tAny, true);
+		m_env.Define("Array", m_tArray, true);
 	}
 
 	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)

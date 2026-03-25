@@ -87,13 +87,14 @@ public:
 		std::cout << "[Info] Running Semantic Analysis...\n";
 		sem::SemanticAnalyzer semanticAnalyzer;
 		semanticAnalyzer.Analyze(linkedProgram.get());
-		auto globalNames = semanticAnalyzer.GetGlobalNames();
-		auto& importAliases = semanticAnalyzer.GetImportAliases();
+		const auto& globalNames = semanticAnalyzer.GetGlobalNames();
+		const auto& importAliases = semanticAnalyzer.GetImportAliases();
+		const auto& externals = semanticAnalyzer.GetExternalFunctions();
 
 		// --- PHASE 4: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
 		compiler::TextCompiler textCompiler;
-		std::string assembly = textCompiler.Compile(linkedProgram.get(), globalNames, importAliases);
+		std::string assembly = textCompiler.Compile(linkedProgram.get(), globalNames, importAliases, externals);
 
 		return assembly;
 	}

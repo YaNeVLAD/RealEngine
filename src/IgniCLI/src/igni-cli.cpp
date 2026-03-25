@@ -63,31 +63,6 @@ void InitIgniStdLib(re::rvm::VirtualMachine& vm)
 		arr->elements.resize(std::get<Int>(args[0]));
 		return arr;
 	});
-
-	auto typeMath = std::make_shared<TypeInfo>("MathModule");
-
-	auto sqrtMethod = std::make_shared<NativeObject>();
-	sqrtMethod->name = "sqrt";
-	sqrtMethod->argCount = 1;
-	sqrtMethod->function = [](const std::vector<Value>& args) -> Value {
-		double val = 0.0;
-		if (auto* d = std::get_if<Double>(&args[1]))
-		{
-			val = *d;
-		}
-		else if (auto* i = std::get_if<Int>(&args[1]))
-		{
-			val = static_cast<double>(*i);
-		}
-
-		return std::sqrt(val);
-	};
-	typeMath->methods["sqrt"_hs] = sqrtMethod;
-
-	vm.RegisterType(typeMath);
-
-	auto mathInstance = std::make_shared<Instance>(typeMath);
-	vm.RegisterGlobal("math", mathInstance);
 }
 
 int main(const int argc, char** argv)

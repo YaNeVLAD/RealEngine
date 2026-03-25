@@ -199,6 +199,11 @@ public:
 	void Visit(const ast::FunDecl* node) override
 	{
 		m_scopeStack.back().insert(node->name);
+		if (node->isExternal)
+		{
+			return;
+		}
+
 		m_functionBoxedVars[node];
 
 		ScopeAnalyzer childAnalyzer(m_flatFunctions, m_functionUpvalues, m_functionBoxedVars, m_scopeStack.front());
