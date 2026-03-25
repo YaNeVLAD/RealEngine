@@ -17,6 +17,11 @@ struct SemanticType
 
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
+		if (other->name.Hashed() == "Any"_hs)
+		{
+			return true;
+		}
+
 		return name == other->name;
 	}
 };
@@ -37,8 +42,9 @@ struct FunctionType final : SemanticType
 {
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 	std::shared_ptr<SemanticType> returnType;
+	bool isVararg = false;
 
-	FunctionType() { name = "Function"; }
+	explicit FunctionType(const re::String& n) { name = n; }
 };
 
 struct ClassType final : SemanticType

@@ -166,7 +166,7 @@ private:
 			}
 
 			// 2. Параметры [5]
-			ExtractParameters(actualDecl->children[5].get(), funDecl->parameters);
+			ExtractParameters(actualDecl->children[5].get(), funDecl.get());
 
 			// 3. Тело функции [8]
 			if (const auto& funBody = actualDecl->children[8]; funBody->children[0]->symbol.Hashed() == "Block"_hs)
@@ -453,27 +453,64 @@ private:
 		}
 	}
 
-	static void ExtractParameters(const CstNode* optFormPars, std::vector<ast::Parameter>& outParams)
+	static ast::FunDecl::Parameter ParseFormPar(const CstNode* node)
+	{
+		// FormPar -> ident : Type
+		ast::FunDecl::Parameter p;
+		p.name = node->children[0]->token->lexeme;
+		p.type = ConvertType(node->children[2].get());
+		return p;
+	}
+
+	static ast::FunDecl::Parameter ParseVarargPar(const CstNode* node)
+	{
+		// VarargPar -> ident : Type ...
+		ast::FunDecl::Parameter p;
+		p.name = node->children[0]->token->lexeme;
+		p.type = ConvertType(node->children[2].get());
+		return p;
+	}
+
+	static void ExtractNormalPars(const CstNode* node, std::vector<ast::FunDecl::Parameter>& outParams)
+	{
+		if (node->children.size() != 1)
+		{
+			if (node->children.size() == 3)
+			{ // NormalPars , FormPar
+				ExtractNormalPars(node->children[0].get(), outParams);
+				outParams.emplace_back(ParseFormPar(node->children[2].get()));
+			}
+		}
+		else
+		{ // FormPar
+			outParams.emplace_back(ParseFormPar(node->children[0].get()));
+		}
+	}
+
+	static void ExtractParameters(const CstNode* optFormPars, ast::FunDecl* funDecl)
 	{
 		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol.Hashed() == "e"_hs)
 		{
 			return;
 		}
-		FlattenFormPars(optFormPars->children[0].get(), outParams);
-	}
 
-	static void FlattenFormPars(const CstNode* formPars, std::vector<ast::Parameter>& outParams)
-	{
-		if (formPars->children.size() == 3)
+		if (const auto& formPars = optFormPars->children[0]; formPars->children.size() == 1)
 		{
-			FlattenFormPars(formPars->children[0].get(), outParams);
-			const auto& parNode = formPars->children[2];
-			outParams.push_back({ parNode->children[0]->token->lexeme, ConvertType(parNode->children[2].get()) });
+			if (formPars->children[0]->symbol.Hashed() == "NormalPars"_hs)
+			{
+				ExtractNormalPars(formPars->children[0].get(), funDecl->parameters);
+			}
+			else
+			{ // VarargPar
+				funDecl->parameters.push_back(ParseVarargPar(formPars->children[0].get()));
+				funDecl->isVararg = true;
+			}
 		}
-		else if (formPars->children.size() == 1)
-		{
-			const auto& parNode = formPars->children[0];
-			outParams.push_back({ parNode->children[0]->token->lexeme, ConvertType(parNode->children[2].get()) });
+		else if (formPars->children.size() == 3)
+		{ // NormalPars , VarargPar
+			ExtractNormalPars(formPars->children[0].get(), funDecl->parameters);
+			funDecl->parameters.push_back(ParseVarargPar(formPars->children[2].get()));
+			funDecl->isVararg = true;
 		}
 	}
 

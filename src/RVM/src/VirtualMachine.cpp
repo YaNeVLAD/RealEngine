@@ -595,6 +595,22 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::PackArray: {
+			std::uint8_t count = READ_BYTE();
+
+			auto arr = std::make_shared<ArrayInstance>();
+			arr->typeInfo = m_typeArray;
+			arr->elements.resize(count);
+
+			for (int i = count - 1; i >= 0; --i)
+			{
+				arr->elements[i] = Pop();
+			}
+
+			Push(arr);
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())

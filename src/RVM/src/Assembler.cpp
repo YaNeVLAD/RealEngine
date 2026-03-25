@@ -505,6 +505,22 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parsePackArray = [&]() -> bool {
+		const auto countOpt = lexer.next();
+		if (!countOpt || countOpt->type != TokenType::Integer)
+		{
+			std::cerr << "Expected integer count after PACK_ARRAY\n";
+			return false;
+		}
+
+		const std::uint8_t count = static_cast<std::uint8_t>(std::stoul(std::string(countOpt->lexeme)));
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::PackArray));
+		outChunk.Write(count);
+
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -558,6 +574,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		  case "MAKE_CLOSURE"_hs:  if (!parseMakeClosure()) return false; break;
 		  case "LOAD_NATIVE"_hs:   if (!parseLoadNative()) return false; break;
+
+		  case "PACK_ARRAY"_hs:    if (!parsePackArray()) return false; break;
 
 		  case "CALL_METHOD"_hs:   if (!parseCallMethod()) return false; break;
 		  case "CALL"_hs:   	   if (!parseCall())   return false; break;

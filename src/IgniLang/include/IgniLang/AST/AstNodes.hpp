@@ -199,6 +199,9 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 	std::unique_ptr<Expr> callee;
 	std::vector<std::unique_ptr<Expr>> arguments;
 
+	bool isVarargCall = false;
+	std::size_t varargCount = 0;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
@@ -435,12 +438,6 @@ struct ForStmt final : Visitable<ForStmt, Statement>
 // ==========================================
 // DECLARATIONS
 // ==========================================
-struct Parameter
-{
-	re::String name;
-	std::unique_ptr<TypeNode> type;
-};
-
 struct ValDecl final : Visitable<ValDecl, Decl>
 {
 	re::String name;
@@ -487,8 +484,16 @@ struct VarDecl final : Visitable<VarDecl, Decl>
 
 struct FunDecl final : Visitable<FunDecl, Decl>
 {
+	struct Parameter
+	{
+		re::String name;
+		std::unique_ptr<TypeNode> type;
+	};
+
 	re::String name;
 	std::vector<Parameter> parameters;
+	bool isVararg = false;
+
 	std::unique_ptr<Block> body;
 	std::unique_ptr<TypeNode> returnType;
 

@@ -35,8 +35,10 @@ FunDecl -> OptFunMod fun FunName OptTypeParams ( OptFormPars ) OptColonType FunB
 FunName -> ident | Type . ident | Type ? . ident
 OptFunMod -> external | compile_time | \e
 OptFormPars -> FormPars | \e
-FormPars -> FormPars , FormPar | FormPar
+FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
+NormalPars -> NormalPars , FormPar | FormPar
 FormPar -> ident : Type
+VarargPar -> ident : Type ...
 FunBody -> Block | = Expr ;
 
 Type -> ident OptTypeArgs OptQuestion | ( OptTypeList ) -> Type OptQuestion

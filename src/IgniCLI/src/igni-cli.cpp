@@ -14,10 +14,22 @@ void InitIgniStdLib(re::rvm::VirtualMachine& vm)
 
 	vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
 		std::cout << ">>> [SCRIPT]: ";
-		for (const auto& arg : args)
+
+		if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
 		{
-			std::cout << arg << " ";
+			for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
+			{
+				std::cout << arg << " ";
+			}
 		}
+		else
+		{ // Fallback
+			for (const auto& arg : args)
+			{
+				std::cout << arg << " ";
+			}
+		}
+
 		std::cout << "\n";
 		return Null;
 	});

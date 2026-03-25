@@ -193,7 +193,15 @@ public:
 				}
 			}
 
-			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << node->arguments.size() << "\n";
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
+			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << actualArgs << "\n";
 			return;
 		}
 
@@ -203,23 +211,30 @@ public:
 		{
 			directFuncName = id->name;
 			const auto hashed = directFuncName.Hashed();
+
 			if (m_importAliases.contains(directFuncName))
 			{
 				const auto& moduleName = m_importAliases.at(directFuncName);
-
 				m_out << "GET_GLOBAL \"" << moduleName << "\"\n";
 
 				for (const auto& arg : node->arguments)
 				{
 					if (arg)
-					{
 						arg->Accept(*this);
-					}
 				}
 
-				m_out << "CALL_METHOD \"" << directFuncName << "\" " << node->arguments.size() << "\n";
+				if (node->isVarargCall)
+				{
+					m_out << "PACK_ARRAY " << node->varargCount << "\n";
+				}
+				const std::size_t actualArgs = node->isVarargCall
+					? (node->arguments.size() - node->varargCount + 1)
+					: node->arguments.size();
+
+				m_out << "CALL_METHOD \"" << directFuncName << "\" " << actualArgs << "\n";
 				return;
 			}
+
 			if (hashed == "print"_hs || hashed == "make_array"_hs || hashed == "len"_hs)
 			{
 				isDirectCall = true;
@@ -241,13 +256,21 @@ public:
 				}
 			}
 
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
 			if (directFuncName == "print" || directFuncName == "make_array" || directFuncName == "len")
 			{
-				m_out << "NATIVE \"" << directFuncName << "\" " << node->arguments.size() << "\n";
+				m_out << "NATIVE \"" << directFuncName << "\" " << actualArgs << "\n";
 			}
 			else
 			{
-				m_out << "CALL " << directFuncName << " " << node->arguments.size() << "\n";
+				m_out << "CALL " << directFuncName << " " << actualArgs << "\n";
 			}
 		}
 		else
@@ -256,6 +279,7 @@ public:
 			{
 				node->callee->Accept(*this);
 			}
+
 			for (const auto& arg : node->arguments)
 			{
 				if (arg)
@@ -263,7 +287,17 @@ public:
 					arg->Accept(*this);
 				}
 			}
-			m_out << "CALL_INDIRECT " << node->arguments.size() << "\n";
+
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
+			m_out << "CALL_INDIRECT " << actualArgs << "\n";
 		}
 	}
 

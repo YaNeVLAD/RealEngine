@@ -3,8 +3,11 @@ package main;
 import stdlib.*;
 import math.sqrt;
 
+fun _print(first: String, params: Int...) {
+    print(first, ": ", params);
+}
+
 fun main()
 {
-    val result = sqrt(36);
-    print(result);
+    _print("Numbers", 1, 2);
 }

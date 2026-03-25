@@ -33,6 +33,7 @@ namespace igni
     TOKEN(IntConst,     R"([0-9]+)",           "intCon") \
     TOKEN(StringConst,  R"("[^"]*")",          "stringCon") \
     TOKEN(Identifier,   R"([a-zA-Z_]\w*)",     "ident") \
+	TOKEN(ExpandRange,  R"(\.\.\.)",           "...") \
     /* Double char operations */ \
 	TOKEN(Decrement,    R"(\-\-)",             "--") \
 	TOKEN(Increment,    R"(\+\+)",             "++") \
