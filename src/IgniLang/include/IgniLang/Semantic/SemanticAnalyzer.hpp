@@ -3,7 +3,6 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
-#include <RVM/VirtualMachine.hpp>
 
 namespace igni::sem
 {
@@ -13,26 +12,7 @@ class SemanticAnalyzer final : public ast::BaseAstVisitor
 public:
 	SemanticAnalyzer()
 	{
-		using namespace re::rvm;
-		// Registering native functions
-		const auto printType = std::make_shared<FunctionType>("print");
-		printType->returnType = m_tUnit;
-		printType->isVararg = true;
-		printType->paramTypes.emplace_back(m_tAny);
-		m_env.Define("print", printType, true);
-
-		// Manually adding module (import std.math)
-		const auto mathModule = std::make_shared<ModuleType>("math");
-		const auto sqrtType = std::make_shared<FunctionType>("sqrt");
-		sqrtType->paramTypes.emplace_back(m_tDouble);
-		sqrtType->returnType = m_tDouble;
-		mathModule->exports["sqrt"] = sqrtType;
-
-		m_env.Define("math", mathModule, true);
-
-		const auto makeArrayType = std::make_shared<FunctionType>("make_array");
-		makeArrayType->returnType = m_tArray;
-		m_env.Define("make_array", makeArrayType, true);
+		InitBuiltins();
 	}
 
 	void Analyze(const ast::Program* program)
@@ -56,11 +36,15 @@ public:
 	void Visit(const ast::LiteralExpr* node) override
 	{
 		// clang-format off
-        if (node->token.type == TokenType::IntConst) m_currentExprType = m_tInt;
-        else if (node->token.type == TokenType::FloatConst) m_currentExprType = m_tDouble;
-        else if (node->token.type == TokenType::StringConst) m_currentExprType = m_tString;
-        else if (node->token.type == TokenType::KwTrue || node->token.type == TokenType::KwFalse) m_currentExprType = m_tBool;
-        else m_currentExprType = m_tUnit;
+		switch (node->token.type)
+		{
+		case TokenType::IntConst:    m_currentExprType = m_tInt; break;
+		case TokenType::FloatConst:  m_currentExprType = m_tDouble; break;
+		case TokenType::StringConst: m_currentExprType = m_tString; break;
+		case TokenType::KwTrue:
+		case TokenType::KwFalse:     m_currentExprType = m_tBool; break;
+		default:                     m_currentExprType = m_tUnit; break;
+		}
 		// clang-format on
 	}
 
@@ -76,29 +60,15 @@ public:
 
 	void Visit(const ast::MemberAccessExpr* node) override
 	{
-		if (node->object)
-		{
-			node->object->Accept(*this);
-		}
+		const auto leftType = Evaluate(node->object.get());
 
-		const auto leftType = m_currentExprType;
 		if (const auto modType = std::dynamic_pointer_cast<ModuleType>(leftType))
 		{
-			const auto it = modType->exports.find(node->member.ToString());
-			if (it == modType->exports.end())
-			{
-				throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + node->member.ToString() + "'");
-			}
-			m_currentExprType = it->second;
+			m_currentExprType = ResolveExport(modType, node->member);
 		}
 		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(leftType))
 		{
-			const auto it = classType->methods.find(node->member.ToString());
-			if (it == classType->methods.end())
-			{
-				throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no method named '" + node->member.ToString() + "'");
-			}
-			m_currentExprType = it->second;
+			m_currentExprType = ResolveMethod(classType, node->member);
 		}
 		else
 		{
@@ -110,24 +80,15 @@ public:
 	{
 		using namespace re::literals;
 
-		node->left->Accept(*this);
-		const auto leftType = m_currentExprType;
+		const auto leftType = Evaluate(node->left.get());
+		const auto rightType = Evaluate(node->right.get());
 
-		node->right->Accept(*this);
-		const auto rightType = m_currentExprType;
-
-		if (!leftType->IsAssignableTo(rightType.get()))
-		{
-			throw std::runtime_error("Semantic Error: Type mismatch in binary expression (" + leftType->name + " and " + rightType->name + ")");
-		}
+		ExpectAssignable(rightType, leftType, "binary expression");
 
 		if (const auto hashed = node->op.Hashed();
-			hashed == "<"_hs
-			|| hashed == ">"_hs
-			|| hashed == "=="_hs
-			|| hashed == "!="_hs
-			|| hashed == "<="_hs
-			|| hashed == ">="_hs)
+			hashed == "<"_hs || hashed == ">"_hs
+			|| hashed == "=="_hs || hashed == "!="_hs
+			|| hashed == "<="_hs || hashed == ">="_hs)
 		{
 			m_currentExprType = m_tBool;
 		}
@@ -137,112 +98,71 @@ public:
 		}
 	}
 
+	void Visit(const ast::UnaryExpr* node) override
+	{
+		m_currentExprType = Evaluate(node->operand.get());
+	}
+
+	void Visit(const ast::IndexExpr* node) override
+	{
+		if (const auto arrType = Evaluate(node->array.get()); arrType->name != "Array")
+		{
+			throw std::runtime_error("Semantic Error: Cannot index non-array type '" + arrType->name + "'");
+		}
+
+		const auto indexType = Evaluate(node->index.get());
+		ExpectAssignable(indexType, m_tInt, "array index");
+
+		// TODO: Replace with generic element type when Generics are introduced
+		m_currentExprType = m_tInt;
+	}
+
+	void Visit(const ast::CallExpr* node) override
+	{
+		const auto calleeType = Evaluate(node->callee.get());
+
+		const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType);
+		if (!funType)
+		{
+			throw std::runtime_error("Semantic Error: Attempt to call a non-callable type");
+		}
+
+		ValidateCallArguments(node, funType);
+		m_currentExprType = funType->returnType;
+	}
+
 	// ==========================================
 	// INSTRUCTIONS
 	// ==========================================
 	void Visit(const ast::VarDecl* node) override
 	{
-		std::shared_ptr<SemanticType> varType = nullptr;
-
-		if (node->initializer)
-		{
-			node->initializer->Accept(*this);
-			varType = m_currentExprType;
-		}
-
-		// TODO: Check explicit user type for matching (node->type)
-
-		if (!varType)
-		{ // Fallback
-			varType = m_tUnit;
-		}
-
-		m_env.Define(node->name, varType, false);
+		HandleVariableDeclaration(node->name, node->initializer.get(), node->type.get(), false);
 	}
 
 	void Visit(const ast::ValDecl* node) override
 	{
-		std::shared_ptr<SemanticType> valType = nullptr;
-		if (node->initializer)
-		{
-			node->initializer->Accept(*this);
-			valType = m_currentExprType;
-		}
-
-		// TODO: Check explicit user type for matching (node->type)
-
-		if (!valType)
-		{ // Fallback
-			valType = m_tUnit;
-		}
-
-		m_env.Define(node->name, valType, true);
+		HandleVariableDeclaration(node->name, node->initializer.get(), node->type.get(), true);
 	}
 
 	void Visit(const ast::ExprStmt* node) override
 	{
-		if (node->expr)
-		{
-			node->expr->Accept(*this);
-		}
+		Evaluate(node->expr.get());
 	}
 
 	void Visit(const ast::AssignExpr* node) override
 	{
-		if (node->target)
-		{
-			node->target->Accept(*this);
-		}
-		const auto targetType = m_currentExprType;
+		const auto targetType = Evaluate(node->target.get());
+		const auto valueType = Evaluate(node->value.get());
 
-		if (node->value)
-		{
-			node->value->Accept(*this);
-		}
-		const auto valueType = m_currentExprType;
-
-		if (!valueType->IsAssignableTo(targetType.get()))
-		{
-			throw std::runtime_error("Semantic Error: Cannot assign " + valueType->name + " to " + targetType->name);
-		}
+		ExpectAssignable(valueType, targetType, "assignment");
 		m_currentExprType = valueType;
-	}
-
-	void Visit(const ast::IndexExpr* node) override
-	{
-		if (node->array)
-		{
-			node->array->Accept(*this);
-		}
-
-		if (const auto arrType = m_currentExprType; arrType->name != "Array")
-		{
-			throw std::runtime_error("Semantic Error: Cannot index non-array type '" + arrType->name + "'");
-		}
-
-		if (node->index)
-		{
-			node->index->Accept(*this);
-			if (!m_currentExprType->IsAssignableTo(m_tInt.get()))
-			{
-				throw std::runtime_error("Semantic Error: Array index must be of type Int");
-			}
-		}
-
-		// TODO: Replace Int with Generics
-		m_currentExprType = m_tInt;
 	}
 
 	void Visit(const ast::IfStmt* node) override
 	{
-		if (node->condition)
-		{
-			node->condition->Accept(*this);
-			if (!m_currentExprType->IsAssignableTo(m_tBool.get()))
-			{
-				throw std::runtime_error("Semantic Error: Condition must be of type Bool");
-			}
-		}
+		const auto condType = Evaluate(node->condition.get());
+		ExpectAssignable(condType, m_tBool, "if condition");
+
 		if (node->thenBranch)
 		{
 			node->thenBranch->Accept(*this);
@@ -255,14 +175,9 @@ public:
 
 	void Visit(const ast::WhileStmt* node) override
 	{
-		if (node->condition)
-		{
-			node->condition->Accept(*this);
-			if (!m_currentExprType->IsAssignableTo(m_tBool.get()))
-			{
-				throw std::runtime_error("Semantic Error: Loop condition must be of type Bool");
-			}
-		}
+		const auto condType = Evaluate(node->condition.get());
+		ExpectAssignable(condType, m_tBool, "while condition");
+
 		if (node->body)
 		{
 			node->body->Accept(*this);
@@ -273,14 +188,8 @@ public:
 	{
 		m_env.PushScope();
 
-		if (node->startExpr)
-		{
-			node->startExpr->Accept(*this);
-		}
-		if (node->endExpr)
-		{
-			node->endExpr->Accept(*this);
-		}
+		Evaluate(node->startExpr.get());
+		Evaluate(node->endExpr.get());
 
 		m_env.Define(node->iteratorName, m_tInt, false);
 
@@ -307,25 +216,11 @@ public:
 
 	void Visit(const ast::ReturnStmt* node) override
 	{
-		std::shared_ptr<SemanticType> retType = m_tUnit;
+		const auto retType = Evaluate(node->expr.get());
 
-		if (node->expr)
+		if (m_currentReturnType)
 		{
-			node->expr->Accept(*this);
-			retType = m_currentExprType;
-		}
-
-		if (m_currentReturnType && !retType->IsAssignableTo(m_currentReturnType.get()))
-		{
-			throw std::runtime_error("Semantic Error: Return type mismatch. Expected " + m_currentReturnType->name + ", got " + retType->name);
-		}
-	}
-
-	void Visit(const ast::UnaryExpr* node) override
-	{
-		if (node->operand)
-		{
-			node->operand->Accept(*this);
+			ExpectAssignable(retType, m_currentReturnType, "return statement");
 		}
 	}
 
@@ -339,12 +234,10 @@ public:
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
 			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
-
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
 				paramType = m_tArray;
 			}
-
 			m_env.Define(node->parameters[i].name, paramType, false);
 		}
 
@@ -360,121 +253,18 @@ public:
 		m_env.PopScope();
 	}
 
-	void Visit(const ast::CallExpr* node) override
-	{
-		if (node->callee)
-		{
-			node->callee->Accept(*this);
-		}
-		const auto calleeType = m_currentExprType;
-
-		const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType);
-		if (!funType)
-		{
-			throw std::runtime_error("Semantic Error: Attempt to call a non-callable type");
-		}
-
-		if (funType->isVararg)
-		{
-			const std::size_t fixedParams = funType->paramTypes.size() - 1;
-
-			if (node->arguments.size() < fixedParams)
-			{
-				throw std::runtime_error("Semantic Error: Not enough arguments");
-			}
-
-			const auto mutableNode = const_cast<ast::CallExpr*>(node);
-			mutableNode->isVarargCall = true;
-			mutableNode->varargCount = node->arguments.size() - fixedParams;
-		}
-		else if (node->arguments.size() != funType->paramTypes.size())
-		{
-			throw std::runtime_error("Semantic Error: Argument count mismatch");
-		}
-
-		for (size_t i = 0; i < node->arguments.size(); ++i)
-		{
-			if (node->arguments[i])
-			{
-				node->arguments[i]->Accept(*this);
-			}
-
-			std::shared_ptr<SemanticType> expectedType;
-			if (funType->isVararg && i >= funType->paramTypes.size() - 1)
-			{
-				expectedType = funType->paramTypes.back();
-			}
-			else
-			{
-				expectedType = funType->paramTypes[i];
-			}
-
-			if (!m_currentExprType->IsAssignableTo(expectedType.get()))
-			{
-				throw std::runtime_error("Semantic Error: Type mismatch in argument " + std::to_string(i + 1));
-			}
-		}
-
-		m_currentExprType = funType->returnType;
-	}
-
 	void Visit(const ast::ImportDecl* node) override
 	{
-		std::string fullPath = node->path.ToString();
-
-		const std::size_t dotPos = fullPath.find('.');
-		if (dotPos == std::string::npos)
-		{ // import module;
-			return;
-		}
-
-		const std::string modName = fullPath.substr(0, dotPos);
-		const std::string memberName = fullPath.substr(dotPos + 1);
-
-		const Symbol* modSym = m_env.Resolve(modName);
-		if (!modSym)
-		{
-			throw std::runtime_error("Semantic Error: Unknown module '" + modName + "' in import");
-		}
-
-		const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
-		if (!modType)
-		{
-			throw std::runtime_error("Semantic Error: '" + modName + "' is not a module");
-		}
-
-		if (node->isStar)
-		{ // import module.*
-			for (const auto& [exportName, exportType] : modType->exports)
-			{
-				m_env.Define(exportName, exportType, true);
-
-				m_importAliases[exportName] = modName;
-			}
-		}
-		else
-		{ // import module.ident
-			if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
-			{
-				m_env.Define(memberName, it->second, true);
-
-				m_importAliases[memberName] = modName;
-			}
-			else
-			{
-				throw std::runtime_error("Semantic Error: Module '" + modName + "' has no export named '" + memberName + "'");
-			}
-		}
+		ProcessImport(node);
 	}
 
 	void Visit(const ast::Program* node) override
 	{
 		for (const auto& stmt : node->statements)
-		{
+		{ // Functions forward declarations
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
 				auto funType = std::make_shared<FunctionType>(fun->name);
-
 				funType->returnType = ResolveAstType(fun->returnType.get());
 				funType->isVararg = fun->isVararg;
 
@@ -482,16 +272,15 @@ public:
 				{
 					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
 				}
-
 				m_env.Define(fun->name, funType, true);
 			}
 		}
 
-		for (const auto& imp : node->imports)
+		for (const auto& import : node->imports)
 		{
-			if (imp)
+			if (import)
 			{
-				imp->Accept(*this);
+				import->Accept(*this);
 			}
 		}
 
@@ -511,6 +300,7 @@ private:
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 
+	// --- Type Definitions ---
 	std::shared_ptr<PrimitiveType> m_tInt = std::make_shared<PrimitiveType>("Int");
 	std::shared_ptr<PrimitiveType> m_tDouble = std::make_shared<PrimitiveType>("Double");
 	std::shared_ptr<PrimitiveType> m_tBool = std::make_shared<PrimitiveType>("Bool");
@@ -518,6 +308,168 @@ private:
 	std::shared_ptr<PrimitiveType> m_tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<PrimitiveType> m_tAny = std::make_shared<PrimitiveType>("Any");
 	std::shared_ptr<ClassType> m_tArray = std::make_shared<ClassType>("Array");
+
+	// ==========================================
+	// HELPER METHODS
+	// ==========================================
+	void InitBuiltins()
+	{
+		const auto printType = std::make_shared<FunctionType>("print");
+		printType->returnType = m_tUnit;
+		printType->isVararg = true;
+		printType->paramTypes.emplace_back(m_tAny);
+		m_env.Define("print", printType, true);
+
+		const auto mathModule = std::make_shared<ModuleType>("math");
+		const auto sqrtType = std::make_shared<FunctionType>("sqrt");
+		sqrtType->paramTypes.emplace_back(m_tDouble);
+		sqrtType->returnType = m_tDouble;
+		mathModule->exports["sqrt"] = sqrtType;
+		m_env.Define("math", mathModule, true);
+
+		const auto makeArrayType = std::make_shared<FunctionType>("make_array");
+		makeArrayType->returnType = m_tArray;
+		m_env.Define("make_array", makeArrayType, true);
+	}
+
+	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)
+	{
+		if (!expr)
+		{
+			return m_tUnit;
+		}
+
+		m_currentExprType = m_tUnit; // Reset state
+		expr->Accept(*this);
+
+		return m_currentExprType;
+	}
+
+	static void ExpectAssignable(const std::shared_ptr<SemanticType>& actual, const std::shared_ptr<SemanticType>& expected, const std::string& context)
+	{
+		if (!actual->IsAssignableTo(expected.get()))
+		{
+			throw std::runtime_error("Semantic Error: Type mismatch in " + context + ". Expected " + expected->name + ", got " + actual->name);
+		}
+	}
+
+	void HandleVariableDeclaration(const re::String& name, const ast::Expr* initializer, const ast::TypeNode* explicitTypeNode, bool isReadOnly)
+	{
+		auto varType = Evaluate(initializer);
+
+		if (explicitTypeNode)
+		{
+			const auto declaredType = ResolveAstType(explicitTypeNode);
+			if (initializer)
+			{
+				ExpectAssignable(varType, declaredType, "variable initialization");
+			}
+			varType = declaredType;
+		}
+
+		if (varType == m_tUnit && !explicitTypeNode)
+		{
+			throw std::runtime_error("Semantic Error: Cannot infer type for variable '" + name.ToString() + "'");
+		}
+
+		m_env.Define(name, varType, isReadOnly);
+	}
+
+	static std::shared_ptr<SemanticType> ResolveExport(const std::shared_ptr<ModuleType>& modType, const re::String& member)
+	{
+		if (const auto it = modType->exports.find(member.ToString()); it != modType->exports.end())
+		{
+			return it->second;
+		}
+		throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + member.ToString() + "'");
+	}
+
+	static std::shared_ptr<SemanticType> ResolveMethod(const std::shared_ptr<ClassType>& classType, const re::String& member)
+	{
+		if (const auto it = classType->methods.find(member.ToString()); it != classType->methods.end())
+		{
+			return it->second;
+		}
+		throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no method named '" + member.ToString() + "'");
+	}
+
+	void ValidateCallArguments(const ast::CallExpr* node, const std::shared_ptr<FunctionType>& funType)
+	{
+		if (funType->isVararg)
+		{
+			const std::size_t fixedParams = funType->paramTypes.size() - 1;
+			if (node->arguments.size() < fixedParams)
+			{
+				throw std::runtime_error("Semantic Error: Not enough arguments for vararg function");
+			}
+
+			const auto mutableNode = const_cast<ast::CallExpr*>(node);
+			mutableNode->isVarargCall = true;
+			mutableNode->varargCount = node->arguments.size() - fixedParams;
+		}
+		else if (node->arguments.size() != funType->paramTypes.size())
+		{
+			throw std::runtime_error("Semantic Error: Argument count mismatch");
+		}
+
+		for (std::size_t i = 0; i < node->arguments.size(); ++i)
+		{
+			const auto argType = Evaluate(node->arguments[i].get());
+
+			std::shared_ptr<SemanticType> expectedType = (funType->isVararg && i >= funType->paramTypes.size() - 1)
+				? funType->paramTypes.back()
+				: funType->paramTypes[i];
+
+			ExpectAssignable(argType, expectedType, "argument " + std::to_string(i + 1));
+		}
+	}
+
+	void ProcessImport(const ast::ImportDecl* node)
+	{
+		const re::String fullPath = node->path;
+		const std::size_t dotPos = fullPath.Find('.');
+
+		if (dotPos == re::String::NPos)
+		{
+			return;
+		}
+
+		const auto modName = fullPath.Substring(0, dotPos);
+		const auto memberName = fullPath.Substring(dotPos + 1);
+
+		const Symbol* modSym = m_env.Resolve(modName);
+		if (!modSym)
+		{
+			throw std::runtime_error("Semantic Error: Unknown module '" + modName + "' in import");
+		}
+
+		const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
+		if (!modType)
+		{
+			throw std::runtime_error("Semantic Error: '" + modName + "' is not a module");
+		}
+
+		if (node->isStar)
+		{
+			for (const auto& [exportName, exportType] : modType->exports)
+			{
+				m_env.Define(exportName, exportType, true);
+				m_importAliases[exportName] = modName;
+			}
+		}
+		else
+		{
+			if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
+			{
+				m_env.Define(memberName, it->second, true);
+				m_importAliases[memberName] = modName;
+			}
+			else
+			{
+				throw std::runtime_error("Semantic Error: Module '" + modName + "' has no export named '" + memberName + "'");
+			}
+		}
+	}
 
 	std::shared_ptr<SemanticType> ResolveAstType(const ast::TypeNode* typeNode)
 	{
@@ -528,26 +480,26 @@ private:
 
 		if (const auto simpleType = dynamic_cast<const ast::SimpleTypeNode*>(typeNode))
 		{
-			const auto typeName = simpleType->name;
+			using namespace re::literals;
 
 			// clang-format off
-			switch (typeName.Hashed())
+			switch (simpleType->name.Hashed())
 			{
-			case "Int"_hs: return m_tInt;
+			case "Int"_hs:    return m_tInt;
 			case "Double"_hs: return m_tDouble;
-			case "Bool"_hs: return m_tBool;
+			case "Bool"_hs:   return m_tBool;
 			case "String"_hs: return m_tString;
-			case "Unit"_hs: return m_tUnit;
-			default: break;
+			case "Unit"_hs:   return m_tUnit;
+			default:          break;
 			}
 			// clang-format on
 
-			if (const Symbol* sym = m_env.Resolve(typeName))
+			if (const Symbol* sym = m_env.Resolve(simpleType->name))
 			{
 				return sym->type;
 			}
 
-			throw std::runtime_error("Semantic Error: Unknown type '" + typeName + "'");
+			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name.ToString() + "'");
 		}
 
 		return m_tUnit;
