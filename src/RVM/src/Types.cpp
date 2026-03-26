@@ -30,6 +30,18 @@ void TypeInfo::AddField(String const& fieldName)
 	}
 }
 
+TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::uint8_t argCount, NativeFn function)
+{
+	auto nativeObj = std::make_shared<NativeObject>();
+	nativeObj->name = methodName;
+	nativeObj->argCount = argCount;
+	nativeObj->function = std::move(function);
+
+	methods[methodName.Hash()] = nativeObj;
+
+	return *this;
+}
+
 Instance::Instance(TypeInfoPtr const& typeInfo)
 	: typeInfo(typeInfo)
 {

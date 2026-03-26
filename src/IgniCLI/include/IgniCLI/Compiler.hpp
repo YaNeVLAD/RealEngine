@@ -42,13 +42,13 @@ public:
 
 	[[nodiscard]] std::string CompileFiles(const std::vector<std::string>& filePaths) const
 	{
-		const auto linkedProgram = std::make_unique<ast::Program>();
-		linkedProgram->packageName = "global";
-
 		fsm::slr::parser parser(m_table, "<EPSILON>");
 		AstConverter astConverter;
 
 		std::list<std::string> sourceBuffers;
+
+		// Вектор для хранения всех файлов ДО линковки
+		std::vector<std::unique_ptr<ast::Program>> parsedPrograms;
 
 		// --- PHASE 1: FRONTEND ---
 		for (const auto& path : filePaths)
@@ -66,30 +66,42 @@ public:
 				throw std::runtime_error("Syntax error in file: " + path);
 			}
 
-			const auto astRoot = astConverter.Convert(cstRoot.get());
+			auto astRoot = astConverter.Convert(cstRoot.get());
 			if (!astRoot)
 			{
 				throw std::runtime_error("AST conversion failed for file: " + path);
 			}
 
-			// --- PHASE 2: AST LINKING ---
-			for (auto& imp : astRoot->imports)
+			// Сохраняем готовую программу с её оригинальным packageName!
+			parsedPrograms.push_back(std::move(astRoot));
+		}
+
+		// --- PHASE 2: SEMANTIC ANALYSIS ---
+		std::cout << "[Info] Running Semantic Analysis...\n";
+		sem::SemanticAnalyzer semanticAnalyzer;
+
+		// Теперь мы передаем массив всех файлов!
+		semanticAnalyzer.Analyze(parsedPrograms);
+
+		const auto& globalNames = semanticAnalyzer.GetGlobalNames();
+		const auto& importAliases = semanticAnalyzer.GetImportAliases();
+		const auto& externals = semanticAnalyzer.GetExternalFunctions();
+
+		// --- PHASE 3: AST LINKING (Для CodeGen) ---
+		const auto linkedProgram = std::make_unique<ast::Program>();
+		linkedProgram->packageName = "global";
+
+		for (const auto& prog : parsedPrograms)
+		{
+			for (auto& imp : prog->imports)
 			{
 				linkedProgram->imports.push_back(std::move(imp));
 			}
-			for (auto& stmt : astRoot->statements)
+			for (auto& stmt : prog->statements)
 			{
 				linkedProgram->statements.push_back(std::move(stmt));
 			}
 		}
-
-		// --- PHASE 3: SEMANTIC ANALYSIS ---
-		std::cout << "[Info] Running Semantic Analysis...\n";
-		sem::SemanticAnalyzer semanticAnalyzer;
-		semanticAnalyzer.Analyze(linkedProgram.get());
-		const auto& globalNames = semanticAnalyzer.GetGlobalNames();
-		const auto& importAliases = semanticAnalyzer.GetImportAliases();
-		const auto& externals = semanticAnalyzer.GetExternalFunctions();
 
 		// --- PHASE 4: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
@@ -113,7 +125,8 @@ private:
 		const std::size_t fileSize = file.tellg();
 		std::string buffer(fileSize, ' ');
 		file.seekg(0);
-		file.read(buffer.data(), fileSize);
+		file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+
 		return buffer;
 	}
 };

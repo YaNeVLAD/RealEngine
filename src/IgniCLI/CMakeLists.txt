@@ -15,8 +15,6 @@ target_link_libraries(igni-cli
         ReCore
         ReRVM
         IgniLang
-
-        FSM
 )
 
 target_compile_definitions(igni-cli PRIVATE IGNI_CLI_EXPORT)

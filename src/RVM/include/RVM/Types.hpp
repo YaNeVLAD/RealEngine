@@ -52,19 +52,6 @@ using Value = std::variant<
 
 constexpr auto Null = Value{ Null_t{} };
 
-struct TypeInfo
-{
-	String name;
-	std::unordered_map<Hash_t, std::size_t> fieldIndexes;
-	std::vector<String> fieldNames;
-
-	std::unordered_map<Hash_t, Value> methods;
-
-	explicit TypeInfo(String name);
-
-	void AddField(String const& fieldName);
-};
-
 struct Instance
 {
 	TypeInfoPtr typeInfo;
@@ -97,6 +84,21 @@ struct NativeObject
 	String name;
 	std::uint8_t argCount;
 	NativeFn function;
+};
+
+struct TypeInfo
+{
+	String name;
+	std::unordered_map<Hash_t, std::size_t> fieldIndexes;
+	std::vector<String> fieldNames;
+
+	std::unordered_map<Hash_t, Value> methods;
+
+	explicit TypeInfo(String name);
+
+	void AddField(String const& fieldName);
+
+	TypeInfo& AddNativeMethod(String const& methodName, std::uint8_t argCount, NativeFn function);
 };
 
 enum class OpCode : std::uint8_t

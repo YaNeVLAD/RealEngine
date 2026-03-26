@@ -1,9 +1,13 @@
 package main;
 
-import stdlib.*;
+import math.*;
 
 fun main()
 {
+    print("sqrt(36)", sqrt(36.0));
+    print("pow(2,3)", pow(2.0, 3.0));
+    print("sin(45)", math.sin(45.0));
+
     val n = 5;
     val arr: Array = make_array(n);
 

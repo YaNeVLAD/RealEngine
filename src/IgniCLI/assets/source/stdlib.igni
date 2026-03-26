@@ -1,4 +1,4 @@
-package stdlib;
+package global;
 
 external fun print(args: Any...): Unit;
 external fun len(arr: Array): Int;

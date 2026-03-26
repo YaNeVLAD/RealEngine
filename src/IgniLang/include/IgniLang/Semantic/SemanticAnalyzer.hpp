@@ -15,14 +15,57 @@ public:
 		InitBuiltins();
 	}
 
-	void Analyze(const ast::Program* program)
+	void Analyze(const std::vector<std::unique_ptr<ast::Program>>& programs)
 	{
-		program->Accept(*this);
+		for (const auto& prog : programs)
+		{
+			RegisterProgramDeclarations(prog.get());
+		}
+
+		for (const auto& prog : programs)
+		{
+			m_env.PushScope();
+
+			if (const bool isGlobal = prog->packageName.Empty() || prog->packageName == "global"; !isGlobal)
+			{
+				if (const Symbol* modSym = m_env.Resolve(prog->packageName))
+				{
+					if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
+					{
+						for (const auto& [name, type] : modType->exports)
+						{
+							m_env.Define(name, type, true);
+						}
+					}
+				}
+			}
+
+			for (const auto& imp : prog->imports)
+			{
+				if (imp)
+				{
+					imp->Accept(*this);
+				}
+			}
+
+			for (const auto& stmt : prog->statements)
+			{
+				if (stmt)
+				{
+					stmt->Accept(*this);
+				}
+			}
+
+			m_env.PopScope();
+		}
 	}
 
 	[[nodiscard]] std::unordered_set<re::String> GetGlobalNames() const
 	{
-		return m_env.GetGlobalNames();
+		auto globals = m_env.GetGlobalNames();
+		globals.insert(m_allFunctionNames.begin(), m_allFunctionNames.end());
+
+		return globals;
 	}
 
 	[[nodiscard]] const std::unordered_map<re::String, re::String>& GetImportAliases() const
@@ -231,23 +274,22 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		const Symbol* sym = m_env.Resolve(node->name);
-		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
-
 		m_env.PushScope();
 
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
-			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
+			std::shared_ptr<SemanticType> paramType = ResolveAstType(node->parameters[i].type.get());
+
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
 				paramType = m_tArray;
 			}
+
 			m_env.Define(node->parameters[i].name, paramType, false);
 		}
 
 		const auto previousReturnType = m_currentReturnType;
-		m_currentReturnType = funType->returnType;
+		m_currentReturnType = ResolveAstType(node->returnType.get());
 
 		if (node->body)
 		{
@@ -263,45 +305,6 @@ public:
 		ProcessImport(node);
 	}
 
-	void Visit(const ast::Program* node) override
-	{
-		for (const auto& stmt : node->statements)
-		{ // Functions forward declarations
-			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
-			{
-				auto funType = std::make_shared<FunctionType>(fun->name);
-				funType->returnType = ResolveAstType(fun->returnType.get());
-				funType->isVararg = fun->isVararg;
-
-				for (const auto& [name, type] : fun->parameters)
-				{
-					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
-				}
-				m_env.Define(fun->name, funType, true);
-				if (fun->isExternal)
-				{
-					m_externalFunctions.insert(fun->name);
-				}
-			}
-		}
-
-		for (const auto& import : node->imports)
-		{
-			if (import)
-			{
-				import->Accept(*this);
-			}
-		}
-
-		for (const auto& stmt : node->statements)
-		{
-			if (stmt)
-			{
-				stmt->Accept(*this);
-			}
-		}
-	}
-
 private:
 	Environment m_env;
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
@@ -309,6 +312,7 @@ private:
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
+	std::unordered_set<re::String> m_allFunctionNames;
 
 	// --- Type Definitions ---
 	std::shared_ptr<PrimitiveType> m_tInt = std::make_shared<PrimitiveType>("Int");
@@ -344,6 +348,57 @@ private:
 		expr->Accept(*this);
 
 		return m_currentExprType;
+	}
+
+	void RegisterProgramDeclarations(const ast::Program* node)
+	{
+		const bool isGlobal = node->packageName.Empty() || node->packageName == "global";
+		std::shared_ptr<ModuleType> currentModule = nullptr;
+
+		if (!isGlobal)
+		{
+			if (const Symbol* sym = m_env.Resolve(node->packageName))
+			{
+				currentModule = std::dynamic_pointer_cast<ModuleType>(sym->type);
+			}
+
+			if (!currentModule)
+			{
+				currentModule = std::make_shared<ModuleType>(node->packageName.ToString());
+				m_env.Define(node->packageName, currentModule, true);
+			}
+		}
+
+		for (const auto& stmt : node->statements)
+		{ // Functions forward declarations
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+			{
+				m_allFunctionNames.insert(fun->name);
+
+				auto funType = std::make_shared<FunctionType>(fun->name);
+				funType->returnType = ResolveAstType(fun->returnType.get());
+				funType->isVararg = fun->isVararg;
+
+				for (const auto& [_, type] : fun->parameters)
+				{
+					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+				}
+
+				if (isGlobal)
+				{
+					m_env.Define(fun->name, funType, true);
+				}
+				else
+				{
+					currentModule->exports[fun->name.ToString()] = funType;
+				}
+
+				if (fun->isExternal)
+				{
+					m_externalFunctions.insert(fun->name);
+				}
+			}
+		}
 	}
 
 	static void ExpectAssignable(const std::shared_ptr<SemanticType>& actual, const std::shared_ptr<SemanticType>& expected, const std::string& context)
@@ -428,46 +483,58 @@ private:
 	void ProcessImport(const ast::ImportDecl* node)
 	{
 		const re::String fullPath = node->path;
-		const std::size_t dotPos = fullPath.Find('.');
-
-		if (dotPos == re::String::NPos)
-		{
-			return;
-		}
-
-		const auto modName = fullPath.Substring(0, dotPos);
-		const auto memberName = fullPath.Substring(dotPos + 1);
-
-		const Symbol* modSym = m_env.Resolve(modName);
-		if (!modSym)
-		{
-			throw std::runtime_error("Semantic Error: Unknown module '" + modName + "' in import");
-		}
-
-		const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
-		if (!modType)
-		{
-			throw std::runtime_error("Semantic Error: '" + modName + "' is not a module");
-		}
 
 		if (node->isStar)
-		{
+		{ // import module.*
+			const Symbol* modSym = m_env.Resolve(fullPath);
+			if (!modSym)
+			{
+				throw std::runtime_error("Semantic Error: Unknown module '" + fullPath.ToString() + "' in import");
+			}
+
+			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
+			if (!modType)
+			{
+				throw std::runtime_error("Semantic Error: '" + fullPath.ToString() + "' is not a module");
+			}
+
 			for (const auto& [exportName, exportType] : modType->exports)
 			{
 				m_env.Define(exportName, exportType, true);
-				m_importAliases[exportName] = modName;
+				m_importAliases[exportName] = fullPath;
 			}
 		}
 		else
-		{
-			if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
+		{ // import module.ident
+			const std::size_t dotPos = fullPath.Find('.');
+			if (dotPos == re::String::NPos)
+			{
+				return;
+			}
+
+			const auto modName = fullPath.Substring(0, dotPos);
+			const auto memberName = fullPath.Substring(dotPos + 1);
+
+			const Symbol* modSym = m_env.Resolve(modName);
+			if (!modSym)
+			{
+				throw std::runtime_error("Semantic Error: Unknown module '" + modName.ToString() + "' in import");
+			}
+
+			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
+			if (!modType)
+			{
+				throw std::runtime_error("Semantic Error: '" + modName.ToString() + "' is not a module");
+			}
+
+			if (const auto it = modType->exports.find(memberName.ToString()); it != modType->exports.end())
 			{
 				m_env.Define(memberName, it->second, true);
 				m_importAliases[memberName] = modName;
 			}
 			else
 			{
-				throw std::runtime_error("Semantic Error: Module '" + modName + "' has no export named '" + memberName + "'");
+				throw std::runtime_error("Semantic Error: Module '" + modName.ToString() + "' has no export named '" + memberName.ToString() + "'");
 			}
 		}
 	}

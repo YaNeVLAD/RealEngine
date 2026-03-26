@@ -33,13 +33,17 @@ class RE_RVM_API VirtualMachine
 public:
 	VirtualMachine();
 
-	InterpreterResult Interpret(const Chunk& chunk);
+	InterpreterResult Interpret(Chunk const& chunk);
 
 	void RegisterNative(String const& name, NativeFn fn);
 
 	void RegisterType(TypeInfoPtr typeInfo);
 
 	void RegisterGlobal(const String& name, Value value);
+
+	[[nodiscard]] TypeInfoPtr GetType(Value const& value) const;
+
+	[[nodiscard]] TypeInfoPtr GetTypeByName(String const& name) const;
 
 private:
 	InterpreterResult Run();
@@ -51,7 +55,6 @@ private:
 	template <typename T>
 	using HashMap = std::unordered_map<Hash_t, T>;
 
-	TypeInfoPtr GetTypeInfo(Value const& value) const;
 	void InitBuiltinTypes();
 
 	TypeInfoPtr m_typeInt;

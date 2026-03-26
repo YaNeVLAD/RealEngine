@@ -1,3 +1,4 @@
+#include <Core/LibraryLoader.hpp>
 #include <IgniCLI/Compiler.hpp>
 #include <RVM/Assembler.hpp>
 #include <RVM/VirtualMachine.hpp>
@@ -7,63 +8,7 @@
 #include <string>
 #include <vector>
 
-void InitIgniStdLib(re::rvm::VirtualMachine& vm)
-{
-	using namespace re::rvm;
-	using namespace re::literals;
-
-	vm.RegisterNative("print", [](std::vector<Value> const& args) -> Value {
-		std::cout << ">>> [SCRIPT]: ";
-
-		if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
-		{
-			for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
-			{
-				std::cout << arg << " ";
-			}
-		}
-		else
-		{ // Fallback
-			for (const auto& arg : args)
-			{
-				std::cout << arg << " ";
-			}
-		}
-
-		std::cout << "\n";
-		return Null;
-	});
-
-	auto typeArray = std::make_shared<TypeInfo>("Array");
-	auto getMethod = std::make_shared<NativeObject>();
-	getMethod->name = "get";
-	getMethod->argCount = 1;
-	getMethod->function = [](const std::vector<Value>& args) -> Value {
-		const auto arr = std::get<ArrayInstancePtr>(args[0]);
-		const auto index = std::get<Int>(args[1]);
-		return arr->elements[index];
-	};
-	typeArray->methods["get"_hs] = getMethod;
-
-	auto setMethod = std::make_shared<NativeObject>();
-	setMethod->name = "set";
-	setMethod->argCount = 2;
-	setMethod->function = [](const std::vector<Value>& args) -> Value {
-		const auto arr = std::get<ArrayInstancePtr>(args[0]);
-		const auto index = std::get<Int>(args[1]);
-		arr->elements[index] = args[2];
-		return Null;
-	};
-	typeArray->methods["set"_hs] = setMethod;
-
-	vm.RegisterType(typeArray);
-	vm.RegisterNative("make_array", [typeArray](const std::vector<Value>& args) -> Value {
-		auto arr = std::make_shared<ArrayInstance>();
-		arr->typeInfo = typeArray;
-		arr->elements.resize(std::get<Int>(args[0]));
-		return arr;
-	});
-}
+using IgniPluginInitFn = void (*)(re::rvm::VirtualMachine*);
 
 int main(const int argc, char** argv)
 {
@@ -95,8 +40,22 @@ int main(const int argc, char** argv)
 				  << assemblyCode
 				  << "\n-------------------\n";
 
+		std::unique_ptr<re::LibraryLoader> stdlibPlugin = nullptr;
 		re::rvm::VirtualMachine vm;
-		InitIgniStdLib(vm);
+		try
+		{
+			constexpr auto STD_LIB_NAME = "IgniStdLib.dll";
+
+			stdlibPlugin = std::make_unique<re::LibraryLoader>(STD_LIB_NAME);
+			const auto initFn = stdlibPlugin->GetSymbol<IgniPluginInitFn>("IgniPluginInit");
+			initFn(&vm);
+
+			std::cout << "[Info] Standard library plugin loaded successfully.\n";
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "[Warning] Could not load standard library: " << e.what() << "\n";
+		}
 
 		re::rvm::Chunk chunk;
 		if (re::rvm::Assembler assembler; !assembler.Compile(assemblyCode, chunk))

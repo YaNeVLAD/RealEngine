@@ -1,0 +1,6 @@
+package math;
+
+external fun sqrt(value: Double): Double;
+external fun sin(value: Double): Double;
+external fun cos(value: Double): Double;
+external fun pow(value: Double, base: Double): Double;

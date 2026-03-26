@@ -30,9 +30,10 @@ namespace re::rvm
 VirtualMachine::VirtualMachine()
 {
 	m_stack.reserve(256);
+	InitBuiltinTypes();
 }
 
-InterpreterResult VirtualMachine::Interpret(const Chunk& chunk)
+InterpreterResult VirtualMachine::Interpret(Chunk const& chunk)
 {
 	m_chunk = &chunk;
 	m_ip = m_chunk->GetCode().data();
@@ -293,7 +294,7 @@ InterpreterResult VirtualMachine::Run()
 			// We need to look at the 'Self' object without popping everything yet
 			Value selfVal = m_stack[m_stack.size() - 1 - argCount];
 
-			auto typeInfo = GetTypeInfo(selfVal);
+			auto typeInfo = GetType(selfVal);
 			if (!typeInfo)
 			{
 				std::cerr << "Runtime Error: Value has no type info\n";
@@ -379,7 +380,7 @@ InterpreterResult VirtualMachine::Run()
 			auto propHash = propName.Hash();
 
 			Value objVal = Pop();
-			auto typeInfo = GetTypeInfo(objVal);
+			auto typeInfo = GetType(objVal);
 
 			if (!typeInfo)
 			{
@@ -467,7 +468,7 @@ InterpreterResult VirtualMachine::Run()
 
 		case OpCode::TypeOf: {
 			Value objVal = Pop();
-			if (auto typeInfo = GetTypeInfo(objVal))
+			if (auto typeInfo = GetType(objVal))
 			{
 				Push(typeInfo);
 			}
@@ -664,7 +665,7 @@ void VirtualMachine::Push(Value const& value)
 	m_stack.push_back(value);
 }
 
-TypeInfoPtr VirtualMachine::GetTypeInfo(Value const& value) const
+TypeInfoPtr VirtualMachine::GetType(Value const& value) const
 {
 	return std::visit(utils::overloaded{
 						  [this](Null_t) { return m_typeNull; },
@@ -675,6 +676,16 @@ TypeInfoPtr VirtualMachine::GetTypeInfo(Value const& value) const
 						  [](ArrayInstancePtr const& arr) { return arr ? arr->typeInfo : nullptr; },
 						  [](const auto&) -> TypeInfoPtr { return nullptr; } },
 		value);
+}
+
+TypeInfoPtr VirtualMachine::GetTypeByName(String const& name) const
+{
+	if (const auto it = m_types.find(name.Hash()); it != m_types.end())
+	{
+		return it->second;
+	}
+
+	return nullptr;
 }
 
 void VirtualMachine::InitBuiltinTypes()
