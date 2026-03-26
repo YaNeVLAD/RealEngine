@@ -25,6 +25,8 @@ public:
 
 	[[nodiscard]] std::size_t Generation() const;
 
+	[[nodiscard]] bool Valid() const;
+
 	auto operator<=>(Entity const&) const = default;
 
 private:
