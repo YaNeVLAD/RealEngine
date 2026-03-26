@@ -48,7 +48,7 @@ std::size_t Entity::Generation() const
 
 bool Entity::Valid() const
 {
-	return m_id & ENTITY_GENERATION_MASK;
+	return m_id != ENTITY_INDEX_MASK;
 }
 
 } // namespace re::ecs
