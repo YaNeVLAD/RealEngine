@@ -30,6 +30,21 @@ constexpr T Vector3<T>::LengthSq() const
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
+template <typename U>
+constexpr Vector3<T>::operator Vector3<U>() const
+{
+	return Vector3<U>{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(z) };
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr Vector3<T> Vector3<T>::operator-() const
+{
+	return Vector3{ -x, -y, -z };
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
 auto Vector3<T>::Length() const
 {
 	return std::sqrt(LengthSq());
@@ -37,7 +52,7 @@ auto Vector3<T>::Length() const
 
 template <typename T>
 	requires std::floating_point<T> || std::integral<T>
-		 Vector3<T> Vector3<T>::Normalize() const
+		 Vector3<T> Vector3<T>::Normalized() const
 	requires std::floating_point<T>
 {
 	const T len = Length();
@@ -47,13 +62,26 @@ template <typename T>
 }
 
 template <typename T>
-constexpr Vector3<T> operator+(Vector3<T> left, Vector3<T> right)
+	requires std::floating_point<T> || std::integral<T>
+		 Vector3<T>& Vector3<T>::Normalize() const
+	requires std::floating_point<T>
+{
+	const T len = Length();
+	RE_ASSERT(len != 0, "Vector3::Normalize cannot divide by 0");
+
+	*this /= len;
+
+	return *this;
+}
+
+template <typename T>
+constexpr Vector3<T> operator+(Vector3<T> const& left, Vector3<T> const& right)
 {
 	return Vector3<T>{ left.x + right.x, left.y + right.y, left.z + right.z };
 }
 
 template <typename T>
-constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> right)
+constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> const& right)
 {
 	left.x += right.x;
 	left.y += right.y;
@@ -63,13 +91,13 @@ constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> right)
 }
 
 template <typename T>
-constexpr Vector3<T> operator-(Vector3<T> left, Vector3<T> right)
+constexpr Vector3<T> operator-(Vector3<T> const& left, Vector3<T> const& right)
 {
 	return Vector3<T>{ left.x - right.x, left.y - right.y, left.z - right.z };
 }
 
 template <typename T>
-constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> right)
+constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> const& right)
 {
 	left.x -= right.x;
 	left.y -= right.y;
@@ -79,13 +107,13 @@ constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> right)
 }
 
 template <typename T>
-constexpr Vector3<T> operator*(Vector3<T> left, T right)
+constexpr Vector3<T> operator*(Vector3<T> const& left, T right)
 {
 	return Vector3<T>{ left.x * right, left.y * right, left.z * right };
 }
 
 template <typename T>
-constexpr Vector3<T> operator*(T left, Vector3<T> right)
+constexpr Vector3<T> operator*(T left, Vector3<T> const& right)
 {
 	return Vector3<T>{ left * right.x, left * right.y, left * right.z };
 }
@@ -101,7 +129,7 @@ constexpr Vector3<T>& operator*=(Vector3<T>& left, T right)
 }
 
 template <typename T>
-constexpr Vector3<T> operator/(Vector3<T> left, T right)
+constexpr Vector3<T> operator/(Vector3<T> const& left, T right)
 {
 	RE_ASSERT(right != 0, "Vector3::operator/ cannot divide by 0");
 
@@ -120,8 +148,8 @@ constexpr Vector3<T>& operator/=(Vector3<T>& left, T right)
 	return left;
 }
 
-template <typename T>
-constexpr Vector3<T> Lerp(const Vector3<T>& a, const Vector3<T>& b, float t)
+template <typename T, std::floating_point U>
+constexpr Vector3<T> Lerp(Vector3<T> const& a, Vector3<T> const& b, U t)
 {
 	return a + (b - a) * t;
 }

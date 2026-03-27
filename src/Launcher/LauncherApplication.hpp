@@ -21,10 +21,9 @@ struct MenuLayout final : re::Layout
 
 	void OnCreate() override
 	{
-		using namespace re::literals;
-
 		auto& scene = GetScene();
-		m_window.SetVSyncEnabled(false);
+		m_window.SetVSyncEnabled(true);
+
 		scene
 			.AddSystem<CameraControlSystem>()
 			.WithRead<re::CameraComponent, re::TransformComponent>()

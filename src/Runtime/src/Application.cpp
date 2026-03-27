@@ -1,11 +1,12 @@
 #include <Runtime/Application.hpp>
 
-#include "Runtime/Internal/RenderSystem3D.hpp"
 #include <Core/Utils.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
+#include <Runtime/Internal/RenderSystem3D.hpp>
+#include <Runtime/System/CollisionSystem.hpp>
 
 #if defined(RE_USE_SFML_RENDER)
 #include <RenderCore/SFML/SFMLRenderAPI.hpp>
@@ -17,7 +18,7 @@
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 #endif
 
-#include "Render3D/Renderer3D.hpp"
+#include <Render3D/Renderer3D.hpp>
 
 #include <chrono>
 
@@ -205,6 +206,11 @@ void Application::SetupScene(Layout& layout) const
 {
 	auto& scene = layout.GetScene();
 	scene
+		.AddSystem<CollisionSystem>()
+		.WithRead<TransformComponent>()
+		.RunOnMainThread();
+
+	scene
 		.AddSystem<detail::RenderSystem3D>(*m_window)
 		.WithRead<
 			TransformComponent,
@@ -222,6 +228,8 @@ void Application::SetupScene(Layout& layout) const
 			DynamicTextureComponent>()
 		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
+
+	scene.CreateEntity().Add<PhysicsGridComponent>();
 
 	scene
 		.CreateEntity()

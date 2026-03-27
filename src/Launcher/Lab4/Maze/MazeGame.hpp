@@ -30,10 +30,16 @@ class MazePlayerControllerSystem final : public re::ecs::System
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		std::vector<MazeWallComponent> walls;
-		for (auto&& [entity, wall] : *scene.CreateView<MazeWallComponent>())
+		re::SpatialGrid* grid = nullptr;
+		for (auto&& [entity, gridComp] : *scene.CreateView<re::PhysicsGridComponent>())
 		{
-			walls.push_back(wall);
+			grid = &gridComp.grid;
+			break;
+		}
+
+		if (!grid)
+		{
+			return;
 		}
 
 		for (auto&& [entity, transform, player] : *scene.CreateView<re::TransformComponent, MazePlayerStateComponent>())
@@ -64,20 +70,20 @@ public:
 				moveDir += right;
 			}
 
-			if (glm::length(moveDir) > 0.001f)
+			if (glm::length(moveDir) > std::numeric_limits<float>::epsilon())
 			{
 				moveDir = glm::normalize(moveDir) * player.MOVE_SPEED * dt;
 
 				re::Vector3f newPos = transform.position;
 
 				newPos.x += moveDir.x;
-				if (CheckCollision(newPos, walls))
+				if (CheckCollision(scene, *grid, newPos))
 				{
 					newPos.x -= moveDir.x;
 				}
 
 				newPos.z += moveDir.z;
-				if (CheckCollision(newPos, walls))
+				if (CheckCollision(scene, *grid, newPos))
 				{
 					newPos.z -= moveDir.z;
 				}
@@ -91,21 +97,28 @@ public:
 private:
 	static constexpr float PLAYER_RADIUS = 0.4f;
 
-	static bool CheckCollision(const re::Vector3f& pos, const std::vector<MazeWallComponent>& walls)
+	// Добавить предварительное убирание кубов, с которыми точно не будет коллизий
+	// Можно разделить мир на кубы и проверять пересечения только в них
+	static bool CheckCollision(re::ecs::Scene& scene, const re::SpatialGrid& grid, const re::Vector3f& pos)
 	{
-		for (const auto& [x, z, halfSize] : walls)
-		{
+		const re::AABB playerBounds = re::AABB::FromCenterSize({ pos.x, pos.y, pos.z }, PLAYER_RADIUS);
+
+		std::vector<re::ecs::Entity> potentialColliders = grid.Query(playerBounds);
+		return std::ranges::any_of(potentialColliders, [&](const re::ecs::Entity wallEntity) {
+			if (!scene.HasComponent<MazeWallComponent>(wallEntity))
+			{
+				return false;
+			}
+
+			const auto& [x, z, halfSize] = scene.GetComponent<MazeWallComponent>(wallEntity);
+
 			const float closestX = std::clamp(pos.x, x - halfSize, x + halfSize);
 			const float closestZ = std::clamp(pos.z, z - halfSize, z + halfSize);
 
 			const float dx = pos.x - closestX;
 			const float dz = pos.z - closestZ;
 
-			if ((dx * dx + dz * dz) < (PLAYER_RADIUS * PLAYER_RADIUS))
-			{ // distance(player, point) < PLAYER_RADIUS
-				return true;
-			}
-		}
-		return false;
+			return ((dx * dx + dz * dz) < (PLAYER_RADIUS * PLAYER_RADIUS));
+		});
 	}
 };

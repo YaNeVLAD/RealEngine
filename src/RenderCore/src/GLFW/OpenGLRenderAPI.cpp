@@ -1,11 +1,10 @@
-#include "glm/gtc/type_ptr.hpp"
-
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 
 #include <glad/glad.h>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace
 {
@@ -515,7 +514,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 	}
 
 	const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
-	const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(uint32_t));
+	const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(std::uint32_t));
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
 
@@ -620,7 +619,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		return;
 	}
 
-	const auto totalInstances = static_cast<uint32_t>(transforms.size());
+	const auto totalInstances = static_cast<std::uint32_t>(transforms.size());
 
 	if (batchIndex >= m_cullingBatches.size())
 	{
