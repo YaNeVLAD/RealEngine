@@ -79,7 +79,6 @@ if (NOT EXISTS "${STB_IMAGE_PATH}/stb_image_impl.cpp")
     file(WRITE "${STB_IMAGE_PATH}/stb_image_impl.cpp"
             "#define STB_IMAGE_IMPLEMENTATION\n#include \"stb_image.h\"")
 endif ()
-
 add_library(stb_image STATIC "${STB_IMAGE_PATH}/stb_image_impl.cpp")
 target_include_directories(stb_image PUBLIC "${STB_IMAGE_PATH}")
 
@@ -89,6 +88,14 @@ if (NOT EXISTS "${STB_IMAGE_PATH}/stb_image_resize_impl.cpp")
     file(WRITE "${STB_IMAGE_PATH}/stb_image_resize_impl.cpp"
             "#define STB_IMAGE_RESIZE_IMPLEMENTATION\n#include \"stb_image_resize.h\"")
 endif ()
-
 add_library(stb_image_resize STATIC "${STB_IMAGE_PATH}/stb_image_resize_impl.cpp")
 target_include_directories(stb_image_resize PUBLIC "${STB_IMAGE_PATH}")
+
+# MINIAUDIO
+set(MINIAUDIO_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/miniaudio")
+if (NOT EXISTS "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
+    file(WRITE "${MINIAUDIO_PATH}/miniaudio_impl.cpp"
+            "#define MINIAUDIO_IMPLEMENTATION\n#include \"miniaudio.h\"")
+endif ()
+add_library(miniaudio STATIC "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
+target_include_directories(miniaudio PUBLIC "${MINIAUDIO_PATH}")
