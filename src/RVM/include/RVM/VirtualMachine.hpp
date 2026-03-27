@@ -53,7 +53,7 @@ private:
 
 private:
 	template <typename T>
-	using HashMap = std::unordered_map<Hash_t, T>;
+	using HashMap = std::unordered_map<String, T>;
 
 	void InitBuiltinTypes();
 

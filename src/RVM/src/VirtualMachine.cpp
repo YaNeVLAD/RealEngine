@@ -45,12 +45,12 @@ InterpreterResult VirtualMachine::Interpret(Chunk const& chunk)
 
 void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
 {
-	m_natives[name.Hash()] = std::move(fn);
+	m_natives[name] = std::move(fn);
 }
 
 void VirtualMachine::RegisterType(TypeInfoPtr typeInfo)
 {
-	m_types[typeInfo->name.Hash()] = std::move(typeInfo);
+	m_types[typeInfo->name] = std::move(typeInfo);
 }
 
 void VirtualMachine::RegisterGlobal(const String& name, Value value)
@@ -207,7 +207,7 @@ InterpreterResult VirtualMachine::Run()
 			auto funcName = std::get<String>(nameVal);
 
 			std::uint8_t argCount = READ_BYTE();
-			auto it = m_natives.find(funcName.Hash());
+			const auto it = m_natives.find(funcName);
 			if (it == m_natives.end())
 			{
 				throw std::runtime_error("Unknown native function " + funcName);
@@ -304,7 +304,7 @@ InterpreterResult VirtualMachine::Run()
 			auto methodIt = typeInfo->methods.find(methodHash);
 			if (methodIt == typeInfo->methods.end())
 			{
-				std::cerr << "Runtime Error: Undefined method '" << methodName.ToString() << "'\n";
+				std::cerr << "Runtime Error: Undefined method '" << methodName << "'\n";
 				return InterpreterResult::RuntimeError;
 			}
 
@@ -332,7 +332,7 @@ InterpreterResult VirtualMachine::Run()
 				if (native->argCount != argCount)
 				{
 					std::cerr << "Runtime Error: Method '"
-							  << methodName.ToString()
+							  << methodName
 							  << "' expects " << static_cast<int>(native->argCount)
 							  << " arguments.\n";
 
@@ -362,10 +362,10 @@ InterpreterResult VirtualMachine::Run()
 			Value classNameVal = READ_CONSTANT();
 			auto className = std::get<String>(classNameVal);
 
-			auto it = m_types.find(className.Hash());
+			const auto it = m_types.find(className);
 			if (it == m_types.end())
 			{
-				std::cerr << "Runtime Error: Unknown class '" << className.ToString() << "'\n";
+				std::cerr << "Runtime Error: Unknown class '" << className << "'\n";
 				return InterpreterResult::RuntimeError;
 			}
 
@@ -404,7 +404,7 @@ InterpreterResult VirtualMachine::Run()
 				}
 				else
 				{
-					std::cerr << "Runtime Error: Undefined property '" << propName.ToString() << "'\n";
+					std::cerr << "Runtime Error: Undefined property '" << propName << "'\n";
 					return InterpreterResult::RuntimeError;
 				}
 			}
@@ -507,7 +507,7 @@ InterpreterResult VirtualMachine::Run()
 				}
 			}
 
-			m_types[className.Hash()] = classInfo;
+			m_types[className] = classInfo;
 			break;
 		}
 
@@ -585,10 +585,10 @@ InterpreterResult VirtualMachine::Run()
 			auto funcName = std::get<String>(nameVal);
 			std::uint8_t argCount = READ_BYTE();
 
-			auto it = m_natives.find(funcName.Hash());
+			const auto it = m_natives.find(funcName);
 			if (it == m_natives.end())
 			{
-				throw std::runtime_error("Unknown native function " + funcName.ToString());
+				throw std::runtime_error("Unknown native function " + funcName);
 			}
 
 			auto nativeObj = std::make_shared<NativeObject>();
@@ -680,7 +680,7 @@ TypeInfoPtr VirtualMachine::GetType(Value const& value) const
 
 TypeInfoPtr VirtualMachine::GetTypeByName(String const& name) const
 {
-	if (const auto it = m_types.find(name.Hash()); it != m_types.end())
+	if (const auto it = m_types.find(name); it != m_types.end())
 	{
 		return it->second;
 	}
@@ -696,10 +696,10 @@ void VirtualMachine::InitBuiltinTypes()
 	m_typeNull = std::make_shared<TypeInfo>(String("Null"));
 	m_typeArray = std::make_shared<TypeInfo>(String("Array"));
 
-	m_types[m_typeInt->name.Hash()] = m_typeInt;
-	m_types[m_typeDouble->name.Hash()] = m_typeDouble;
-	m_types[m_typeString->name.Hash()] = m_typeString;
-	m_types[m_typeArray->name.Hash()] = m_typeArray;
+	m_types[m_typeInt->name] = m_typeInt;
+	m_types[m_typeDouble->name] = m_typeDouble;
+	m_types[m_typeString->name] = m_typeString;
+	m_types[m_typeArray->name] = m_typeArray;
 }
 
 } // namespace re::rvm
