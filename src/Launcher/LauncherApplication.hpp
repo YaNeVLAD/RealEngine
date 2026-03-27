@@ -7,6 +7,7 @@
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
+#include "Lab4/Maze/MazeLayout.hpp"
 
 #include "CameraControlSystem.hpp"
 
@@ -20,6 +21,8 @@ struct MenuLayout final : re::Layout
 
 	void OnCreate() override
 	{
+		using namespace re::literals;
+
 		auto& scene = GetScene();
 		m_window.SetVSyncEnabled(false);
 		scene
@@ -30,9 +33,11 @@ struct MenuLayout final : re::Layout
 
 		scene.CreateEntity()
 			.Add<re::DirectionalLightComponent>(re::Color{ 255, 230, 200, 255 }, 0.2f)
-			.Add<re::TransformComponent>({ .position = { 0.f, 0.f, 0.f },
-				.rotation = { -35.f, 45.f, 0.f },
-				.scale = { 1.f, 1.f, 1.f } })
+			.Add<re::TransformComponent>({
+				.position = { 0.f, 0.f, 0.f },
+				.rotation = { -35, 45, 0 },
+				.scale = { 1.f, 1.f, 1.f },
+			})
 			.Add<re::Dirty<re::TransformComponent>>();
 
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
@@ -65,19 +70,19 @@ struct MenuLayout final : re::Layout
 					scene.CreateEntity()
 						.Add<re::detail::TransparentTag>()
 						.Add<re::Dirty<re::TransformComponent>>()
-						.Add<re::TransformComponent>(
-							{ .position = { posX, posY, posZ },
-								.rotation = { 0.f, 0.f, 0.f },
-								.scale = { 1.0f, 1.0f, 1.0f } })
+						.Add<re::TransformComponent>({
+							.position = { posX, posY, posZ },
+							.scale = { 1.0f, 1.0f, 1.0f },
+						})
 						.Add<re::StaticMeshComponent3D>(solidMesh, false);
 
 					scene.CreateEntity()
 						.Add<re::detail::TransparentTag>()
 						.Add<re::Dirty<re::TransformComponent>>()
-						.Add<re::TransformComponent>(
-							{ .position = { posX, posY, posZ },
-								.rotation = { 0.f, 0.f, 0.f },
-								.scale = { 1.0f, 1.0f, 1.0f } })
+						.Add<re::TransformComponent>({
+							.position = { posX, posY, posZ },
+							.scale = { 1.0f, 1.0f, 1.0f },
+						})
 						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
 				}
 			}
@@ -152,6 +157,7 @@ public:
 	{
 		AddLayout<MenuLayout>(Window());
 		AddLayout<AsteroidsLayout>(Window());
+		AddLayout<MazeLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -189,14 +195,9 @@ public:
 			{
 				SwitchLayout<AsteroidsLayout>();
 			}
-		}
-
-		if (const auto* e = event.GetIf<re::Event::MouseWheelScrolled>())
-		{
-			for (auto&& [entity, camera] : *CurrentScene().CreateView<re::CameraComponent>())
+			if (e->key == re::Keyboard::Key::Num3)
 			{
-				const auto newZoom = camera.zoom + e->delta * 0.1f;
-				camera.zoom = std::max(newZoom, 0.1f);
+				SwitchLayout<MazeLayout>();
 			}
 		}
 	}

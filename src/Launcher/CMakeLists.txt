@@ -11,6 +11,9 @@ add_executable(ReLauncher main.cpp
         Lab3/Asteroids/MovementSystem.hpp
         Lab3/Asteroids/AsteroidsComponents.hpp
 
+        Lab4/Maze/MazeGame.hpp
+        Lab4/Maze/MazeLayout.hpp
+
         LauncherApplication.hpp
 )
 

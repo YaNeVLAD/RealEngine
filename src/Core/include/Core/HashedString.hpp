@@ -127,7 +127,7 @@ using HashedU8String = BaseHashedString<char8_t>;
 using HashedU16String = BaseHashedString<char16_t>;
 using HashedU32String = BaseHashedString<char32_t>;
 
-inline namespace literals
+namespace literals
 {
 
 [[nodiscard]] consteval HashedString operator"" _hs(const char* str, const std::size_t size) noexcept
