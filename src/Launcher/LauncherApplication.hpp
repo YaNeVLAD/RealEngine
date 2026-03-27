@@ -8,6 +8,7 @@
 
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 #include "Lab4/Maze/MazeLayout.hpp"
+#include "Lab4/Piano/PianoLayout.hpp"
 
 #include "CameraControlSystem.hpp"
 
@@ -157,6 +158,7 @@ public:
 		AddLayout<MenuLayout>(Window());
 		AddLayout<AsteroidsLayout>(Window());
 		AddLayout<MazeLayout>(Window());
+		AddLayout<PianoLayout>(Window());
 
 		SwitchLayout<MenuLayout>();
 	}
@@ -186,17 +188,21 @@ public:
 	{
 		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
 		{
-			if (e->key == re::Keyboard::Key::Num1)
+			if (e->key == re::Keyboard::Key::F1)
 			{
 				SwitchLayout<MenuLayout>();
 			}
-			if (e->key == re::Keyboard::Key::Num2)
+			if (e->key == re::Keyboard::Key::F2)
 			{
 				SwitchLayout<AsteroidsLayout>();
 			}
-			if (e->key == re::Keyboard::Key::Num3)
+			if (e->key == re::Keyboard::Key::F3)
 			{
 				SwitchLayout<MazeLayout>();
+			}
+			if (e->key == re::Keyboard::Key::F4)
+			{
+				SwitchLayout<PianoLayout>();
 			}
 		}
 	}

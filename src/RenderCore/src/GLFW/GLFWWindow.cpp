@@ -382,7 +382,7 @@ Color GLFWWindow::GetBackgroundColor() const
 
 void GLFWWindow::SetBackgroundColor(const Color color)
 {
-	glClearColor(color.r, color.g, color.b, color.a);
+	glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
 }
 
 Vector2f GLFWWindow::ToWorldPos(const Vector2i& pixelPos)
