@@ -40,7 +40,7 @@ public:
 		{
 			glm::vec3 front;
 			front.x = std::cos(glm::radians(transform.rotation.y)) * std::cos(glm::radians(transform.rotation.x));
-			front.y = std::sin(glm::radians(transform.rotation.x));
+			front.y = 0.f;
 			front.z = std::sin(glm::radians(transform.rotation.y)) * std::cos(glm::radians(transform.rotation.x));
 			front = glm::normalize(front);
 

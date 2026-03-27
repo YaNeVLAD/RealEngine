@@ -83,17 +83,17 @@ CameraData ExtractCamera(ecs::Scene& scene)
 			data.farClip = camera.farClip;
 
 			glm::vec3 front;
-			float yaw = transform.rotation.y;
-			float pitch = transform.rotation.x;
+			const float yaw = transform.rotation.y;
+			const float pitch = transform.rotation.x;
 
 			front.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
 			front.y = std::sin(glm::radians(pitch));
 			front.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
 			front = glm::normalize(front);
 
-			glm::vec3 up = { camera.up.x, camera.up.y, camera.up.z };
+			const glm::vec3 up = { camera.up.x, camera.up.y, camera.up.z };
 			data.viewMatrix = glm::lookAt(data.position, data.position + front, up);
-			break;
+			break; // TODO: Add support for multiple cameras
 		}
 	}
 
@@ -113,7 +113,11 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
 	auto [width, height] = m_window.Size();
-	const float aspect = static_cast<float>(width) / static_cast<float>(height);
+	float aspect = static_cast<float>(width) / static_cast<float>(height);
+	if (width == 0 || height == 0)
+	{
+		aspect = 1.f;
+	}
 
 	ProcessTransforms(scene);
 
