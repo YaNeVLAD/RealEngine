@@ -47,7 +47,6 @@ public:
 
 		std::list<std::string> sourceBuffers;
 
-		// Вектор для хранения всех файлов ДО линковки
 		std::vector<std::unique_ptr<ast::Program>> parsedPrograms;
 
 		// --- PHASE 1: FRONTEND ---

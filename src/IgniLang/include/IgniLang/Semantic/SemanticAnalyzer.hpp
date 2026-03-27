@@ -274,8 +274,21 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		m_env.PushScope();
+		const auto funType = std::make_shared<FunctionType>(node->name.ToString());
+		funType->returnType = ResolveAstType(node->returnType.get());
+		funType->isVararg = node->isVararg;
 
+		for (const auto& [_, type] : node->parameters)
+		{
+			funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+		}
+
+		if (m_currentReturnType != nullptr)
+		{
+			m_env.Define(node->name, funType, true);
+		}
+
+		m_env.PushScope();
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
 			std::shared_ptr<SemanticType> paramType = ResolveAstType(node->parameters[i].type.get());

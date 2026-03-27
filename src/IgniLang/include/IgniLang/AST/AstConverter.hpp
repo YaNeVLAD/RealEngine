@@ -239,6 +239,10 @@ private:
 			case "ForStmt"_hs:
 				outStmts.push_back(ConvertForStmt(actualStmt.get()));
 				break;
+			case "Block"_hs: {
+				outStmts.push_back(ConvertBlock(actualStmt.get()));
+				break;
+			}
 			default:
 				throw std::invalid_argument("Invalid statement");
 			}

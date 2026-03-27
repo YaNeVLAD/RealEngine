@@ -8,6 +8,13 @@ fun main()
     print("pow(2,3)", pow(2.0, 3.0));
     print("sin(45)", math.sin(45.0));
 
+    val a = 10;
+    {
+        val a = 42;
+        print("In scope:", a);
+    }
+    print("After scope:", a);
+
     val n = 5;
     val arr: Array = make_array(n);
 

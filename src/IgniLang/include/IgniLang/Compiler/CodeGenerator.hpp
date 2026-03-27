@@ -100,9 +100,9 @@ public:
 		{
 			m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 		}
-		else if (std::ranges::find(m_currentLocals, name) != m_currentLocals.end())
+		else if (IsLocal(name))
 		{
-			m_out << "GET " << name << "\n";
+			m_out << "GET " << GetAsmName(name) << "\n";
 			if (m_functionBoxedVars.at(m_currentFunction).contains(name))
 			{
 				m_out << "UNBOX\n";
@@ -139,9 +139,11 @@ public:
 			}
 			else
 			{
+				const re::String asmName = IsLocal(name) ? GetAsmName(name) : name;
+
 				if (m_functionBoxedVars.at(m_currentFunction).contains(name))
 				{
-					m_out << "GET " << name << "\n";
+					m_out << "GET " << asmName << "\n";
 					if (node->value)
 					{
 						node->value->Accept(*this);
@@ -154,7 +156,7 @@ public:
 					{
 						node->value->Accept(*this);
 					}
-					m_out << "SET " << name << "\n";
+					m_out << "SET " << asmName << "\n";
 				}
 			}
 			m_out << "CONST 0\n";
@@ -240,7 +242,7 @@ public:
 			{
 				isDirectCall = true;
 			}
-			else if (std::ranges::find(m_currentLocals, directFuncName) == m_currentLocals.end()
+			else if (!IsLocal(directFuncName)
 				&& std::ranges::find(m_currentUpvalues, directFuncName) == m_currentUpvalues.end())
 			{
 				isDirectCall = true;
@@ -353,15 +355,20 @@ public:
 					m_out << vmOp << "\n";
 					m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 				}
-				else if (m_functionBoxedVars.at(m_currentFunction).contains(name))
-				{
-					m_out << "GET " << name << "\nGET " << name << "\nUNBOX\n"
-						  << vmOp << "\nSTORE_BOX\n";
-				}
 				else
 				{
-					m_out << "GET " << name << "\n"
-						  << vmOp << "\nSET " << name << "\n";
+					const re::String asmName = IsLocal(name) ? GetAsmName(name) : name;
+
+					if (m_functionBoxedVars.at(m_currentFunction).contains(name))
+					{
+						m_out << "GET " << asmName << "\nGET " << asmName << "\nUNBOX\n"
+							  << vmOp << "\nSTORE_BOX\n";
+					}
+					else
+					{
+						m_out << "GET " << asmName << "\n"
+							  << vmOp << "\nSET " << asmName << "\n";
+					}
 				}
 
 				if (upIt != m_currentUpvalues.end())
@@ -370,7 +377,8 @@ public:
 				}
 				else
 				{
-					m_out << "GET " << name << "\n";
+					const re::String asmName = IsLocal(name) ? GetAsmName(name) : name;
+					m_out << "GET " << asmName << "\n";
 					if (m_functionBoxedVars.at(m_currentFunction).contains(name))
 					{
 						m_out << "UNBOX\n";
@@ -457,6 +465,8 @@ public:
 
 	void Visit(const ast::Block* node) override
 	{
+		const std::size_t localsCountBefore = m_currentLocals.size();
+
 		for (const auto& s : node->statements)
 		{
 			if (s)
@@ -464,6 +474,8 @@ public:
 				s->Accept(*this);
 			}
 		}
+
+		m_currentLocals.resize(localsCountBefore);
 	}
 
 	void Visit(const ast::IfStmt* node) override
@@ -521,25 +533,28 @@ public:
 		const re::String endLabel = "L_for_end_" + std::to_string(labelId);
 
 		const auto& iterName = node->iteratorName;
-		re::String limitName = "_for_limit_" + std::to_string(labelId);
+		const re::String limitName = "_for_limit_" + std::to_string(labelId);
+
+		const std::size_t localsCountBefore = m_currentLocals.size();
 
 		m_out << "// --- for (" << iterName << ") ---\n";
+
 		if (node->startExpr)
 		{
 			node->startExpr->Accept(*this);
 		}
-		m_out << "SET " << iterName << "\n";
-		m_currentLocals.emplace_back(iterName);
+		const auto asmIterName = DeclareLocal(iterName);
+		m_out << "SET " << asmIterName << "\n";
 
 		if (node->endExpr)
 		{
 			node->endExpr->Accept(*this);
 		}
-		m_out << "SET " << limitName << "\n";
-		m_currentLocals.emplace_back(limitName);
+		const auto asmLimitName = DeclareLocal(limitName);
+		m_out << "SET " << asmLimitName << "\n";
 
 		m_out << "LABEL " << startLabel << "\n";
-		m_out << "CONST 1\nGET " << limitName << "\nGET " << iterName << "\nLESS\nSUB\n";
+		m_out << "CONST 1\nGET " << asmLimitName << "\nGET " << asmIterName << "\nLESS\nSUB\n";
 		m_out << "JMP_IF_FALSE " << endLabel << "\n";
 
 		if (node->body)
@@ -547,8 +562,10 @@ public:
 			node->body->Accept(*this);
 		}
 
-		m_out << "GET " << iterName << "\nCONST 1\nADD\nSET " << iterName << "\n";
+		m_out << "GET " << asmIterName << "\nCONST 1\nADD\nSET " << asmIterName << "\n";
 		m_out << "JMP " << startLabel << "\nLABEL " << endLabel << "\n";
+
+		m_currentLocals.resize(localsCountBefore);
 	}
 
 	void Visit(const ast::VarDecl* node) override
@@ -567,8 +584,7 @@ public:
 			m_out << "BOX\n";
 		}
 
-		m_out << "SET " << node->name << "\n";
-		m_currentLocals.emplace_back(node->name);
+		m_out << "SET " << DeclareLocal(node->name) << "\n";
 	}
 
 	void Visit(const ast::ValDecl* node) override
@@ -587,8 +603,7 @@ public:
 			m_out << "BOX\n";
 		}
 
-		m_out << "SET " << node->name << "\n";
-		m_currentLocals.emplace_back(node->name);
+		m_out << "SET " << DeclareLocal(node->name) << "\n";
 	}
 
 	void Visit(const ast::FunDecl* node) override
@@ -607,21 +622,21 @@ public:
 			}
 			else
 			{
-				m_out << "GET " << uv << "\n";
+				m_out << "GET " << GetAsmName(uv) << "\n";
 			}
 		}
 
 		m_out << "MAKE_CLOSURE " << node->name << " " << upvalues.size() << "\n";
-		m_out << "SET " << node->name << "\n";
-		m_currentLocals.emplace_back(node->name);
+		m_out << "SET " << DeclareLocal(node->name) << "\n";
 	}
 
 private:
 	std::ostream& m_out;
 	std::size_t m_labelCount = 0;
+	std::size_t m_varCounter = 0;
 
 	const ast::FunDecl* m_currentFunction = nullptr;
-	std::vector<re::String> m_currentLocals;
+	std::vector<std::pair<re::String, re::String>> m_currentLocals;
 	std::vector<re::String> m_currentUpvalues;
 
 	const std::vector<const ast::FunDecl*>& m_flatFunctions;
@@ -631,11 +646,45 @@ private:
 	const std::unordered_map<re::String, re::String>& m_importAliases;
 	const std::unordered_set<re::String>& m_externals;
 
+	re::String DeclareLocal(const re::String& originalName)
+	{
+		re::String asmName = originalName + "_" + std::to_string(m_varCounter++);
+		m_currentLocals.emplace_back(originalName, asmName);
+		return asmName;
+	}
+
+	re::String GetAsmName(const re::String& name) const
+	{
+		for (auto it = m_currentLocals.rbegin(); it != m_currentLocals.rend(); ++it)
+		{
+			if (it->first == name)
+			{
+				return it->second;
+			}
+		}
+
+		return name;
+	}
+
+	bool IsLocal(const re::String& name) const
+	{
+		for (const auto& key : m_currentLocals | std::views::keys)
+		{
+			if (key == name)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	void GenerateFunction(const ast::FunDecl* fun)
 	{
 		m_currentFunction = fun;
 		m_out << "FUN " << fun->name << "\n";
 		m_currentLocals.clear();
+		m_varCounter = 0;
 		m_currentUpvalues = m_functionUpvalues.at(fun);
 
 		const auto& boxedVars = m_functionBoxedVars.at(fun);
@@ -647,8 +696,8 @@ private:
 			{
 				m_out << "BOX\n";
 			}
-			m_out << "SET " << paramName << "\n";
-			m_currentLocals.emplace_back(paramName);
+
+			m_out << "SET " << DeclareLocal(paramName) << "\n";
 		}
 
 		if (fun->body)

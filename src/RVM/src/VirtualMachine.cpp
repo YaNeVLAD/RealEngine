@@ -73,15 +73,15 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 			// clang-format off
-		case OpCode::Add:     BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
-		case OpCode::Sub:     BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
-		case OpCode::Mul:     BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
-		case OpCode::Div:     BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
-		case OpCode::Equal:   BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
-		case OpCode::Less:    BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
-		case OpCode::Greater: BINARY_OP([](const Value& a, const Value& b) { return OpLess(b, a); }, GREATER); break;
-		case OpCode::NotEqual: BINARY_OP([](const Value& a, const Value& b) { return IsTruthy(OpEqual(a, b)) ? Value(static_cast<Int>(0)) : Value(static_cast<Int>(1)); }, NOT_EQUAL); break;
-		case OpCode::LessEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(a, b); }, LESS_EQUAL); break;
+		case OpCode::Add:          BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
+		case OpCode::Sub:          BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
+		case OpCode::Mul:          BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
+		case OpCode::Div:          BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
+		case OpCode::Equal:        BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
+		case OpCode::Less:         BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
+		case OpCode::Greater:      BINARY_OP([](const Value& a, const Value& b) { return OpLess(b, a); }, GREATER); break;
+		case OpCode::NotEqual:     BINARY_OP([](const Value& a, const Value& b) { return IsTruthy(OpEqual(a, b)) ? Value(static_cast<Int>(0)) : Value(static_cast<Int>(1)); }, NOT_EQUAL); break;
+		case OpCode::LessEqual:    BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(a, b); }, LESS_EQUAL); break;
 		case OpCode::GreaterEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(b, a); }, GREATER_EQUAL); break;
 			// clang-format on
 

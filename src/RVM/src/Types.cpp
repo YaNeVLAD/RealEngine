@@ -7,7 +7,7 @@
 namespace
 {
 
-bool IsZero(const double d) { return std::abs(d) < 1e-9; }
+bool IsZero(const double d) { return std::abs(d) < std::numeric_limits<double>::epsilon(); }
 
 } // namespace
 
@@ -123,14 +123,14 @@ Value OpLess(Value const& lhs, Value const& rhs)
 Value OpEqual(Value const& lhs, Value const& rhs)
 {
 	return std::visit(overloaded{
-						  [](Null_t, Null_t) -> Value { return static_cast<Int>(1); }, // null == null
+						  [](Null_t, Null_t) -> Value { return static_cast<Int>(1); },
 						  [](const Int a, const Int b) -> Value { return static_cast<Int>(a == b ? 1 : 0); },
 						  [](const Double a, const Double b) -> Value { return static_cast<Int>(a == b ? 1 : 0); },
 						  [](const Int a, const Double b) -> Value { return static_cast<Int>(static_cast<Double>(a) == b ? 1 : 0); },
 						  [](const Double a, const Int b) -> Value { return static_cast<Int>(a == static_cast<Double>(b) ? 1 : 0); },
 						  [](String const& a, String const& b) -> Value { return static_cast<Int>(a.ToString() == b.ToString() ? 1 : 0); },
 						  [](TypeInfoPtr const& a, TypeInfoPtr const& b) -> Value { return static_cast<Int>(a == b ? 1 : 0); },
-						  [](const auto&, const auto&) -> Value { return static_cast<Int>(0); } // Разные типы не равны
+						  [](const auto&, const auto&) -> Value { return static_cast<Int>(0); },
 					  },
 		lhs, rhs);
 }
@@ -141,7 +141,7 @@ bool IsTruthy(Value const& val)
 						  [](Null_t) { return false; },
 						  [](const Int v) { return v != 0; },
 						  [](const Double v) { return !IsZero(v); },
-						  [](String const& str) { return !str.ToString().empty(); },
+						  [](String const& str) { return !str.Empty(); },
 						  [](ArrayInstancePtr const& ptr) { return ptr && !ptr->elements.empty(); },
 						  []<typename T>(const Ptr<T>& ptr) { return ptr == nullptr; },
 					  },

@@ -51,7 +51,16 @@ OptQuestion -> ? | \e
 Block -> { StatementList }
 StatementList -> StatementList Statement | \e
 
-Statement -> VarDecl | ValDecl | FunDecl | Expr ; | IfStmt | WhileStmt | ForStmt | return OptExpr ; | break ;
+Statement -> VarDecl
+           | ValDecl
+           | FunDecl
+           | Expr ;
+           | IfStmt
+           | WhileStmt
+           | ForStmt
+           | return OptExpr ;
+           | break ;
+           | Block
 OptExpr -> Expr | \e
 
 IfStmt -> if ( Expr ) Block OptElse
