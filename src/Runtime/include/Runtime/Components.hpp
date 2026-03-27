@@ -202,7 +202,7 @@ struct ColliderComponent3D
 	}
 
 private:
-	AABB m_lastBounds;
+	AABB m_lastBounds{};
 	bool m_isInserted = false;
 
 	friend class CollisionSystem;

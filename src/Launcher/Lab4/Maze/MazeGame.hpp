@@ -101,7 +101,7 @@ private:
 	// Можно разделить мир на кубы и проверять пересечения только в них
 	static bool CheckCollision(re::ecs::Scene& scene, const re::SpatialGrid& grid, const re::Vector3f& pos)
 	{
-		const re::AABB playerBounds = re::AABB::FromCenterSize({ pos.x, pos.y, pos.z }, PLAYER_RADIUS);
+		const re::AABB playerBounds = re::AABB::FromCenterSize(pos, PLAYER_RADIUS);
 
 		std::vector<re::ecs::Entity> potentialColliders = grid.Query(playerBounds);
 		return std::ranges::any_of(potentialColliders, [&](const re::ecs::Entity wallEntity) {
