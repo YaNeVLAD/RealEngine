@@ -97,8 +97,6 @@ public:
 private:
 	static constexpr float PLAYER_RADIUS = 0.4f;
 
-	// Добавить предварительное убирание кубов, с которыми точно не будет коллизий
-	// Можно разделить мир на кубы и проверять пересечения только в них
 	static bool CheckCollision(re::ecs::Scene& scene, const re::SpatialGrid& grid, const re::Vector3f& pos)
 	{
 		const re::AABB playerBounds = re::AABB::FromCenterSize(pos, PLAYER_RADIUS);
