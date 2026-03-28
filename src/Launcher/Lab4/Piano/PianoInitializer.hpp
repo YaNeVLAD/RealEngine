@@ -2,7 +2,6 @@
 
 #include <Audio/Player.hpp>
 #include <Audio/SineWaveGenerator.hpp>
-#include <Core/Math/Vector3.hpp>
 #include <RenderCore/Keyboard.hpp>
 
 #include <atomic>
@@ -20,40 +19,63 @@ struct PianoKeyComponent
 class PianoVoice
 {
 public:
-	re::audio::SineWaveGenerator osc;
-	std::atomic<bool> isPressed{ false };
-
-	float currentVolume = 0.0f;
-	float releaseStep = 0.0f;
-
-	PianoVoice(const ma_uint32 sampleRate, const float frequency)
-		: osc(sampleRate, frequency, 1.0f)
+	PianoVoice(
+		const ma_uint32 sampleRate,
+		const float frequency,
+		const float amplitude = 1.f,
+		const float fadingDuration = 0.5f, // seconds
+		const float attackDuration = 0.01f) // seconds
+		: m_osc(sampleRate, frequency, amplitude)
 	{
-		releaseStep = 1.0f / (sampleRate * 0.5f);
+		m_volumeFadingStep = 1.0f / (static_cast<float>(sampleRate) * fadingDuration);
+		m_attackStep = 1.0f / (static_cast<float>(sampleRate) * attackDuration);
 	}
 
-	float Process()
+	float GetNextSample()
 	{
-		if (isPressed.load(std::memory_order_relaxed))
+		if (m_isPressed.load(std::memory_order_relaxed))
 		{
-			currentVolume = 1.0f;
+			if (m_currentVolume < 1.f)
+			{
+				m_currentVolume += m_attackStep;
+				if (m_currentVolume > 1.f)
+				{
+					m_currentVolume = 1.f;
+				}
+			}
 		}
 		else
 		{
-			currentVolume -= releaseStep;
-			if (currentVolume < 0.0f)
+			if (m_currentVolume > 0.f)
 			{
-				currentVolume = 0.0f;
+				m_currentVolume -= m_volumeFadingStep;
+				if (m_currentVolume < 0.f)
+				{
+					m_currentVolume = 0.f;
+				}
 			}
 		}
 
-		if (currentVolume > 0.0f)
+		if (m_currentVolume > 0.f)
 		{
-			return osc.GetNextSample() * currentVolume;
+			return m_osc.GetNextSample() * m_currentVolume;
 		}
 
-		return 0.0f;
+		return 0.f;
 	}
+
+	void SetPressed(const bool pressed)
+	{
+		m_isPressed.store(pressed, std::memory_order_relaxed);
+	}
+
+private:
+	re::audio::SineWaveGenerator m_osc;
+	std::atomic_bool m_isPressed{ false };
+
+	float m_currentVolume = 0.f;
+	float m_volumeFadingStep = 0.f;
+	float m_attackStep = 0.f;
 };
 
 namespace KeyInitializer
@@ -111,7 +133,7 @@ inline PianoData Prepare(ma_uint32 sampleRate = 48000)
 
 	for (const auto& def : data.layout)
 	{
-		const float frequency = 440.0f * std::pow(2.0f, def.halfSteps / 12.0f);
+		const float frequency = 440.0f * std::pow(2.0f, static_cast<float>(def.halfSteps) / 12.0f);
 		data.voices.push_back(std::make_unique<PianoVoice>(sampleRate, frequency));
 	}
 

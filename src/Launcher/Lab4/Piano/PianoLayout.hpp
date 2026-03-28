@@ -11,7 +11,6 @@
 
 #include "PianoInitializer.hpp"
 
-#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -26,18 +25,21 @@ struct PianoLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-
 		m_piano = KeyInitializer::Prepare();
 		m_piano.player->SetDataCallback([this](void* output, const ma_uint32 frameCount) {
+			constexpr float PRE_GAIN = 0.5f;
+			constexpr float MASTER_GAIN = 0.8f;
+			// Нужно сбрасывать фазу, потому что сейчас при повторном нажатии клавиши будет щелчок
+
 			const auto fOutput = static_cast<float*>(output);
 			for (ma_uint32 i = 0; i < frameCount; ++i)
 			{
 				float mixedSample = 0.0f;
 				for (const auto& voice : m_piano.voices)
 				{
-					mixedSample += voice->Process();
+					mixedSample += voice->GetNextSample();
 				}
-				fOutput[i] = mixedSample * 0.15f;
+				fOutput[i] = std::tanh(mixedSample * PRE_GAIN) * MASTER_GAIN;
 			}
 		});
 
@@ -45,7 +47,7 @@ struct PianoLayout final : re::Layout
 		constexpr float BLACK_WIDTH = 30.0f;
 		float currentWhiteX = -350.0f;
 
-		for (size_t i = 0; i < m_piano.layout.size(); ++i)
+		for (std::size_t i = 0; i < m_piano.layout.size(); ++i)
 		{
 			const auto& def = m_piano.layout[i];
 
@@ -141,7 +143,7 @@ struct PianoLayout final : re::Layout
 
 			const bool isPressed = isKeyboardPressed || isMousePressedOnThisKey;
 
-			m_piano.voices[pianoKey.voiceIndex]->isPressed.store(isPressed, std::memory_order_relaxed);
+			m_piano.voices[pianoKey.voiceIndex]->SetPressed(isPressed);
 
 			if (isPressed)
 			{
