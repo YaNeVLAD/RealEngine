@@ -45,13 +45,13 @@ void IndexBuffer::SetData(const uint32_t* data, const std::size_t count, const s
 	m_count = count;
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_rendererId);
 
-	const uint32_t sizeBytes = count * sizeof(uint32_t);
-	const uint32_t offsetBytes = offset * sizeof(uint32_t);
+	const std::uint32_t sizeBytes = static_cast<std::uint32_t>(count) * sizeof(std::uint32_t);
+	const std::uint32_t offsetBytes = static_cast<std::uint32_t>(offset) * sizeof(std::uint32_t);
 
 	if (offset + count > m_capacity)
 	{
 		m_capacity = static_cast<std::size_t>(static_cast<double>(offset + count) * 1.5);
-		const std::uint32_t capacityBytes = m_capacity * sizeof(std::uint32_t);
+		const std::uint32_t capacityBytes = static_cast<std::uint32_t>(m_capacity) * sizeof(std::uint32_t);
 
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, capacityBytes, nullptr, GL_DYNAMIC_DRAW);
 		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offsetBytes, sizeBytes, data);
@@ -60,7 +60,7 @@ void IndexBuffer::SetData(const uint32_t* data, const std::size_t count, const s
 	{
 		if (offset == 0)
 		{
-			const std::uint32_t capacityBytes = m_capacity * sizeof(std::uint32_t);
+			const std::uint32_t capacityBytes = static_cast<std::uint32_t>(m_capacity) * sizeof(std::uint32_t);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, capacityBytes, nullptr, GL_DYNAMIC_DRAW);
 		}
 		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offsetBytes, sizeBytes, data);

@@ -25,6 +25,16 @@ if (RE_USE_ENTT)
     FetchContent_MakeAvailable(EnTT)
 endif ()
 
+# TinyObjLoader
+FetchContent_Declare(
+        tinyobjloader
+        GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
+        GIT_TAG release
+)
+FetchContent_MakeAvailable(tinyobjloader)
+target_compile_definitions(tinyobjloader INTERFACE TINYOBJLOADER_DISABLE_FAST_FLOAT)
+target_compile_definitions(tinyobjloader PRIVATE TINYOBJLOADER_DISABLE_FAST_FLOAT)
+
 if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     FetchContent_Declare(
             SFML

@@ -11,6 +11,7 @@
 #include "Lab4/Piano/PianoLayout.hpp"
 
 #include "CameraControlSystem.hpp"
+#include "RenderCore/Model.hpp"
 
 struct MenuLayout final : re::Layout
 {
@@ -23,7 +24,7 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-		m_window.SetVSyncEnabled(true);
+		m_window.SetVSyncEnabled(false);
 
 		scene
 			.AddSystem<CameraControlSystem>()
@@ -86,6 +87,23 @@ struct MenuLayout final : re::Layout
 						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
 				}
 			}
+		}
+
+		const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		auto monkey = scene.CreateEntity();
+		monkey
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({
+				.position = { 0.f, 0.f, -5.f },
+				.rotation = { 0.f, 0.f, 0.f },
+				.scale = { 1.f, 1.f, 1.f },
+			});
+
+		if (model)
+		{
+			monkey
+				.Add<re::detail::OpaqueTag>()
+				.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
 		}
 	}
 

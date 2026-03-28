@@ -2,6 +2,7 @@ set(COMMON_SOURCES
         src/Image.cpp
         src/Keyboard.cpp
         src/Mouse.cpp
+        src/Model.cpp
 )
 
 if (RE_RENDER_BACKEND STREQUAL "GLFW")
@@ -35,6 +36,7 @@ target_link_libraries(ReRenderCore
         PRIVATE
         stb_image
         stb_image_resize
+        tinyobjloader
 )
 
 target_compile_definitions(ReRenderCore PRIVATE RE_RENDER_CORE_EXPORTS ${BACKEND_DEFINES})
