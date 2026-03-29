@@ -4,7 +4,7 @@
 
 #include <Core/HashedString.hpp>
 #include <Core/Types.hpp>
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <RenderCore/IWindow.hpp>
 #include <Runtime/Layout.hpp>
 

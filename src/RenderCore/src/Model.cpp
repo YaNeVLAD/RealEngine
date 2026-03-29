@@ -27,7 +27,6 @@ bool Model::LoadFromFile(String const& filePath)
 	std::vector<tinyobj::material_t> materials;
 	std::string warn, err;
 
-	// Загружаем файл
 	const bool success = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filePath.ToString().c_str());
 
 	if (!warn.empty())
@@ -47,44 +46,38 @@ bool Model::LoadFromFile(String const& filePath)
 
 	std::unordered_map<Vertex, std::uint32_t> uniqueVertices;
 
-	// Проходим по всем формам (shapes) в .obj файле
 	for (const auto& shape : shapes)
 	{
-		// Проходим по всем индексам формы
-		for (const auto& index : shape.mesh.indices)
+		for (const auto& [vertex_index, normal_index, texcoord_index] : shape.mesh.indices)
 		{
 			Vertex vertex{};
 
-			// 1. Позиция
 			vertex.position = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2],
+				attrib.vertices[3 * vertex_index + 0],
+				attrib.vertices[3 * vertex_index + 1],
+				attrib.vertices[3 * vertex_index + 2],
 			};
 
-			// 2. Нормаль (если есть в файле)
-			if (index.normal_index >= 0)
+			if (normal_index >= 0)
 			{
 				vertex.normal = {
-					attrib.normals[3 * index.normal_index + 0],
-					attrib.normals[3 * index.normal_index + 1],
-					attrib.normals[3 * index.normal_index + 2]
+					attrib.normals[3 * normal_index + 0],
+					attrib.normals[3 * normal_index + 1],
+					attrib.normals[3 * normal_index + 2]
 				};
 			}
 
-			// 3. Текстурные координаты (если есть в файле)
-			if (index.texcoord_index >= 0)
+			if (texcoord_index >= 0)
 			{
 				vertex.texCoord = {
-					attrib.texcoords[2 * index.texcoord_index + 0],
-					// В формате OBJ ось V инвертирована относительно OpenGL, поэтому 1.0f - V
-					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+					attrib.texcoords[2 * texcoord_index + 0],
+					// In OBJ V axis is inverted comparing to OpenGL
+					1.0f - attrib.texcoords[2 * texcoord_index + 1]
 				};
 			}
 
 			vertex.color = Color::Gray;
 
-			// 4. Дедупликация (формирование единого индексного буфера)
 			if (!uniqueVertices.contains(vertex))
 			{
 				uniqueVertices[vertex] = static_cast<std::uint32_t>(m_vertices.size());

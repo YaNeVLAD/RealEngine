@@ -32,7 +32,7 @@ struct MazeLayout final : re::Layout
 		const auto [floorV, floorI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Navy);
 		const auto floorMesh = std::make_shared<re::StaticMesh>(floorV, floorI);
 
-		const auto [ceilV, ceilI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Black);
+		const auto [ceilV, ceilI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Maroon);
 		const auto ceilMesh = std::make_shared<re::StaticMesh>(ceilV, ceilI);
 
 		CreateMazeMap(wallMesh, floorMesh, ceilMesh);
@@ -143,6 +143,11 @@ private:
 									   .position = { worldX, 0.f, worldZ },
 									   .rotation = { 0.f, 90.f, 0.f },
 								   })
+								   .Add<re::LightComponent>(re::LightComponent::CreateSpotlight(
+									   re::Color{ 255, 255, 240, 255 }, // Слегка теплый свет фонарика
+									   60.0f, // Угол конуса в градусах (GL_SPOT_CUTOFF) [cite: 221, 228]
+									   2.0f // Концентрация света к центру (GL_SPOT_EXPONENT) [cite: 222, 229]
+									   ))
 								   .GetEntity();
 				}
 

@@ -41,7 +41,8 @@ public:
 	void DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe) override;
 	void DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe) override;
 	void DrawStaticMeshGPUCulled(std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, float boundingRadius, const glm::vec3& cameraPos, bool wireframe) override;
-	void SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity) override;
+	void SetLight(const LightData& light) override;
+	void SetMaterial(const Material& material) override;
 
 private:
 	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);

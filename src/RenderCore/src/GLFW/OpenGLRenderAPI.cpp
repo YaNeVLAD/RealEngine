@@ -59,17 +59,19 @@ constexpr auto s_VertexShader3D = UR"(
     layout(location = 4) in float a_TexIndex;
 
 	uniform mat4 u_ModelViewProjection;
+	uniform mat4 u_ModelMatrix;
 	uniform mat3 u_NormalMatrix;
 
     out vec4 v_Color;
     out vec2 v_TexCoord;
     out vec3 v_Normal;
+	out vec3 v_FragmentWorldPos;
 
     void main() {
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-
 		v_Normal = u_NormalMatrix * a_Normal;
+		v_FragmentWorldPos = vec3(u_ModelMatrix * vec4(a_Position, 1.0));
 		gl_Position = u_ModelViewProjection * vec4(a_Position, 1.0);
     }
 )";
@@ -81,23 +83,86 @@ constexpr auto s_FragmentShader3D = UR"(
     in vec4 v_Color;
     in vec2 v_TexCoord;
     in vec3 v_Normal;
+	in vec3 v_FragmentWorldPos;
 
-    uniform vec4 u_TintColor;
+	struct Material
+	{
+		vec3 ambient;
+		vec3 diffuse;
+		vec3 specular;
+		vec3 emission;
+		float shininess;
+	};
 
-	uniform vec3 u_ReverseLightDir;
-	uniform vec3 u_AmbientColor;
-	uniform vec3 u_DiffuseColor;
+	struct Light
+	{
+        int type; // 0: Directional, 1: Point, 2: Spot
+        vec3 position;
+        vec3 direction;
 
-    void main() {
-		vec3 norm = normalize(v_Normal);
+        vec3 ambient;
+        vec3 diffuse;
+        vec3 specular;
 
-        float diff = max(dot(norm, u_ReverseLightDir), 0.0);
+        float constant;
+        float linear;
+        float quadratic;
 
-        vec4 objectColor = v_Color * u_TintColor;
+        float cutOff;
+        float exponent;
+    };
 
-        vec3 finalLight = u_AmbientColor + diff * u_DiffuseColor;
+	uniform Material u_Material;
+    uniform Light u_Light;
+    uniform vec3 u_CameraPos;
 
-        o_Color = vec4(finalLight * objectColor.rgb, objectColor.a);
+void main() {
+        vec3 m = normalize(v_Normal); // Нормаль к поверхности [cite: 43]
+        vec3 v = normalize(u_CameraPos - v_FragmentWorldPos); // Вектор к наблюдателю
+        vec3 s; // Вектор к источнику света
+
+        float attenuation = 1.0;
+        float spotEffect = 1.0;
+
+        if (u_Light.type == 0) {
+            // Directional light
+            s = normalize(-u_Light.direction);
+        } else {
+            // Point or Spot light [cite: 203, 204]
+            s = normalize(u_Light.position - v_FragmentWorldPos);
+            float d = length(u_Light.position - v_FragmentWorldPos);
+
+            // Ослабление света (Attenuation) [cite: 218, 219]
+            attenuation = 1.0 / (u_Light.constant + u_Light.linear * d + u_Light.quadratic * (d * d));
+
+            // Прожектор (Spotlight) [cite: 220]
+            if (u_Light.type == 2) {
+                float cosAlpha = dot(s, normalize(-u_Light.direction));
+                if (cosAlpha > u_Light.cutOff) {
+                    spotEffect = pow(cosAlpha, u_Light.exponent); // Концентрация света [cite: 222, 229]
+                } else {
+                    spotEffect = 0.0;
+                }
+            }
+        }
+
+        // Ambient (Фоновая составляющая) [cite: 104]
+        vec3 ambient = u_Light.ambient * u_Material.ambient;
+
+        // Diffuse (Диффузная составляющая) [cite: 48, 58]
+        float diff = max(dot(m, s), 0.0);
+        vec3 diffuse = u_Light.diffuse * (diff * u_Material.diffuse);
+
+        // Specular (Зеркальная составляющая) [cite: 73, 85]
+        vec3 r = reflect(-s, m); // Направление отражения [cite: 87]
+        float spec = pow(max(dot(r, v), 0.0), u_Material.shininess);
+        vec3 specular = u_Light.specular * (spec * u_Material.specular);
+
+        // Итоговое освещение
+        // Для упрощения эмулируем glColorMaterial, умножая результат на v_Color
+        vec3 finalColor = u_Material.emission + ambient + (diffuse + specular) * attenuation * spotEffect;
+
+        o_Color = vec4(finalColor * v_Color.rgb, v_Color.a);
     }
 )";
 
@@ -115,14 +180,15 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     out vec4 v_Color;
     out vec2 v_TexCoord;
     out vec3 v_Normal;
+	out vec3 v_FragmentWorldPos;
 
     void main() {
 		v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-
         v_Normal = mat3(transpose(inverse(a_InstanceMatrix))) * a_Normal;
-
-        gl_Position = u_ViewProjection * (a_InstanceMatrix * vec4(a_Position, 1.0));
+        vec4 worldPos = a_InstanceMatrix * vec4(a_Position, 1.0);
+        v_FragmentWorldPos = vec3(worldPos);
+        gl_Position = u_ViewProjection * worldPos;
     }
 )";
 
@@ -469,11 +535,14 @@ void OpenGLRenderAPI::SetCameraPerspective(
 	const glm::mat4 projection = glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip);
 	m_viewProj3D = projection * viewMatrix;
 
+	auto cameraPos = glm::vec3(glm::inverse(viewMatrix)[3]);
+
 	m_Shader3D->Bind();
-	m_Shader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
+	m_Shader3D->SetFloat3("u_CameraPos", cameraPos);
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3D->SetFloat3("u_CameraPos", cameraPos);
 }
 
 void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, const bool wireframe)
@@ -488,6 +557,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 
 	m_Shader3D->Bind();
 	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3D->SetMat4("u_ModelMatrix", transform);
 	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
@@ -541,6 +611,7 @@ void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transf
 
 	m_Shader3D->Bind();
 	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3D->SetMat4("u_ModelMatrix", transform);
 	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
 
 	mesh->GetVAO()->Bind();
@@ -572,7 +643,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
+	// m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	mesh->GetVAO()->Bind();
 
@@ -671,7 +742,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
+	// m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	mesh->GetVAO()->Bind();
 
@@ -727,25 +798,40 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glBindVertexArray(0);
 }
 
-void OpenGLRenderAPI::SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity)
+void OpenGLRenderAPI::SetLight(const LightData& light)
 {
-	m_lightDir = direction;
-	m_lightColor = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
-	m_lightAmbient = ambientIntensity;
+	auto bindLightToShader = [&](const std::shared_ptr<Shader>& shader) {
+		shader->Bind();
+		shader->SetInt("u_Light.type", light.type);
+		shader->SetFloat3("u_Light.position", light.position);
+		shader->SetFloat3("u_Light.direction", light.direction);
+		shader->SetFloat3("u_Light.ambient", light.ambient);
+		shader->SetFloat3("u_Light.diffuse", light.diffuse);
+		shader->SetFloat3("u_Light.specular", light.specular);
+		shader->SetFloat("u_Light.constant", light.constant);
+		shader->SetFloat("u_Light.linear", light.linear);
+		shader->SetFloat("u_Light.quadratic", light.quadratic);
+		shader->SetFloat("u_Light.cutOff", light.cutOff);
+		shader->SetFloat("u_Light.exponent", light.exponent);
+	};
 
-	const auto reverseDir = glm::normalize(-m_lightDir);
-	const auto diffuseCol = glm::vec3(m_lightColor);
-	const auto ambientCol = diffuseCol * m_lightAmbient;
+	bindLightToShader(m_Shader3D);
+	bindLightToShader(m_InstancedShader3D);
+}
 
-	m_InstancedShader3D->Bind();
-	m_InstancedShader3D->SetFloat3("u_ReverseLightDir", reverseDir);
-	m_InstancedShader3D->SetFloat3("u_AmbientColor", ambientCol);
-	m_InstancedShader3D->SetFloat3("u_DiffuseColor", diffuseCol);
+void OpenGLRenderAPI::SetMaterial(const Material& material)
+{
+	auto bindMaterialToShader = [&](const std::shared_ptr<Shader>& shader) {
+		shader->Bind();
+		shader->SetFloat3("u_Material.ambient", { material.ambient.r / 255.f, material.ambient.g / 255.f, material.ambient.b / 255.f });
+		shader->SetFloat3("u_Material.diffuse", { material.diffuse.r / 255.f, material.diffuse.g / 255.f, material.diffuse.b / 255.f });
+		shader->SetFloat3("u_Material.specular", { material.specular.r / 255.f, material.specular.g / 255.f, material.specular.b / 255.f });
+		shader->SetFloat3("u_Material.emission", { material.emission.r / 255.f, material.emission.g / 255.f, material.emission.b / 255.f });
+		shader->SetFloat("u_Material.shininess", material.shininess);
+	};
 
-	m_Shader3D->Bind();
-	m_Shader3D->SetFloat3("u_ReverseLightDir", reverseDir);
-	m_Shader3D->SetFloat3("u_AmbientColor", ambientCol);
-	m_Shader3D->SetFloat3("u_DiffuseColor", diffuseCol);
+	bindMaterialToShader(m_Shader3D);
+	bindMaterialToShader(m_InstancedShader3D);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <Runtime/Components.hpp>
 

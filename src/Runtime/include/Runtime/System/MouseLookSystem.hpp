@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <RenderCore/Event.hpp>
 #include <Runtime/Components.hpp>

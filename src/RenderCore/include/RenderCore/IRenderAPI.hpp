@@ -1,11 +1,13 @@
 #pragma once
 
-#include "RenderCore/StaticMesh.hpp"
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/String.hpp>
 #include <RenderCore/Font.hpp>
+#include <RenderCore/Light.hpp>
+#include <RenderCore/Material.hpp>
 #include <RenderCore/PrimitiveType.hpp>
+#include <RenderCore/StaticMesh.hpp>
 #include <RenderCore/Texture.hpp>
 #include <RenderCore/Vertex.hpp>
 
@@ -52,7 +54,8 @@ public:
 	virtual void DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe) = 0;
 	virtual void DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe) = 0;
 	virtual void DrawStaticMeshGPUCulled(std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, float boundingRadius, const glm::vec3& cameraPos, bool wireframe) = 0;
-	virtual void SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity) = 0;
+	virtual void SetLight(const LightData& light) = 0;
+	virtual void SetMaterial(const Material& material) = 0;
 };
 
 } // namespace re::render

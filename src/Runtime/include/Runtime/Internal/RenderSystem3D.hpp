@@ -7,6 +7,7 @@
 #include <ECS/System/System.hpp>
 #include <RenderCore/IWindow.hpp>
 #include <RenderCore/Vertex.hpp>
+#include <Runtime/Components.hpp>
 
 #include <glm/glm.hpp>
 
@@ -15,16 +16,18 @@ namespace re::detail
 
 struct StaticBatchItem
 {
-	StaticMesh* mesh;
-	bool wireframe;
-	float distance;
-	glm::mat4 transform;
+	StaticMesh* mesh{};
+	bool wireframe{};
+	float distance{};
+	glm::mat4 transform{};
+	MaterialComponent material;
 };
 
 struct OpaqueBatchCache
 {
-	StaticMesh* mesh;
-	bool wireframe;
+	StaticMesh* mesh{};
+	bool wireframe{};
+	MaterialComponent material;
 	std::vector<glm::mat4> transforms;
 };
 
@@ -39,6 +42,8 @@ struct RenderCommand3D
 
 	float distanceToCamera = 0.0f;
 	bool wireframe = false;
+
+	MaterialComponent material;
 };
 
 class RE_RUNTIME_API RenderSystem3D final : public ecs::System

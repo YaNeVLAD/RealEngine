@@ -24,7 +24,6 @@ struct MenuLayout final : re::Layout
 	void OnCreate() override
 	{
 		auto& scene = GetScene();
-		m_window.SetVSyncEnabled(false);
 
 		scene
 			.AddSystem<CameraControlSystem>()
@@ -33,13 +32,13 @@ struct MenuLayout final : re::Layout
 			.RunOnMainThread();
 
 		scene.CreateEntity()
-			.Add<re::DirectionalLightComponent>(re::Color{ 255, 230, 200, 255 }, 0.2f)
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::LightComponent>(re::LightComponent::CreateDirectional(
+				re::Color{ 255, 240, 220, 255 },
+				re::Color{ 80, 80, 80, 255 }))
 			.Add<re::TransformComponent>({
-				.position = { 0.f, 0.f, 0.f },
-				.rotation = { -35, 45, 0 },
-				.scale = { 1.f, 1.f, 1.f },
-			})
-			.Add<re::Dirty<re::TransformComponent>>();
+				.rotation = { -45.f, 45.f, 0.f },
+			});
 
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
@@ -110,13 +109,11 @@ struct MenuLayout final : re::Layout
 	void OnAttach() override
 	{
 		m_window.SetCursorLocked(true);
-		m_window.SetBackgroundColor(re::Color::White);
 	}
 
 	void OnDetach() override
 	{
 		m_window.SetCursorLocked(false);
-		m_window.SetBackgroundColor(re::Color::Black);
 	}
 
 	void OnEvent(re::Event const& event) override
@@ -173,6 +170,8 @@ public:
 
 	void OnStart() override
 	{
+		Window().SetVSyncEnabled(false);
+
 		AddLayout<MenuLayout>(Window());
 		AddLayout<AsteroidsLayout>(Window());
 		AddLayout<MazeLayout>(Window());

@@ -1,6 +1,6 @@
 #include <Runtime/Internal/RenderSystem2D.hpp>
 
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <Runtime/Components.hpp>
 

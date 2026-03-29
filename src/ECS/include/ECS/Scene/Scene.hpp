@@ -1,10 +1,7 @@
 #pragma once
 
-#if defined(RE_USE_ENTT)
-#include <ECS/EnttAdapter/Scene_EnTT.hpp>
-#else
-
 #include <ECS/ComponentManager/ComponentManager.hpp>
+#include <ECS/Components.hpp>
 #include <ECS/Entity/Entity.hpp>
 #include <ECS/EntityManager/EntityManager.hpp>
 #include <ECS/EntityWrapper/EntityWrapper.hpp>
@@ -148,9 +145,9 @@ public:
 	}
 
 	template <typename... TComponents>
-	void MarkDirty(const Entity entity)
+	void MakeDirty(const Entity entity)
 	{
-		(AddComponent<detail::DirtyTag<TComponents>(entity)>(entity), ...);
+		(AddComponent<detail::DirtyTag<TComponents>>(entity), ...);
 	}
 
 	template <typename... TComponents>
@@ -188,5 +185,3 @@ private:
 };
 
 } // namespace re::ecs
-
-#endif

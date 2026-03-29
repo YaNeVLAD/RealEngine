@@ -4,9 +4,10 @@
 #include <Core/Math/Vector2.hpp>
 #include <Core/Math/Vector3.hpp>
 #include <Core/String.hpp>
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
+#include <RenderCore/Material.hpp>
 #include <RenderCore/PrimitiveType.hpp>
 #include <RenderCore/StaticMesh.hpp>
 #include <RenderCore/Texture.hpp>
@@ -115,7 +116,7 @@ struct StaticMeshComponent3D
 	{
 	}
 
-	StaticMeshComponent3D(std::vector<Vertex> vertices, std::vector<std::uint32_t> indices, const bool wireframe = false)
+	StaticMeshComponent3D(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices, const bool wireframe = false)
 		: mesh(std::make_shared<StaticMesh>(vertices, indices))
 		, wireframe(wireframe)
 	{
@@ -125,10 +126,86 @@ struct StaticMeshComponent3D
 	bool wireframe;
 };
 
-struct DirectionalLightComponent
+enum class LightType : std::uint8_t
 {
-	Color color = Color::White;
-	float ambientIntensity = 0.3f;
+	Directional = 0,
+	Point = 1,
+	Spotlight = 2,
+};
+
+struct LightComponent
+{
+	LightType type = LightType::Directional;
+
+	Color ambient = { 50, 50, 50, 255 }; // Фоновая составляющая [cite: 36]
+	Color diffuse = { 255, 255, 255, 255 }; // Диффузная составляющая [cite: 37]
+	Color specular = { 255, 255, 255, 255 }; // Зеркальная составляющая [cite: 38]
+
+	// Затухание света (для Point и Spotlight) [cite: 219]
+	float constant = 1.0f;
+	float linear = 0.09f;
+	float quadratic = 0.032f;
+
+	// Настройки конуса (для Spotlight) [cite: 220]
+	float cutOffAngle = 12.5f; // Угол ограничения (внешний) [cite: 221]
+	float exponent = 1.0f; // Концентрация света к центру [cite: 222]
+
+	// Удобные фабрики для пользователя:
+	static LightComponent CreateDirectional(const Color diffuse = Color::White, const Color ambient = { 50, 50, 50, 255 }, const Color specular = Color::White)
+	{
+		LightComponent l;
+		l.type = LightType::Directional;
+		l.diffuse = diffuse;
+		l.ambient = ambient;
+		l.specular = specular;
+		return l;
+	}
+
+	static LightComponent CreatePoint(const Color diffuse = Color::White, const float linearAtt = 0.09f, const float quadAtt = 0.032f)
+	{
+		LightComponent l;
+		l.type = LightType::Point;
+		l.diffuse = diffuse;
+		l.specular = diffuse;
+		l.linear = linearAtt;
+		l.quadratic = quadAtt;
+		return l;
+	}
+
+	static LightComponent CreateSpotlight(const Color diffuse = Color::White, const float cutOffAngle = 12.5f, const float exponent = 1.0f)
+	{
+		LightComponent l;
+		l.type = LightType::Spotlight;
+		l.diffuse = diffuse;
+		l.specular = diffuse;
+		l.cutOffAngle = cutOffAngle;
+		l.exponent = exponent;
+		return l;
+	}
+};
+
+struct MaterialComponent
+{
+	Material material;
+
+	MaterialComponent() = default;
+
+	explicit MaterialComponent(Material material)
+		: material(std::move(material))
+	{
+	}
+
+	explicit MaterialComponent(const Color ambient, const Color diffuse, const Color specular, const Color emission, const float shininess = 32.f)
+		: material(ambient, diffuse, specular, emission, shininess)
+	{
+	}
+
+	bool operator==(MaterialComponent const&) const = default;
+
+	bool operator<(MaterialComponent const& rhs) const
+	{
+		return material < rhs.material;
+	}
 };
 
 class MouseLookSystem;

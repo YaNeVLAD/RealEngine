@@ -1,7 +1,8 @@
 #include <Runtime/Internal/RenderSystem3D.hpp>
 
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <Render3D/Renderer3D.hpp>
+#include <RenderCore/Light.hpp>
 #include <Runtime/Components.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -27,13 +28,6 @@ struct CameraData
 	float farClip = 1000.0f;
 };
 
-struct LightData
-{
-	glm::vec3 direction{ -0.5f, -1.0f, -0.5f };
-	Color color = Color::White;
-	float ambient = 0.3f;
-};
-
 glm::mat4 CalculateModelMatrix(TransformComponent const& transform)
 {
 	glm::mat4 result = glm::translate(glm::mat4(1.0f), glm::vec3(transform.position.x, transform.position.y, transform.position.z));
@@ -51,20 +45,29 @@ glm::mat4 CalculateModelMatrix(TransformComponent const& transform)
 LightData ExtractLight(ecs::Scene& scene)
 {
 	LightData data;
-	for (auto&& [entity, transform, light] : *scene.CreateView<TransformComponent, DirectionalLightComponent>())
-	{
-		const float yaw = transform.rotation.y;
-		const float pitch = transform.rotation.x;
 
-		data.direction.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
-		data.direction.y = std::sin(glm::radians(pitch));
-		data.direction.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+	for (auto&& [entity, transform, light] : *scene.CreateView<TransformComponent, LightComponent>())
+	{
+		data.type = static_cast<int>(light.type);
+		data.position = { transform.position.x, transform.position.y, transform.position.z };
+
+		const float yawRad = glm::radians(transform.rotation.y);
+		const float pitchRad = glm::radians(transform.rotation.x);
+		data.direction.x = std::cos(yawRad) * std::cos(pitchRad);
+		data.direction.y = std::sin(pitchRad);
+		data.direction.z = std::sin(yawRad) * std::cos(pitchRad);
 		data.direction = glm::normalize(data.direction);
 
-		data.color = light.color;
-		data.ambient = light.ambientIntensity;
+		data.ambient = { light.ambient.r / 255.f, light.ambient.g / 255.f, light.ambient.b / 255.f };
+		data.diffuse = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
+		data.specular = { light.specular.r / 255.f, light.specular.g / 255.f, light.specular.b / 255.f };
 
-		break; // TODO: Add support for multiple light sources
+		data.constant = light.constant;
+		data.linear = light.linear;
+		data.quadratic = light.quadratic;
+		data.cutOff = glm::cos(glm::radians(light.cutOffAngle));
+		data.exponent = light.exponent;
+		break;
 	}
 
 	return data;
@@ -126,14 +129,14 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 		RebuildStaticOpaqueBatches(scene);
 	}
 
-	const auto [direction, color, ambient] = ExtractLight(scene);
+	const auto light = ExtractLight(scene);
 	const auto [position, viewMatrix, fov, nearClip, farClip] = ExtractCamera(scene);
 
 	CollectDynamicAndTransparent(scene, position);
 
 	render::Renderer3D::BeginScene(fov, aspect, nearClip, farClip, viewMatrix);
 
-	render::Renderer3D::SetDirectionalLight(direction, color, ambient);
+	render::Renderer3D::SetLight(light);
 
 	RenderOpaqueGeometry(position);
 	RenderTransparentGeometry();
@@ -171,30 +174,53 @@ void RenderSystem3D::RebuildStaticOpaqueBatches(ecs::Scene& scene)
 	for (auto&& [entity, transform, staticComp, _] : *scene.CreateView<TransformComponent, StaticMeshComponent3D, OpaqueTag>())
 	{
 		if (!staticComp.mesh)
+		{
 			continue;
-		m_flatOpaqueBatch.emplace_back(staticComp.mesh.get(), staticComp.wireframe, 0.0f, transform.modelMatrix);
+		}
+
+		MaterialComponent material;
+		if (scene.HasComponent<MaterialComponent>(entity))
+		{
+			material = scene.GetComponent<MaterialComponent>(entity);
+		}
+
+		m_flatOpaqueBatch.emplace_back(
+			staticComp.mesh.get(),
+			staticComp.wireframe,
+			0.0f,
+			transform.modelMatrix,
+			material);
 	}
 
 	std::sort(std::execution::par_unseq, m_flatOpaqueBatch.begin(), m_flatOpaqueBatch.end(), [](const auto& a, const auto& b) {
 		if (a.mesh != b.mesh)
+		{
 			return a.mesh < b.mesh;
-		return a.wireframe < b.wireframe;
+		}
+		if (a.wireframe != b.wireframe)
+		{
+			return a.wireframe < b.wireframe;
+		}
+
+		return a.material < b.material;
 	});
 
 	if (!m_flatOpaqueBatch.empty())
 	{
 		auto currentMesh = m_flatOpaqueBatch[0].mesh;
 		auto currentWireframe = m_flatOpaqueBatch[0].wireframe;
-		OpaqueBatchCache currentBatch{ currentMesh, currentWireframe, {} };
+		auto currentMat = m_flatOpaqueBatch[0].material;
+		OpaqueBatchCache currentBatch{ currentMesh, currentWireframe, currentMat, {} };
 
 		for (const auto& item : m_flatOpaqueBatch)
 		{
-			if (item.mesh != currentMesh || item.wireframe != currentWireframe)
+			if (item.mesh != currentMesh || item.wireframe != currentWireframe || item.material != currentMat)
 			{
 				m_cachedOpaqueBatches.emplace_back(currentBatch);
 				currentMesh = item.mesh;
 				currentWireframe = item.wireframe;
-				currentBatch = { currentMesh, currentWireframe, {} };
+				currentMat = item.material;
+				currentBatch = { currentMesh, currentWireframe, currentMat, {} };
 			}
 			currentBatch.transforms.emplace_back(item.transform);
 		}
@@ -217,8 +243,19 @@ void RenderSystem3D::CollectDynamicAndTransparent(ecs::Scene& scene, const glm::
 			continue;
 		}
 
+		MaterialComponent material;
+		if (scene.HasComponent<MaterialComponent>(entity))
+		{
+			material = scene.GetComponent<MaterialComponent>(entity);
+		}
+
 		float dist = glm::distance(camPos, glm::vec3(transform.modelMatrix[3]));
-		m_flatTransparentBatch.emplace_back(staticComp.mesh.get(), staticComp.wireframe, dist, transform.modelMatrix);
+		m_flatTransparentBatch.emplace_back(
+			staticComp.mesh.get(),
+			staticComp.wireframe,
+			dist,
+			transform.modelMatrix,
+			material);
 	}
 
 	for (auto&& [entity, transform, dynComp] : *scene.CreateView<TransformComponent, DynamicMeshComponent3D>())
@@ -228,11 +265,18 @@ void RenderSystem3D::CollectDynamicAndTransparent(ecs::Scene& scene, const glm::
 			continue;
 		}
 
+		MaterialComponent material;
+		if (scene.HasComponent<MaterialComponent>(entity))
+		{
+			material = scene.GetComponent<MaterialComponent>(entity);
+		}
+
 		RenderCommand3D cmd;
 		cmd.transform = transform.modelMatrix;
 		cmd.vertices = &dynComp.vertices;
 		cmd.indices = &dynComp.indices;
 		cmd.wireframe = dynComp.wireframe;
+		cmd.material = material;
 
 		if (dynComp.vertices[0].color.a < 255)
 		{
@@ -251,8 +295,9 @@ void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos)
 	std::uint32_t batchIndex = 0;
 
 	render::Renderer3D::SetCullMode(render::CullMode::Back);
-	for (const auto& [mesh, wireframe, transforms] : m_cachedOpaqueBatches)
+	for (const auto& [mesh, wireframe, material, transforms] : m_cachedOpaqueBatches)
 	{
+		render::Renderer3D::SetMaterial(material.material);
 		render::Renderer3D::DrawStaticMeshGPUCulled(batchIndex++, mesh, transforms, 2.0f, camPos, wireframe);
 	}
 
@@ -332,6 +377,8 @@ void RenderSystem3D::DrawFlatBatch(const std::vector<StaticBatchItem>& batch)
 
 void RenderSystem3D::ExecuteRenderCommand(const RenderCommand3D& cmd)
 {
+	render::Renderer3D::SetMaterial(cmd.material.material);
+
 	if (cmd.staticMesh)
 	{
 		render::Renderer3D::DrawStaticMesh(cmd.staticMesh, cmd.transform, cmd.wireframe);

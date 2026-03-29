@@ -67,9 +67,14 @@ void Renderer3D::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticM
 	m_api->DrawStaticMeshGPUCulled(batchIndex, mesh, transforms, boundingRadius, cameraPos, wireframe);
 }
 
-void Renderer3D::SetDirectionalLight(const glm::vec3& direction, const Color& color, float ambientIntensity)
+void Renderer3D::SetMaterial(const Material& material)
 {
-	m_api->SetDirectionalLight(direction, color, ambientIntensity);
+	m_api->SetMaterial(material);
+}
+
+void Renderer3D::SetLight(const LightData& light)
+{
+	m_api->SetLight(light);
 }
 
 void Renderer3D::ResetCullingCache()

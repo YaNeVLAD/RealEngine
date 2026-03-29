@@ -1,12 +1,10 @@
 #pragma once
 
-#include "ECS/Scene.hpp"
-
+#include <ECS/Components.hpp>
 #include <ECS/Entity/Entity.hpp>
 #include <ECS/EntityWrapper/EntityWrapper.hpp>
-#include <ECS/SystemManager/SystemManager.hpp>
-
 #include <ECS/EnttAdapter/EnttViewAdapter.hpp>
+#include <ECS/SystemManager/SystemManager.hpp>
 
 #include <entt/entt.hpp>
 #include <memory>

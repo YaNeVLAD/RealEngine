@@ -2,7 +2,7 @@
 
 #include <Runtime/Export.hpp>
 
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <RenderCore/Event.hpp>
 
 namespace re

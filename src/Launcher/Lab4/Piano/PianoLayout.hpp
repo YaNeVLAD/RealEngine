@@ -4,7 +4,7 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/Math/Vector3.hpp>
-#include <ECS/Scene/Scene.hpp>
+#include <ECS/Scene.hpp>
 #include <RenderCore/Keyboard.hpp>
 #include <Runtime/Application.hpp>
 #include <Runtime/Components.hpp>

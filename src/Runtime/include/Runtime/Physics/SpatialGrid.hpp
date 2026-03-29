@@ -5,6 +5,7 @@
 #include <ECS/Entity/Entity.hpp>
 #include <Runtime/Physics/AABB.hpp>
 
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
 

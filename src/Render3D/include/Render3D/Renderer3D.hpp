@@ -4,6 +4,8 @@
 
 #include <Core/Math/Vector3.hpp>
 #include <RenderCore/IRenderAPI.hpp>
+#include <RenderCore/Light.hpp>
+#include <RenderCore/Material.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -53,10 +55,9 @@ public:
 		const glm::vec3& cameraPos,
 		bool wireframe);
 
-	static void SetDirectionalLight(
-		const glm::vec3& direction,
-		const Color& color,
-		float ambientIntensity);
+	static void SetMaterial(const Material& material);
+
+	static void SetLight(const LightData& light);
 
 	static void ResetCullingCache();
 
