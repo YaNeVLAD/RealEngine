@@ -89,8 +89,8 @@ struct MenuLayout final : re::Layout
 		}
 
 		const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		auto monkey = scene.CreateEntity();
-		monkey
+		auto entity = scene.CreateEntity();
+		entity
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
 				.position = { 0.f, 0.f, -5.f },
@@ -100,7 +100,7 @@ struct MenuLayout final : re::Layout
 
 		if (model)
 		{
-			monkey
+			entity
 				.Add<re::detail::OpaqueTag>()
 				.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
 		}

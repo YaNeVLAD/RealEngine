@@ -137,20 +137,17 @@ struct LightComponent
 {
 	LightType type = LightType::Directional;
 
-	Color ambient = { 50, 50, 50, 255 }; // Фоновая составляющая [cite: 36]
-	Color diffuse = { 255, 255, 255, 255 }; // Диффузная составляющая [cite: 37]
-	Color specular = { 255, 255, 255, 255 }; // Зеркальная составляющая [cite: 38]
+	Color ambient = { 50, 50, 50, 255 };
+	Color diffuse = { 255, 255, 255, 255 };
+	Color specular = { 255, 255, 255, 255 };
 
-	// Затухание света (для Point и Spotlight) [cite: 219]
 	float constant = 1.0f;
 	float linear = 0.09f;
 	float quadratic = 0.032f;
 
-	// Настройки конуса (для Spotlight) [cite: 220]
-	float cutOffAngle = 12.5f; // Угол ограничения (внешний) [cite: 221]
-	float exponent = 1.0f; // Концентрация света к центру [cite: 222]
+	float cutOffAngle = 12.5f;
+	float exponent = 1.0f;
 
-	// Удобные фабрики для пользователя:
 	static LightComponent CreateDirectional(const Color diffuse = Color::White, const Color ambient = { 50, 50, 50, 255 }, const Color specular = Color::White)
 	{
 		LightComponent l;
@@ -190,8 +187,8 @@ struct MaterialComponent
 
 	MaterialComponent() = default;
 
-	explicit MaterialComponent(Material material)
-		: material(std::move(material))
+	explicit MaterialComponent(Material const& material)
+		: material(material)
 	{
 	}
 

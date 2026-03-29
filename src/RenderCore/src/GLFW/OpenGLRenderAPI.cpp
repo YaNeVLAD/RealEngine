@@ -125,41 +125,40 @@ void main() {
         float spotEffect = 1.0;
 
         if (u_Light.type == 0) {
-            // Directional light
+            // Directional
             s = normalize(-u_Light.direction);
         } else {
-            // Point or Spot light [cite: 203, 204]
+            // Point or Spotlight
             s = normalize(u_Light.position - v_FragmentWorldPos);
             float d = length(u_Light.position - v_FragmentWorldPos);
 
-            // Ослабление света (Attenuation) [cite: 218, 219]
+            // Attenuation
             attenuation = 1.0 / (u_Light.constant + u_Light.linear * d + u_Light.quadratic * (d * d));
 
-            // Прожектор (Spotlight) [cite: 220]
+            // Spotlight
             if (u_Light.type == 2) {
                 float cosAlpha = dot(s, normalize(-u_Light.direction));
                 if (cosAlpha > u_Light.cutOff) {
-                    spotEffect = pow(cosAlpha, u_Light.exponent); // Концентрация света [cite: 222, 229]
+                    spotEffect = pow(cosAlpha, u_Light.exponent);
                 } else {
                     spotEffect = 0.0;
                 }
             }
         }
 
-        // Ambient (Фоновая составляющая) [cite: 104]
+        // Ambient
         vec3 ambient = u_Light.ambient * u_Material.ambient;
 
-        // Diffuse (Диффузная составляющая) [cite: 48, 58]
+        // Diffuse
         float diff = max(dot(m, s), 0.0);
         vec3 diffuse = u_Light.diffuse * (diff * u_Material.diffuse);
 
-        // Specular (Зеркальная составляющая) [cite: 73, 85]
-        vec3 r = reflect(-s, m); // Направление отражения [cite: 87]
-        float spec = pow(max(dot(r, v), 0.0), u_Material.shininess);
+        // Specular
+        vec3 reflection = reflect(-s, m);
+        float spec = pow(max(dot(reflection, v), 0.0), u_Material.shininess);
         vec3 specular = u_Light.specular * (spec * u_Material.specular);
 
-        // Итоговое освещение
-        // Для упрощения эмулируем glColorMaterial, умножая результат на v_Color
+        // Emulate glColorMaterial by multiplying by v_Color
         vec3 finalColor = u_Material.emission + ambient + (diffuse + specular) * attenuation * spotEffect;
 
         o_Color = vec4(finalColor * v_Color.rgb, v_Color.a);
