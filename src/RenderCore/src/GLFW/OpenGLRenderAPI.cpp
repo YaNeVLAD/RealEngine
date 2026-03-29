@@ -25,7 +25,8 @@ constexpr auto s_VertexShaderSource = UR"(
     out vec2 v_TexCoord;
     out float v_TexIndex;
 
-    void main() {
+    void main()
+	{
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
         v_TexIndex = a_TexIndex;
@@ -43,10 +44,14 @@ constexpr auto s_FragmentShaderSource = UR"(
 
     uniform sampler2D u_Texture;
 
-    void main() {
-        if (v_TexIndex < 0.0) {
+    void main()
+	{
+        if (v_TexIndex < 0.0)
+		{
             color = v_Color;
-        } else {
+        }
+		else
+		{
             color = texture(u_Texture, v_TexCoord) * v_Color;
         }
     }
@@ -104,7 +109,8 @@ constexpr auto s_FragmentShader3D = UR"(
 
     uniform vec3 u_CameraPos;
 
-    void main() {
+    void main()
+	{
         vec3 surfaceNormal = normalize(v_Normal);
         vec3 viewDir = normalize(u_CameraPos - v_FragmentWorldPos);
         vec3 lightDir;
@@ -170,14 +176,16 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     out vec3 v_Normal;
     out vec3 v_FragmentWorldPos;
 
-    void main() {
+    void main()
+	{
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
 
         if (u_HasNonUniformScale)
 		{
             v_Normal = mat3(a_NormalMatrix) * a_Normal;
-        } else
+        }
+		else
 		{
             v_Normal = mat3(a_InstanceMatrix) * a_Normal;
         }
@@ -359,6 +367,25 @@ void BindStandard3DUniforms(const std::shared_ptr<re::render::Shader>& shader, c
 	shader->SetMat4("u_NormalMatrix", glm::transpose(glm::inverse(glm::mat3(transform))));
 }
 
+glm::vec4 ColorToVec4(const re::Color c)
+{
+	return {
+		static_cast<float>(c.r) / 255.f,
+		static_cast<float>(c.g) / 255.f,
+		static_cast<float>(c.b) / 255.f,
+		static_cast<float>(c.a) / 255.f,
+	};
+}
+
+glm::vec3 ColorToVec3(const re::Color c)
+{
+	return {
+		static_cast<float>(c.r) / 255.f,
+		static_cast<float>(c.g) / 255.f,
+		static_cast<float>(c.b) / 255.f,
+	};
+}
+
 } // namespace
 
 namespace re::render
@@ -496,12 +523,12 @@ void OpenGLRenderAPI::DrawQuad(const Vector3f& pos, const Vector2f& size, const 
 }
 
 void OpenGLRenderAPI::DrawCircle(const Vector3f& center, const float radius, const Color& color)
-{
+{ // TODO: Implement circle drawing
 	std::ignore = center, std::ignore = radius, std::ignore = color;
 }
 
 void OpenGLRenderAPI::DrawText(const String& text, const Font& font, const Vector3f& pos, const float fontSize, const Color& color)
-{
+{ // TODO: Implement text drawing
 	std::ignore = text, std::ignore = font, std::ignore = pos, std::ignore = fontSize, std::ignore = color;
 }
 
@@ -634,7 +661,9 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe)
 {
 	if (!mesh)
+	{
 		return;
+	}
 
 	BindStandard3DUniforms(m_Shader3D, transform, m_viewProj3D);
 	mesh->GetVAO()->Bind();
@@ -813,10 +842,10 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
 {
-	const glm::vec3 matAmb = { material.ambient.r / 255.f, material.ambient.g / 255.f, material.ambient.b / 255.f };
-	const glm::vec3 matDif = { material.diffuse.r / 255.f, material.diffuse.g / 255.f, material.diffuse.b / 255.f };
-	const glm::vec3 matSpec = { material.specular.r / 255.f, material.specular.g / 255.f, material.specular.b / 255.f };
-	const glm::vec3 matEmis = { material.emission.r / 255.f, material.emission.g / 255.f, material.emission.b / 255.f };
+	const glm::vec3 matAmb = ColorToVec3(material.ambient);
+	const glm::vec3 matDif = ColorToVec3(material.diffuse);
+	const glm::vec3 matSpec = ColorToVec3(material.specular);
+	const glm::vec3 matEmis = ColorToVec3(material.emission);
 
 	const glm::vec3 finalAmbient = m_activeLight.ambient * matAmb;
 	const glm::vec3 finalDiffuse = m_activeLight.diffuse * matDif;
