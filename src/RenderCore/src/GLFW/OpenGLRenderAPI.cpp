@@ -98,6 +98,9 @@ constexpr auto s_FragmentShader3D = UR"(
     uniform vec3 u_Emission;
     uniform float u_Shininess;
 
+	uniform sampler2D u_Texture;
+    uniform int u_HasTexture;
+
     uniform int u_LightType;
     uniform vec3 u_LightPos;
     uniform vec3 u_LightDir;
@@ -142,19 +145,31 @@ constexpr auto s_FragmentShader3D = UR"(
             }
         }
 
+		// TEXTURE
+		vec4 surfaceColor = v_Color;
+        if (u_HasTexture != 0) {
+            surfaceColor *= texture(u_Texture, v_TexCoord);
+        }
+
+		// Ambient
+        vec3 ambientLight = u_AmbientLighting;
+
         // Diffuse
-        float diffAngle = max(dot(surfaceNormal, lightDir), 0.0);
-        vec3 diffuse = u_DiffuseLighting * diffAngle;
+		float diffAngle = max(dot(surfaceNormal, lightDir), 0.0);
+		vec3 diffuseLight = u_DiffuseLighting * diffAngle;
 
         // Specular
-        vec3 reflectDir = reflect(-lightDir, surfaceNormal);
+		vec3 reflectDir = reflect(-lightDir, surfaceNormal);
         float specFactor = pow(max(dot(reflectDir, viewDir), 0.0), u_Shininess);
-        vec3 specular = u_SpecularLighting * specFactor;
+        vec3 specularLight = u_SpecularLighting * specFactor;
 
-		// Emulate glColorMaterial by multiplying by v_Color
-        vec3 finalLighting = u_Emission + u_AmbientLighting + (diffuse + specular) * attenuation * spotEffect;
+		vec3 finalAmbient = ambientLight * surfaceColor.rgb;
+       	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect;
+       	vec3 finalSpecular = specularLight * attenuation * spotEffect;
 
-        o_Color = vec4(finalLighting * v_Color.rgb, v_Color.a);
+		vec3 finalColor = u_Emission + finalAmbient + finalDiffuse + finalSpecular;
+
+		o_Color = vec4(finalColor, surfaceColor.a);
     }
 )";
 
@@ -858,6 +873,20 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 		shader->SetFloat3("u_SpecularLighting", finalSpecular);
 		shader->SetFloat3("u_Emission", matEmis);
 		shader->SetFloat("u_Shininess", material.shininess);
+
+		glActiveTexture(GL_TEXTURE0);
+		if (material.texture)
+		{
+			shader->SetInt("u_Texture", 0);
+			shader->SetInt("u_HasTexture", 1);
+
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.texture->GetNativeHandle()));
+		}
+		else
+		{
+			shader->SetInt("u_HasTexture", 0);
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
 	};
 
 	bindMaterialToShader(m_Shader3D);

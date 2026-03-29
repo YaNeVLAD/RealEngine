@@ -16,6 +16,7 @@
 #include <Runtime/Physics/SpatialGrid.hpp>
 
 #include <compare>
+#include <utility>
 
 namespace re
 {
@@ -187,8 +188,8 @@ struct MaterialComponent
 
 	MaterialComponent() = default;
 
-	explicit MaterialComponent(Material const& material)
-		: data(material)
+	explicit MaterialComponent(Material material)
+		: data(std::move(material))
 	{
 	}
 

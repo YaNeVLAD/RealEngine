@@ -360,18 +360,24 @@ void RenderSystem3D::DrawFlatBatch(const std::vector<StaticBatchItem>& batch)
 	m_instanceBuffer.clear();
 	auto currentMesh = batch[0].mesh;
 	auto currentWireframe = batch[0].wireframe;
+	auto currentMaterial = batch[0].material;
 
 	for (const auto& item : batch)
 	{
-		if (item.mesh != currentMesh || item.wireframe != currentWireframe)
+		if (item.mesh != currentMesh || item.wireframe != currentWireframe || item.material != currentMaterial)
 		{
+			render::Renderer3D::SetMaterial(currentMaterial.data);
 			render::Renderer3D::DrawStaticMeshInstanced(currentMesh, m_instanceBuffer, currentWireframe);
 			m_instanceBuffer.clear();
+
 			currentMesh = item.mesh;
 			currentWireframe = item.wireframe;
+			currentMaterial = item.material;
 		}
 		m_instanceBuffer.push_back(item.transform);
 	}
+
+	render::Renderer3D::SetMaterial(currentMaterial.data);
 	render::Renderer3D::DrawStaticMeshInstanced(currentMesh, m_instanceBuffer, currentWireframe);
 }
 

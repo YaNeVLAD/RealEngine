@@ -2,6 +2,7 @@
 
 #include <compare>
 #include <cstdint>
+#include <tuple>
 
 namespace re
 {
@@ -44,15 +45,15 @@ public:
 	static const Color Teal;
 	static const Color Transparent;
 
+	constexpr bool operator==(const Color&) const = default;
+	constexpr bool operator!=(const Color&) const = default;
+	constexpr auto operator<=>(const Color&) const = default;
+
 	uint8_t r{};
 	uint8_t g{};
 	uint8_t b{};
 	uint8_t a{ 255 };
 };
-
-[[nodiscard]] constexpr bool operator==(Color left, Color right);
-
-[[nodiscard]] constexpr bool operator!=(Color left, Color right);
 
 } // namespace re
 

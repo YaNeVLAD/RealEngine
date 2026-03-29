@@ -31,12 +31,14 @@ public:
 	[[nodiscard]] std::uint32_t Width() const;
 	[[nodiscard]] std::uint32_t Height() const;
 	[[nodiscard]] std::uint32_t Size() const;
+	[[nodiscard]] std::uint8_t Channels() const;
 
 	[[nodiscard]] bool IsEmpty() const;
 
 	bool LoadFromFile(String const& filePath) override;
 
 private:
+	std::uint8_t m_channels = 0;
 	std::uint32_t m_width = 0;
 	std::uint32_t m_height = 0;
 

@@ -123,6 +123,11 @@ std::uint32_t Image::Size() const
 	return m_width * m_height * sizeof(Color);
 }
 
+std::uint8_t Image::Channels() const
+{
+	return m_channels;
+}
+
 bool Image::IsEmpty() const
 {
 	return m_data.empty();
@@ -138,10 +143,12 @@ bool Image::LoadFromFile(String const& filePath)
 
 	if (!pixels)
 	{
-		std::cerr << "Failed to load image: " << filePath.ToString() << std::endl;
+		std::cerr << "Failed to load image: " << filePath << std::endl;
 
 		return false;
 	}
+
+	m_channels = static_cast<std::uint8_t>(channels);
 
 	Resize(w, h);
 	std::memcpy(m_data.data(), pixels, w * h * sizeof(Color));

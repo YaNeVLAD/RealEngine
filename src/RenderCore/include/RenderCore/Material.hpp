@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Math/Color.hpp>
+#include <RenderCore/Texture.hpp>
 
 namespace re
 {
@@ -13,12 +14,14 @@ struct Material
 	Color emission = Color::Transparent;
 	float shininess = 32.0f;
 
-	bool operator==(Material const& rhs) const = default;
+	std::shared_ptr<Texture> texture = nullptr;
+
+	bool operator==(const Material& rhs) const = default;
 
 	bool operator<(Material const& rhs) const
 	{
-		return std::tie(ambient.r, ambient.g, ambient.b, diffuse.r, specular.r, emission.r, shininess)
-			< std::tie(rhs.ambient.r, rhs.ambient.g, rhs.ambient.b, rhs.diffuse.r, rhs.specular.r, rhs.emission.r, rhs.shininess);
+		return std::tie(ambient, diffuse, specular, emission, shininess, texture)
+			< std::tie(rhs.ambient, rhs.diffuse, rhs.specular, rhs.emission, rhs.shininess, rhs.texture);
 	}
 };
 

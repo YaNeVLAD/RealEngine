@@ -60,16 +60,6 @@ constexpr uint32_t Color::ToInt() const
 	return static_cast<uint32_t>((r << 24) | (g << 16) | (b << 8) | a);
 }
 
-constexpr bool operator==(const Color left, const Color right)
-{
-	return (left.r == right.r) && (left.g == right.g) && (left.b == right.b) && (left.a == right.a);
-}
-
-constexpr bool operator!=(const Color left, const Color right)
-{
-	return !(left == right);
-}
-
 inline constexpr Color Color::Black(0, 0, 0);
 inline constexpr Color Color::White(255, 255, 255);
 inline constexpr Color Color::Red(255, 0, 0);

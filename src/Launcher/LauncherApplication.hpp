@@ -43,9 +43,13 @@ struct MenuLayout final : re::Layout
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
 
-		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Red);
+		const auto texture = m_manager.Get<re::Texture>("0.png");
+		re::Material material;
+		material.texture = texture;
+		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::White);
 		scene
 			.CreateEntity()
+			.Add<re::MaterialComponent>(material)
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::TransformComponent>({ .position = { 3.f, 0.f, -5.f } })
@@ -88,27 +92,28 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		auto entity = scene.CreateEntity();
-		entity
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::TransformComponent>({
-				.position = { 0.f, 0.f, -5.f },
-				.rotation = { 0.f, 0.f, 0.f },
-				.scale = { 1.f, 1.f, 1.f },
-			});
-
-		if (model)
-		{
-			entity
-				.Add<re::detail::OpaqueTag>()
-				.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
-		}
+		// const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		// auto entity = scene.CreateEntity();
+		// entity
+		// 	.Add<re::Dirty<re::TransformComponent>>()
+		// 	.Add<re::TransformComponent>({
+		// 		.position = { 0.f, 0.f, -5.f },
+		// 		.rotation = { 0.f, 0.f, 0.f },
+		// 		.scale = { 1.f, 1.f, 1.f },
+		// 	});
+		//
+		// if (model)
+		// {
+		// 	entity
+		// 		.Add<re::detail::OpaqueTag>()
+		// 		.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
+		// }
 	}
 
 	void OnAttach() override
 	{
 		m_window.SetCursorLocked(true);
+		m_window.SetBackgroundColor(re::Color::White);
 	}
 
 	void OnDetach() override

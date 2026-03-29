@@ -5,12 +5,6 @@
 #include <Core/Assets/IAsset.hpp>
 
 #include <cstdint>
-#include <memory>
-
-namespace sf
-{
-class Texture;
-}
 
 namespace re
 {
