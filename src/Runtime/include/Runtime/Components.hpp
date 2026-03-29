@@ -183,17 +183,17 @@ struct LightComponent
 
 struct MaterialComponent
 {
-	Material material;
+	Material data;
 
 	MaterialComponent() = default;
 
 	explicit MaterialComponent(Material const& material)
-		: material(material)
+		: data(material)
 	{
 	}
 
 	explicit MaterialComponent(const Color ambient, const Color diffuse, const Color specular, const Color emission, const float shininess = 32.f)
-		: material(ambient, diffuse, specular, emission, shininess)
+		: data(ambient, diffuse, specular, emission, shininess)
 	{
 	}
 
@@ -201,7 +201,7 @@ struct MaterialComponent
 
 	bool operator<(MaterialComponent const& rhs) const
 	{
-		return material < rhs.material;
+		return data < rhs.data;
 	}
 };
 

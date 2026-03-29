@@ -6,6 +6,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <algorithm>
+
 namespace
 {
 // 0: Position, 1: Normal, 2: Color, 3: TexCoord, 4: TexIndex
@@ -83,85 +85,70 @@ constexpr auto s_FragmentShader3D = UR"(
     in vec4 v_Color;
     in vec2 v_TexCoord;
     in vec3 v_Normal;
-	in vec3 v_FragmentWorldPos;
+    in vec3 v_FragmentWorldPos;
 
-	struct Material
-	{
-		vec3 ambient;
-		vec3 diffuse;
-		vec3 specular;
-		vec3 emission;
-		float shininess;
-	};
+    uniform vec3 u_AmbientLighting;
+    uniform vec3 u_DiffuseLighting;
+    uniform vec3 u_SpecularLighting;
+    uniform vec3 u_Emission;
+    uniform float u_Shininess;
 
-	struct Light
-	{
-        int type; // 0: Directional, 1: Point, 2: Spot
-        vec3 position;
-        vec3 direction;
+    uniform int u_LightType;
+    uniform vec3 u_LightPos;
+    uniform vec3 u_LightDir;
+    uniform float u_LightConstant;
+    uniform float u_LightLinear;
+    uniform float u_LightQuadratic;
+    uniform float u_LightCutOff;
+    uniform float u_LightExponent;
 
-        vec3 ambient;
-        vec3 diffuse;
-        vec3 specular;
-
-        float constant;
-        float linear;
-        float quadratic;
-
-        float cutOff;
-        float exponent;
-    };
-
-	uniform Material u_Material;
-    uniform Light u_Light;
     uniform vec3 u_CameraPos;
 
-void main() {
-        vec3 m = normalize(v_Normal); // Нормаль к поверхности [cite: 43]
-        vec3 v = normalize(u_CameraPos - v_FragmentWorldPos); // Вектор к наблюдателю
-        vec3 s; // Вектор к источнику света
+    void main() {
+        vec3 surfaceNormal = normalize(v_Normal);
+        vec3 viewDir = normalize(u_CameraPos - v_FragmentWorldPos);
+        vec3 lightDir;
 
         float attenuation = 1.0;
         float spotEffect = 1.0;
 
-        if (u_Light.type == 0) {
-            // Directional
-            s = normalize(-u_Light.direction);
-        } else {
-            // Point or Spotlight
-            s = normalize(u_Light.position - v_FragmentWorldPos);
-            float d = length(u_Light.position - v_FragmentWorldPos);
+        if (u_LightType == 0)
+		{ // Directional
+            lightDir = normalize(-u_LightDir);
+        }
+		else
+		{ // Point or Spotlight
+            lightDir = normalize(u_LightPos - v_FragmentWorldPos);
+            float dist = length(u_LightPos - v_FragmentWorldPos);
+            attenuation = 1.0 / (u_LightConstant + u_LightLinear * dist + u_LightQuadratic * (dist * dist));
 
-            // Attenuation
-            attenuation = 1.0 / (u_Light.constant + u_Light.linear * d + u_Light.quadratic * (d * d));
-
-            // Spotlight
-            if (u_Light.type == 2) {
-                float cosAlpha = dot(s, normalize(-u_Light.direction));
-                if (cosAlpha > u_Light.cutOff) {
-                    spotEffect = pow(cosAlpha, u_Light.exponent);
-                } else {
+            if (u_LightType == 2)
+			{ // Spotlight
+                float cosAlpha = dot(lightDir, normalize(-u_LightDir));
+                if (cosAlpha > u_LightCutOff)
+				{
+					spotEffect = pow(cosAlpha, u_LightExponent);
+                }
+				else
+				{
                     spotEffect = 0.0;
                 }
             }
         }
 
-        // Ambient
-        vec3 ambient = u_Light.ambient * u_Material.ambient;
-
         // Diffuse
-        float diff = max(dot(m, s), 0.0);
-        vec3 diffuse = u_Light.diffuse * (diff * u_Material.diffuse);
+        float diffAngle = max(dot(surfaceNormal, lightDir), 0.0);
+        vec3 diffuse = u_DiffuseLighting * diffAngle;
 
         // Specular
-        vec3 reflection = reflect(-s, m);
-        float spec = pow(max(dot(reflection, v), 0.0), u_Material.shininess);
-        vec3 specular = u_Light.specular * (spec * u_Material.specular);
+        vec3 reflectDir = reflect(-lightDir, surfaceNormal);
+        float specFactor = pow(max(dot(reflectDir, viewDir), 0.0), u_Shininess);
+        vec3 specular = u_SpecularLighting * specFactor;
 
-        // Emulate glColorMaterial by multiplying by v_Color
-        vec3 finalColor = u_Material.emission + ambient + (diffuse + specular) * attenuation * spotEffect;
+		// Emulate glColorMaterial by multiplying by v_Color
+        vec3 finalLighting = u_Emission + u_AmbientLighting + (diffuse + specular) * attenuation * spotEffect;
 
-        o_Color = vec4(finalColor * v_Color.rgb, v_Color.a);
+        o_Color = vec4(finalLighting * v_Color.rgb, v_Color.a);
     }
 )";
 
@@ -172,19 +159,29 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     layout(location = 2) in vec4 a_Color;
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
-	layout(location = 5) in mat4 a_InstanceMatrix;
+    layout(location = 5) in mat4 a_InstanceMatrix;
+    layout(location = 9) in mat4 a_NormalMatrix;
 
     uniform mat4 u_ViewProjection;
+    uniform bool u_HasNonUniformScale;
 
     out vec4 v_Color;
     out vec2 v_TexCoord;
     out vec3 v_Normal;
-	out vec3 v_FragmentWorldPos;
+    out vec3 v_FragmentWorldPos;
 
     void main() {
-		v_Color = a_Color;
+        v_Color = a_Color;
         v_TexCoord = a_TexCoord;
-        v_Normal = mat3(transpose(inverse(a_InstanceMatrix))) * a_Normal;
+
+        if (u_HasNonUniformScale)
+		{
+            v_Normal = mat3(a_NormalMatrix) * a_Normal;
+        } else
+		{
+            v_Normal = mat3(a_InstanceMatrix) * a_Normal;
+        }
+
         vec4 worldPos = a_InstanceMatrix * vec4(a_Position, 1.0);
         v_FragmentWorldPos = vec3(worldPos);
         gl_Position = u_ViewProjection * worldPos;
@@ -197,13 +194,14 @@ constexpr auto s_ComputeCullingShader3D = UR"(
 
     layout(std430, binding = 0) readonly buffer InputInstances { mat4 inputTransforms[]; };
     layout(std430, binding = 1) writeonly buffer OutputInstances { mat4 outputTransforms[]; };
+	layout(std430, binding = 3) writeonly buffer OutputNormals { mat4 outputNormalMatrices[]; };
 
-    struct DrawCommand 
+    struct DrawCommand
 	{
-        uint count; 
-		uint instanceCount; 
-		uint firstIndex; 
-		uint baseVertex; 
+        uint count;
+		uint instanceCount;
+		uint firstIndex;
+		uint baseVertex;
 		uint baseInstance;
     };
     layout(std430, binding = 2) buffer CommandBuffer { DrawCommand cmd; };
@@ -214,6 +212,8 @@ constexpr auto s_ComputeCullingShader3D = UR"(
 
     uniform vec3 u_CameraPos;
     uniform float u_MaxDistance;
+
+	uniform bool u_ComputeNormals;
 
     void main()
     {
@@ -244,6 +244,10 @@ constexpr auto s_ComputeCullingShader3D = UR"(
         {
             uint outIdx = atomicAdd(cmd.instanceCount, 1);
             outputTransforms[outIdx] = model;
+			if (u_ComputeNormals)
+			{
+                outputNormalMatrices[outIdx] = mat4(transpose(inverse(mat3(model))));
+            }
         }
     }
 )";
@@ -294,6 +298,18 @@ void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6])
 	}
 }
 
+bool HasNonUniformScale(const std::vector<glm::mat4>& transforms)
+{
+	return std::ranges::any_of(transforms, [](const auto& t) {
+		const float l0 = glm::length(glm::vec3(t[0]));
+		const float l1 = glm::length(glm::vec3(t[1]));
+		const float l2 = glm::length(glm::vec3(t[2]));
+
+		return std::abs(l0 - l1) > std::numeric_limits<float>::epsilon()
+			|| std::abs(l0 - l2) > std::numeric_limits<float>::epsilon();
+	});
+}
+
 } // namespace
 
 namespace re::render
@@ -315,8 +331,9 @@ void OpenGLRenderAPI::Init()
 	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3D);
 
 	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3D);
-	glGenBuffers(1, &m_instanceVBOId);
 
+	glGenBuffers(1, &m_instanceVBOId);
+	glGenBuffers(1, &m_normalVBOId);
 	m_CullingComputeShader = std::make_shared<Shader>(s_ComputeCullingShader3D);
 
 	BufferLayout unifiedLayout;
@@ -515,11 +532,12 @@ void OpenGLRenderAPI::SetCullMode(const CullMode mode)
 
 void OpenGLRenderAPI::ResetCullingCache()
 {
-	for (auto& [inputSsbo, outputSsbo, cmdBuffer] : m_cullingBatches)
+	for (auto& [inputSsbo, outputSsbo, cmdBuffer, normalSsbo] : m_cullingBatches)
 	{
 		glDeleteBuffers(1, &inputSsbo);
 		glDeleteBuffers(1, &outputSsbo);
 		glDeleteBuffers(1, &cmdBuffer);
+		glDeleteBuffers(1, &normalSsbo);
 	}
 	m_cullingBatches.clear();
 }
@@ -639,10 +657,11 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	{
 		return;
 	}
+	bool nonUniform = HasNonUniformScale(transforms);
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	// m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
+	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
 
 	mesh->GetVAO()->Bind();
 
@@ -654,8 +673,27 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	{
 		glEnableVertexAttribArray(5 + i);
 		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
-
 		glVertexAttribDivisor(5 + i, 1);
+	}
+
+	std::vector<glm::mat4> normalMatrices;
+	if (nonUniform)
+	{
+		normalMatrices.reserve(transforms.size());
+		for (const auto& t : transforms)
+		{
+			normalMatrices.emplace_back(glm::transpose(glm::inverse(glm::mat3(t))));
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_normalVBOId);
+		glBufferData(GL_ARRAY_BUFFER, normalMatrices.size() * sizeof(glm::mat4), normalMatrices.data(), GL_DYNAMIC_DRAW);
+
+		for (int i = 0; i < 4; i++)
+		{
+			glEnableVertexAttribArray(9 + i); // Locations 9-12
+			glVertexAttribPointer(9 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
+			glVertexAttribDivisor(9 + i, 1);
+		}
 	}
 
 	if (wireframe)
@@ -695,18 +733,23 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	{
 		m_cullingBatches.resize(batchIndex + 1);
 	}
-	auto& [inputSsbo, outputSsbo, cmdBuffer] = m_cullingBatches[batchIndex];
+	bool nonUniform = HasNonUniformScale(transforms);
+	auto& [inputSsbo, outputSsbo, cmdBuffer, normalSsbo] = m_cullingBatches[batchIndex];
 
 	if (inputSsbo == 0)
 	{
 		glGenBuffers(1, &inputSsbo);
 		glGenBuffers(1, &outputSsbo);
+		glGenBuffers(1, &normalSsbo);
 		glGenBuffers(1, &cmdBuffer);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, inputSsbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), transforms.data(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputSsbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, normalSsbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 	}
 
@@ -724,6 +767,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	ExtractFrustumPlanes(m_viewProj3D, planes);
 
 	m_CullingComputeShader->Bind();
+	m_CullingComputeShader->SetBool("u_ComputeNormals", nonUniform);
 	m_CullingComputeShader->SetFloat4Array("u_FrustumPlanes", planes, 6);
 	m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
 	m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
@@ -733,6 +777,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cmdBuffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, normalSsbo);
 
 	const GLuint numGroups = (totalInstances + 63) / 64;
 	glDispatchCompute(numGroups, 1, 1);
@@ -740,8 +785,8 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
 	m_InstancedShader3D->Bind();
+	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	// m_InstancedShader3D->SetFloat4("u_TintColor", { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	mesh->GetVAO()->Bind();
 
@@ -752,6 +797,17 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glEnableVertexAttribArray(5 + i);
 		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
 		glVertexAttribDivisor(5 + i, 1);
+	}
+
+	if (nonUniform)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, normalSsbo);
+		for (int i = 0; i < 4; i++)
+		{
+			glEnableVertexAttribArray(9 + i);
+			glVertexAttribPointer(9 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
+			glVertexAttribDivisor(9 + i, 1);
+		}
 	}
 
 	if (wireframe)
@@ -799,19 +855,18 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 
 void OpenGLRenderAPI::SetLight(const LightData& light)
 {
+	m_activeLight = light;
+
 	auto bindLightToShader = [&](const std::shared_ptr<Shader>& shader) {
 		shader->Bind();
-		shader->SetInt("u_Light.type", light.type);
-		shader->SetFloat3("u_Light.position", light.position);
-		shader->SetFloat3("u_Light.direction", light.direction);
-		shader->SetFloat3("u_Light.ambient", light.ambient);
-		shader->SetFloat3("u_Light.diffuse", light.diffuse);
-		shader->SetFloat3("u_Light.specular", light.specular);
-		shader->SetFloat("u_Light.constant", light.constant);
-		shader->SetFloat("u_Light.linear", light.linear);
-		shader->SetFloat("u_Light.quadratic", light.quadratic);
-		shader->SetFloat("u_Light.cutOff", light.cutOff);
-		shader->SetFloat("u_Light.exponent", light.exponent);
+		shader->SetInt("u_LightType", light.type);
+		shader->SetFloat3("u_LightPos", light.position);
+		shader->SetFloat3("u_LightDir", light.direction);
+		shader->SetFloat("u_LightConstant", light.constant);
+		shader->SetFloat("u_LightLinear", light.linear);
+		shader->SetFloat("u_LightQuadratic", light.quadratic);
+		shader->SetFloat("u_LightCutOff", light.cutOff);
+		shader->SetFloat("u_LightExponent", light.exponent);
 	};
 
 	bindLightToShader(m_Shader3D);
@@ -820,13 +875,22 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
 {
+	const glm::vec3 matAmb = { material.ambient.r / 255.f, material.ambient.g / 255.f, material.ambient.b / 255.f };
+	const glm::vec3 matDif = { material.diffuse.r / 255.f, material.diffuse.g / 255.f, material.diffuse.b / 255.f };
+	const glm::vec3 matSpec = { material.specular.r / 255.f, material.specular.g / 255.f, material.specular.b / 255.f };
+	const glm::vec3 matEmis = { material.emission.r / 255.f, material.emission.g / 255.f, material.emission.b / 255.f };
+
+	const glm::vec3 finalAmbient = m_activeLight.ambient * matAmb;
+	const glm::vec3 finalDiffuse = m_activeLight.diffuse * matDif;
+	const glm::vec3 finalSpecular = m_activeLight.specular * matSpec;
+
 	auto bindMaterialToShader = [&](const std::shared_ptr<Shader>& shader) {
 		shader->Bind();
-		shader->SetFloat3("u_Material.ambient", { material.ambient.r / 255.f, material.ambient.g / 255.f, material.ambient.b / 255.f });
-		shader->SetFloat3("u_Material.diffuse", { material.diffuse.r / 255.f, material.diffuse.g / 255.f, material.diffuse.b / 255.f });
-		shader->SetFloat3("u_Material.specular", { material.specular.r / 255.f, material.specular.g / 255.f, material.specular.b / 255.f });
-		shader->SetFloat3("u_Material.emission", { material.emission.r / 255.f, material.emission.g / 255.f, material.emission.b / 255.f });
-		shader->SetFloat("u_Material.shininess", material.shininess);
+		shader->SetFloat3("u_AmbientLighting", finalAmbient);
+		shader->SetFloat3("u_DiffuseLighting", finalDiffuse);
+		shader->SetFloat3("u_SpecularLighting", finalSpecular);
+		shader->SetFloat3("u_Emission", matEmis);
+		shader->SetFloat("u_Shininess", material.shininess);
 	};
 
 	bindMaterialToShader(m_Shader3D);

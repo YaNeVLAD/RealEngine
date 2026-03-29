@@ -170,7 +170,7 @@ public:
 
 	void OnStart() override
 	{
-		Window().SetVSyncEnabled(false);
+		Window().SetVSyncEnabled(true);
 
 		AddLayout<MenuLayout>(Window());
 		AddLayout<AsteroidsLayout>(Window());

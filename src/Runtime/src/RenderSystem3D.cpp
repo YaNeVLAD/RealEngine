@@ -297,7 +297,7 @@ void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos)
 	render::Renderer3D::SetCullMode(render::CullMode::Back);
 	for (const auto& [mesh, wireframe, material, transforms] : m_cachedOpaqueBatches)
 	{
-		render::Renderer3D::SetMaterial(material.material);
+		render::Renderer3D::SetMaterial(material.data);
 		render::Renderer3D::DrawStaticMeshGPUCulled(batchIndex++, mesh, transforms, 2.0f, camPos, wireframe);
 	}
 
@@ -377,7 +377,7 @@ void RenderSystem3D::DrawFlatBatch(const std::vector<StaticBatchItem>& batch)
 
 void RenderSystem3D::ExecuteRenderCommand(const RenderCommand3D& cmd)
 {
-	render::Renderer3D::SetMaterial(cmd.material.material);
+	render::Renderer3D::SetMaterial(cmd.material.data);
 
 	if (cmd.staticMesh)
 	{

@@ -61,22 +61,23 @@ private:
 	std::shared_ptr<VertexBuffer> m_DynamicVBO3D;
 	std::shared_ptr<IndexBuffer> m_DynamicEBO3D;
 
+	std::uint32_t m_normalVBOId = 0;
+
 	std::shared_ptr<Shader> m_InstancedShader3D;
 	std::uint32_t m_instanceVBOId = 0;
 
 	std::shared_ptr<Shader> m_CullingComputeShader;
 	struct CullingData
 	{
-		uint32_t inputSsbo = 0;
-		uint32_t outputSsbo = 0;
-		uint32_t cmdBuffer = 0;
+		std::uint32_t inputSsbo = 0;
+		std::uint32_t outputSsbo = 0;
+		std::uint32_t cmdBuffer = 0;
+		std::uint32_t normalSsbo = 0;
 	};
 
 	std::vector<CullingData> m_cullingBatches;
 
-	glm::vec3 m_lightDir = { -0.5f, -1.0f, -0.5f };
-	glm::vec4 m_lightColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-	float m_lightAmbient = 0.3f;
+	LightData m_activeLight;
 
 	std::vector<Vertex> m_batchBuffer{};
 

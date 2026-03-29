@@ -167,6 +167,11 @@ void Shader::SetUInt(const std::string_view name, const std::uint32_t value)
 	glUniform1ui(GetUniformLocation(name), value);
 }
 
+void Shader::SetBool(const std::string_view name, const bool value)
+{
+	glUniform1i(GetUniformLocation(name), value);
+}
+
 void Shader::SetFloat4Array(const std::string_view name, const glm::vec4* values, const std::uint32_t count)
 {
 	glUniform4fv(GetUniformLocation(name), static_cast<int>(count), glm::value_ptr(values[0]));
