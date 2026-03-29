@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Math/Vector3.hpp>
+#include <RenderCore/Model.hpp>
 #include <Runtime/Application.hpp>
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
@@ -11,7 +12,6 @@
 #include "Lab4/Piano/PianoLayout.hpp"
 
 #include "CameraControlSystem.hpp"
-#include "RenderCore/Model.hpp"
 
 struct MenuLayout final : re::Layout
 {
@@ -92,22 +92,22 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		// const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		// auto entity = scene.CreateEntity();
-		// entity
-		// 	.Add<re::Dirty<re::TransformComponent>>()
-		// 	.Add<re::TransformComponent>({
-		// 		.position = { 0.f, 0.f, -5.f },
-		// 		.rotation = { 0.f, 0.f, 0.f },
-		// 		.scale = { 1.f, 1.f, 1.f },
-		// 	});
-		//
-		// if (model)
-		// {
-		// 	entity
-		// 		.Add<re::detail::OpaqueTag>()
-		// 		.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
-		// }
+		const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		auto entity = scene.CreateEntity();
+		entity
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({
+				.position = { 0.f, 0.f, -5.f },
+				.rotation = { 0.f, 0.f, 0.f },
+				.scale = { 1.f, 1.f, 1.f },
+			});
+
+		if (model)
+		{
+			entity
+				.Add<re::detail::OpaqueTag>()
+				.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
+		}
 	}
 
 	void OnAttach() override
