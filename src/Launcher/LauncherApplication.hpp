@@ -93,20 +93,21 @@ struct MenuLayout final : re::Layout
 		}
 
 		const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		auto entity = scene.CreateEntity();
-		entity
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::TransformComponent>({
-				.position = { 0.f, 0.f, -5.f },
-				.rotation = { 0.f, 0.f, 0.f },
-				.scale = { 1.f, 1.f, 1.f },
-			});
-
 		if (model)
 		{
-			entity
-				.Add<re::detail::OpaqueTag>()
-				.Add<re::StaticMeshComponent3D>(model->Vertices(), model->Indices());
+			for (const auto& [vertices, indices, material] : model->GetParts())
+			{
+				scene.CreateEntity()
+					.Add<re::Dirty<re::TransformComponent>>()
+					.Add<re::TransformComponent>({
+						.position = { 0.f, 0.f, -5.f },
+						.rotation = { 0.f, 0.f, 0.f },
+						.scale = { 10.f, 10.f, 10.f },
+					})
+					.Add<re::detail::OpaqueTag>()
+					.Add<re::MaterialComponent>(material)
+					.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
 		}
 	}
 
