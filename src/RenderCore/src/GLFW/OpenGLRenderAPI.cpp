@@ -270,11 +270,11 @@ constexpr GLenum ToOpenGLType(const re::PrimitiveType type)
 
 struct DrawElementsIndirectCommand
 {
-	uint32_t count;
-	uint32_t instanceCount;
-	uint32_t firstIndex;
-	uint32_t baseVertex;
-	uint32_t baseInstance;
+	[[maybe_unused]] std::uint32_t count;
+	[[maybe_unused]] std::uint32_t instanceCount;
+	[[maybe_unused]] std::uint32_t firstIndex;
+	[[maybe_unused]] std::uint32_t baseVertex;
+	[[maybe_unused]] std::uint32_t baseInstance;
 };
 
 void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6])
@@ -308,6 +308,55 @@ bool HasNonUniformScale(const std::vector<glm::mat4>& transforms)
 		return std::abs(l0 - l1) > std::numeric_limits<float>::epsilon()
 			|| std::abs(l0 - l2) > std::numeric_limits<float>::epsilon();
 	});
+}
+
+template <typename Func>
+void DrawWithWireframe(const bool wireframe, Func&& drawCall)
+{
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glEnable(GL_POLYGON_OFFSET_LINE);
+		glPolygonOffset(-1.0f, -1.0f);
+		glLineWidth(5.0f);
+	}
+
+	drawCall();
+
+	if (wireframe)
+	{
+		glLineWidth(1.0f);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_POLYGON_OFFSET_LINE);
+	}
+}
+
+void SetupMatrixAttribute(const GLuint location)
+{
+	constexpr std::size_t vec4Size = sizeof(glm::vec4);
+	for (int i = 0; i < 4; i++)
+	{
+		glEnableVertexAttribArray(location + i);
+		glVertexAttribPointer(location + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
+		glVertexAttribDivisor(location + i, 1);
+	}
+}
+
+void TeardownMatrixAttribute(const GLuint location)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		glVertexAttribDivisor(location + i, 0);
+		glDisableVertexAttribArray(location + i);
+	}
+}
+
+void BindStandard3DUniforms(const std::shared_ptr<re::render::Shader>& shader, const glm::mat4& transform, const glm::mat4& viewProj)
+{
+	shader->Bind();
+	shader->SetMat4("u_ModelViewProjection", viewProj * transform);
+	shader->SetMat4("u_ModelMatrix", transform);
+	shader->SetMat4("u_NormalMatrix", glm::transpose(glm::inverse(glm::mat3(transform))));
 }
 
 } // namespace
@@ -388,9 +437,7 @@ void OpenGLRenderAPI::Clear()
 void OpenGLRenderAPI::Flush()
 {
 	if (m_batchBuffer.empty())
-	{
 		return;
-	}
 
 	m_Shader2D->Bind();
 	m_Shader2D->SetMat4("u_ViewProjection", m_viewProjection);
@@ -428,7 +475,6 @@ Vector2f OpenGLRenderAPI::ScreenToWorld(Vector2i const& pixelPos)
 	};
 
 	const glm::mat4 inverseViewProj = glm::inverse(m_viewProjection);
-
 	const glm::vec4 worldPos = inverseViewProj * clipSpacePos;
 
 	return Vector2f{ worldPos.x, worldPos.y };
@@ -454,12 +500,7 @@ void OpenGLRenderAPI::DrawCircle(const Vector3f& center, const float radius, con
 	std::ignore = center, std::ignore = radius, std::ignore = color;
 }
 
-void OpenGLRenderAPI::DrawText(
-	const String& text,
-	const Font& font,
-	const Vector3f& pos,
-	const float fontSize,
-	const Color& color)
+void OpenGLRenderAPI::DrawText(const String& text, const Font& font, const Vector3f& pos, const float fontSize, const Color& color)
 {
 	std::ignore = text, std::ignore = font, std::ignore = pos, std::ignore = fontSize, std::ignore = color;
 }
@@ -469,7 +510,7 @@ void OpenGLRenderAPI::DrawTexturedQuad(const Vector3f& pos, const Vector2f& size
 	DrawTexturedQuadImpl(pos, size, 0.0f, texture, tint);
 }
 
-void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveType type)
+void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, const PrimitiveType type)
 {
 	if (vertices.empty())
 	{
@@ -491,7 +532,7 @@ void OpenGLRenderAPI::DrawMesh(std::vector<Vertex> const& vertices, PrimitiveTyp
 
 	if (type == PrimitiveType::Points)
 	{
-		glPointSize(5.0f);
+		glPointSize(5.f);
 	}
 
 	const auto firstVertex = static_cast<GLint>(m_dynamicOffset2D / sizeof(Vertex));
@@ -542,17 +583,11 @@ void OpenGLRenderAPI::ResetCullingCache()
 	m_cullingBatches.clear();
 }
 
-void OpenGLRenderAPI::SetCameraPerspective(
-	const float fov,
-	const float aspectRatio,
-	const float nearClip,
-	const float farClip,
-	const glm::mat4& viewMatrix)
+void OpenGLRenderAPI::SetCameraPerspective(const float fov, const float aspectRatio, const float nearClip, const float farClip, const glm::mat4& viewMatrix)
 {
 	const glm::mat4 projection = glm::perspective(glm::radians(fov), aspectRatio, nearClip, farClip);
 	m_viewProj3D = projection * viewMatrix;
-
-	auto cameraPos = glm::vec3(glm::inverse(viewMatrix)[3]);
+	const auto cameraPos = glm::vec3(glm::inverse(viewMatrix)[3]);
 
 	m_Shader3D->Bind();
 	m_Shader3D->SetFloat3("u_CameraPos", cameraPos);
@@ -569,13 +604,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		return;
 	}
 
-	const glm::mat4 mvp = m_viewProj3D * transform;
-	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
-
-	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
-	m_Shader3D->SetMat4("u_ModelMatrix", transform);
-	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
+	BindStandard3DUniforms(m_Shader3D, transform, m_viewProj3D);
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
 	const std::size_t eboCountNeeded = indices.size();
@@ -588,29 +617,15 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 	}
 
 	m_DynamicVAO3D->Bind();
-
 	m_DynamicVBO3D->SetData(vertices.data(), vboBytesNeeded, m_dynamicOffsetVbo3D);
 	m_DynamicEBO3D->SetData(indices.data(), eboCountNeeded, m_dynamicOffsetEbo3D);
 
-	if (wireframe)
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glEnable(GL_POLYGON_OFFSET_LINE);
-		glPolygonOffset(-1.0f, -1.0f);
-		glLineWidth(5.0f);
-	}
+	DrawWithWireframe(wireframe, [&] {
+		const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
+		const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(std::uint32_t));
 
-	const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
-	const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(std::uint32_t));
-
-	glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
-
-	if (wireframe)
-	{
-		glLineWidth(1.0f);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDisable(GL_POLYGON_OFFSET_LINE);
-	}
+		glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
+	});
 
 	m_dynamicOffsetVbo3D += vboBytesNeeded;
 	m_dynamicOffsetEbo3D += eboCountNeeded;
@@ -619,36 +634,14 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transform, bool wireframe)
 {
 	if (!mesh)
-	{
 		return;
-	}
 
-	const glm::mat4 mvp = m_viewProj3D * transform;
-	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
-
-	m_Shader3D->Bind();
-	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
-	m_Shader3D->SetMat4("u_ModelMatrix", transform);
-	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
-
+	BindStandard3DUniforms(m_Shader3D, transform, m_viewProj3D);
 	mesh->GetVAO()->Bind();
 
-	if (wireframe)
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glEnable(GL_POLYGON_OFFSET_LINE);
-		glPolygonOffset(-1.0f, -1.0f);
-		glLineWidth(5.0f);
-	}
-
-	glDrawElements(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr);
-
-	if (wireframe)
-	{
-		glLineWidth(1.0f);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDisable(GL_POLYGON_OFFSET_LINE);
-	}
+	DrawWithWireframe(wireframe, [&] {
+		glDrawElements(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr);
+	});
 }
 
 void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm::mat4>& transforms, bool wireframe)
@@ -657,7 +650,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	{
 		return;
 	}
-	bool nonUniform = HasNonUniformScale(transforms);
+	const bool nonUniform = HasNonUniformScale(transforms);
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
@@ -667,14 +660,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBOId);
 	glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
-
-	constexpr std::size_t vec4Size = sizeof(glm::vec4);
-	for (int i = 0; i < 4; i++)
-	{
-		glEnableVertexAttribArray(5 + i);
-		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
-		glVertexAttribDivisor(5 + i, 1);
-	}
+	SetupMatrixAttribute(5);
 
 	std::vector<glm::mat4> normalMatrices;
 	if (nonUniform)
@@ -687,36 +673,17 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 		glBindBuffer(GL_ARRAY_BUFFER, m_normalVBOId);
 		glBufferData(GL_ARRAY_BUFFER, normalMatrices.size() * sizeof(glm::mat4), normalMatrices.data(), GL_DYNAMIC_DRAW);
-
-		for (int i = 0; i < 4; i++)
-		{
-			glEnableVertexAttribArray(9 + i); // Locations 9-12
-			glVertexAttribPointer(9 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
-			glVertexAttribDivisor(9 + i, 1);
-		}
+		SetupMatrixAttribute(9);
 	}
 
-	if (wireframe)
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glEnable(GL_POLYGON_OFFSET_LINE);
-		glPolygonOffset(-1.0f, -1.0f);
-		glLineWidth(5.0f);
-	}
+	DrawWithWireframe(wireframe, [&] {
+		glDrawElementsInstanced(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
+	});
 
-	glDrawElementsInstanced(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
-
-	if (wireframe)
+	TeardownMatrixAttribute(5);
+	if (nonUniform)
 	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDisable(GL_POLYGON_OFFSET_LINE);
-		glLineWidth(1.0f);
-	}
-
-	for (int i = 0; i < 4; i++)
-	{
-		glVertexAttribDivisor(5 + i, 0);
-		glDisableVertexAttribArray(5 + i);
+		TeardownMatrixAttribute(9);
 	}
 }
 
@@ -733,7 +700,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	{
 		m_cullingBatches.resize(batchIndex + 1);
 	}
-	bool nonUniform = HasNonUniformScale(transforms);
+	const bool nonUniform = HasNonUniformScale(transforms);
 	auto& [inputSsbo, outputSsbo, cmdBuffer, normalSsbo] = m_cullingBatches[batchIndex];
 
 	if (inputSsbo == 0)
@@ -753,12 +720,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 	}
 
-	DrawElementsIndirectCommand cmd{};
-	cmd.count = mesh->GetIndexCount();
-	cmd.instanceCount = 0;
-	cmd.firstIndex = 0;
-	cmd.baseVertex = 0;
-	cmd.baseInstance = 0;
+	const DrawElementsIndirectCommand cmd{ mesh->GetIndexCount(), 0, 0, 0, 0 };
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, cmdBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(DrawElementsIndirectCommand), &cmd, GL_DYNAMIC_DRAW);
@@ -791,61 +753,37 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	mesh->GetVAO()->Bind();
 
 	glBindBuffer(GL_ARRAY_BUFFER, outputSsbo);
-	constexpr std::size_t vec4Size = sizeof(glm::vec4);
-	for (int i = 0; i < 4; i++)
-	{
-		glEnableVertexAttribArray(5 + i);
-		glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
-		glVertexAttribDivisor(5 + i, 1);
-	}
+	SetupMatrixAttribute(5);
 
 	if (nonUniform)
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, normalSsbo);
-		for (int i = 0; i < 4; i++)
-		{
-			glEnableVertexAttribArray(9 + i);
-			glVertexAttribPointer(9 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * vec4Size));
-			glVertexAttribDivisor(9 + i, 1);
-		}
-	}
-
-	if (wireframe)
-	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glEnable(GL_POLYGON_OFFSET_LINE);
-		glPolygonOffset(-1.0f, -1.0f);
-		glLineWidth(5.0f);
+		SetupMatrixAttribute(9);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, cmdBuffer);
 
-	// DEPTH PRE-PASS
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	glDepthFunc(GL_LESS);
-	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
+	DrawWithWireframe(wireframe, [&] {
+		// DEPTH PRE-PASS
+		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+		glDepthFunc(GL_LESS);
+		glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
 
-	// COLOR PASS
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glDepthFunc(GL_LEQUAL);
-	glDepthMask(GL_FALSE);
-	glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
+		// COLOR PASS
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glDepthFunc(GL_LEQUAL);
+		glDepthMask(GL_FALSE);
+		glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr);
 
-	// CLEANUP
-	glDepthFunc(GL_LESS);
-	glDepthMask(GL_TRUE);
+		// CLEANUP
+		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
+	});
 
-	if (wireframe)
+	TeardownMatrixAttribute(5);
+	if (nonUniform)
 	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDisable(GL_POLYGON_OFFSET_LINE);
-		glLineWidth(1.0f);
-	}
-
-	for (int i = 0; i < 4; i++)
-	{
-		glVertexAttribDivisor(5 + i, 0);
-		glDisableVertexAttribArray(5 + i);
+		TeardownMatrixAttribute(9);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
@@ -913,8 +851,7 @@ void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& 
 		texIndex = 0.0f;
 	}
 
-	float hw = size.x / 2.0f;
-	float hh = size.y / 2.0f;
+	float hw = size.x / 2.0f, hh = size.y / 2.0f;
 	glm::vec2 p[4] = { { -hw, -hh }, { hw, -hh }, { hw, hh }, { -hw, hh } };
 
 	if (rotation != 0.0f)
