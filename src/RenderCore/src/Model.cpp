@@ -34,7 +34,6 @@ const std::vector<MeshPart>& Model::GetParts() const
 
 bool Model::LoadFromFile(String const& filePath)
 {
-	RE_PROFILE_FUNCTION();
 	m_parts.clear();
 
 	tinyobj::attrib_t attrib;
