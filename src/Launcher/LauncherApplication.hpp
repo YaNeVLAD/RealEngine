@@ -100,8 +100,8 @@ struct MenuLayout final : re::Layout
 				scene.CreateEntity()
 					.Add<re::Dirty<re::TransformComponent>>()
 					.Add<re::TransformComponent>({
-						.position = { 0.f, -2.f, -5.f },
-						.rotation = { 0.f, 0.f, 0.f },
+						.position = { 0.f, -1.f, -5.f },
+						.rotation = { 0.f, 180.f, 0.f },
 						.scale = { 1.f, 1.f, 1.f },
 					})
 					.Add<re::detail::OpaqueTag>()

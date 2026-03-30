@@ -1,4 +1,5 @@
 
+#include <Core/Timer.hpp>
 #include <RenderCore/Model.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -33,6 +34,7 @@ const std::vector<MeshPart>& Model::GetParts() const
 
 bool Model::LoadFromFile(String const& filePath)
 {
+	RE_PROFILE_FUNCTION();
 	m_parts.clear();
 
 	tinyobj::attrib_t attrib;
@@ -66,6 +68,8 @@ bool Model::LoadFromFile(String const& filePath)
 	std::vector<Material> engineMaterials;
 	engineMaterials.reserve(materials.size());
 
+	std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
+
 	for (const auto& mat : materials)
 	{
 		Material engineMat{
@@ -78,15 +82,22 @@ bool Model::LoadFromFile(String const& filePath)
 
 		if (!mat.diffuse_texname.empty())
 		{
-			std::string texPath = baseDir + mat.diffuse_texname;
-			if (auto texture = std::make_shared<Texture>(); texture->LoadFromFile(texPath))
+			if (std::string texPath = baseDir + mat.diffuse_texname; textureCache.contains(texPath))
 			{
-				engineMat.texture = texture;
-				std::cout << "  [Texture Loaded]: " << texPath << std::endl;
+				engineMat.texture = textureCache[texPath];
 			}
 			else
 			{
-				std::cerr << "  [Texture Failed]: " << texPath << std::endl;
+				if (auto texture = std::make_shared<Texture>(); texture->LoadFromFile(texPath))
+				{
+					engineMat.texture = texture;
+					textureCache[texPath] = texture;
+					std::cout << "  [Texture Loaded]: " << texPath << std::endl;
+				}
+				else
+				{
+					std::cerr << "  [Texture Failed]: " << texPath << std::endl;
+				}
 			}
 		}
 		engineMaterials.emplace_back(engineMat);
