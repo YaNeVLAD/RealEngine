@@ -116,10 +116,10 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 void RenderSystem3D::Update(ecs::Scene& scene, float)
 {
 	auto [width, height] = m_window.Size();
-	float aspect = static_cast<float>(width) / static_cast<float>(height);
+	const float aspect = static_cast<float>(width) / static_cast<float>(height);
 	if (width == 0 || height == 0)
 	{
-		aspect = 1.f;
+		return;
 	}
 
 	ProcessTransforms(scene);
