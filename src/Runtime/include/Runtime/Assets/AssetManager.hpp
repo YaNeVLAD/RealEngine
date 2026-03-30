@@ -2,10 +2,9 @@
 
 #include <Runtime/Export.hpp>
 
-#include <Core/FileSystem.hpp>
-#include <Core/HashedString.hpp>
-#include <Core/String.hpp>
 #include <Core/Assets/IAsset.hpp>
+#include <Core/FileSystem.hpp>
+#include <Core/String.hpp>
 
 #include <memory>
 #include <unordered_map>
@@ -22,7 +21,7 @@ public:
 	void CleanUp();
 
 private:
-	std::unordered_map<Hash_t, std::shared_ptr<IAsset>> m_assets;
+	std::unordered_map<String, std::shared_ptr<IAsset>> m_assets;
 };
 
 } // namespace re
