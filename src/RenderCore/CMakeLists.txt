@@ -3,6 +3,7 @@ set(COMMON_SOURCES
         src/Keyboard.cpp
         src/Mouse.cpp
         src/Model.cpp
+        src/TextureLoader.cpp
 )
 
 if (RE_RENDER_BACKEND STREQUAL "GLFW")
