@@ -17,6 +17,11 @@ struct SemanticType
 
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
+		if (name.Hashed() == "Any"_hs)
+		{ // TODO: Remove after Generics and typecast
+			return true;
+		}
+
 		if (other->name.Hashed() == "Any"_hs)
 		{
 			return true;
@@ -45,6 +50,45 @@ struct FunctionType final : SemanticType
 	bool isVararg = false;
 
 	explicit FunctionType(const re::String& n) { name = n; }
+
+	bool IsAssignableTo(const SemanticType* other) const override
+	{
+		if (name.Hashed() == "Any"_hs)
+		{ // TODO: Remove after Generics and typecast
+			return true;
+		}
+
+		if (other->name == "Any")
+		{
+			return true;
+		}
+
+		const auto* otherFun = dynamic_cast<const FunctionType*>(other);
+		if (!otherFun)
+		{
+			return false;
+		}
+
+		if (!returnType->IsAssignableTo(otherFun->returnType.get()))
+		{
+			return false;
+		}
+
+		if (paramTypes.size() != otherFun->paramTypes.size())
+		{
+			return false;
+		}
+
+		for (std::size_t i = 0; i < paramTypes.size(); ++i)
+		{
+			if (!paramTypes[i]->IsAssignableTo(otherFun->paramTypes[i].get()))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
 };
 
 struct ClassType final : SemanticType

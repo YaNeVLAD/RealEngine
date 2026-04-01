@@ -2,6 +2,14 @@ package main;
 
 import math.*;
 
+fun less(a: Int, b: Int): Bool {
+    return a < b;
+}
+
+fun greater(a: Int, b: Int): Bool {
+    return a > b;
+}
+
 fun main()
 {
     print("sqrt(36)", sqrt(36.0));
@@ -24,7 +32,7 @@ fun main()
     arr[3] = 12;
     arr[4] = 11;
 
-    bubbleSort(arr, n);
+    bubbleSort(arr, n, greater);
     print("Sorted array:", arr);
 
     sieve(50);

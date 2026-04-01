@@ -583,6 +583,21 @@ private:
 			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name.ToString() + "'");
 		}
 
+		if (const auto funTypeNode = dynamic_cast<const ast::FunctionTypeNode*>(typeNode))
+		{
+			// TODO: Generate anonymous type
+			auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
+
+			for (const auto& pType : funTypeNode->paramTypes)
+			{
+				semFunType->paramTypes.push_back(ResolveAstType(pType.get()));
+			}
+
+			semFunType->returnType = ResolveAstType(funTypeNode->returnType.get());
+
+			return semFunType;
+		}
+
 		return m_tUnit;
 	}
 };

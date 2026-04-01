@@ -1,19 +1,16 @@
 package main;
 
-fun bubbleSort(arr: Array, size: Int) {
+fun bubbleSort(arr: Array, size: Int, comp: (Int, Int) -> Bool) {
     var i = 0;
     while (i < size - 1) {
         var j = 0;
         while (j < size - i - 1) {
-            // Используем новый оператор >
-            // Обращение по индексу arr[j] автоматически сгенерирует CALL_METHOD "get" 1
-            if (arr[j] > arr[j + 1]) {
-                // Меняем элементы местами (автоматически генерируется CALL_METHOD "set" 2)
+            if (comp(arr[j + 1], arr[j])) {
                 var temp = arr[j];
                 arr[j] = arr[j + 1];
                 arr[j + 1] = temp;
             }
-            j++; // Используем инкремент!
+            j++;
         }
         i++;
     }
