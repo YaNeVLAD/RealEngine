@@ -16,38 +16,19 @@ namespace re
 class LibraryLoader
 {
 public:
-	explicit LibraryLoader(String const& path)
-	{
-		if (m_handle = LoadLibraryA(path.ToString().c_str()); !m_handle)
-		{
-			throw std::runtime_error("Failed to load library: " + path);
-		}
-	}
+	explicit LibraryLoader(String const& path);
 
-	~LibraryLoader()
-	{
-		if (m_handle)
-		{
-			FreeLibrary(static_cast<HMODULE>(m_handle));
-		}
-	}
+	~LibraryLoader();
 
 	template <typename T>
-	T GetSymbol(String const& name) const
-	{
-		auto symbol = (void*)GetProcAddress(static_cast<HMODULE>(m_handle), name.ToString().c_str());
-		if (!symbol)
-		{
-			throw std::runtime_error("Failed to find symbol: " + name);
-		}
-
-		return reinterpret_cast<T>(symbol);
-	}
+	T GetSymbol(String const& name) const;
 
 private:
-	void* m_handle = nullptr;
+	HMODULE m_handle = nullptr;
 };
 
 } // namespace re
+
+#include <Core/LibraryLoader.inl>
 
 #endif
