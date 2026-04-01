@@ -107,7 +107,7 @@ private:
 		}
 	}
 
-	std::unique_ptr<ast::Decl> ConvertTopLevelDecl(const CstNode* topLevelDecl)
+	static std::unique_ptr<ast::Decl> ConvertTopLevelDecl(const CstNode* topLevelDecl)
 	{
 		const auto& declNode = topLevelDecl->children[2]; // TopLevelDecl -> AnnotationList OptVisibility Decl
 		const auto& actualDecl = declNode->children[0]; // Decl -> ValDecl | FunDecl
@@ -115,7 +115,7 @@ private:
 		return ConvertActualDecl(actualDecl.get());
 	}
 
-	std::unique_ptr<ast::Decl> ConvertActualDecl(const CstNode* actualDecl)
+	static std::unique_ptr<ast::Decl> ConvertActualDecl(const CstNode* actualDecl)
 	{
 		switch (actualDecl->symbol.Hashed())
 		{
@@ -192,19 +192,31 @@ private:
 
 			return funDecl;
 		}
+		case "ClassDecl"_hs: {
+			auto classDecl = std::make_unique<ast::ClassDecl>();
+
+			classDecl->name = actualDecl->children[1]->token->lexeme;
+
+			// TODO: Parse OptTypeParams (children[2]) when Generics are implemented
+
+			const auto& classMemberList = actualDecl->children[4];
+			ExtractClassMembers(classMemberList.get(), classDecl->members);
+
+			return classDecl;
+		}
 		default:
 			return nullptr;
 		}
 	}
 
-	std::unique_ptr<ast::Block> ConvertBlock(const CstNode* blockNode)
+	static std::unique_ptr<ast::Block> ConvertBlock(const CstNode* blockNode)
 	{
 		auto block = std::make_unique<ast::Block>();
 		FlattenStatements(blockNode->children[1].get(), block->statements);
 		return block;
 	}
 
-	void FlattenStatements(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
+	static void FlattenStatements(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
 		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
 		{
@@ -379,7 +391,7 @@ private:
 		return nullptr;
 	}
 
-	std::unique_ptr<ast::IfStmt> ConvertIfStmt(const CstNode* ifNode)
+	static std::unique_ptr<ast::IfStmt> ConvertIfStmt(const CstNode* ifNode)
 	{
 		auto ifStmt = std::make_unique<ast::IfStmt>();
 		ifStmt->condition = ConvertExpr(ifNode->children[2].get());
@@ -404,7 +416,7 @@ private:
 		return ifStmt;
 	}
 
-	std::unique_ptr<ast::WhileStmt> ConvertWhileStmt(const CstNode* whileNode)
+	static std::unique_ptr<ast::WhileStmt> ConvertWhileStmt(const CstNode* whileNode)
 	{
 		auto stmt = std::make_unique<ast::WhileStmt>();
 		stmt->condition = ConvertExpr(whileNode->children[2].get());
@@ -413,7 +425,7 @@ private:
 		return stmt;
 	}
 
-	std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
+	static std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
 		auto stmt = std::make_unique<ast::ForStmt>();
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
@@ -553,6 +565,34 @@ private:
 		else if (actPars->children.size() == 1)
 		{
 			outArgs.push_back(ConvertExpr(actPars->children[0].get()));
+		}
+	}
+
+	static void ExtractClassMembers(const CstNode* listNode, std::vector<std::unique_ptr<ast::Decl>>& outMembers)
+	{
+		if (!listNode || listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		{
+			return;
+		}
+
+		// ClassMemberList -> ClassMemberList ClassMember
+		if (listNode->children.size() == 2)
+		{
+			ExtractClassMembers(listNode->children[0].get(), outMembers);
+
+			const auto& classMemberNode = listNode->children[1];
+
+			// ClassMember -> AnnotationList [0] OptVisibility [1] ClassMemberDecl [2]
+			// TODO: Handle member visibility (public/private)
+			const auto& classMemberDeclNode = classMemberNode->children[2];
+
+			// ClassMemberDecl -> VarDecl | ValDecl | FunDecl (лежит в children[0])
+			const auto& actualMemberDecl = classMemberDeclNode->children[0];
+
+			if (auto decl = ConvertActualDecl(actualMemberDecl.get()))
+			{
+				outMembers.emplace_back(std::move(decl));
+			}
 		}
 	}
 };

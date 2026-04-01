@@ -30,6 +30,7 @@ namespace igni::ast
 	V(ValDecl)          \
 	V(FunDecl)          \
 	V(ImportDecl)       \
+	V(ClassDecl)        \
 	V(MemberAccessExpr) \
 	V(Program)
 
@@ -525,6 +526,22 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 		{
 			body->Print(depth + 1);
 		}
+	}
+};
+
+struct ClassDecl final : Visitable<ClassDecl, Decl>
+{
+	re::String name;
+
+	std::vector<re::String> typeParams;
+
+	std::vector<std::unique_ptr<Decl>> members;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "ClassDecl [name: '" << name.ToString() << "']\n";
+		PrintIndent(depth + 1);
 	}
 };
 
