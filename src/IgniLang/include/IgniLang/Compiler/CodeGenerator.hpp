@@ -39,6 +39,29 @@ public:
 		m_out << "// Package: " << program->packageName << "\n";
 		m_out << "// ==========================================\n\n";
 
+		m_funcAsmNames.clear();
+		std::size_t funcId = 0;
+		std::unordered_set<const ast::FunDecl*> globalFuncs;
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+			{
+				globalFuncs.insert(fun);
+			}
+		}
+
+		for (const ast::FunDecl* fun : m_flatFunctions)
+		{
+			if (globalFuncs.contains(fun))
+			{
+				m_funcAsmNames[fun] = fun->name;
+			}
+			else
+			{
+				m_funcAsmNames[fun] = fun->name + "_fn_" + std::to_string(funcId++);
+			}
+		}
+
 		m_out << "// --- Global Initialization ---\n";
 		m_currentFunction = nullptr;
 		for (const auto& stmt : program->statements)
@@ -121,17 +144,12 @@ public:
 		}
 		else
 		{
-			const auto it = std::ranges::find_if(m_flatFunctions, [name](const ast::FunDecl* fun) {
-				return fun->name == name;
+			const bool isGlobal = std::ranges::any_of(m_flatFunctions, [this, name](const ast::FunDecl* fun) {
+				return fun->name == name && m_funcAsmNames.at(fun) == name;
 			});
-			if (it != m_flatFunctions.end())
-			{
-				m_out << "LOAD_FUN " << name << "\n";
-			}
-			else
-			{
-				m_out << "GET_GLOBAL \"" << name << "\"\n";
-			}
+			isGlobal
+				? m_out << "LOAD_FUN " << name << "\n"
+				: m_out << "GET_GLOBAL \"" << name << "\"\n";
 		}
 	}
 
@@ -658,7 +676,7 @@ public:
 			}
 		}
 
-		m_out << "MAKE_CLOSURE " << node->name << " " << upvalues.size() << "\n";
+		m_out << "MAKE_CLOSURE " << m_funcAsmNames.at(node) << " " << upvalues.size() << "\n";
 		m_out << "SET " << DeclareLocal(node->name) << "\n";
 	}
 
@@ -674,6 +692,7 @@ private:
 	const std::vector<const ast::FunDecl*>& m_flatFunctions;
 	const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& m_functionUpvalues;
 	const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& m_functionBoxedVars;
+	std::unordered_map<const ast::FunDecl*, re::String> m_funcAsmNames;
 
 	const std::unordered_map<re::String, re::String>& m_importAliases;
 	const std::unordered_set<re::String>& m_externals;
@@ -714,7 +733,7 @@ private:
 	void GenerateFunction(const ast::FunDecl* fun)
 	{
 		m_currentFunction = fun;
-		m_out << "FUN " << fun->name << "\n";
+		m_out << "FUN " << m_funcAsmNames.at(fun) << "\n";
 		m_currentLocals.clear();
 		m_varCounter = 0;
 		m_currentUpvalues = m_functionUpvalues.at(fun);
