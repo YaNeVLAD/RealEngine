@@ -131,7 +131,16 @@ public:
 		const auto leftType = Evaluate(node->left.get());
 		const auto rightType = Evaluate(node->right.get());
 
-		ExpectAssignable(rightType, leftType, "binary expression");
+		const bool isNumeric = (leftType == m_tInt || leftType == m_tDouble) && (rightType == m_tInt || rightType == m_tDouble);
+		if (isNumeric)
+		{ // TODO: Add type promotion for other expressions
+			m_currentExprType = (leftType == m_tDouble || rightType == m_tDouble) ? m_tDouble : m_tInt;
+		}
+		else
+		{
+			ExpectAssignable(rightType, leftType, "binary expression");
+			m_currentExprType = leftType;
+		}
 
 		if (const auto hashed = node->op.Hashed();
 			hashed == "<"_hs || hashed == ">"_hs

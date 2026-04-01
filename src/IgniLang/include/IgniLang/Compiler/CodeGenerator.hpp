@@ -38,6 +38,17 @@ public:
 		m_out << "// Auto-generated RVM Assembly\n";
 		m_out << "// Package: " << program->packageName << "\n";
 		m_out << "// ==========================================\n\n";
+
+		m_out << "// --- Global Initialization ---\n";
+		m_currentFunction = nullptr;
+		for (const auto& stmt : program->statements)
+		{
+			if (!dynamic_cast<const ast::FunDecl*>(stmt.get()))
+			{
+				stmt->Accept(*this);
+			}
+		}
+
 		m_out << "// --- Entry Point ---\n";
 		m_out << "CALL main 0\nRETURN\n\n";
 
@@ -137,11 +148,10 @@ public:
 				}
 				m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 			}
-			else
+			else if (IsLocal(name))
 			{
-				const re::String asmName = IsLocal(name) ? GetAsmName(name) : name;
-
-				if (m_functionBoxedVars.at(m_currentFunction).contains(name))
+				const re::String asmName = GetAsmName(name);
+				if (m_currentFunction && m_functionBoxedVars.at(m_currentFunction).contains(name))
 				{
 					m_out << "GET " << asmName << "\n";
 					if (node->value)
@@ -158,6 +168,14 @@ public:
 					}
 					m_out << "SET " << asmName << "\n";
 				}
+			}
+			else
+			{
+				if (node->value)
+				{
+					node->value->Accept(*this);
+				}
+				m_out << "SET_GLOBAL \"" << name << "\"\n";
 			}
 			m_out << "CONST 0\n";
 		}
@@ -579,12 +597,19 @@ public:
 			m_out << "CONST 0\n";
 		}
 
-		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
-		{
-			m_out << "BOX\n";
+		if (m_currentFunction == nullptr)
+		{ // Global var declaration
+			m_out << "SET_GLOBAL \"" << node->name << "\"\n";
 		}
-
-		m_out << "SET " << DeclareLocal(node->name) << "\n";
+		else
+		{
+			if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
+			{
+				m_out << "BOX\n";
+			}
+			const re::String asmName = DeclareLocal(node->name);
+			m_out << "SET " << asmName << "\n";
+		}
 	}
 
 	void Visit(const ast::ValDecl* node) override
@@ -598,12 +623,19 @@ public:
 			m_out << "CONST 0\n";
 		}
 
-		if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
-		{
-			m_out << "BOX\n";
+		if (m_currentFunction == nullptr)
+		{ // Global val declaration
+			m_out << "SET_GLOBAL \"" << node->name << "\"\n";
 		}
-
-		m_out << "SET " << DeclareLocal(node->name) << "\n";
+		else
+		{
+			if (m_functionBoxedVars.at(m_currentFunction).contains(node->name))
+			{
+				m_out << "BOX\n";
+			}
+			const re::String asmName = DeclareLocal(node->name);
+			m_out << "SET " << asmName << "\n";
+		}
 	}
 
 	void Visit(const ast::FunDecl* node) override

@@ -2,13 +2,13 @@ package main;
 
 import math.*;
 
-fun less(a: Int, b: Int): Bool {
-    return a < b;
-}
+fun less(a: Int, b: Int): Bool = a < b;
 
-fun greater(a: Int, b: Int): Bool {
-    return a > b;
-}
+fun greater(a: Int, b: Int): Bool = a > b;
+
+fun f1() {}
+
+val GLOBAL = 42;
 
 fun main()
 {
@@ -16,12 +16,39 @@ fun main()
     print("pow(2,3)", pow(2.0, 3.0));
     print("sin(45)", math.sin(45.0));
 
-    val a = 10;
-    {
-        val a = 42;
-        print("In scope:", a);
-    }
-    print("After scope:", a);
+    print(GLOBAL);
+
+//    val x = 5;
+//    val y = 12.5;
+//    val z = x + y;
+//    print(z);
+
+    val a: Int = 10;
+	fun f1() {
+		// val a: Array = make_array(1);
+		// a[0] = 25;
+		a = 15;
+		fun f2() {
+			val a: Double = 42.42;
+			fun f3() {
+				print(a);
+			}
+
+			f3();
+			print(a);
+		}
+		fun f4() {
+			val a: Array = make_array(1);
+			a[0] = 40;
+			print(a);
+		}
+
+		f2();
+		f4();
+		print(a);
+	}
+	f1();
+	print(a);
 
     val n = 5;
     val arr: Array = make_array(n);
@@ -33,6 +60,7 @@ fun main()
     arr[4] = 11;
 
     bubbleSort(arr, n, greater);
+	print("n:", n);
     print("Sorted array:", arr);
 
     sieve(50);
