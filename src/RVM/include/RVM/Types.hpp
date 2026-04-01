@@ -353,6 +353,9 @@ RE_RVM_API Value OpEqual(Value const& lhs, Value const& rhs);
 
 RE_RVM_API bool IsTruthy(Value const& val);
 
-RE_RVM_API std::ostream& operator<<(std::ostream& os, Value const& val);
+template <typename TChar>
+std::basic_ostream<TChar>& operator<<(std::basic_ostream<TChar>& os, Value const& val);
 
 } // namespace re::rvm
+
+#include <RVM/Types.inl>

@@ -12,6 +12,10 @@ using IgniPluginInitFn = void (*)(re::rvm::VirtualMachine*);
 
 int main(const int argc, char** argv)
 {
+#ifdef RE_SYSTEM_WINDOWS
+	SetConsoleOutputCP(CP_UTF8);
+#endif
+
 	if (argc < 2)
 	{
 		std::cerr << "Usage: igni-cli <file1.igni> <file2.igni> ...\n";
