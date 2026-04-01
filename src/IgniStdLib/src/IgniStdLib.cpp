@@ -83,14 +83,14 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		{
 			for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
 			{
-				std::cout << arg << " ";
+				std::cout << arg;
 			}
 		}
 		else
 		{
 			for (const auto& arg : args)
 			{
-				std::cout << arg << " ";
+				std::cout << arg;
 			}
 		}
 		std::cout << "\n";

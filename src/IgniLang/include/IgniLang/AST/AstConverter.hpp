@@ -152,13 +152,12 @@ private:
 
 			if (const auto& optFunMod = actualDecl->children[0];
 				!optFunMod->children.empty() && optFunMod->children[0]->symbol.Hashed() == "external"_hs)
-			{
+			{ // External modifier
 				funDecl->isExternal = true;
 			}
 
-			// 1. Имя функции [2]
 			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
-			{
+			{ // Name [2]
 				funDecl->name = funNameNode->children[0]->token->lexeme;
 			}
 			else
@@ -167,17 +166,28 @@ private:
 			}
 
 			if (const auto& optColon = actualDecl->children[7]; optColon->children.size() == 2)
-			{
+			{ // Return type [7]
 				funDecl->returnType = ConvertType(optColon->children[1].get());
 			}
 
-			// 2. Параметры [5]
+			// Parameters [5]
 			ExtractParameters(actualDecl->children[5].get(), funDecl.get());
 
-			// 3. Тело функции [8]
 			if (const auto& funBody = actualDecl->children[8]; funBody->children[0]->symbol.Hashed() == "Block"_hs)
-			{
+			{ // Body [8]
 				funDecl->body = ConvertBlock(funBody->children[0].get());
+			}
+			else if (funBody->children[0]->symbol.Hashed() == "="_hs)
+			{ // Desugaring: fun ident(args) = expr; => fun ident(args) { return expr; }
+				funDecl->isExprBody = true;
+
+				auto expr = ConvertExpr(funBody->children[1].get());
+
+				auto returnStatement = std::make_unique<ast::ReturnStmt>();
+				returnStatement->expr = std::move(expr);
+
+				funDecl->body = std::make_unique<ast::Block>();
+				funDecl->body->statements.push_back(std::move(returnStatement));
 			}
 
 			return funDecl;

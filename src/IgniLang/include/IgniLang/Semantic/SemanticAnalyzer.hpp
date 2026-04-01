@@ -131,27 +131,33 @@ public:
 		const auto leftType = Evaluate(node->left.get());
 		const auto rightType = Evaluate(node->right.get());
 
-		const bool isNumeric = (leftType == m_tInt || leftType == m_tDouble) && (rightType == m_tInt || rightType == m_tDouble);
+		std::shared_ptr<SemanticType> mathType;
+
+		const bool isNumeric = (leftType == m_tInt || leftType == m_tDouble)
+			&& (rightType == m_tInt || rightType == m_tDouble);
 		if (isNumeric)
-		{ // TODO: Add type promotion for other expressions
-			m_currentExprType = (leftType == m_tDouble || rightType == m_tDouble) ? m_tDouble : m_tInt;
+		{ // Type promotion for numeric types
+			mathType = (leftType == m_tDouble || rightType == m_tDouble) ? m_tDouble : m_tInt;
 		}
 		else
-		{
+		{ // lhs and rhs type comparison
 			ExpectAssignable(rightType, leftType, "binary expression");
-			m_currentExprType = leftType;
+			mathType = leftType;
 		}
 
 		if (const auto hashed = node->op.Hashed();
-			hashed == "<"_hs || hashed == ">"_hs
-			|| hashed == "=="_hs || hashed == "!="_hs
-			|| hashed == "<="_hs || hashed == ">="_hs)
+			hashed == "<"_hs
+			|| hashed == ">"_hs
+			|| hashed == "=="_hs
+			|| hashed == "!="_hs
+			|| hashed == "<="_hs
+			|| hashed == ">="_hs)
 		{
 			m_currentExprType = m_tBool;
 		}
 		else
 		{
-			m_currentExprType = leftType;
+			m_currentExprType = mathType;
 		}
 	}
 
@@ -185,6 +191,12 @@ public:
 		}
 
 		ValidateCallArguments(node, funType);
+
+		if (funType->returnType == nullptr)
+		{
+			throw std::runtime_error("Semantic Error: Cannot infer return type for forward call of '" + funType->name + "'. Please specify the return type explicitly or move the declaration above the call.");
+		}
+
 		m_currentExprType = funType->returnType;
 	}
 
@@ -275,7 +287,12 @@ public:
 	{
 		const auto retType = Evaluate(node->expr.get());
 
-		if (m_currentReturnType)
+		if (m_currentFunctionType && m_currentFunctionType->returnType == nullptr)
+		{ // Resolving a type of return expression
+			m_currentFunctionType->returnType = retType;
+			m_currentReturnType = retType;
+		}
+		else if (m_currentReturnType)
 		{
 			ExpectAssignable(retType, m_currentReturnType, "return statement");
 		}
@@ -283,42 +300,61 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		const auto funType = std::make_shared<FunctionType>(node->name.ToString());
-		funType->returnType = ResolveAstType(node->returnType.get());
-		funType->isVararg = node->isVararg;
+		std::shared_ptr<FunctionType> funType;
 
-		for (const auto& [_, type] : node->parameters)
-		{
-			funType->paramTypes.emplace_back(ResolveAstType(type.get()));
-		}
+		if (m_currentFunctionType != nullptr)
+		{ // Local function
+			funType = std::make_shared<FunctionType>(node->name.ToString());
+			funType->returnType = ResolveAstType(node->returnType.get());
 
-		if (m_currentReturnType != nullptr)
-		{
+			if (funType->returnType == nullptr && !node->isExprBody)
+			{
+				funType->returnType = m_tUnit;
+			}
+
+			funType->isVararg = node->isVararg;
+
+			for (const auto& [_, type] : node->parameters)
+			{
+				funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+			}
 			m_env.Define(node->name, funType, true);
+		}
+		else
+		{ // Global function
+			const Symbol* sym = m_env.Resolve(node->name);
+			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
 		}
 
 		m_env.PushScope();
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
-			std::shared_ptr<SemanticType> paramType = ResolveAstType(node->parameters[i].type.get());
-
+			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
 				paramType = m_tArray;
 			}
-
 			m_env.Define(node->parameters[i].name, paramType, false);
 		}
 
 		const auto previousReturnType = m_currentReturnType;
-		m_currentReturnType = ResolveAstType(node->returnType.get());
+		const auto previousFunctionType = m_currentFunctionType;
+
+		m_currentReturnType = funType->returnType;
+		m_currentFunctionType = funType;
 
 		if (node->body)
 		{
 			node->body->Accept(*this);
 		}
 
+		if (m_currentFunctionType->returnType == nullptr)
+		{ // No return in function -> fallback to Unit
+			m_currentFunctionType->returnType = m_tUnit;
+		}
+
 		m_currentReturnType = previousReturnType;
+		m_currentFunctionType = previousFunctionType;
 		m_env.PopScope();
 	}
 
@@ -331,6 +367,7 @@ private:
 	Environment m_env;
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	std::shared_ptr<SemanticType> m_currentReturnType = nullptr;
+	std::shared_ptr<FunctionType> m_currentFunctionType = nullptr;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
@@ -399,6 +436,12 @@ private:
 
 				auto funType = std::make_shared<FunctionType>(fun->name);
 				funType->returnType = ResolveAstType(fun->returnType.get());
+
+				if (funType->returnType == nullptr && !fun->isExprBody)
+				{
+					funType->returnType = m_tUnit;
+				}
+
 				funType->isVararg = fun->isVararg;
 
 				for (const auto& [_, type] : fun->parameters)
@@ -564,8 +607,8 @@ private:
 	std::shared_ptr<SemanticType> ResolveAstType(const ast::TypeNode* typeNode)
 	{
 		if (!typeNode)
-		{
-			return m_tUnit;
+		{ // Type must be resolved via expression
+			return nullptr;
 		}
 
 		if (const auto simpleType = dynamic_cast<const ast::SimpleTypeNode*>(typeNode))
