@@ -32,6 +32,8 @@ namespace igni::ast
 	V(ImportDecl)       \
 	V(ClassDecl)        \
 	V(MemberAccessExpr) \
+	V(ConstructorDecl)  \
+	V(DestructorDecl)   \
 	V(Program)
 
 #define FORWARD_DECLARE_AST_NODE(Name) struct Name;
@@ -545,6 +547,43 @@ struct ClassDecl final : Visitable<ClassDecl, Decl>
 	{
 		PrintIndent(depth);
 		std::cout << "ClassDecl [name: '" << name.ToString() << "']\n";
+		PrintIndent(depth + 1);
+	}
+};
+
+struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
+{
+	re::String name;
+	std::vector<FunDecl::Parameter> parameters;
+	bool isVararg = false;
+	std::unique_ptr<Block> body;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "ConstructorDecl [name: '" << name.ToString() << "']\n";
+		PrintIndent(depth + 1);
+		std::cout << "Parameters: ";
+		for (const auto& [paramName, type] : parameters)
+		{
+			std::cout << paramName.ToString() << " ";
+			if (type)
+			{
+				type->Print(depth);
+			}
+		}
+	}
+};
+
+struct DestructorDecl final : Visitable<DestructorDecl, Decl>
+{
+	re::String name;
+	std::unique_ptr<Block> body;
+
+	void Print(int depth = 0) const override
+	{
+		PrintIndent(depth);
+		std::cout << "DestructorDecl [name: '" << name.ToString() << "']\n";
 		PrintIndent(depth + 1);
 	}
 };

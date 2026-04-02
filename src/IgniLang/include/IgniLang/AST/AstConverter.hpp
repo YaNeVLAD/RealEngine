@@ -204,6 +204,35 @@ private:
 
 			return classDecl;
 		}
+		case "ConstructorDecl"_hs: {
+			// ConstructorDecl -> ident ( OptFormPars ) Block
+			auto ctorDecl = std::make_unique<ast::ConstructorDecl>();
+
+			ctorDecl->name = actualDecl->children[0]->token->lexeme;
+
+			// Reuse FunDecl for temporary storage
+			ast::FunDecl tempFun;
+			ExtractParameters(actualDecl->children[2].get(), &tempFun);
+
+			ctorDecl->parameters = std::move(tempFun.parameters);
+			ctorDecl->isVararg = tempFun.isVararg;
+
+			const auto& bodyNode = actualDecl->children[4];
+			ctorDecl->body = ConvertBlock(bodyNode.get());
+
+			return ctorDecl;
+		}
+		case "DestructorDecl"_hs: {
+			// DestructorDecl -> ~ ident ( ) Block
+			auto dtorDecl = std::make_unique<ast::DestructorDecl>();
+
+			dtorDecl->name = actualDecl->children[1]->token->lexeme;
+
+			const auto& bodyNode = actualDecl->children[4];
+			dtorDecl->body = ConvertBlock(bodyNode.get());
+
+			return dtorDecl;
+		}
 		default:
 			return nullptr;
 		}
@@ -586,9 +615,8 @@ private:
 			// TODO: Handle member visibility (public/private)
 			const auto& classMemberDeclNode = classMemberNode->children[2];
 
-			// ClassMemberDecl -> VarDecl | ValDecl | FunDecl (лежит в children[0])
+			// ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
 			const auto& actualMemberDecl = classMemberDeclNode->children[0];
-
 			if (auto decl = ConvertActualDecl(actualMemberDecl.get()))
 			{
 				outMembers.emplace_back(std::move(decl));

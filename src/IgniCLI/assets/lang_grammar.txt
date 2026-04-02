@@ -29,7 +29,10 @@ TypeParams -> TypeParams , ident | ident
 
 ClassMemberList -> ClassMemberList ClassMember | \e
 ClassMember -> AnnotationList OptVisibility ClassMemberDecl
-ClassMemberDecl -> VarDecl | ValDecl | FunDecl
+ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
+
+ConstructorDecl -> ident ( OptFormPars ) Block
+DestructorDecl -> ~ ident ( ) Block
 
 FunDecl -> OptFunMod fun FunName OptTypeParams ( OptFormPars ) OptColonType FunBody
 FunName -> ident | Type . ident | Type ? . ident

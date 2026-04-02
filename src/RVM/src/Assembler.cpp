@@ -542,6 +542,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "BIT_NOT"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::BitNot)); break;
           case "POP"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Pop)); break;
           case "RETURN"_hs: 	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Return)); break;
+		  case "DUP"_hs:           outChunk.Write(static_cast<std::uint8_t>(OpCode::Dup)); break;
 
 		  case "LESS"_hs:   	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
 		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;

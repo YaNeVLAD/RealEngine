@@ -108,9 +108,29 @@ public:
 		m_out << "// --- Entry Point ---\n";
 		m_out << "CALL main 0\nRETURN\n\n";
 
+		m_out << "// --- Function Definitions ---\n";
 		for (const ast::FunDecl* fun : m_flatFunctions)
 		{
 			GenerateFunction(fun);
+		}
+
+		m_out << "// --- Constructor/Destructor Definitions ---\n";
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
+			{
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+					{
+						GenerateConstructor(ctor, classDecl);
+					}
+					else if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+					{
+						GenerateDestructor(dtor, classDecl);
+					}
+				}
+			}
 		}
 	}
 
@@ -277,6 +297,29 @@ public:
 			}
 
 			m_out << "NEW \"" << className << "\"\n";
+
+			m_out << "DUP\n";
+
+			for (const auto& arg : node->arguments)
+			{
+				if (arg)
+				{
+					arg->Accept(*this);
+				}
+			}
+
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
+			m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+
+			m_out << "POP\n";
+
 			return;
 		}
 
@@ -789,6 +832,80 @@ private:
 
 	const std::unordered_map<re::String, re::String>& m_importAliases;
 	const std::unordered_set<re::String>& m_externals;
+
+	void GenerateConstructor(const ast::ConstructorDecl* ctor, const ast::ClassDecl* classDecl)
+	{
+		m_out << "FUN " << ctor->name << "\n";
+		m_currentLocals.clear();
+		m_varCounter = 0;
+
+		m_currentUpvalues.clear(); // TODO: Think about upvalues in constructors
+
+		for (auto it = ctor->parameters.rbegin(); it != ctor->parameters.rend(); ++it)
+		{
+			m_out << "SET " << DeclareLocal(it->name) << "\n";
+		}
+
+		// Injecting member initializers
+		const re::String thisAsmName = GetAsmName("this");
+		for (const auto& member : classDecl->members)
+		{
+			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+			{
+				if (varDecl->initializer)
+				{
+					m_out << "GET " << thisAsmName << "\n";
+					varDecl->initializer->Accept(*this);
+					m_out << "SET_PROPERTY \"" << varDecl->name << "\"\n";
+				}
+			}
+			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+			{
+				if (valDecl->initializer)
+				{
+					m_out << "GET " << thisAsmName << "\n";
+					valDecl->initializer->Accept(*this);
+					m_out << "SET_PROPERTY \"" << valDecl->name << "\"\n";
+				}
+			}
+		}
+
+		if (ctor->body)
+		{
+			for (const auto& s : ctor->body->statements)
+			{
+				if (s)
+				{
+					s->Accept(*this);
+				}
+			}
+		}
+
+		m_out << "CONST 0\nRETURN\n\n";
+	}
+
+	void GenerateDestructor(const ast::DestructorDecl* dtor, const ast::ClassDecl* classDecl)
+	{
+		m_out << "FUN " << dtor->name << "\n";
+		m_currentLocals.clear();
+		m_varCounter = 0;
+		m_currentUpvalues.clear();
+
+		m_out << "SET " << DeclareLocal("this") << "\n";
+
+		if (dtor->body)
+		{
+			for (const auto& s : dtor->body->statements)
+			{
+				if (s)
+				{
+					s->Accept(*this);
+				}
+			}
+		}
+
+		m_out << "CONST 0\nRETURN\n\n";
+	}
 
 	re::String DeclareLocal(const re::String& originalName)
 	{

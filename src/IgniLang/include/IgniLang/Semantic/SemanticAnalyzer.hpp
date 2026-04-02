@@ -185,14 +185,18 @@ public:
 		const auto calleeType = Evaluate(node->callee.get());
 
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
-		{ // TODO: Add constructor arguments
-			if (!node->arguments.empty())
-			{
-				throw std::runtime_error("Semantic Error: Default constructor for class '" + classType->name + "' takes 0 arguments.");
-			}
-
+		{
 			const auto mutableNode = const_cast<ast::CallExpr*>(node);
 			mutableNode->isConstructorCall = true;
+
+			if (const auto it = classType->methods.find(classType->name); it != classType->methods.end())
+			{
+				const auto ctorType = std::dynamic_pointer_cast<FunctionType>(it->second);
+
+				ValidateCallArguments(node, ctorType, true);
+
+				mutableNode->staticMethodTarget = ctorType->name;
+			}
 
 			m_currentExprType = classType;
 			return;
@@ -242,6 +246,65 @@ public:
 	void Visit(const ast::ExprStmt* node) override
 	{
 		Evaluate(node->expr.get());
+	}
+
+	void Visit(const ast::ConstructorDecl* node) override
+	{
+		const Symbol* sym = m_env.Resolve(node->name);
+		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+
+		m_env.PushScope();
+
+		// Parameters including 'this'
+		for (std::size_t i = 0; i < node->parameters.size(); ++i)
+		{
+			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
+			if (node->isVararg && i == node->parameters.size() - 1)
+			{
+				paramType = m_tArray;
+			}
+			m_env.Define(node->parameters[i].name, paramType, false);
+		}
+
+		const auto previousReturnType = m_currentReturnType;
+		const auto previousFunctionType = m_currentFunctionType;
+
+		m_currentReturnType = funType->returnType; // Unit
+		m_currentFunctionType = funType;
+
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		m_currentReturnType = previousReturnType;
+		m_currentFunctionType = previousFunctionType;
+		m_env.PopScope();
+	}
+
+	void Visit(const ast::DestructorDecl* node) override
+	{
+		const Symbol* sym = m_env.Resolve(node->name);
+		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+
+		m_env.PushScope();
+
+		m_env.Define("this", funType->paramTypes[0], false);
+
+		const auto previousReturnType = m_currentReturnType;
+		const auto previousFunctionType = m_currentFunctionType;
+
+		m_currentReturnType = funType->returnType; // Unit
+		m_currentFunctionType = funType;
+
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		m_currentReturnType = previousReturnType;
+		m_currentFunctionType = previousFunctionType;
+		m_env.PopScope();
 	}
 
 	void Visit(const ast::AssignExpr* node) override
@@ -429,6 +492,14 @@ public:
 			{
 				funDecl->Accept(*this);
 			}
+			else if (const auto ctorDecl = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+			{
+				ctorDecl->Accept(*this);
+			}
+			else if (const auto dtorDecl = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+			{
+				dtorDecl->Accept(*this);
+			}
 		}
 	}
 
@@ -511,6 +582,25 @@ private:
 			{
 				auto classType = std::make_shared<ClassType>(classDecl->name.ToString());
 
+				bool hasConstructor = false;
+				for (const auto& member : classDecl->members)
+				{
+					if (dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+					{
+						hasConstructor = true;
+						break;
+					}
+				}
+
+				if (!hasConstructor)
+				{
+					auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
+					defaultCtor->name = classDecl->name;
+					defaultCtor->body = std::make_unique<ast::Block>();
+
+					const_cast<ast::ClassDecl*>(classDecl)->members.push_back(std::move(defaultCtor));
+				}
+
 				if (isGlobal)
 				{
 					m_env.Define(classDecl->name, classType, true);
@@ -564,6 +654,69 @@ private:
 						}
 
 						classType->methods[originalName.ToString()] = funType;
+					}
+					else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+					{
+						const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
+
+						// Adding 'this' as first argument
+						ast::FunDecl::Parameter thisParam;
+						thisParam.name = "this";
+						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+						thisTypeNode->name = classDecl->name;
+						thisParam.type = std::move(thisTypeNode);
+						mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
+
+						// Renaming function to Class_Class
+						mutableCtor->name = classDecl->name.ToString() + "_" + classDecl->name.ToString();
+						m_allFunctionNames.insert(mutableCtor->name);
+
+						auto funType = std::make_shared<FunctionType>(mutableCtor->name.ToString());
+						funType->returnType = m_tUnit;
+						funType->isVararg = mutableCtor->isVararg;
+
+						for (const auto& [_, type] : mutableCtor->parameters)
+						{
+							funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+						}
+
+						if (isGlobal)
+						{
+							m_env.Define(mutableCtor->name, funType, true);
+						}
+						else
+						{
+							currentModule->exports[mutableCtor->name.ToString()] = funType;
+						}
+
+						// Registering as member with name Class
+						classType->methods[classDecl->name.ToString()] = funType;
+					}
+					else if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+					{
+						const auto mutableDtor = const_cast<ast::DestructorDecl*>(dtor);
+
+						mutableDtor->name = classDecl->name.ToString() + "_destructor";
+						m_allFunctionNames.insert(mutableDtor->name);
+
+						auto funType = std::make_shared<FunctionType>(mutableDtor->name.ToString());
+						funType->returnType = m_tUnit;
+
+						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+						thisTypeNode->name = classDecl->name;
+						funType->paramTypes.emplace_back(ResolveAstType(thisTypeNode.get()));
+
+						if (isGlobal)
+						{
+							m_env.Define(mutableDtor->name, funType, true);
+						}
+						else
+						{
+							currentModule->exports[mutableDtor->name.ToString()] = funType;
+						}
+
+						// Registering as member with name ~Class
+						classType->methods["~" + classDecl->name.ToString()] = funType;
 					}
 				}
 			}

@@ -49,6 +49,7 @@ private:
 	InterpreterResult Run();
 
 	Value Pop();
+	Value const& Peek();
 	void Push(Value const& value);
 
 private:

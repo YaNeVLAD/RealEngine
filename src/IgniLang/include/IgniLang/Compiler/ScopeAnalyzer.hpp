@@ -206,6 +206,14 @@ public:
 		m_scopeStack.back().insert(node->name);
 	}
 
+	void Visit(const ast::ConstructorDecl* node) override
+	{
+	}
+
+	void Visit(const ast::DestructorDecl* node) override
+	{
+	}
+
 	void Visit(const ast::FunDecl* node) override
 	{
 		m_scopeStack.back().insert(node->name);

@@ -71,6 +71,10 @@ InterpreterResult VirtualMachine::Run()
 			Push(constant);
 			break;
 		}
+		case OpCode::Dup: {
+			Push(Peek());
+			break;
+		}
 
 			// clang-format off
 		case OpCode::Add:          BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
@@ -658,6 +662,11 @@ Value VirtualMachine::Pop()
 	m_stack.pop_back();
 
 	return val;
+}
+
+Value const& VirtualMachine::Peek()
+{
+	return m_stack.back();
 }
 
 void VirtualMachine::Push(Value const& value)

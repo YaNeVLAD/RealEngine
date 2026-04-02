@@ -119,6 +119,11 @@ enum class OpCode : std::uint8_t
 	// Used for stack cleanup after evaluating expression statements.
 	Pop,
 
+	// Bytecode: [Dup]
+	// Stack: ..., [value] -> ..., [value], [value]
+	// Description: Duplicates the top value on the stack.
+	Dup,
+
 	// ---------------------------------------------------------
 	// LOCAL VARIABLES
 	// ---------------------------------------------------------
