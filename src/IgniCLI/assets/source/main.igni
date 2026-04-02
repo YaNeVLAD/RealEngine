@@ -1,67 +1,40 @@
 package main;
 
-import math.*;
+class Player {
 
-fun less(a: Int, b: Int): Bool = a < b;
+	var hp: Int = 100;
+	val name: String = "Hero";
 
-fun greater(a: Int, b: Int): Bool = a > b;
-
-fun f1() {}
-
-val GLOBAL = 42;
-
-fun main()
-{
-    print("sqrt(36)", sqrt(36.0));
-    print("pow(2,3)", pow(2.0, 3.0));
-    print("sin(45)", math.sin(45.0));
-
-    print(GLOBAL);
-
-//    val x = 5;
-//    val y = 12.5;
-//    val z = x + y;
-//    print(z);
-
-    val a: Int = 10;
-	fun f1() {
-		// val a: Array = make_array(1);
-		// a[0] = 25;
-		a = 15;
-		fun f2() {
-			val a: Double = 42.42;
-			fun f3() {
-				print(a);
-			}
-
-			f3();
-			print(a);
-		}
-		fun f4() {
-			val a: Array = make_array(1);
-			a[0] = 40;
-			print(a);
-		}
-
-		f2();
-		f4();
-		print(a);
+	Player(_name: String) {
+		this.name = _name;
 	}
-	f1();
-	print(a);
 
-    val n = 5;
-    val arr: Array = make_array(n);
+	~Player() { print("~Player"); }
 
-    arr[0] = 64;
-    arr[1] = 34;
-    arr[2] = 25;
-    arr[3] = 12;
-    arr[4] = 11;
+	fun move(dx: Double, dy: Double) {
+		print("dx: ", dx,", ", "dy: ", dy);
+	}
 
-    bubbleSort(arr, n, greater);
-	print("n:", n);
-    print("Sorted array:", arr);
+}
 
-    sieve(50);
+class Vector2 {
+	val x: Double = 0.0;
+	val y: Double = 0.0;
+
+	Vector2(x: Double, y: Double) {
+		this.x = x;
+		this.y = y;
+	}
+}
+
+fun move(player: Player, dir: Vector2) {
+	player.move(dir.x, dir.y);
+}
+
+fun main() {
+	val player = Player("Женя Пригожин");
+	print("Привет, ", player.name, "!");
+	val dir = Vector2(10.0, 15.0);
+	move(player, dir);
+	move(player, Vector2(15.0, 10.0));
 }
