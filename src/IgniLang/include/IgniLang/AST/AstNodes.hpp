@@ -203,6 +203,10 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 	bool isVarargCall = false;
 	std::size_t varargCount = 0;
 
+	bool isConstructorCall = false;
+
+	re::String staticMethodTarget;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);

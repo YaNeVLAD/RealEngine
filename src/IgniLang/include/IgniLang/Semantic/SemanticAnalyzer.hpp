@@ -116,7 +116,7 @@ public:
 		}
 		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(leftType))
 		{
-			m_currentExprType = ResolveMethod(classType, node->member);
+			m_currentExprType = ResolveFieldOrMethod(classType, node->member);
 		}
 		else
 		{
@@ -184,13 +184,39 @@ public:
 	{
 		const auto calleeType = Evaluate(node->callee.get());
 
+		if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
+		{ // TODO: Add constructor arguments
+			if (!node->arguments.empty())
+			{
+				throw std::runtime_error("Semantic Error: Default constructor for class '" + classType->name + "' takes 0 arguments.");
+			}
+
+			const auto mutableNode = const_cast<ast::CallExpr*>(node);
+			mutableNode->isConstructorCall = true;
+
+			m_currentExprType = classType;
+			return;
+		}
+
 		const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType);
 		if (!funType)
 		{
 			throw std::runtime_error("Semantic Error: Attempt to call a non-callable type");
 		}
 
-		ValidateCallArguments(node, funType);
+		bool isMethodCall = false;
+		if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+		{ // Static class methods dispatching
+			const auto objectType = Evaluate(memAccess->object.get());
+			if (const auto classType = std::dynamic_pointer_cast<ClassType>(objectType))
+			{
+				isMethodCall = true;
+				const auto mutableNode = const_cast<ast::CallExpr*>(node);
+				mutableNode->staticMethodTarget = classType->name + "_" + memAccess->member;
+			}
+		}
+
+		ValidateCallArguments(node, funType, isMethodCall);
 
 		if (funType->returnType == nullptr)
 		{
@@ -358,6 +384,54 @@ public:
 		m_env.PopScope();
 	}
 
+	void Visit(const ast::ClassDecl* node) override
+	{
+		const Symbol* sym = m_env.Resolve(node->name);
+		const auto classType = std::dynamic_pointer_cast<ClassType>(sym->type);
+
+		for (const auto& member : node->members)
+		{
+			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+			{ // Member var
+				auto fieldType = ResolveAstType(varDecl->type.get());
+				if (varDecl->initializer)
+				{ // Resolve a field type from initializer
+					auto initType = Evaluate(varDecl->initializer.get());
+					if (fieldType == nullptr || fieldType == m_tUnit)
+					{
+						fieldType = initType;
+					}
+					else
+					{
+						ExpectAssignable(initType, fieldType, "field initialization");
+					}
+				}
+				classType->fields[varDecl->name.ToString()] = fieldType;
+			}
+			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+			{ // Member val
+				auto fieldType = ResolveAstType(valDecl->type.get());
+				if (valDecl->initializer)
+				{ // Resolve a field type from initializer
+					auto initType = Evaluate(valDecl->initializer.get());
+					if (fieldType == nullptr || fieldType == m_tUnit)
+					{
+						fieldType = initType;
+					}
+					else
+					{
+						ExpectAssignable(initType, fieldType, "field initialization");
+					}
+				}
+				classType->fields[valDecl->name.ToString()] = fieldType;
+			}
+			else if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
+			{
+				funDecl->Accept(*this);
+			}
+		}
+	}
+
 	void Visit(const ast::ImportDecl* node) override
 	{
 		ProcessImport(node);
@@ -368,6 +442,7 @@ private:
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	std::shared_ptr<SemanticType> m_currentReturnType = nullptr;
 	std::shared_ptr<FunctionType> m_currentFunctionType = nullptr;
+	std::shared_ptr<ModuleType> m_currentPackage = nullptr;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
@@ -428,10 +503,73 @@ private:
 			}
 		}
 
+		m_currentPackage = currentModule;
+
 		for (const auto& stmt : node->statements)
-		{ // Functions forward declarations
-			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+		{
+			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
+				auto classType = std::make_shared<ClassType>(classDecl->name.ToString());
+
+				if (isGlobal)
+				{
+					m_env.Define(classDecl->name, classType, true);
+				}
+				else
+				{
+					currentModule->exports[classDecl->name.ToString()] = classType;
+				}
+
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+					{ // Class methods
+						const auto mutableFun = const_cast<ast::FunDecl*>(fun);
+						const re::String originalName = mutableFun->name;
+
+						// Adding `this: ClassName` as first parameter
+						ast::FunDecl::Parameter thisParam;
+						thisParam.name = "this";
+						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+						thisTypeNode->name = classDecl->name;
+						thisParam.type = std::move(thisTypeNode);
+						mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
+
+						// Creating function with ident = Class_method
+						mutableFun->name = classDecl->name.ToString() + "_" + originalName.ToString();
+
+						// Registering new function as global
+						m_allFunctionNames.insert(mutableFun->name);
+
+						auto funType = std::make_shared<FunctionType>(mutableFun->name.ToString());
+						funType->returnType = ResolveAstType(mutableFun->returnType.get());
+						if (funType->returnType == nullptr && !mutableFun->isExprBody)
+						{
+							funType->returnType = m_tUnit;
+						}
+						funType->isVararg = mutableFun->isVararg;
+
+						for (const auto& [_, type] : mutableFun->parameters)
+						{
+							funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+						}
+
+						if (isGlobal)
+						{
+							m_env.Define(mutableFun->name, funType, true);
+						}
+						else
+						{
+							currentModule->exports[mutableFun->name.ToString()] = funType;
+						}
+
+						classType->methods[originalName.ToString()] = funType;
+					}
+				}
+			}
+
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+			{ // Functions forward declarations
 				m_allFunctionNames.insert(fun->name);
 
 				auto funType = std::make_shared<FunctionType>(fun->name);
@@ -464,6 +602,8 @@ private:
 				}
 			}
 		}
+
+		m_currentPackage = nullptr;
 	}
 
 	static void ExpectAssignable(const std::shared_ptr<SemanticType>& actual, const std::shared_ptr<SemanticType>& expected, const std::string& context)
@@ -505,20 +645,27 @@ private:
 		throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + member.ToString() + "'");
 	}
 
-	static std::shared_ptr<SemanticType> ResolveMethod(const std::shared_ptr<ClassType>& classType, const re::String& member)
+	static std::shared_ptr<SemanticType> ResolveFieldOrMethod(const std::shared_ptr<ClassType>& classType, const re::String& member)
 	{
+		if (const auto it = classType->fields.find(member.ToString()); it != classType->fields.end())
+		{
+			return it->second;
+		}
 		if (const auto it = classType->methods.find(member.ToString()); it != classType->methods.end())
 		{
 			return it->second;
 		}
-		throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no method named '" + member.ToString() + "'");
+
+		throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no field or method named '" + member + "'");
 	}
 
-	void ValidateCallArguments(const ast::CallExpr* node, const std::shared_ptr<FunctionType>& funType)
+	void ValidateCallArguments(const ast::CallExpr* node, const std::shared_ptr<FunctionType>& funType, bool isMethodCall = false)
 	{
+		const std::size_t thisOffset = isMethodCall ? 1 : 0;
+
 		if (funType->isVararg)
 		{
-			const std::size_t fixedParams = funType->paramTypes.size() - 1;
+			const std::size_t fixedParams = funType->paramTypes.size() - 1 - thisOffset;
 			if (node->arguments.size() < fixedParams)
 			{
 				throw std::runtime_error("Semantic Error: Not enough arguments for vararg function");
@@ -528,7 +675,7 @@ private:
 			mutableNode->isVarargCall = true;
 			mutableNode->varargCount = node->arguments.size() - fixedParams;
 		}
-		else if (node->arguments.size() != funType->paramTypes.size())
+		else if (node->arguments.size() + thisOffset != funType->paramTypes.size())
 		{
 			throw std::runtime_error("Semantic Error: Argument count mismatch");
 		}
@@ -537,9 +684,9 @@ private:
 		{
 			const auto argType = Evaluate(node->arguments[i].get());
 
-			std::shared_ptr<SemanticType> expectedType = (funType->isVararg && i >= funType->paramTypes.size() - 1)
+			std::shared_ptr<SemanticType> expectedType = (funType->isVararg && i + thisOffset >= funType->paramTypes.size() - 1)
 				? funType->paramTypes.back()
-				: funType->paramTypes[i];
+				: funType->paramTypes[i + thisOffset];
 
 			ExpectAssignable(argType, expectedType, "argument " + std::to_string(i + 1));
 		}
@@ -630,6 +777,14 @@ private:
 			if (const Symbol* sym = m_env.Resolve(simpleType->name))
 			{
 				return sym->type;
+			}
+
+			if (m_currentPackage)
+			{
+				if (const auto it = m_currentPackage->exports.find(simpleType->name.ToString()); it != m_currentPackage->exports.end())
+				{
+					return it->second;
+				}
 			}
 
 			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name.ToString() + "'");

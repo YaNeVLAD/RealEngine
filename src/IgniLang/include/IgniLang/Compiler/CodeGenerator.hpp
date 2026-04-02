@@ -48,6 +48,17 @@ public:
 			{
 				globalFuncs.insert(fun);
 			}
+			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
+			{
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto memberFun = dynamic_cast<const ast::FunDecl*>(member.get()))
+					{
+						globalFuncs.insert(memberFun);
+					}
+				}
+			}
+			// --------------------------
 		}
 
 		for (const ast::FunDecl* fun : m_flatFunctions)
@@ -59,6 +70,28 @@ public:
 			else
 			{
 				m_funcAsmNames[fun] = fun->name + "_fn_" + std::to_string(funcId++);
+			}
+		}
+
+		m_out << "// --- Type Definitions ---\n";
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
+			{
+				m_out << "TYPE \"" << classDecl->name << "\"\n";
+
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+					{
+						m_out << "    FIELD \"" << varDecl->name << "\"\n";
+					}
+					else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+					{
+						m_out << "    FIELD \"" << valDecl->name << "\"\n";
+					}
+				}
+				m_out << "END_TYPE\n\n";
 			}
 		}
 
@@ -213,10 +246,70 @@ public:
 			}
 			m_out << "CALL_METHOD \"set\" 2\n";
 		}
+		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
+		{
+			if (memAccess->object)
+			{
+				memAccess->object->Accept(*this);
+			}
+			if (node->value)
+			{
+				node->value->Accept(*this);
+			}
+			m_out << "SET_PROPERTY \"" << memAccess->member << "\"\n";
+			m_out << "CONST 0\n";
+		}
 	}
 
 	void Visit(const ast::CallExpr* node) override
 	{
+		if (node->isConstructorCall)
+		{
+			re::String className;
+
+			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+			{
+				className = id->name;
+			}
+			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+			{
+				className = memAccess->member;
+			}
+
+			m_out << "NEW \"" << className << "\"\n";
+			return;
+		}
+
+		if (!node->staticMethodTarget.Empty())
+		{
+			if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()); memberAccess->object)
+			{
+				memberAccess->object->Accept(*this);
+			}
+
+			// 2. Кладем остальные аргументы
+			for (const auto& arg : node->arguments)
+			{
+				if (arg)
+				{
+					arg->Accept(*this);
+				}
+			}
+
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
+			// Call function with one extra argument (this)
+			m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+			return;
+		}
+
 		if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
 		{
 			if (memberAccess->object)

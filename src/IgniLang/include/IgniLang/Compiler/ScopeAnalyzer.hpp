@@ -177,7 +177,17 @@ public:
 		m_scopeStack.pop_back();
 	}
 
-	// --- Объявления ---
+	void Visit(const ast::ClassDecl* node) override
+	{
+		for (const auto& member : node->members)
+		{
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+			{
+				fun->Accept(*this);
+			}
+		}
+	}
+
 	void Visit(const ast::VarDecl* node) override
 	{
 		if (node->initializer)
