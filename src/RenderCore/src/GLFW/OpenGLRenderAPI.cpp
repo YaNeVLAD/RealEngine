@@ -92,11 +92,11 @@ constexpr auto s_FragmentShader3D = UR"(
     in vec3 v_Normal;
     in vec3 v_FragmentWorldPos;
 
-    uniform vec3 u_AmbientLighting;
-    uniform vec3 u_DiffuseLighting;
-    uniform vec3 u_SpecularLighting;
-    uniform vec3 u_Emission;
-    uniform float u_Shininess;
+    uniform vec3 u_MaterialAmbientLighting;
+    uniform vec3 u_MaterialDiffuseLighting;
+    uniform vec3 u_MaterialSpecularLighting;
+    uniform vec3 u_MaterialEmission;
+    uniform float u_MaterialShininess;
 
 	uniform sampler2D u_Texture;
     uniform int u_HasTexture;
@@ -123,7 +123,7 @@ constexpr auto s_FragmentShader3D = UR"(
 
         if (u_LightType == 0)
 		{ // Directional
-            lightDir = normalize(-u_LightDir);
+            lightDir = normalize(u_LightDir);
         }
 		else
 		{ // Point or Spotlight
@@ -133,7 +133,7 @@ constexpr auto s_FragmentShader3D = UR"(
 
             if (u_LightType == 2)
 			{ // Spotlight
-                float cosAlpha = dot(lightDir, normalize(-u_LightDir));
+                float cosAlpha = dot(lightDir, normalize(u_LightDir));
                 if (cosAlpha > u_LightCutOff)
 				{
 					spotEffect = pow(cosAlpha, u_LightExponent);
@@ -152,22 +152,22 @@ constexpr auto s_FragmentShader3D = UR"(
         }
 
 		// Ambient
-        vec3 ambientLight = u_AmbientLighting;
+        vec3 ambientLight = u_MaterialAmbientLighting;
 
         // Diffuse
-		float diffAngle = max(dot(surfaceNormal, lightDir), 0.0);
-		vec3 diffuseLight = u_DiffuseLighting * diffAngle;
+		float diffuseIntensity = max(dot(surfaceNormal, lightDir), 0.0);
+		vec3 diffuseLight = u_MaterialDiffuseLighting * diffuseIntensity;
 
         // Specular
-		vec3 reflectDir = reflect(-lightDir, surfaceNormal);
-        float specFactor = pow(max(dot(reflectDir, viewDir), 0.0), u_Shininess);
-        vec3 specularLight = u_SpecularLighting * specFactor;
+		vec3 reflectDir = reflect(lightDir, surfaceNormal);
+        float specFactor = pow(max(dot(reflectDir, viewDir), 0.0), u_MaterialShininess);
+        vec3 specularLight = u_MaterialSpecularLighting * specFactor;
 
 		vec3 finalAmbient = ambientLight * surfaceColor.rgb;
        	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect;
        	vec3 finalSpecular = specularLight * attenuation * spotEffect;
 
-		vec3 finalColor = u_Emission + finalAmbient + finalDiffuse + finalSpecular;
+		vec3 finalColor = u_MaterialEmission + finalAmbient + finalDiffuse + finalSpecular;
 
 		o_Color = vec4(finalColor, surfaceColor.a);
     }
@@ -843,7 +843,7 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 		shader->Bind();
 		shader->SetInt("u_LightType", light.type);
 		shader->SetFloat3("u_LightPos", light.position);
-		shader->SetFloat3("u_LightDir", light.direction);
+		shader->SetFloat3("u_LightDir", -light.direction);
 		shader->SetFloat("u_LightConstant", light.constant);
 		shader->SetFloat("u_LightLinear", light.linear);
 		shader->SetFloat("u_LightQuadratic", light.quadratic);
@@ -868,11 +868,11 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 
 	auto bindMaterialToShader = [&](const std::shared_ptr<Shader>& shader) {
 		shader->Bind();
-		shader->SetFloat3("u_AmbientLighting", finalAmbient);
-		shader->SetFloat3("u_DiffuseLighting", finalDiffuse);
-		shader->SetFloat3("u_SpecularLighting", finalSpecular);
-		shader->SetFloat3("u_Emission", matEmis);
-		shader->SetFloat("u_Shininess", material.shininess);
+		shader->SetFloat3("u_MaterialAmbientLighting", finalAmbient);
+		shader->SetFloat3("u_MaterialDiffuseLighting", finalDiffuse);
+		shader->SetFloat3("u_MaterialSpecularLighting", finalSpecular);
+		shader->SetFloat3("u_MaterialEmission", matEmis);
+		shader->SetFloat("u_MaterialShininess", material.shininess);
 
 		glActiveTexture(GL_TEXTURE0);
 		if (material.texture)

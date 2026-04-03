@@ -183,7 +183,7 @@ public:
 		AddLayout<MazeLayout>(Window());
 		AddLayout<PianoLayout>(Window());
 
-		SwitchLayout<MenuLayout>();
+		SwitchLayout<MazeLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override

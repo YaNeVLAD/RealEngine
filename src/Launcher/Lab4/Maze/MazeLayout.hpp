@@ -120,6 +120,12 @@ private:
 
 				if (map[z][x] == '1')
 				{
+					const auto textureIndex = rand() % 6 + 1;
+					const auto texture = m_manager.Get<re::Texture>(re::String("maze/" + std::to_string(textureIndex) + ".png"));
+					re::Material material{
+						.texture = texture,
+					};
+
 					scene.CreateEntity() // Wall
 						.Add<re::ColliderComponent3D>()
 						.Add<re::detail::OpaqueTag>()
@@ -129,6 +135,7 @@ private:
 							.scale = { BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE },
 						})
 						.Add<MazeWallComponent>({ worldX, worldZ, HALF_BLOCK })
+						.Add<re::MaterialComponent>(material)
 						.Add<re::StaticMeshComponent3D>(wallMesh);
 				}
 				else if (map[z][x] == 'P')
@@ -144,10 +151,9 @@ private:
 									   .rotation = { 0.f, 90.f, 0.f },
 								   })
 								   .Add<re::LightComponent>(re::LightComponent::CreateSpotlight(
-									   re::Color{ 255, 255, 240, 255 }, // Слегка теплый свет фонарика
-									   60.0f, // Угол конуса в градусах (GL_SPOT_CUTOFF) [cite: 221, 228]
-									   2.0f // Концентрация света к центру (GL_SPOT_EXPONENT) [cite: 222, 229]
-									   ))
+									   re::Color{ 255, 255, 240, 255 },
+									   60.0f,
+									   2.0f))
 								   .GetEntity();
 				}
 
@@ -176,6 +182,7 @@ private:
 		RE_ASSERT(m_player.Valid(), "You forgot to add a player spawn ('P') on the maze map");
 	}
 
+	re::AssetManager m_manager;
 	re::render::IWindow& m_window;
 	re::ecs::Entity m_player = re::ecs::Entity::INVALID_ID;
 };
