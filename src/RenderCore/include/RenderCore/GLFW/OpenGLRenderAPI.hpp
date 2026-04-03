@@ -3,12 +3,14 @@
 #include <RenderCore/Export.hpp>
 #include <RenderCore/IRenderAPI.hpp>
 #include <RenderCore/Vertex.hpp>
+
+#include <RenderCore/GLFW/Shader.hpp>
+#include <RenderCore/GLFW/VertexArray.hpp>
+
 #include <glm/glm.hpp>
+
 #include <memory>
 #include <vector>
-
-#include "Shader.hpp"
-#include "VertexArray.hpp"
 
 namespace re::render
 {
