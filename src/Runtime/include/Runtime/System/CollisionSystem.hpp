@@ -12,27 +12,23 @@ class CollisionSystem final : public ecs::System
 public:
 	void Update(ecs::Scene& scene, const core::TimeDelta) override
 	{
-		SpatialGrid* grid = nullptr;
-		for (auto&& [entity, gridComp] : *scene.CreateView<PhysicsGridComponent>())
-		{
-			grid = &gridComp.grid;
-			break;
-		}
-		if (!grid)
+		auto* gridComponent = scene.FindComponent<PhysicsGridComponent>();
+		if (!gridComponent)
 		{
 			return;
 		}
+		auto& grid = gridComponent->grid;
 
 		for (auto&& [entity, transform, collider, _] : *scene.CreateView<TransformComponent, ColliderComponent3D, Dirty<TransformComponent>>())
 		{
 			if (collider.m_isInserted)
 			{
-				grid->Remove(entity, collider.m_lastBounds);
+				grid.Remove(entity, collider.m_lastBounds);
 			}
 
 			AABB newBounds = collider.GetWorldBounds(transform);
 
-			grid->Insert(entity, newBounds);
+			grid.Insert(entity, newBounds);
 
 			collider.m_lastBounds = newBounds;
 			collider.m_isInserted = true;

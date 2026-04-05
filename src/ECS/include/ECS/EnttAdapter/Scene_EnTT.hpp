@@ -31,7 +31,7 @@ public:
 
 	void DestroyEntity(const Entity entity)
 	{
-		m_entitiesToDestroy.push_back(entity);
+		m_entitiesToDestroy.emplace(entity);
 	}
 
 	template <typename>
@@ -139,6 +139,54 @@ public:
 		return std::make_shared<EnttViewAdapter<TComponents...>>(m_registry);
 	}
 
+	template <typename... TComponents>
+	EntityWrapper<Scene> FindFirstWith()
+	{
+		if (auto view = m_registry.view<TComponents...>(); view.begin() != view.end())
+		{
+			entt::entity e = *view.begin();
+			return { this, Entity{ static_cast<uint32_t>(e) }, {} };
+		}
+
+		// Возвращаем невалидную сущность (INVALID_ID)
+		return { this, Entity{ Entity::INVALID_ID }, {} };
+	}
+
+	template <typename TComponent>
+	TComponent* FindComponent()
+	{
+		if (const auto view = m_registry.view<TComponent>(); view.begin() != view.end())
+		{
+			return &view.template get<TComponent>(*view.begin());
+		}
+
+		return nullptr;
+	}
+
+	template <typename... TComponents>
+	std::vector<Entity> FindEntitiesWith()
+	{
+		std::vector<Entity> result;
+		auto view = m_registry.view<TComponents...>();
+
+		result.reserve(std::distance(view.begin(), view.end()));
+
+		for (auto entity : view)
+		{
+			result.emplace_back(static_cast<std::uint32_t>(entity));
+		}
+
+		return result;
+	}
+
+	template <typename... TComponents>
+	bool ContainsAny()
+	{
+		auto view = m_registry.view<TComponents...>();
+
+		return view.begin() != view.end();
+	}
+
 	entt::registry& GetRegistry()
 	{
 		return m_registry;
@@ -148,7 +196,7 @@ private:
 	entt::registry m_registry;
 	std::unique_ptr<SystemManager> m_systemManager;
 
-	std::vector<Entity> m_entitiesToDestroy;
+	std::unordered_set<Entity> m_entitiesToDestroy;
 };
 
 } // namespace re::ecs

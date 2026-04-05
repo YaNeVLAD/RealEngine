@@ -8,6 +8,7 @@
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
+#include "Lab4/Arcanoid/ArcanoidLayout.hpp"
 #include "Lab4/Maze/MazeLayout.hpp"
 #include "Lab4/Piano/PianoLayout.hpp"
 
@@ -182,6 +183,7 @@ public:
 		AddLayout<AsteroidsLayout>(Window());
 		AddLayout<MazeLayout>(Window());
 		AddLayout<PianoLayout>(Window());
+		AddLayout<ArcanoidLayout>(Window());
 
 		SwitchLayout<MazeLayout>();
 	}
@@ -226,6 +228,10 @@ public:
 			if (e->key == re::Keyboard::Key::F4)
 			{
 				SwitchLayout<PianoLayout>();
+			}
+			if (e->key == re::Keyboard::Key::F5)
+			{
+				SwitchLayout<ArcanoidLayout>();
 			}
 		}
 	}

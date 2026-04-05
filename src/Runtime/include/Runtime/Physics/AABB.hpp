@@ -12,9 +12,9 @@ struct AABB
 
 	[[nodiscard]] static AABB FromCenterSize(const Vector3f& center, const float size)
 	{
-		const auto sz = Vector3f(size, size, size);
+		const auto halfSize = Vector3f(size, size, size) * 0.5f;
 
-		return { center - sz, center + sz };
+		return { center - halfSize, center + halfSize };
 	}
 
 	[[nodiscard]] static AABB FromCenterExtents(const Vector3f& center, const Vector3f& halfExtents)

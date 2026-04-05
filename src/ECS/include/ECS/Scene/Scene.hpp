@@ -35,7 +35,7 @@ public:
 
 	void DestroyEntity(const Entity entity)
 	{
-		m_entitiesToDestroy.push_back(entity);
+		m_entitiesToDestroy.emplace(entity);
 	}
 
 	template <typename TComponent>
@@ -156,6 +156,59 @@ public:
 		return m_viewManager->CreateView<TComponents...>(*m_componentManager, *m_entityManager);
 	}
 
+	template <typename... TComponents>
+	EntityWrapper<Scene> FindFirstWith()
+	{
+		auto view = CreateView<TComponents...>();
+
+		auto it = view->begin();
+		if (it != view->end())
+		{
+			const Entity entity = std::get<0>(*it);
+			const auto signature = m_entityManager->GetSignature(entity);
+
+			return { this, entity, signature };
+		}
+
+		return { this, Entity::INVALID_ID, {} };
+	}
+
+	template <typename TComponent>
+	TComponent* FindComponent()
+	{
+		auto view = CreateView<TComponent>();
+
+		auto it = view->begin();
+		if (it != view->end())
+		{
+			return &std::get<1>(*it);
+		}
+
+		return nullptr;
+	}
+
+	template <typename... TComponents>
+	std::vector<Entity> FindEntitiesWith()
+	{
+		std::vector<Entity> result;
+		auto view = CreateView<TComponents...>();
+
+		for (auto&& element : *view)
+		{
+			result.push_back(std::get<0>(element));
+		}
+
+		return result;
+	}
+
+	template <typename... TComponents>
+	bool ContainsAny()
+	{
+		auto view = CreateView<TComponents...>();
+
+		return view->begin() != view->end();
+	}
+
 private:
 	template <typename TComponent>
 	void AddComponentImpl(Entity entity, TComponent component)
@@ -181,7 +234,7 @@ private:
 	std::unique_ptr<SystemManager> m_systemManager;
 	std::unique_ptr<ViewManager> m_viewManager;
 
-	std::vector<Entity> m_entitiesToDestroy;
+	std::unordered_set<Entity> m_entitiesToDestroy;
 };
 
 } // namespace re::ecs
