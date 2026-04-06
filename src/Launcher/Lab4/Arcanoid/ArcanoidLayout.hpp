@@ -130,7 +130,7 @@ private:
 
 		scene.CreateEntity()
 			.Add<arcanoid::PaddleComponent>()
-			.Add<re::physics::RigidBody>({ .type = re::physics::BodyType::Kinematic,
+			.Add<re::RigidBodyComponent>({ .type = re::physics::BodyType::Kinematic,
 				.collider = { re::physics::ColliderType::Box, { PaddleWidth * 0.5f, PaddleHeight * 0.5f, PaddleDepth * 0.5f } },
 				.friction = 0.0f,
 				.restitution = 1.0f })
@@ -145,7 +145,7 @@ private:
 
 		scene.CreateEntity()
 			.Add<arcanoid::BallComponent>()
-			.Add<re::physics::RigidBody>({
+			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Dynamic,
 				.collider = { re::physics::ColliderType::Sphere, { 0.f, 0.f, 0.f }, BallRadius },
 				.friction = 0.0f,
@@ -187,7 +187,7 @@ private:
 			.Add<re::TransformComponent>({
 				.position = { -arcanoid::constants::FieldLimitX - WALL_THICKNESS * 0.5f, 0.f, 0.f },
 			})
-			.Add<re::physics::RigidBody>({
+			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Static,
 				.collider = { re::physics::ColliderType::Box, { WALL_THICKNESS * 0.5f, 5.f, 50.f } },
 				.friction = 0.f,
@@ -198,7 +198,7 @@ private:
 			.Add<re::TransformComponent>({
 				.position = { arcanoid::constants::FieldLimitX + WALL_THICKNESS * 0.5f, 0.f, 0.f },
 			})
-			.Add<re::physics::RigidBody>({
+			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Static,
 				.collider = { re::physics::ColliderType::Box, { WALL_THICKNESS * 0.5f, 5.f, 50.f } },
 				.friction = 0.f,
@@ -209,7 +209,7 @@ private:
 			.Add<re::TransformComponent>({
 				.position = { 0.f, 0.f, arcanoid::constants::FieldTopZ - WALL_THICKNESS * 0.5f },
 			})
-			.Add<re::physics::RigidBody>({
+			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Static,
 				.collider = { re::physics::ColliderType::Box, { 50.f, 5.f, WALL_THICKNESS * 0.5f } },
 				.friction = 0.f,
@@ -221,7 +221,7 @@ private:
 			.Add<re::TransformComponent>({
 				.position = { 0.f, 0.f, arcanoid::constants::FieldBottomZ + 2.0f },
 			})
-			.Add<re::physics::RigidBody>({
+			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Static,
 				.collider = { re::physics::ColliderType::Box, { 50.f, 5.f, 2.f } },
 				.isSensor = true,
@@ -257,7 +257,7 @@ private:
 
 				scene.CreateEntity()
 					.Add<arcanoid::BrickComponent>({ .health = hp })
-					.Add<re::physics::RigidBody>({
+					.Add<re::RigidBodyComponent>({
 						.type = re::physics::BodyType::Static,
 						.collider = { re::physics::ColliderType::Box, { BrickWidth * 0.5f, BrickHeight * 0.5f, BrickDepth * 0.5f } },
 						.friction = 0.0f,
