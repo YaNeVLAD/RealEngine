@@ -5,6 +5,7 @@
 #include <Core/Math/Vector3.hpp>
 #include <Core/String.hpp>
 #include <ECS/Scene.hpp>
+#include <Physics/Types.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
 #include <RenderCore/Material.hpp>
@@ -12,8 +13,6 @@
 #include <RenderCore/StaticMesh.hpp>
 #include <RenderCore/Texture.hpp>
 #include <RenderCore/Vertex.hpp>
-#include <Runtime/Physics/AABB.hpp>
-#include <Runtime/Physics/SpatialGrid.hpp>
 
 #include <compare>
 #include <utility>
@@ -229,69 +228,12 @@ private:
 	friend class MouseLookSystem;
 };
 
-class CollisionSystem;
-struct ColliderComponent3D
+struct PhysicsEventsComponent
 {
-	Vector3f halfExtents = { 0.5f, 0.5f, 0.5f };
-	Vector3f centerOffset = { 0.f, 0.f, 0.f };
-
-	ColliderComponent3D() = default;
-
-	ColliderComponent3D(const Vector3f halfExtents, const Vector3f centerOffset)
-		: halfExtents(halfExtents)
-		, centerOffset(centerOffset)
-	{
-	}
-
-	[[nodiscard]] static ColliderComponent3D CreateCube(const float size, Vector3f const& offset = { 0.f, 0.f, 0.f })
-	{
-		const float half = size * 0.5f;
-		return { { half, half, half }, offset };
-	}
-
-	[[nodiscard]] static ColliderComponent3D CreateBox(Vector3f const& size, Vector3f const& offset = { 0.f, 0.f, 0.f })
-	{
-		return { size * 0.5f, offset };
-	}
-
-	[[nodiscard]] AABB GetWorldBounds(Vector3f const& worldPos) const
-	{
-		return AABB::FromCenterExtents(worldPos + centerOffset, halfExtents);
-	}
-
-	[[nodiscard]] AABB GetWorldBounds(const TransformComponent& transform) const
-	{
-		const Vector3f scaledHalfExtents = {
-			halfExtents.x * std::abs(transform.scale.x),
-			halfExtents.y * std::abs(transform.scale.y),
-			halfExtents.z * std::abs(transform.scale.z)
-		};
-
-		const Vector3f scaledOffset = {
-			centerOffset.x * transform.scale.x,
-			centerOffset.y * transform.scale.y,
-			centerOffset.z * transform.scale.z
-		};
-
-		return AABB::FromCenterExtents(transform.position + scaledOffset, scaledHalfExtents);
-	}
-
-private:
-	AABB m_lastBounds{};
-	bool m_isInserted = false;
-
-	friend class CollisionSystem;
+	std::vector<physics::CollisionPair> collisions;
 };
 
-struct PhysicsGridComponent
-{
-	explicit PhysicsGridComponent(const float gridCellSize = 3.f)
-		: grid(gridCellSize)
-	{
-	}
-
-	SpatialGrid grid;
-};
+using RigidBodyComponent = physics::RigidBody;
 
 template <typename T>
 using Dirty = detail::DirtyTag<T>;

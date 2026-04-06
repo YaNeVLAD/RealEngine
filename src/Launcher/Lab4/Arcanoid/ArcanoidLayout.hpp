@@ -84,12 +84,13 @@ public:
 
 			if (e->key == re::Keyboard::Key::Space)
 			{
-				for (auto&& [entity, ball] : *scene.CreateView<arcanoid::BallComponent>())
+				for (auto&& [entity, ball, rb] : *scene.CreateView<arcanoid::BallComponent, re::RigidBodyComponent>())
 				{
 					if (ball.isAttachedToPaddle)
 					{
 						ball.isAttachedToPaddle = false;
-						ball.velocity = { 0.0f, 0.0f, -ball.speed };
+						rb.linearVelocity = { 0.0f, 0.0f, -ball.speed };
+						rb.isVelocityDirty = true;
 					}
 				}
 			}
@@ -126,7 +127,10 @@ private:
 
 		scene.CreateEntity()
 			.Add<arcanoid::PaddleComponent>()
-			.Add<re::ColliderComponent3D>()
+			.Add<re::physics::RigidBody>({ .type = re::physics::BodyType::Kinematic,
+				.collider = { re::physics::ColliderType::Box, { PaddleWidth * 0.5f, PaddleHeight * 0.5f, PaddleDepth * 0.5f } },
+				.friction = 0.0f,
+				.restitution = 1.0f })
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
@@ -138,19 +142,15 @@ private:
 
 		scene.CreateEntity()
 			.Add<arcanoid::BallComponent>()
-			.Add<re::ColliderComponent3D>()
-			.Add<re::detail::OpaqueTag>()
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::TransformComponent>({
-				.position = BallSpawnPos,
-				.scale = { BallRadius * 2.f, BallRadius * 2.f, BallRadius * 2.f },
+			.Add<re::physics::RigidBody>({
+				.type = re::physics::BodyType::Dynamic,
+				.collider = { re::physics::ColliderType::Sphere, { 0.f, 0.f, 0.f }, BallRadius },
+				.friction = 0.0f,
+				.restitution = 1.0f,
+				.gravityFactor = 0.0f,
+				.linearDamping = 0.f,
+				.lockRotation = true,
 			})
-			.Add<re::MaterialComponent>(re::Material{ .texture = ballTex })
-			.Add<re::StaticMeshComponent3D>(m_cubeMesh);
-
-		scene.CreateEntity()
-			.Add<arcanoid::BallComponent>()
-			.Add<re::ColliderComponent3D>()
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
@@ -164,17 +164,64 @@ private:
 	void CreateBackground()
 	{
 		auto& scene = GetScene();
-		const auto bgTex = m_manager.Get<re::Texture>("textures/background.png");
+		const auto bgTex = m_manager.Get<re::Texture>("arcanoid/background.png");
 
 		scene.CreateEntity()
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
 				.position = arcanoid::constants::BgPos,
+				.rotation = { 0.f, 180.f, 0.f },
 				.scale = arcanoid::constants::BgScale,
 			})
 			.Add<re::MaterialComponent>(re::Material{ .texture = bgTex })
 			.Add<re::StaticMeshComponent3D>(m_cubeMesh);
+
+		constexpr float WALL_THICKNESS = 5.0f;
+
+		scene.CreateEntity()
+			.Add<re::TransformComponent>({
+				.position = { -arcanoid::constants::FieldLimitX - WALL_THICKNESS * 0.5f, 0.f, 0.f },
+			})
+			.Add<re::physics::RigidBody>({
+				.type = re::physics::BodyType::Static,
+				.collider = { re::physics::ColliderType::Box, { WALL_THICKNESS * 0.5f, 5.f, 50.f } },
+				.friction = 0.f,
+				.restitution = 1.0f,
+			});
+
+		scene.CreateEntity()
+			.Add<re::TransformComponent>({
+				.position = { arcanoid::constants::FieldLimitX + WALL_THICKNESS * 0.5f, 0.f, 0.f },
+			})
+			.Add<re::physics::RigidBody>({
+				.type = re::physics::BodyType::Static,
+				.collider = { re::physics::ColliderType::Box, { WALL_THICKNESS * 0.5f, 5.f, 50.f } },
+				.friction = 0.f,
+				.restitution = 1.0f,
+			});
+
+		scene.CreateEntity()
+			.Add<re::TransformComponent>({
+				.position = { 0.f, 0.f, arcanoid::constants::FieldTopZ - WALL_THICKNESS * 0.5f },
+			})
+			.Add<re::physics::RigidBody>({
+				.type = re::physics::BodyType::Static,
+				.collider = { re::physics::ColliderType::Box, { 50.f, 5.f, WALL_THICKNESS * 0.5f } },
+				.friction = 0.f,
+				.restitution = 1.0f,
+			});
+
+		scene.CreateEntity()
+			.Add<arcanoid::BottomDeathZoneTag>()
+			.Add<re::TransformComponent>({
+				.position = { 0.f, 0.f, arcanoid::constants::FieldBottomZ + 2.0f },
+			})
+			.Add<re::physics::RigidBody>({
+				.type = re::physics::BodyType::Static,
+				.collider = { re::physics::ColliderType::Box, { 50.f, 5.f, 2.f } },
+				.isSensor = true,
+			});
 	}
 
 	void LoadLevel(const int level = 1)
@@ -192,8 +239,8 @@ private:
 			ball.isAttachedToPaddle = true;
 		}
 
-		const auto tex1 = m_manager.Get<re::Texture>("textures/brick_hp1.png");
-		const auto tex2 = m_manager.Get<re::Texture>("textures/brick_hp2.png");
+		const auto tex1 = m_manager.Get<re::Texture>("arcanoid/brick_hp1.png");
+		const auto tex2 = m_manager.Get<re::Texture>("arcanoid/brick_hp2.png");
 
 		const int rows = BaseRows + level;
 
@@ -206,7 +253,12 @@ private:
 
 				scene.CreateEntity()
 					.Add<arcanoid::BrickComponent>({ .health = hp })
-					.Add<re::ColliderComponent3D>()
+					.Add<re::physics::RigidBody>({
+						.type = re::physics::BodyType::Static,
+						.collider = { re::physics::ColliderType::Box, { BrickWidth * 0.5f, BrickHeight * 0.5f, BrickDepth * 0.5f } },
+						.friction = 0.0f,
+						.restitution = 1.0f,
+					})
 					.Add<re::detail::OpaqueTag>()
 					.Add<re::Dirty<re::TransformComponent>>()
 					.Add<re::TransformComponent>({

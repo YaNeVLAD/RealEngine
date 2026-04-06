@@ -45,6 +45,8 @@ public:
 		{
 			return it != other.it;
 		}
+
+		bool operator==(const Iterator& other) const = default;
 	};
 
 	Iterator begin()

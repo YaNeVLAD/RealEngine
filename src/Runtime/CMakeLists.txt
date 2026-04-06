@@ -8,6 +8,7 @@ target_link_libraries(ReRuntime
         ReRenderCore
         ReRender2D
         ReRender3D
+        RePhysics
 )
 
 target_compile_definitions(ReRuntime PRIVATE RE_RUNTIME_EXPORTS)

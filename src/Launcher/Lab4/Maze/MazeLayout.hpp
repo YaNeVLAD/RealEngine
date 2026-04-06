@@ -127,7 +127,10 @@ private:
 					};
 
 					scene.CreateEntity() // Wall
-						.Add<re::ColliderComponent3D>()
+						.Add<re::RigidBodyComponent>({
+							.type = re::physics::BodyType::Static,
+							.collider = { re::physics::ColliderType::Box, { HALF_BLOCK, HALF_BLOCK, HALF_BLOCK } },
+						})
 						.Add<re::detail::OpaqueTag>()
 						.Add<re::Dirty<re::TransformComponent>>()
 						.Add<re::TransformComponent>({
@@ -140,25 +143,29 @@ private:
 				}
 				else if (map[z][x] == 'P')
 				{
-					m_player = scene.CreateEntity() // Player
-								   .Add<re::ColliderComponent3D>()
-								   .Add<MazePlayerStateComponent>()
-								   .Add<re::CameraComponent>({ .isPrimal = true, .fov = 60.f })
-								   .Add<re::Dirty<re::TransformComponent>>()
-								   .Add<re::MouseLookComponent>()
-								   .Add<re::TransformComponent>({
-									   .position = { worldX, 0.f, worldZ },
-									   .rotation = { 0.f, 90.f, 0.f },
-								   })
-								   .Add<re::LightComponent>(re::LightComponent::CreateSpotlight(
-									   re::Color{ 255, 255, 240, 255 },
-									   60.0f,
-									   2.0f))
-								   .GetEntity();
+					auto playerWrapper = scene.FindFirstWith<re::CameraComponent>();
+					m_player = playerWrapper.GetEntity();
+
+					playerWrapper
+						.Add<re::RigidBodyComponent>({ .type = re::physics::BodyType::Dynamic,
+							.collider = { re::physics::ColliderType::Capsule, { 0.f, 0.f, 0.f }, 0.4f, 3.0f },
+							.mass = 80.0f,
+							.friction = 0.0f,
+							.lockRotation = true })
+						.Add<MazePlayerStateComponent>()
+						.Add<re::MouseLookComponent>()
+						.Add<re::LightComponent>(re::LightComponent::CreateSpotlight(re::Color{ 255, 255, 240, 255 }, 60.0f, 2.0f));
+
+					auto& transform = scene.GetComponent<re::TransformComponent>(m_player);
+					transform.position = { worldX, 0.f, worldZ };
+					scene.MakeDirty<re::TransformComponent>(m_player);
 				}
 
 				scene.CreateEntity() // Floor
-					.Add<re::ColliderComponent3D>()
+					.Add<re::RigidBodyComponent>({
+						.type = re::physics::BodyType::Static,
+						.collider = { re::physics::ColliderType::Box, { HALF_BLOCK, HALF_BLOCK, HALF_BLOCK } },
+					})
 					.Add<re::detail::OpaqueTag>()
 					.Add<re::Dirty<re::TransformComponent>>()
 					.Add<re::TransformComponent>({
@@ -168,7 +175,6 @@ private:
 					.Add<re::StaticMeshComponent3D>(floorMesh);
 
 				scene.CreateEntity() // Ceil
-					.Add<re::ColliderComponent3D>()
 					.Add<re::detail::OpaqueTag>()
 					.Add<re::Dirty<re::TransformComponent>>()
 					.Add<re::TransformComponent>({

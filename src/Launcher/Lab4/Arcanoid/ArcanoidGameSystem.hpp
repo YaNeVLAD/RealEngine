@@ -1,54 +1,77 @@
 #pragma once
 
+#include "Components.hpp"
+#include "Constants.hpp"
 #include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <Runtime/Components.hpp>
-#include <Runtime/Physics/SpatialGrid.hpp>
-
-#include "Components.hpp"
-#include "Constants.hpp"
-
-#include <algorithm>
-#include <cmath>
-#include <vector>
 
 namespace arcanoid
 {
+
+struct BottomDeathZoneTag
+{
+};
 
 class ArcanoidGameSystem final : public re::ecs::System
 {
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		auto* gridComponent = scene.FindComponent<re::PhysicsGridComponent>();
-		if (!gridComponent)
-		{
-			return;
-		}
-		const auto& grid = gridComponent->grid;
-
 		UpdatePaddle(scene, dt);
-		UpdateBall(scene, grid, dt);
+		HandleCollisions(scene);
+		UpdateBallAttached(scene);
+		KeepBallSpeedConstant(scene);
 	}
 
 private:
+	static void KeepBallSpeedConstant(re::ecs::Scene& scene)
+	{
+		for (auto&& [entity, ball, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
+		{
+			if (ball.isAttachedToPaddle)
+			{
+				continue;
+			}
+
+			const re::Vector3f currentVel = rb.linearVelocity;
+			const float currentSpeed = std::sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
+			if (currentSpeed > std::numeric_limits<float>::epsilon())
+			{
+				// Если скорость отличается от желаемой (ball.speed)
+				if (std::abs(currentSpeed - ball.speed) > 0.01f)
+				{
+					rb.linearVelocity.x = (currentVel.x / currentSpeed) * ball.speed;
+					rb.linearVelocity.z = (currentVel.z / currentSpeed) * ball.speed;
+					rb.isVelocityDirty = true;
+				}
+			}
+			else
+			{
+				rb.linearVelocity = { 0.0f, 0.0f, -ball.speed };
+				rb.isVelocityDirty = true;
+			}
+		}
+	}
+
 	static void UpdatePaddle(re::ecs::Scene& scene, const float dt)
 	{
-		for (auto&& [entity, transform, paddle] : *scene.CreateView<re::TransformComponent, PaddleComponent>())
+		for (auto&& [entity, transform, paddle, rb] : *scene.CreateView<re::TransformComponent, PaddleComponent, re::physics::RigidBody>())
 		{
-			if (paddle.moveDir != 0)
+			rb.linearVelocity.x = paddle.moveDir * paddle.speed;
+			rb.isVelocityDirty = true;
+
+			const float limit = constants::FieldLimitX - (paddle.width * 0.5f);
+			if (transform.position.x > limit || transform.position.x < -limit)
 			{
-				transform.position.x += paddle.moveDir * paddle.speed * dt;
-
-				const float limit = constants::FieldLimitX - (paddle.width * 0.5f);
 				transform.position.x = std::clamp(transform.position.x, -limit, limit);
-
+				rb.position = transform.position;
 				scene.MakeDirty<re::TransformComponent>(entity);
 			}
 		}
 	}
 
-	static void UpdateBall(re::ecs::Scene& scene, const re::SpatialGrid& grid, const float dt)
+	static void UpdateBallAttached(re::ecs::Scene& scene)
 	{
 		re::Vector3f paddlePos;
 		bool paddleFound = false;
@@ -60,104 +83,88 @@ private:
 			break;
 		}
 
-		for (auto&& [entity, transform, ball] : *scene.CreateView<re::TransformComponent, BallComponent>())
+		for (auto&& [entity, transform, ball, rb] : *scene.CreateView<re::TransformComponent, BallComponent, re::physics::RigidBody>())
 		{
 			if (ball.isAttachedToPaddle && paddleFound)
 			{
 				transform.position.x = paddlePos.x;
 				transform.position.z = paddlePos.z - 1.0f;
+
+				rb.linearVelocity = { 0.f, 0.f, 0.f };
+				rb.isVelocityDirty = true;
+
 				scene.MakeDirty<re::TransformComponent>(entity);
+			}
+		}
+	}
+
+	static void HandleCollisions(re::ecs::Scene& scene)
+	{
+		const auto eventView = scene.CreateView<re::PhysicsEventsComponent>();
+		if (eventView->begin() == eventView->end())
+		{
+			return;
+		}
+
+		auto& [collisions] = scene.GetComponent<re::PhysicsEventsComponent>(std::get<0>(*eventView->begin()));
+
+		for (const auto& collision : collisions)
+		{
+			const re::ecs::Entity entityA{ collision.entityA };
+			const re::ecs::Entity entityB{ collision.entityB };
+
+			// Проверяем, жив ли еще объект (чтобы не обрабатывать одну пулю дважды)
+			if (!scene.IsValid(entityA) || !scene.IsValid(entityB))
+			{
 				continue;
 			}
 
-			re::Vector3f nextPos = transform.position;
-			nextPos.x += ball.velocity.x * dt;
-			nextPos.z += ball.velocity.z * dt;
+			CheckBallCollision(scene, entityA, entityB);
+			CheckBallCollision(scene, entityB, entityA); // Проверяем в обе стороны
+		}
+	}
 
-			if (nextPos.x > constants::FieldLimitX || nextPos.x < -constants::FieldLimitX)
+	static void CheckBallCollision(re::ecs::Scene& scene, re::ecs::Entity ballEntity, re::ecs::Entity otherEntity)
+	{
+		if (!scene.HasComponent<BallComponent>(ballEntity))
+		{
+			return;
+		}
+
+		auto& ball = scene.GetComponent<BallComponent>(ballEntity);
+		auto& ballRb = scene.GetComponent<re::physics::RigidBody>(ballEntity);
+		auto& ballTrans = scene.GetComponent<re::TransformComponent>(ballEntity);
+
+		// 1. Мяч + Кирпич
+		if (scene.HasComponent<BrickComponent>(otherEntity))
+		{
+			auto& brick = scene.GetComponent<BrickComponent>(otherEntity);
+			brick.health--;
+			if (brick.health <= 0)
 			{
-				ball.velocity.x = -ball.velocity.x;
-				nextPos.x = transform.position.x;
+				scene.DestroyEntity(otherEntity); // EnTT сам удалит Jolt Body!
+				AddScore(scene, brick.scoreValue);
 			}
-			if (nextPos.z < constants::FieldTopZ)
-			{
-				ball.velocity.z = -ball.velocity.z;
-				nextPos.z = transform.position.z;
-			}
-			if (nextPos.z > constants::FieldBottomZ)
-			{
-				LoseLife(scene);
-				return;
-			}
+		}
+		// 2. Мяч + Ракетка (Особый аркадный отскок)
+		else if (scene.HasComponent<PaddleComponent>(otherEntity))
+		{
+			auto& paddle = scene.GetComponent<PaddleComponent>(otherEntity);
+			auto& paddleTrans = scene.GetComponent<re::TransformComponent>(otherEntity);
 
-			re::AABB ballBounds = re::AABB::FromCenterSize(nextPos, ball.radius * 2.0f);
-			ballBounds = ballBounds.Swept(ball.velocity * dt);
+			// Jolt уже отбил мяч по оси Z, мы только корректируем ось X в зависимости от места удара
+			const float hitFactor = (ballTrans.position.x - paddleTrans.position.x) / (paddle.width * 0.5f);
 
-			std::vector<re::ecs::Entity> potentialColliders = grid.Query(ballBounds);
-			bool collisionHandled = false;
+			ballRb.linearVelocity.z = -std::abs(ballRb.linearVelocity.z); // Гарантируем отскок вверх
+			ballRb.linearVelocity.x = hitFactor * ball.speed * constants::PaddleBounceFactor;
 
-			for (const re::ecs::Entity colliderEntity : potentialColliders)
-			{
-				if (!scene.HasComponent<re::ColliderComponent3D>(colliderEntity) || !scene.HasComponent<re::TransformComponent>(colliderEntity))
-				{
-					continue;
-				}
-
-				const auto& colliderTrans = scene.GetComponent<re::TransformComponent>(colliderEntity);
-				const auto& colliderComp = scene.GetComponent<re::ColliderComponent3D>(colliderEntity);
-
-				if (re::AABB colliderBounds = colliderComp.GetWorldBounds(colliderTrans); ballBounds.Intersects(colliderBounds))
-				{
-					if (scene.HasComponent<PaddleComponent>(colliderEntity))
-					{
-						const auto& paddle = scene.GetComponent<PaddleComponent>(colliderEntity);
-
-						ball.velocity.z = -std::abs(ball.velocity.z);
-
-						const float hitFactor = (nextPos.x - colliderBounds.Center().x) / (paddle.width * 0.5f);
-						ball.velocity.x = hitFactor * ball.speed * constants::PaddleBounceFactor;
-
-						NormalizeSpeed(ball.velocity, ball.speed);
-
-						nextPos.z = colliderTrans.position.z - 1.0f;
-
-						collisionHandled = true;
-						break;
-					}
-					if (scene.HasComponent<BrickComponent>(colliderEntity))
-					{
-						auto& brick = scene.GetComponent<BrickComponent>(colliderEntity);
-
-						const float dx = nextPos.x - colliderBounds.Center().x;
-						const float dz = nextPos.z - colliderBounds.Center().z;
-
-						if (std::abs(dx) > std::abs(dz))
-						{
-							ball.velocity.x = -ball.velocity.x;
-						}
-						else
-						{
-							ball.velocity.z = -ball.velocity.z;
-						}
-
-						brick.health--;
-						if (brick.health <= 0)
-						{
-							scene.DestroyEntity(colliderEntity);
-							AddScore(scene, brick.scoreValue);
-						}
-						collisionHandled = true;
-						break;
-					}
-				}
-			}
-
-			if (!collisionHandled)
-			{
-				transform.position = nextPos;
-			}
-
-			scene.MakeDirty<re::TransformComponent>(entity);
+			NormalizeSpeed(ballRb.linearVelocity, ball.speed);
+			ballRb.isVelocityDirty = true;
+		}
+		// 3. Мяч + Зона Смерти
+		else if (scene.HasComponent<BottomDeathZoneTag>(otherEntity))
+		{
+			LoseLife(scene);
 		}
 	}
 

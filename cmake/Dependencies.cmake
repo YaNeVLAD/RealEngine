@@ -35,6 +35,23 @@ FetchContent_MakeAvailable(tinyobjloader)
 target_compile_definitions(tinyobjloader INTERFACE TINYOBJLOADER_DISABLE_FAST_FLOAT)
 target_compile_definitions(tinyobjloader PRIVATE TINYOBJLOADER_DISABLE_FAST_FLOAT)
 
+# JoltPhysics
+FetchContent_Declare(
+        Jolt
+        GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+        GIT_TAG v5.5.0
+        SOURCE_SUBDIR "Build"
+)
+
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE INTERNAL "Use dynamic MSVC runtime for Jolt")
+set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "Disable Jolt unit tests")
+set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "Disable Jolt hello world")
+set(TARGET_PERFORMANCE_TEST OFF CACHE INTERNAL "Disable Jolt performance test")
+set(TARGET_SAMPLES OFF CACHE INTERNAL "Disable Jolt samples")
+set(TARGET_VIEWER OFF CACHE INTERNAL "Disable Jolt viewer")
+
+FetchContent_MakeAvailable(Jolt)
+
 if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     FetchContent_Declare(
             SFML

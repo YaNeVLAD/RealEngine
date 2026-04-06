@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Runtime/Export.hpp>
+
 #include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <RenderCore/Event.hpp>
@@ -10,7 +12,7 @@
 namespace re
 {
 
-class MouseLookSystem final : public ecs::System
+class RE_RUNTIME_API MouseLookSystem final : public ecs::System
 {
 public:
 	void Update(ecs::Scene& scene, core::TimeDelta) override

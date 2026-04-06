@@ -1,12 +1,13 @@
 #include <Runtime/Application.hpp>
 
 #include <Core/Utils.hpp>
+#include <Physics/Core.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
 #include <Runtime/Internal/RenderSystem3D.hpp>
-#include <Runtime/System/CollisionSystem.hpp>
+#include <Runtime/System/PhysicsSystem.hpp>
 
 #if defined(RE_USE_SFML_RENDER)
 #include <RenderCore/SFML/SFMLRenderAPI.hpp>
@@ -80,6 +81,8 @@ Application::Application(std::string const& name)
 {
 	m_window = CreateWindow(name, 1920u, 1080u);
 	detail::Input::Init(m_window->GetNativeHandle());
+
+	physics::Init();
 
 	AddLayout<DefaultTag>();
 	ChangeToPendingLayout();
@@ -206,8 +209,9 @@ void Application::SetupScene(Layout& layout) const
 {
 	auto& scene = layout.GetScene();
 	scene
-		.AddSystem<CollisionSystem>()
-		.WithRead<TransformComponent>()
+		.AddSystem<PhysicsSystem>(scene)
+		.WithRead<TransformComponent, physics::RigidBody>()
+		.WithWrite<TransformComponent>()
 		.RunOnMainThread();
 
 	scene
@@ -228,8 +232,6 @@ void Application::SetupScene(Layout& layout) const
 			DynamicTextureComponent>()
 		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
-
-	scene.CreateEntity().Add<PhysicsGridComponent>();
 
 	scene
 		.CreateEntity()
@@ -284,6 +286,7 @@ void Application::ChangeToPendingLayout()
 void Application::Shutdown()
 {
 	m_isRunning = false;
+	physics::Shutdown();
 }
 
 ecs::Scene& Application::CurrentScene() const
