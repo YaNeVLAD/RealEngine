@@ -89,6 +89,81 @@ public:
 		return { std::move(vertices), std::move(indices) };
 	}
 
+	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateSphere(
+		const Color& color,
+		const float radius = 0.5f,
+		const std::uint32_t sectorCount = 36,
+		const std::uint32_t stackCount = 18)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<std::uint32_t> indices;
+
+		vertices.reserve((stackCount + 1) * (sectorCount + 1));
+		indices.reserve(stackCount * sectorCount * 6);
+
+		const float pi = std::acos(-1.0f);
+		const float sectorStep = 2.0f * pi / static_cast<float>(sectorCount);
+		const float stackStep = pi / static_cast<float>(stackCount);
+		const float lengthInv = 1.0f / radius;
+
+		for (std::uint32_t i = 0; i <= stackCount; ++i)
+		{
+			const float stackAngle = pi / 2.0f - static_cast<float>(i) * stackStep;
+			const float xy = radius * std::cos(stackAngle);
+			const float z = radius * std::sin(stackAngle);
+
+			for (std::uint32_t j = 0; j <= sectorCount; ++j)
+			{
+				const float sectorAngle = static_cast<float>(j) * sectorStep;
+
+				const float x = xy * std::cos(sectorAngle);
+				const float y = xy * std::sin(sectorAngle);
+
+				const float nx = x * lengthInv;
+				const float ny = y * lengthInv;
+				const float nz = z * lengthInv;
+
+				const float u = static_cast<float>(j) / static_cast<float>(sectorCount);
+				const float v = static_cast<float>(i) / static_cast<float>(stackCount);
+
+				Vertex vertex;
+				vertex.position = { x, y, z };
+				vertex.normal = { nx, nz, ny };
+				vertex.color = color;
+				vertex.texCoord = { u, v };
+				vertex.texIndex = -1.f;
+				vertex.position = { x, z, y };
+
+				vertices.push_back(vertex);
+			}
+		}
+
+		for (std::uint32_t i = 0; i < stackCount; ++i)
+		{
+			std::uint32_t k1 = i * (sectorCount + 1);
+			std::uint32_t k2 = k1 + sectorCount + 1;
+
+			for (std::uint32_t j = 0; j < sectorCount; ++j, ++k1, ++k2)
+			{
+				if (i != 0)
+				{
+					indices.push_back(k1);
+					indices.push_back(k1 + 1);
+					indices.push_back(k2);
+				}
+
+				if (i != (stackCount - 1))
+				{
+					indices.push_back(k1 + 1);
+					indices.push_back(k2 + 1);
+					indices.push_back(k2);
+				}
+			}
+		}
+
+		return { std::move(vertices), std::move(indices) };
+	}
+
 	static std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> CreateOctahedron(const bool isWireframe = false)
 	{
 		std::vector<Vertex> vertices;

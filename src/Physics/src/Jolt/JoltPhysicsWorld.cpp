@@ -185,12 +185,10 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		shape = new JPH::SphereShape(desc.collider.radius);
 		break;
 	case ColliderType::Capsule:
-		// Jolt ожидает полу-высоту цилиндрической части
 		shape = new JPH::CapsuleShape(desc.collider.height * 0.5f, desc.collider.radius);
 		break;
 	}
 
-	// 2. Определяем тип движения и слой
 	auto motionType = JPH::EMotionType::Dynamic;
 	auto layer = Layers::MOVING;
 
@@ -204,13 +202,11 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		motionType = JPH::EMotionType::Kinematic;
 	}
 
-	// Конвертация Euler (в градусах) в Jolt Quat (радианы)
 	const float radX = JPH::DegreesToRadians(desc.rotationEuler.x);
 	const float radY = JPH::DegreesToRadians(desc.rotationEuler.y);
 	const float radZ = JPH::DegreesToRadians(desc.rotationEuler.z);
 	const JPH::Quat rotation = JPH::Quat::sEulerAngles(JPH::Vec3(radX, radY, radZ));
 
-	// 3. Создаем настройки
 	JPH::BodyCreationSettings bodySettings(
 		shape,
 		JPH::Vec3(desc.position.x, desc.position.y, desc.position.z),
@@ -237,7 +233,6 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		bodySettings.mMassPropertiesOverride.mMass = desc.mass;
 	}
 
-	// 4. Создаем и добавляем тело в мир
 	const JPH::BodyID bodyID = bodyInterface.CreateAndAddBody(bodySettings, JPH::EActivation::Activate);
 
 	return bodyID.GetIndexAndSequenceNumber();

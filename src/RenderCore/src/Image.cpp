@@ -135,10 +135,10 @@ bool Image::IsEmpty() const
 
 bool Image::LoadFromFile(String const& filePath)
 {
-	int w, h, channels;
+	int w, h, channelsInFile;
 	stbi_uc* pixels = stbi_load(
 		filePath.ToString().data(),
-		&w, &h, &channels,
+		&w, &h, &channelsInFile,
 		STBI_rgb_alpha);
 
 	if (!pixels)
@@ -148,7 +148,7 @@ bool Image::LoadFromFile(String const& filePath)
 		return false;
 	}
 
-	m_channels = static_cast<std::uint8_t>(channels);
+	m_channels = STBI_rgb_alpha;
 
 	Resize(w, h);
 	std::memcpy(m_data.data(), pixels, w * h * sizeof(Color));

@@ -47,6 +47,9 @@ public:
 		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::White);
 		m_cubeMesh = std::make_shared<re::StaticMesh>(cubeV, cubeI);
 
+		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::White);
+		m_sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
+
 		CreateBackground();
 		CreatePlayer();
 		LoadLevel(1);
@@ -123,7 +126,7 @@ private:
 		using namespace arcanoid::constants;
 
 		const auto paddleTex = m_manager.Get<re::Texture>("textures/paddle.png");
-		const auto ballTex = m_manager.Get<re::Texture>("textures/ball.png");
+		const auto ballTex = m_manager.Get<re::Texture>("arcanoid/ball.png");
 
 		scene.CreateEntity()
 			.Add<arcanoid::PaddleComponent>()
@@ -155,10 +158,11 @@ private:
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
 				.position = BallSpawnPos,
+				.rotation = { 0.f, 135.f, 0.f },
 				.scale = { BallRadius * 2.f, BallRadius * 2.f, BallRadius * 2.f },
 			})
 			.Add<re::MaterialComponent>(re::Material{ .texture = ballTex })
-			.Add<re::StaticMeshComponent3D>(m_cubeMesh);
+			.Add<re::StaticMeshComponent3D>(m_sphereMesh);
 	}
 
 	void CreateBackground()
@@ -274,5 +278,6 @@ private:
 	re::render::IWindow& m_window;
 	re::AssetManager m_manager;
 	std::shared_ptr<re::StaticMesh> m_cubeMesh;
+	std::shared_ptr<re::StaticMesh> m_sphereMesh;
 	re::ecs::Entity m_gameStateEntity = re::ecs::Entity::INVALID_ID;
 };
