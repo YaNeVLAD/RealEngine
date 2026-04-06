@@ -148,7 +148,7 @@ private:
 
 					playerWrapper
 						.Add<re::RigidBodyComponent>({ .type = re::physics::BodyType::Dynamic,
-							.collider = { re::physics::ColliderType::Capsule, { 0.f, 0.f, 0.f }, 0.4f, 3.0f },
+							.collider = { .type = re::physics::ColliderType::Capsule, .radius = 0.4f, .height = 1.0f },
 							.mass = 80.0f,
 							.friction = 0.0f,
 							.lockRotation = true })

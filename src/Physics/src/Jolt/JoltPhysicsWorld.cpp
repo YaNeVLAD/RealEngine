@@ -10,6 +10,8 @@
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
@@ -178,15 +180,73 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 	// 1. Создаем форму
 	switch (desc.collider.type)
 	{
-	case ColliderType::Box:
-		shape = new JPH::BoxShape(JPH::Vec3(desc.collider.halfExtends.x, desc.collider.halfExtends.y, desc.collider.halfExtends.z));
+	case ColliderType::Box: {
+		JPH::Vec3 scaledExtents(
+			desc.collider.halfExtends.x * std::abs(desc.scale.x),
+			desc.collider.halfExtends.y * std::abs(desc.scale.y),
+			desc.collider.halfExtends.z * std::abs(desc.scale.z));
+		shape = new JPH::BoxShape(scaledExtents);
+
 		break;
-	case ColliderType::Sphere:
-		shape = new JPH::SphereShape(desc.collider.radius);
+	}
+	case ColliderType::Sphere: {
+		const float maxScale = std::max({ std::abs(desc.scale.x), std::abs(desc.scale.y), std::abs(desc.scale.z) });
+		shape = new JPH::SphereShape(desc.collider.radius * maxScale);
+
 		break;
-	case ColliderType::Capsule:
-		shape = new JPH::CapsuleShape(desc.collider.height * 0.5f, desc.collider.radius);
+	}
+	case ColliderType::Capsule: {
+		const float radiusScale = std::max(std::abs(desc.scale.x), std::abs(desc.scale.z));
+		const float heightScale = std::abs(desc.scale.y);
+		shape = new JPH::CapsuleShape(desc.collider.height * 0.5f * heightScale, desc.collider.radius * radiusScale);
+
 		break;
+	}
+	case ColliderType::ConvexMesh: {
+		RE_ASSERT(desc.collider.vertices && desc.collider.vertexCount > 0, "No vertices provided for ConvexMesh!");
+
+		JPH::Array<JPH::Vec3> joltVertices;
+		joltVertices.reserve(desc.collider.vertexCount);
+		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		{
+			// Запекаем скейл прямо в вершины
+			joltVertices.push_back(JPH::Vec3(
+				desc.collider.vertices[i].x * desc.scale.x,
+				desc.collider.vertices[i].y * desc.scale.y,
+				desc.collider.vertices[i].z * desc.scale.z));
+		}
+
+		JPH::ConvexHullShapeSettings convexSettings(joltVertices);
+
+		shape = convexSettings.Create().Get();
+		break;
+	}
+	case ColliderType::TriangleMesh: {
+		RE_ASSERT(desc.collider.vertices && desc.collider.indices, "No data for TriangleMesh!");
+		RE_ASSERT(desc.type == BodyType::Static, "TriangleMesh must be static!");
+
+		JPH::VertexList joltVertices;
+		joltVertices.reserve(desc.collider.vertexCount);
+		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		{
+			joltVertices.push_back(JPH::Float3(
+				desc.collider.vertices[i].x * desc.scale.x,
+				desc.collider.vertices[i].y * desc.scale.y,
+				desc.collider.vertices[i].z * desc.scale.z));
+		}
+
+		JPH::IndexedTriangleList joltTriangles;
+		joltTriangles.reserve(desc.collider.indexCount / 3);
+		for (size_t i = 0; i < desc.collider.indexCount; i += 3)
+		{
+			joltTriangles.push_back(JPH::IndexedTriangle(desc.collider.indices[i], desc.collider.indices[i + 1], desc.collider.indices[i + 2]));
+		}
+
+		JPH::MeshShapeSettings meshSettings(joltVertices, joltTriangles);
+
+		shape = meshSettings.Create().Get();
+		break;
+	}
 	}
 
 	auto motionType = JPH::EMotionType::Dynamic;

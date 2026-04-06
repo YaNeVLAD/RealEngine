@@ -778,7 +778,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
 	m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
 	m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
-	m_CullingComputeShader->SetFloat("u_MaxDistance", 150.0f);
+	m_CullingComputeShader->SetFloat("u_MaxDistance", 1000.0f);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);

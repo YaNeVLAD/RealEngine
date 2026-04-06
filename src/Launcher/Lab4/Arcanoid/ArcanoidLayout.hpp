@@ -252,7 +252,7 @@ private:
 		{
 			for (int col = 0; col < MaxCols; ++col)
 			{
-				const int hp = (row % 2 == 0) ? 1 : 2;
+				const int hp = (row > 0 && row % 4 == 0) ? 2 : 1;
 				const auto currentTex = (hp == 2) ? tex2 : tex1;
 
 				scene.CreateEntity()

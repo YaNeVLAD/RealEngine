@@ -41,6 +41,20 @@ struct MenuLayout final : re::Layout
 				.rotation = { -45.f, 45.f, 0.f },
 			});
 
+		auto camera = scene.FindFirstWith<re::CameraComponent>();
+		camera.Add<re::RigidBodyComponent>({
+			.type = re::physics::BodyType::Dynamic,
+			.collider = re::physics::Collider{
+				.type = re::physics::ColliderType::Sphere,
+				.radius = 1.f,
+			},
+			.mass = 50.0f,
+			.friction = 0.0f,
+			.gravityFactor = 0.0f,
+			.linearDamping = 10.0f,
+			.lockRotation = true,
+		});
+
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
 
@@ -93,23 +107,45 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		// const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		// if (model)
-		// {
-		// 	for (const auto& [vertices, indices, material] : model->GetParts())
-		// 	{
-		// 		scene.CreateEntity()
-		// 			.Add<re::Dirty<re::TransformComponent>>()
-		// 			.Add<re::TransformComponent>({
-		// 				.position = { 0.f, -1.f, -5.f },
-		// 				.rotation = { 0.f, 180.f, 0.f },
-		// 				.scale = { 1.f, 1.f, 1.f },
-		// 			})
-		// 			.Add<re::detail::OpaqueTag>()
-		// 			.Add<re::MaterialComponent>(material)
-		// 			.Add<re::StaticMeshComponent3D>(vertices, indices);
-		// 	}
-		// }
+		const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		if (model)
+		{
+			for (const auto& [vertices, indices, material] : model->GetParts())
+			{
+				std::vector<re::Vector3f> positions;
+				positions.reserve(vertices.size());
+				std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
+					return vertex.position;
+				});
+
+				m_tempCollisionMeshes.push_back(std::move(positions));
+
+				const auto& safePositions = m_tempCollisionMeshes.back();
+
+				scene.CreateEntity()
+					.Add<re::RigidBodyComponent>({
+						.type = re::physics::BodyType::Static,
+						.collider = re::physics::Collider{
+							.type = re::physics::ColliderType::TriangleMesh,
+							.vertices = safePositions.data(),
+							.vertexCount = safePositions.size(),
+							.indices = indices.data(),
+							.indexCount = indices.size(),
+						},
+						.friction = 0.5f,
+						.restitution = 0.f,
+					})
+					.Add<re::Dirty<re::TransformComponent>>()
+					.Add<re::TransformComponent>({
+						.position = { 0.f, -1.f, -5.f },
+						.rotation = { 0.f, 180.f, 0.f },
+						.scale = { 1.f, 1.f, 1.f },
+					})
+					.Add<re::detail::OpaqueTag>()
+					.Add<re::MaterialComponent>(material)
+					.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
+		}
 	}
 
 	void OnAttach() override
@@ -165,6 +201,8 @@ private:
 	bool m_firstMouse = true;
 	float m_lastMouseX = 0.0f;
 	float m_lastMouseY = 0.0f;
+
+	std::vector<std::vector<re::Vector3f>> m_tempCollisionMeshes;
 };
 
 class LauncherApplication final : public re::Application

@@ -21,7 +21,9 @@ enum class ColliderType
 {
 	Box,
 	Sphere,
-	Capsule
+	Capsule,
+	ConvexMesh,
+	TriangleMesh,
 };
 
 struct Collider
@@ -31,6 +33,12 @@ struct Collider
 
 	float radius = 0.5f;
 	float height = 1.f;
+
+	const Vector3f* vertices = nullptr;
+	std::size_t vertexCount = 0;
+
+	const std::uint32_t* indices = nullptr;
+	std::size_t indexCount = 0;
 };
 
 struct RigidBody
@@ -47,6 +55,7 @@ struct RigidBody
 	float linearDamping = 0.05f;
 
 	Vector3f linearVelocity = { 0.f, 0.f, 0.f };
+	Vector3f scale = { 1.f, 1.f, 1.f };
 
 	bool isVelocityDirty = false;
 	bool lockRotation = false;

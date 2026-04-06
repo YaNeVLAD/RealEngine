@@ -23,15 +23,15 @@ constexpr float BallSpeed = 15.0f;
 constexpr float BallRadius = 0.5f;
 constexpr re::Vector3f BallSpawnPos = { 0.f, 0.f, 6.f };
 
-constexpr float BrickWidth = 2.0f;
+constexpr float BrickWidth = 1.0f;
 constexpr float BrickDepth = 1.0f;
 constexpr float BrickHeight = 1.0f;
 
 constexpr int BaseRows = 3;
-constexpr int MaxCols = 8;
-constexpr float LevelStartX = -7.0f;
+constexpr int MaxCols = 16;
+constexpr float LevelStartX = -9.0f;
 constexpr float LevelStartZ = -10.0f;
-constexpr float SpacingX = 2.2f;
+constexpr float SpacingX = 1.2f;
 constexpr float SpacingZ = 1.2f;
 
 constexpr re::Vector3f CameraPos = { 0.f, 15.f, 22.f };

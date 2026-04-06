@@ -5,6 +5,7 @@
 #include <RenderCore/Keyboard.hpp>
 #include <Runtime/Components.hpp>
 
+#include <cmath>
 #include <glm/glm.hpp>
 
 class CameraControlSystem final : public re::ecs::System
@@ -45,39 +46,36 @@ public:
 			const glm::vec3 up = glm::normalize(glm::cross(right, front));
 			camera.up = { up.x, up.y, up.z };
 
-			const float moveSpeed = 10.0f * dt;
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::W))
+			glm::vec3 moveDir(0.0f);
+			// clang-format off
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::W)) moveDir += front;
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::S)) moveDir -= front;
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::A)) moveDir -= right;
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::D)) moveDir += right;
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::E)) moveDir += glm::vec3(0.0f, 1.0f, 0.0f);
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Q)) moveDir -= glm::vec3(0.0f, 1.0f, 0.0f);
+			// clang-format on
+
+			if (glm::length(moveDir) > std::numeric_limits<float>::epsilon())
 			{
-				transform.position.x += front.x * moveSpeed;
-				transform.position.y += front.y * moveSpeed;
-				transform.position.z += front.z * moveSpeed;
-			}
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::S))
-			{
-				transform.position.x -= front.x * moveSpeed;
-				transform.position.y -= front.y * moveSpeed;
-				transform.position.z -= front.z * moveSpeed;
-			}
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::A))
-			{
-				transform.position.x -= right.x * moveSpeed;
-				transform.position.y -= right.y * moveSpeed;
-				transform.position.z -= right.z * moveSpeed;
-			}
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::D))
-			{
-				transform.position.x += right.x * moveSpeed;
-				transform.position.y += right.y * moveSpeed;
-				transform.position.z += right.z * moveSpeed;
+				moveDir = glm::normalize(moveDir);
 			}
 
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::E))
+			constexpr float MOVE_SPEED = 10.0f;
+
+			if (scene.HasComponent<re::RigidBodyComponent>(entity))
 			{
-				transform.position.y += moveSpeed;
+				auto& rb = scene.GetComponent<re::RigidBodyComponent>(entity);
+
+				rb.linearVelocity = { moveDir.x * MOVE_SPEED, moveDir.y * MOVE_SPEED, moveDir.z * MOVE_SPEED };
+				rb.isVelocityDirty = true;
 			}
-			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Q))
+			else
 			{
-				transform.position.y -= moveSpeed;
+				const float moveStep = MOVE_SPEED * dt;
+				transform.position.x += moveDir.x * moveStep;
+				transform.position.y += moveDir.y * moveStep;
+				transform.position.z += moveDir.z * moveStep;
 			}
 
 			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::Z))

@@ -39,6 +39,7 @@ void PhysicsSystem::Update(ecs::Scene& scene, const core::TimeDelta dt)
 		{
 			rb.position = transform.position;
 			rb.rotationEuler = transform.rotation;
+			rb.scale = transform.scale;
 			rb.entityId = static_cast<std::uint32_t>(entity.Id());
 
 			rb.handle = m_world->CreateBody(rb);
