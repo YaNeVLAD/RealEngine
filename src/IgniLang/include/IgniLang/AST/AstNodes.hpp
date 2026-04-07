@@ -107,6 +107,8 @@ struct Decl : Statement
 struct TypeNode : Node
 {
 	bool isNullable = false;
+
+	virtual std::unique_ptr<TypeNode> Clone() const = 0;
 };
 
 // ==========================================
@@ -130,6 +132,19 @@ struct SimpleTypeNode final : Visitable<SimpleTypeNode, TypeNode>
 				arg->Print(depth + 1);
 			}
 		}
+	}
+
+	[[nodiscard]] std::unique_ptr<TypeNode> Clone() const override
+	{
+		auto clone = std::make_unique<SimpleTypeNode>();
+		clone->name = name;
+
+		for (const auto& arg : typeArgs)
+		{
+			clone->typeArgs.emplace_back(arg->Clone());
+		}
+
+		return clone;
 	}
 };
 
@@ -159,6 +174,19 @@ struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
 		{
 			returnType->Print(depth + 2);
 		}
+	}
+
+	[[nodiscard]] std::unique_ptr<TypeNode> Clone() const override
+	{
+		auto clone = std::make_unique<FunctionTypeNode>();
+
+		for (const auto& p : paramTypes)
+		{
+			clone->paramTypes.emplace_back(p->Clone());
+		}
+		clone->returnType = returnType ? returnType->Clone() : nullptr;
+
+		return clone;
 	}
 };
 

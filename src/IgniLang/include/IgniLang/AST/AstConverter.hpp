@@ -29,7 +29,7 @@ public:
 		const auto& importsList = root->children[1];
 		const auto& decls = root->children[2];
 
-		if (!optPkg->children.empty() && optPkg->children[0]->symbol.Hashed() != "e"_hs)
+		if (!optPkg->children.empty() && optPkg->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 		{
 			// PackageDecl -> package PackagePath ;
 			program->packageName = ExtractPathString(optPkg->children[0]->children[1].get());
@@ -45,7 +45,7 @@ public:
 private:
 	static ast::Visibility ParseVisibility(const CstNode* optVisNode)
 	{
-		if (optVisNode->children.empty() || optVisNode->children[0]->symbol.Hashed() == "e"_hs)
+		if (optVisNode->children.empty() || optVisNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
 			return ast::Visibility::Public;
 		}
@@ -83,7 +83,7 @@ private:
 
 	static void ExtractImports(const CstNode* listNode, std::vector<std::unique_ptr<ast::ImportDecl>>& outImports)
 	{
-		if (!listNode || listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -111,7 +111,7 @@ private:
 
 	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
-		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		if (listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -221,20 +221,34 @@ private:
 
 			return funDecl;
 		}
-		case "ClassDecl"_hs: {
+		case "ClassDecl"_hs: { // ClassDecl -> class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
 			auto classDecl = std::make_unique<ast::ClassDecl>();
-
 			classDecl->name = actualDecl->children[1]->token->lexeme;
 
-			// TODO: Parse OptTypeParams (children[2]) when Generics are implemented
+			const auto& optPrimaryCtor = actualDecl->children[3];
+			const auto& classMemberList = actualDecl->children[5];
 
-			const auto& classMemberList = actualDecl->children[4];
+			std::unique_ptr<ast::ConstructorDecl> primaryCtor = nullptr;
+
+			if (!optPrimaryCtor->children.empty() && optPrimaryCtor->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+			{
+				primaryCtor = std::make_unique<ast::ConstructorDecl>();
+				primaryCtor->name = classDecl->name;
+				primaryCtor->body = std::make_unique<ast::Block>();
+
+				ExtractPrimaryCtorParams(optPrimaryCtor->children[1].get(), classDecl.get(), primaryCtor.get());
+			}
+
 			ExtractClassMembers(classMemberList.get(), classDecl->members);
+
+			if (primaryCtor)
+			{
+				classDecl->members.push_back(std::move(primaryCtor));
+			}
 
 			return classDecl;
 		}
-		case "ConstructorDecl"_hs: {
-			// ConstructorDecl -> ident ( OptFormPars ) Block
+		case "ConstructorDecl"_hs: { // ConstructorDecl -> ident ( OptFormPars ) Block
 			auto ctorDecl = std::make_unique<ast::ConstructorDecl>();
 
 			ctorDecl->name = actualDecl->children[0]->token->lexeme;
@@ -276,7 +290,7 @@ private:
 
 	static void FlattenStatements(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
-		if (listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		if (listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -297,7 +311,7 @@ private:
 				break;
 			case "return"_hs: {
 				auto ret = std::make_unique<ast::ReturnStmt>();
-				if (stmtNode->children[1]->symbol.Hashed() != "e"_hs)
+				if (stmtNode->children[1]->symbol.Hashed() != "<EPSILON>"_hs)
 				{
 					ret->expr = ConvertExpr(stmtNode->children[1]->children[0].get());
 				}
@@ -420,7 +434,7 @@ private:
 
 		if (exprNode->children.size() == 1)
 		{
-			if (exprNode->children[0]->symbol.Hashed() == "e"_hs)
+			if (exprNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 			{
 				return nullptr;
 			}
@@ -516,7 +530,7 @@ private:
 		case "("_hs: {
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
 
-			if (const auto& optTypeList = typeNode->children[1]; optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "e"_hs)
+			if (const auto& optTypeList = typeNode->children[1]; optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 			{
 				ExtractTypeList(optTypeList->children[0].get(), funType->paramTypes);
 			}
@@ -579,7 +593,7 @@ private:
 
 	static void ExtractParameters(const CstNode* optFormPars, ast::FunDecl* funDecl)
 	{
-		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol.Hashed() == "e"_hs)
+		if (optFormPars->children.size() == 1 && optFormPars->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
 			return;
 		}
@@ -606,7 +620,7 @@ private:
 
 	static void ExtractArguments(const CstNode* optActPars, std::vector<std::unique_ptr<ast::Expr>>& outArgs)
 	{
-		if (optActPars->children.size() == 1 && optActPars->children[0]->symbol.Hashed() == "e"_hs)
+		if (optActPars->children.size() == 1 && optActPars->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
 			return;
 		}
@@ -628,7 +642,7 @@ private:
 
 	static void ExtractClassMembers(const CstNode* listNode, std::vector<std::unique_ptr<ast::Decl>>& outMembers)
 	{
-		if (!listNode || listNode->symbol.Hashed() == "e"_hs || listNode->children.empty())
+		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
 		{
 			return;
 		}
@@ -650,6 +664,75 @@ private:
 				decl->visibility = ParseVisibility(optVisNode.get());
 				outMembers.push_back(std::move(decl));
 			}
+		}
+	}
+
+	static void ExtractPrimaryCtorParams(const CstNode* listNode, ast::ClassDecl* classDecl, ast::ConstructorDecl* ctorDecl)
+	{
+		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
+		{
+			return;
+		}
+
+		if (listNode->children.size() == 3)
+		{
+			ExtractPrimaryCtorParams(listNode->children[0].get(), classDecl, ctorDecl);
+			ProcessPrimaryCtorPar(listNode->children[2].get(), classDecl, ctorDecl);
+		}
+		else
+		{
+			ProcessPrimaryCtorPar(listNode->children[0].get(), classDecl, ctorDecl);
+		}
+	}
+
+	static void ProcessPrimaryCtorPar(const CstNode* parNode, ast::ClassDecl* classDecl, ast::ConstructorDecl* ctorDecl)
+	{
+		const auto& optValVarNode = parNode->children[0];
+		const re::String name = parNode->children[1]->token->lexeme;
+
+		const auto typeNode = ConvertType(parNode->children[3].get());
+
+		ast::FunDecl::Parameter param;
+		param.name = name;
+		param.type = typeNode->Clone();
+		ctorDecl->parameters.push_back(std::move(param));
+
+		if (!optValVarNode->children.empty() && optValVarNode->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+		{ // Adding class field if parameter is val/var
+			if (const re::String valVar = optValVarNode->children[0]->token->lexeme; valVar.Hashed() == "val"_hs)
+			{ // val
+				auto valDecl = std::make_unique<ast::ValDecl>();
+				valDecl->name = name;
+				valDecl->type = typeNode->Clone();
+				valDecl->visibility = ast::Visibility::Public;
+				classDecl->members.push_back(std::move(valDecl));
+			}
+			else if (valVar.Hashed() == "var"_hs)
+			{ // var
+				auto varDecl = std::make_unique<ast::VarDecl>();
+				varDecl->name = name;
+				varDecl->type = typeNode->Clone();
+				varDecl->visibility = ast::Visibility::Public;
+				classDecl->members.push_back(std::move(varDecl));
+			}
+
+			auto assignExpr = std::make_unique<ast::AssignExpr>();
+
+			auto memAccess = std::make_unique<ast::MemberAccessExpr>();
+			auto thisId = std::make_unique<ast::IdentifierExpr>();
+			thisId->name = "this";
+			memAccess->object = std::move(thisId);
+			memAccess->member = name;
+			assignExpr->target = std::move(memAccess);
+
+			auto valId = std::make_unique<ast::IdentifierExpr>();
+			valId->name = name;
+			assignExpr->value = std::move(valId);
+
+			auto exprStmt = std::make_unique<ast::ExprStmt>();
+			exprStmt->expr = std::move(assignExpr);
+
+			ctorDecl->body->statements.push_back(std::move(exprStmt));
 		}
 	}
 };

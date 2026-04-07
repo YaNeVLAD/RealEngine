@@ -23,9 +23,14 @@ VarDecl -> var ident OptColonType = Expr ;
 ValDecl -> val ident OptColonType = Expr ;
 OptColonType -> : Type | \e
 
-ClassDecl -> class ident OptTypeParams { ClassMemberList }
+ClassDecl -> class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
 OptTypeParams -> < TypeParams > | \e
 TypeParams -> TypeParams , ident | ident
+
+OptPrimaryCtor -> ( PrimaryCtorPars ) | \e
+PrimaryCtorPars -> PrimaryCtorPars , PrimaryCtorPar | PrimaryCtorPar | \e
+PrimaryCtorPar -> OptValVar ident : Type
+OptValVar -> val | var | \e
 
 ClassMemberList -> ClassMemberList ClassMember | \e
 ClassMember -> AnnotationList OptVisibility ClassMemberDecl

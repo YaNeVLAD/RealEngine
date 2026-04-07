@@ -23,14 +23,8 @@ class Player {
 
 }
 
-class Vector2 {
-	val x: Double = 0.0;
-	val y: Double = 0.0;
-
-	Vector2(x: Double, y: Double) {
-		this.x = x;
-		this.y = y;
-	}
+class Vector2(val x: Double, val y: Double) {
+	fun mul(rhs: Double): Vector2 = Vector2(this.x * rhs, this.y * rhs);
 }
 
 fun move(player: Player, dir: Vector2) {
