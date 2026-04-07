@@ -101,7 +101,7 @@ public:
 		const Symbol* sym = m_env.Resolve(node->name);
 		if (!sym)
 		{
-			throw std::runtime_error("Semantic Error: Undefined variable '" + node->name.ToString() + "'");
+			throw std::runtime_error("Semantic Error: Undefined variable '" + node->name + "'");
 		}
 		m_currentExprType = sym->type;
 	}
@@ -120,7 +120,7 @@ public:
 		}
 		else
 		{
-			throw std::runtime_error("Semantic Error: Cannot access member '" + node->member.ToString() + "' on primitive type '" + leftType->name + "'");
+			throw std::runtime_error("Semantic Error: Cannot access member '" + node->member + "' on primitive type '" + leftType->name + "'");
 		}
 	}
 
@@ -312,6 +312,55 @@ public:
 		const auto targetType = Evaluate(node->target.get());
 		const auto valueType = Evaluate(node->value.get());
 
+		// Mutability check
+		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->target.get()))
+		{ // val ident
+			if (const Symbol* sym = m_env.Resolve(id->name); sym && sym->isReadOnly)
+			{
+				throw std::runtime_error("Semantic Error: Cannot reassign to read-only variable '" + id->name + "'");
+			}
+		}
+		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
+		{ // ident.{val ident}
+			const auto objectType = Evaluate(memAccess->object.get());
+			if (const auto classType = std::dynamic_pointer_cast<ClassType>(objectType))
+			{
+				if (const auto it = classType->fields.find(memAccess->member); it != classType->fields.end())
+				{
+					if (it->second.isReadOnly)
+					{
+						bool isInsideCtor = false;
+						if (m_currentFunctionType)
+						{ // allow val mutations in constructor
+							const re::String expectedCtorName = classType->name + "_" + classType->name;
+							if (m_currentFunctionType->name == expectedCtorName)
+							{
+								isInsideCtor = true;
+							}
+						}
+
+						bool isThisAccess = false;
+						if (const auto objId = dynamic_cast<const ast::IdentifierExpr*>(memAccess->object.get()))
+						{ // allow this.val mutations
+							if (objId->name.Hashed() == "this"_hs)
+							{
+								isThisAccess = true;
+							}
+						}
+
+						if (!isInsideCtor || !isThisAccess)
+						{
+							throw std::runtime_error("Semantic Error: Cannot reassign read-only field '" + memAccess->member + "' of class '" + classType->name + "'");
+						}
+					}
+				}
+				else
+				{
+					throw std::runtime_error("Semantic Error: Cannot assign method '" + memAccess->member + "'");
+				}
+			}
+		}
+
 		ExpectAssignable(valueType, targetType, "assignment");
 		m_currentExprType = valueType;
 	}
@@ -393,7 +442,7 @@ public:
 
 		if (m_currentFunctionType != nullptr)
 		{ // Local function
-			funType = std::make_shared<FunctionType>(node->name.ToString());
+			funType = std::make_shared<FunctionType>(node->name);
 			funType->returnType = ResolveAstType(node->returnType.get());
 
 			if (funType->returnType == nullptr && !node->isExprBody)
@@ -452,6 +501,9 @@ public:
 		const Symbol* sym = m_env.Resolve(node->name);
 		const auto classType = std::dynamic_pointer_cast<ClassType>(sym->type);
 
+		const auto previousClass = m_currentClassType;
+		m_currentClassType = classType;
+
 		for (const auto& member : node->members)
 		{
 			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
@@ -469,7 +521,7 @@ public:
 						ExpectAssignable(initType, fieldType, "field initialization");
 					}
 				}
-				classType->fields[varDecl->name.ToString()] = fieldType;
+				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
 			}
 			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
 			{ // Member val
@@ -486,7 +538,7 @@ public:
 						ExpectAssignable(initType, fieldType, "field initialization");
 					}
 				}
-				classType->fields[valDecl->name.ToString()] = fieldType;
+				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
 			}
 			else if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
@@ -501,6 +553,8 @@ public:
 				dtorDecl->Accept(*this);
 			}
 		}
+
+		m_currentClassType = previousClass;
 	}
 
 	void Visit(const ast::ImportDecl* node) override
@@ -514,6 +568,7 @@ private:
 	std::shared_ptr<SemanticType> m_currentReturnType = nullptr;
 	std::shared_ptr<FunctionType> m_currentFunctionType = nullptr;
 	std::shared_ptr<ModuleType> m_currentPackage = nullptr;
+	std::shared_ptr<ClassType> m_currentClassType = nullptr;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
@@ -569,7 +624,7 @@ private:
 
 			if (!currentModule)
 			{
-				currentModule = std::make_shared<ModuleType>(node->packageName.ToString());
+				currentModule = std::make_shared<ModuleType>(node->packageName);
 				m_env.Define(node->packageName, currentModule, true);
 			}
 		}
@@ -580,7 +635,7 @@ private:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				auto classType = std::make_shared<ClassType>(classDecl->name.ToString());
+				auto classType = std::make_shared<ClassType>(classDecl->name);
 
 				bool hasConstructor = false;
 				for (const auto& member : classDecl->members)
@@ -601,23 +656,25 @@ private:
 					const_cast<ast::ClassDecl*>(classDecl)->members.push_back(std::move(defaultCtor));
 				}
 
+				classType->moduleName = currentModule ? currentModule->name : "global";
+
+				// --- ИСПРАВЛЕНИЕ: Кладем ТОЛЬКО в m_env ИЛИ ТОЛЬКО в exports ---
 				if (isGlobal)
 				{
 					m_env.Define(classDecl->name, classType, true);
 				}
 				else
 				{
-					currentModule->exports[classDecl->name.ToString()] = classType;
+					currentModule->exports[classDecl->name] = classType;
 				}
 
 				for (const auto& member : classDecl->members)
 				{
 					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
-					{ // Class methods
+					{
 						const auto mutableFun = const_cast<ast::FunDecl*>(fun);
 						const re::String originalName = mutableFun->name;
 
-						// Adding `this: ClassName` as first parameter
 						ast::FunDecl::Parameter thisParam;
 						thisParam.name = "this";
 						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
@@ -625,13 +682,10 @@ private:
 						thisParam.type = std::move(thisTypeNode);
 						mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
 
-						// Creating function with ident = Class_method
-						mutableFun->name = classDecl->name.ToString() + "_" + originalName.ToString();
-
-						// Registering new function as global
+						mutableFun->name = classDecl->name + "_" + originalName;
 						m_allFunctionNames.insert(mutableFun->name);
 
-						auto funType = std::make_shared<FunctionType>(mutableFun->name.ToString());
+						auto funType = std::make_shared<FunctionType>(mutableFun->name);
 						funType->returnType = ResolveAstType(mutableFun->returnType.get());
 						if (funType->returnType == nullptr && !mutableFun->isExprBody)
 						{
@@ -644,22 +698,25 @@ private:
 							funType->paramTypes.emplace_back(ResolveAstType(type.get()));
 						}
 
+						funType->visibility = mutableFun->visibility;
+						funType->moduleName = currentModule ? currentModule->name : "global";
+
+						// --- ИСПРАВЛЕНИЕ: Исправлен баг с classType и логика Scopes ---
 						if (isGlobal)
 						{
 							m_env.Define(mutableFun->name, funType, true);
 						}
 						else
 						{
-							currentModule->exports[mutableFun->name.ToString()] = funType;
+							currentModule->exports[mutableFun->name] = funType;
 						}
 
-						classType->methods[originalName.ToString()] = funType;
+						classType->methods[originalName] = funType;
 					}
 					else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 					{
 						const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
 
-						// Adding 'this' as first argument
 						ast::FunDecl::Parameter thisParam;
 						thisParam.name = "this";
 						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
@@ -667,11 +724,10 @@ private:
 						thisParam.type = std::move(thisTypeNode);
 						mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
 
-						// Renaming function to Class_Class
-						mutableCtor->name = classDecl->name.ToString() + "_" + classDecl->name.ToString();
+						mutableCtor->name = classDecl->name + "_" + classDecl->name;
 						m_allFunctionNames.insert(mutableCtor->name);
 
-						auto funType = std::make_shared<FunctionType>(mutableCtor->name.ToString());
+						auto funType = std::make_shared<FunctionType>(mutableCtor->name);
 						funType->returnType = m_tUnit;
 						funType->isVararg = mutableCtor->isVararg;
 
@@ -680,31 +736,34 @@ private:
 							funType->paramTypes.emplace_back(ResolveAstType(type.get()));
 						}
 
+						funType->visibility = mutableCtor->visibility;
+
 						if (isGlobal)
 						{
 							m_env.Define(mutableCtor->name, funType, true);
 						}
 						else
 						{
-							currentModule->exports[mutableCtor->name.ToString()] = funType;
+							currentModule->exports[mutableCtor->name] = funType;
 						}
 
-						// Registering as member with name Class
-						classType->methods[classDecl->name.ToString()] = funType;
+						classType->methods[classDecl->name] = funType;
 					}
 					else if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 					{
 						const auto mutableDtor = const_cast<ast::DestructorDecl*>(dtor);
 
-						mutableDtor->name = classDecl->name.ToString() + "_destructor";
+						mutableDtor->name = classDecl->name + "_destructor";
 						m_allFunctionNames.insert(mutableDtor->name);
 
-						auto funType = std::make_shared<FunctionType>(mutableDtor->name.ToString());
+						auto funType = std::make_shared<FunctionType>(mutableDtor->name);
 						funType->returnType = m_tUnit;
 
 						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
 						thisTypeNode->name = classDecl->name;
 						funType->paramTypes.emplace_back(ResolveAstType(thisTypeNode.get()));
+
+						funType->visibility = mutableDtor->visibility;
 
 						if (isGlobal)
 						{
@@ -712,17 +771,16 @@ private:
 						}
 						else
 						{
-							currentModule->exports[mutableDtor->name.ToString()] = funType;
+							currentModule->exports[mutableDtor->name] = funType;
 						}
 
-						// Registering as member with name ~Class
-						classType->methods["~" + classDecl->name.ToString()] = funType;
+						classType->methods["~" + classDecl->name] = funType;
 					}
 				}
 			}
 
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
-			{ // Functions forward declarations
+			{
 				m_allFunctionNames.insert(fun->name);
 
 				auto funType = std::make_shared<FunctionType>(fun->name);
@@ -740,13 +798,16 @@ private:
 					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
 				}
 
+				funType->visibility = fun->visibility;
+				funType->moduleName = currentModule ? currentModule->name : "global";
+
 				if (isGlobal)
 				{
-					m_env.Define(fun->name, funType, true);
+					m_env.Define(funType->name, funType, true);
 				}
 				else
 				{
-					currentModule->exports[fun->name.ToString()] = funType;
+					currentModule->exports[funType->name] = funType;
 				}
 
 				if (fun->isExternal)
@@ -783,7 +844,7 @@ private:
 
 		if (varType == m_tUnit && !explicitTypeNode)
 		{
-			throw std::runtime_error("Semantic Error: Cannot infer type for variable '" + name.ToString() + "'");
+			throw std::runtime_error("Semantic Error: Cannot infer type for variable '" + name + "'");
 		}
 
 		m_env.Define(name, varType, isReadOnly);
@@ -791,25 +852,51 @@ private:
 
 	static std::shared_ptr<SemanticType> ResolveExport(const std::shared_ptr<ModuleType>& modType, const re::String& member)
 	{
-		if (const auto it = modType->exports.find(member.ToString()); it != modType->exports.end())
+		if (const auto it = modType->exports.find(member); it != modType->exports.end())
 		{
 			return it->second;
 		}
-		throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + member.ToString() + "'");
+		throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + member + "'");
 	}
 
-	static std::shared_ptr<SemanticType> ResolveFieldOrMethod(const std::shared_ptr<ClassType>& classType, const re::String& member)
+	std::shared_ptr<SemanticType> ResolveFieldOrMethod(const std::shared_ptr<ClassType>& classType, const re::String& member)
 	{
-		if (const auto it = classType->fields.find(member.ToString()); it != classType->fields.end())
+		auto vis = ast::Visibility::Public;
+		std::shared_ptr<SemanticType> resolvedType = nullptr;
+
+		if (const auto fieldIt = classType->fields.find(member); fieldIt != classType->fields.end())
 		{
-			return it->second;
+			resolvedType = fieldIt->second.type;
+			vis = fieldIt->second.visibility;
 		}
-		if (const auto it = classType->methods.find(member.ToString()); it != classType->methods.end())
+		else if (const auto methodIt = classType->methods.find(member); methodIt != classType->methods.end())
 		{
-			return it->second;
+			resolvedType = methodIt->second;
+			vis = methodIt->second->visibility;
+		}
+		else
+		{
+			throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no field or method named '" + member + "'");
 		}
 
-		throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no field or method named '" + member + "'");
+		if (vis == ast::Visibility::Private)
+		{
+			if (!m_currentClassType || m_currentClassType->name != classType->name)
+			{
+				throw std::runtime_error("Semantic Error: Cannot access private member '" + member + "' of class '" + classType->name + "'");
+			}
+		}
+		else if (vis == ast::Visibility::Internal)
+		{
+			const re::String currentPkg = m_currentPackage ? m_currentPackage->name : "global";
+			const re::String targetPkg = classType->moduleName.Empty() ? "global" : classType->moduleName;
+			if (currentPkg != targetPkg)
+			{
+				throw std::runtime_error("Semantic Error: Cannot access internal member '" + member + "' outside of its package '" + targetPkg + "'");
+			}
+		}
+
+		return resolvedType;
 	}
 
 	void ValidateCallArguments(const ast::CallExpr* node, const std::shared_ptr<FunctionType>& funType, bool isMethodCall = false)
@@ -854,13 +941,13 @@ private:
 			const Symbol* modSym = m_env.Resolve(fullPath);
 			if (!modSym)
 			{
-				throw std::runtime_error("Semantic Error: Unknown module '" + fullPath.ToString() + "' in import");
+				throw std::runtime_error("Semantic Error: Unknown module '" + fullPath + "' in import");
 			}
 
 			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
 			if (!modType)
 			{
-				throw std::runtime_error("Semantic Error: '" + fullPath.ToString() + "' is not a module");
+				throw std::runtime_error("Semantic Error: '" + fullPath + "' is not a module");
 			}
 
 			for (const auto& [exportName, exportType] : modType->exports)
@@ -883,23 +970,23 @@ private:
 			const Symbol* modSym = m_env.Resolve(modName);
 			if (!modSym)
 			{
-				throw std::runtime_error("Semantic Error: Unknown module '" + modName.ToString() + "' in import");
+				throw std::runtime_error("Semantic Error: Unknown module '" + modName + "' in import");
 			}
 
 			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
 			if (!modType)
 			{
-				throw std::runtime_error("Semantic Error: '" + modName.ToString() + "' is not a module");
+				throw std::runtime_error("Semantic Error: '" + modName + "' is not a module");
 			}
 
-			if (const auto it = modType->exports.find(memberName.ToString()); it != modType->exports.end())
+			if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
 			{
 				m_env.Define(memberName, it->second, true);
 				m_importAliases[memberName] = modName;
 			}
 			else
 			{
-				throw std::runtime_error("Semantic Error: Module '" + modName.ToString() + "' has no export named '" + memberName.ToString() + "'");
+				throw std::runtime_error("Semantic Error: Module '" + modName + "' has no export named '" + memberName + "'");
 			}
 		}
 	}
@@ -934,18 +1021,18 @@ private:
 
 			if (m_currentPackage)
 			{
-				if (const auto it = m_currentPackage->exports.find(simpleType->name.ToString()); it != m_currentPackage->exports.end())
+				if (const auto it = m_currentPackage->exports.find(simpleType->name); it != m_currentPackage->exports.end())
 				{
 					return it->second;
 				}
 			}
 
-			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name.ToString() + "'");
+			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name + "'");
 		}
 
 		if (const auto funTypeNode = dynamic_cast<const ast::FunctionTypeNode*>(typeNode))
 		{
-			// TODO: Generate anonymous type
+			// TODO: Generate unique anonymous type
 			auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
 
 			for (const auto& pType : funTypeNode->paramTypes)

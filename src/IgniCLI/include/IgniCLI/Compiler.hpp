@@ -71,7 +71,6 @@ public:
 				throw std::runtime_error("AST conversion failed for file: " + path);
 			}
 
-			// Сохраняем готовую программу с её оригинальным packageName!
 			parsedPrograms.push_back(std::move(astRoot));
 		}
 
@@ -79,14 +78,13 @@ public:
 		std::cout << "[Info] Running Semantic Analysis...\n";
 		sem::SemanticAnalyzer semanticAnalyzer;
 
-		// Теперь мы передаем массив всех файлов!
 		semanticAnalyzer.Analyze(parsedPrograms);
 
 		const auto& globalNames = semanticAnalyzer.GetGlobalNames();
 		const auto& importAliases = semanticAnalyzer.GetImportAliases();
 		const auto& externals = semanticAnalyzer.GetExternalFunctions();
 
-		// --- PHASE 3: AST LINKING (Для CodeGen) ---
+		// --- PHASE 3: AST LINKING ---
 		const auto linkedProgram = std::make_unique<ast::Program>();
 		linkedProgram->packageName = "global";
 

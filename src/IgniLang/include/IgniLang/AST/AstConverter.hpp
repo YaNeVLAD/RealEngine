@@ -43,6 +43,26 @@ public:
 	}
 
 private:
+	static ast::Visibility ParseVisibility(const CstNode* optVisNode)
+	{
+		if (optVisNode->children.empty() || optVisNode->children[0]->symbol.Hashed() == "e"_hs)
+		{
+			return ast::Visibility::Public;
+		}
+
+		const auto hashed = optVisNode->children[0]->symbol.Hashed();
+		if (hashed == "private"_hs)
+		{
+			return ast::Visibility::Private;
+		}
+		if (hashed == "internal"_hs)
+		{
+			return ast::Visibility::Internal;
+		}
+
+		return ast::Visibility::Public;
+	}
+
 	static re::String ExtractPathString(const CstNode* pathNode)
 	{
 		// Path -> ident
@@ -109,10 +129,19 @@ private:
 
 	static std::unique_ptr<ast::Decl> ConvertTopLevelDecl(const CstNode* topLevelDecl)
 	{
-		const auto& declNode = topLevelDecl->children[2]; // TopLevelDecl -> AnnotationList OptVisibility Decl
-		const auto& actualDecl = declNode->children[0]; // Decl -> ValDecl | FunDecl
+		// TopLevelDecl -> AnnotationList [0] OptVisibility [1] Decl [2]
+		const auto& optVisNode = topLevelDecl->children[1];
+		const auto& declNode = topLevelDecl->children[2];
+		const auto& actualDecl = declNode->children[0];
 
-		return ConvertActualDecl(actualDecl.get());
+		if (auto decl = ConvertActualDecl(actualDecl.get()))
+		{
+			decl->visibility = ParseVisibility(optVisNode.get());
+
+			return decl;
+		}
+
+		return nullptr;
 	}
 
 	static std::unique_ptr<ast::Decl> ConvertActualDecl(const CstNode* actualDecl)
@@ -612,14 +641,14 @@ private:
 			const auto& classMemberNode = listNode->children[1];
 
 			// ClassMember -> AnnotationList [0] OptVisibility [1] ClassMemberDecl [2]
-			// TODO: Handle member visibility (public/private)
+			const auto& optVisNode = classMemberNode->children[1];
 			const auto& classMemberDeclNode = classMemberNode->children[2];
-
-			// ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
 			const auto& actualMemberDecl = classMemberDeclNode->children[0];
+
 			if (auto decl = ConvertActualDecl(actualMemberDecl.get()))
 			{
-				outMembers.emplace_back(std::move(decl));
+				decl->visibility = ParseVisibility(optVisNode.get());
+				outMembers.push_back(std::move(decl));
 			}
 		}
 	}

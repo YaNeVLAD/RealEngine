@@ -2,6 +2,8 @@
 
 #include <Core/String.hpp>
 
+#include <IgniLang/AST/AstNodes.hpp>
+
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -49,6 +51,9 @@ struct FunctionType final : SemanticType
 	std::shared_ptr<SemanticType> returnType;
 	bool isVararg = false;
 
+	ast::Visibility visibility = ast::Visibility::Public;
+	re::String moduleName;
+
 	explicit FunctionType(const re::String& n) { name = n; }
 
 	bool IsAssignableTo(const SemanticType* other) const override
@@ -93,8 +98,17 @@ struct FunctionType final : SemanticType
 
 struct ClassType final : SemanticType
 {
-	std::unordered_map<re::String, std::shared_ptr<SemanticType>> fields;
+	struct FieldInfo
+	{
+		std::shared_ptr<SemanticType> type;
+		bool isReadOnly;
+		ast::Visibility visibility = ast::Visibility::Public;
+	};
+
+	std::unordered_map<re::String, FieldInfo> fields;
 	std::unordered_map<re::String, std::shared_ptr<FunctionType>> methods;
+
+	re::String moduleName;
 
 	explicit ClassType(const re::String& n) { name = n; }
 };

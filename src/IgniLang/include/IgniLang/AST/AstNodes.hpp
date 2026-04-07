@@ -84,15 +84,26 @@ struct Visitable : Base
 	}
 };
 
+enum class Visibility
+{
+	Public,
+	Private,
+	Internal,
+};
+
 struct Expr : Node
 {
 };
+
 struct Statement : Node
 {
 };
+
 struct Decl : Statement
 {
+	Visibility visibility = Visibility::Public;
 };
+
 struct TypeNode : Node
 {
 	bool isNullable = false;

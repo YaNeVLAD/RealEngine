@@ -2,7 +2,7 @@ package main;
 
 class Player {
 
-	var hp: Int = 100;
+	private var _hp: Int = 100;
 	val name: String = "Hero";
 
 	Player(_name: String) {
@@ -10,6 +10,12 @@ class Player {
 	}
 
 	~Player() { print("~Player"); }
+
+	fun hp() = this._hp;
+
+	fun takeDamage(amount: Int) {
+		this._hp = this._hp - amount;
+	}
 
 	fun move(dx: Double, dy: Double) {
 		print("dx: ", dx,", ", "dy: ", dy);
@@ -34,6 +40,11 @@ fun move(player: Player, dir: Vector2) {
 fun main() {
 	val player = Player("Женя Пригожин");
 	print("Привет, ", player.name, "!");
+
+	print("До получения урона: ", player.hp(), "!");
+	player.takeDamage(42);
+	print("После получения урона: ", player.hp(), "!");
+
 	val dir = Vector2(10.0, 15.0);
 	move(player, dir);
 	move(player, Vector2(15.0, 10.0));
