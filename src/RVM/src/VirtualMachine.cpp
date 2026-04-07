@@ -80,7 +80,7 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::Add:          BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
 		case OpCode::Sub:          BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
 		case OpCode::Mul:          BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
-		case OpCode::Div:          BINARY_OP([](const Value& a, const Value& b) { return a * b; }, DIV); break;
+		case OpCode::Div:          BINARY_OP([](const Value& a, const Value& b) { return a / b; }, DIV); break;
 		case OpCode::Equal:        BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
 		case OpCode::Less:         BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
 		case OpCode::Greater:      BINARY_OP([](const Value& a, const Value& b) { return OpLess(b, a); }, GREATER); break;
