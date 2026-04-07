@@ -505,7 +505,7 @@ public:
 		m_currentClassType = classType;
 
 		for (const auto& member : node->members)
-		{
+		{ // Register member values
 			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
 			{ // Member var
 				auto fieldType = ResolveAstType(varDecl->type.get());
@@ -540,7 +540,11 @@ public:
 				}
 				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
 			}
-			else if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
+		}
+
+		for (const auto& member : node->members)
+		{ // Register member functions
+			if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
 				funDecl->Accept(*this);
 			}
