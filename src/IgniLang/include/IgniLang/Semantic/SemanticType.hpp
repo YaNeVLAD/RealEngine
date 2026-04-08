@@ -117,4 +117,22 @@ struct ClassType final : SemanticType
 	explicit ClassType(const re::String& n) { name = n; }
 };
 
+struct GenericFunctionTemplate final : SemanticType
+{
+	const ast::FunDecl* astNode{};
+	std::vector<ast::GenericTypeParam> typeParams;
+	re::String moduleName;
+
+	explicit GenericFunctionTemplate(const re::String& n) { name = n; }
+};
+
+struct GenericClassTemplate final : SemanticType
+{
+	const ast::ClassDecl* astNode{};
+	std::vector<ast::GenericTypeParam> typeParams;
+	re::String moduleName;
+
+	explicit GenericClassTemplate(const re::String& n) { name = n; }
+};
+
 } // namespace igni::sem

@@ -27,7 +27,8 @@ ClassDecl -> OptClassMod class ident OptTypeParams OptPrimaryCtor { ClassMemberL
 OptClassMod -> external | \e
 
 OptTypeParams -> < TypeParams > | \e
-TypeParams -> TypeParams , ident | ident
+TypeParams -> TypeParams , TypeParam | TypeParam
+TypeParam -> ident OptColonType
 
 OptPrimaryCtor -> ( PrimaryCtorPars ) | \e
 PrimaryCtorPars -> PrimaryCtorPars , PrimaryCtorPar | PrimaryCtorPar | \e
@@ -41,7 +42,7 @@ ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDec
 ConstructorDecl -> ident ( OptFormPars ) Block
 DestructorDecl -> ~ ident ( ) Block
 
-FunDecl -> OptFunMod fun FunName OptTypeParams ( OptFormPars ) OptColonType FunBody
+FunDecl -> OptFunMod fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
 FunName -> ident | Type . ident | Type ? . ident
 OptFunMod -> external | compile_time | \e
 OptFormPars -> FormPars | \e
@@ -99,7 +100,13 @@ PostfixExpr -> Designator ++
 
 PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr ) | Designator
 
-Designator -> ident | Designator . ident | Designator [ Expr ] | Designator ?. ident | Designator ( OptActPars )
+OptExprTypeArgs -> :: < TypeList > | \e
+
+Designator -> ident OptExprTypeArgs
+            | Designator . ident OptExprTypeArgs
+            | Designator [ Expr ]
+            | Designator ?. ident OptExprTypeArgs
+            | Designator ( OptActPars )
 
 OptActPars -> ActPars | \e
 ActPars -> ActPars , Expr | Expr

@@ -109,7 +109,7 @@ private:
 		}
 	}
 
-	void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
+	static void FlattenTopLevelDecls(const CstNode* listNode, std::vector<std::unique_ptr<ast::Statement>>& outStmts)
 	{
 		if (listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
 		{
@@ -176,23 +176,25 @@ private:
 			}
 			return decl;
 		}
-		case "FunDecl"_hs: {
+		case "FunDecl"_hs: { // FunDecl -> OptFunMod [0] fun [1] OptTypeParams [2] FunName [3] ( [4] OptFormPars [5] ) [6] OptColonType [7] FunBody [8]
 			auto funDecl = std::make_unique<ast::FunDecl>();
 
 			if (const auto& optFunMod = actualDecl->children[0];
 				!optFunMod->children.empty() && optFunMod->children[0]->symbol.Hashed() == "external"_hs)
-			{ // External modifier
+			{ // External modifier [0]
 				funDecl->isExternal = true;
 			}
 
-			if (const auto& funNameNode = actualDecl->children[2]; funNameNode->children.size() == 1)
-			{ // Name [2]
+			if (const auto& funNameNode = actualDecl->children[3]; funNameNode->children.size() == 1)
+			{ // FunName [3]
 				funDecl->name = funNameNode->children[0]->token->lexeme;
 			}
 			else
 			{
 				funDecl->name = funNameNode->children.back()->token->lexeme;
 			}
+
+			ExtractTypeParams(actualDecl->children[2].get(), funDecl->typeParams);
 
 			if (const auto& optColon = actualDecl->children[7]; optColon->children.size() == 2)
 			{ // Return type [7]
@@ -221,7 +223,7 @@ private:
 
 			return funDecl;
 		}
-		case "ClassDecl"_hs: { // ClassDecl -> OptClassMod class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
+		case "ClassDecl"_hs: { // ClassDecl -> OptClassMod [0] class [1] ident [2] OptTypeParams [3] OptPrimaryCtor [4] { [5] ClassMemberList [6] } [7]
 			auto classDecl = std::make_unique<ast::ClassDecl>();
 
 			if (const auto& optClassMod = actualDecl->children[0];
@@ -231,6 +233,8 @@ private:
 			}
 
 			classDecl->name = actualDecl->children[2]->token->lexeme;
+
+			ExtractTypeParams(actualDecl->children[3].get(), classDecl->typeParams);
 
 			const auto& optPrimaryCtor = actualDecl->children[4];
 			const auto& classMemberList = actualDecl->children[6];
@@ -255,7 +259,7 @@ private:
 
 			return classDecl;
 		}
-		case "ConstructorDecl"_hs: { // ConstructorDecl -> ident ( OptFormPars ) Block
+		case "ConstructorDecl"_hs: { // ConstructorDecl -> ident [0] ( [1] OptFormPars [2] ) [3] Block [4]
 			auto ctorDecl = std::make_unique<ast::ConstructorDecl>();
 
 			ctorDecl->name = actualDecl->children[0]->token->lexeme;
@@ -360,36 +364,55 @@ private:
 		switch (exprNode->symbol.Hashed())
 		{
 		case "Designator"_hs: {
-			// Rule 1: Designator -> ident
-			if (exprNode->children.size() == 1)
+			// Designator -> ident [0] OptExprTypeArgs [1]
+			if (exprNode->children.size() == 2 && exprNode->children[0]->symbol.Hashed() == "ident"_hs)
 			{
 				auto id = std::make_unique<ast::IdentifierExpr>();
 				id->name = exprNode->children[0]->token->lexeme;
+
+				if (const auto& optTypeArgs = exprNode->children[1];
+					!optTypeArgs->children.empty() && optTypeArgs->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+				{
+					ExtractTypeList(optTypeArgs->children[2].get(), id->typeArgs);
+				}
+
 				return id;
 			}
-			// Rule 2: Designator -> Designator(OptActPars)
+			// Designator -> Designator [0] ( [1] OptActPars [2] ) [3]
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "("_hs)
 			{
 				auto call = std::make_unique<ast::CallExpr>();
 				call->callee = ConvertExpr(exprNode->children[0].get());
 				ExtractArguments(exprNode->children[2].get(), call->arguments);
+
 				return call;
 			}
-			// Rule 3: Designator -> Designator[Expr]
+			// Designator -> Designator [0] [ [1] Expr [2] ] [3]
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "["_hs)
 			{
 				auto idx = std::make_unique<ast::IndexExpr>();
-				idx->array = ConvertExpr(exprNode->children[0].get()); // Что индексируем
-				idx->index = ConvertExpr(exprNode->children[2].get()); // Сам индекс
+				idx->array = ConvertExpr(exprNode->children[0].get());
+				idx->index = ConvertExpr(exprNode->children[2].get());
+
 				return idx;
 			}
-			if (exprNode->children.size() == 3 && exprNode->children[1]->symbol.Hashed() == "."_hs)
+			// Designator -> Designator [0] . [1] ident [2] OptExprTypeArgs [3]
+			// Designator -> Designator [0] ?. [1] ident [2] OptExprTypeArgs [3]
+			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "."_hs)
 			{
 				auto memberAccess = std::make_unique<ast::MemberAccessExpr>();
-				memberAccess->object = ConvertExpr(exprNode->children[0].get()); // то, что слева от точки
-				memberAccess->member = exprNode->children[2]->token->lexeme; // идентификатор справа
+				memberAccess->object = ConvertExpr(exprNode->children[0].get());
+				memberAccess->member = exprNode->children[2]->token->lexeme;
+
+				if (const auto& optTypeArgs = exprNode->children[1];
+					!optTypeArgs->children.empty() && optTypeArgs->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+				{
+					ExtractTypeList(optTypeArgs->children[2].get(), memberAccess->typeArgs);
+				}
+
 				return memberAccess;
 			}
+
 			break;
 		}
 		case "PrimaryExpr"_hs: {
@@ -562,6 +585,49 @@ private:
 		{
 			outTypes.push_back(ConvertType(typeList->children[0].get()));
 		}
+	}
+
+	static void ExtractTypeParams(const CstNode* optTypeParams, std::vector<ast::GenericTypeParam>& outParams)
+	{
+		// OptTypeParams -> < TypeParams > | \e
+		if (!optTypeParams || optTypeParams->children.empty() || optTypeParams->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
+		{
+			return;
+		}
+
+		ExtractTypeParamList(optTypeParams->children[1].get(), outParams);
+	}
+
+	static void ExtractTypeParamList(const CstNode* typeParamsNode, std::vector<ast::GenericTypeParam>& outParams)
+	{
+		// TypeParams -> TypeParams , TypeParam | TypeParam
+		if (typeParamsNode->children.size() == 3)
+		{
+			ExtractTypeParamList(typeParamsNode->children[0].get(), outParams);
+			outParams.push_back(ParseTypeParam(typeParamsNode->children[2].get()));
+		}
+		else if (typeParamsNode->children.size() == 1)
+		{
+			outParams.push_back(ParseTypeParam(typeParamsNode->children[0].get()));
+		}
+	}
+
+	static ast::GenericTypeParam ParseTypeParam(const CstNode* typeParamNode)
+	{
+		// TypeParam -> ident OptColonType
+		ast::GenericTypeParam param;
+		param.name = typeParamNode->children[0]->token->lexeme;
+
+		if (const auto& optColon = typeParamNode->children[1]; optColon->children.size() == 2)
+		{ // OptColonType -> : Type
+			param.boundType = ConvertType(optColon->children[1].get());
+		}
+		else
+		{
+			param.boundType = nullptr;
+		}
+
+		return param;
 	}
 
 	static ast::FunDecl::Parameter ParseFormPar(const CstNode* node)

@@ -35,6 +35,7 @@ namespace igni
     TOKEN(Identifier,   R"([a-zA-Z_]\w*)",     "ident") \
 	TOKEN(ExpandRange,  R"(\.\.\.)",           "...") \
     /* Double char operations */ \
+    TOKEN(DoubleColon,  R"(::)",               "::") \
 	TOKEN(Decrement,    R"(\-\-)",             "--") \
 	TOKEN(Increment,    R"(\+\+)",             "++") \
     TOKEN(Arrow,        R"(->)",               "->") \

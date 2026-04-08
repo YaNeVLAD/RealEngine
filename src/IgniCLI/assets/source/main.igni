@@ -23,22 +23,11 @@ class Player {
 
 }
 
-class Vector2(val x: Double, val y: Double) {
-	fun mul(rhs: Double): Vector2 = Vector2(this.x * rhs, this.y * rhs);
-}
-
-fun move(player: Player, dir: Vector2) {
-	player.move(dir.x, dir.y);
+class Vec2 <T>(val x: T, val y: T) {
+	fun add(rhs: T): Vec2<T> = Vec2::<T>(this.x + rhs, this.y + rhs);
 }
 
 fun main() {
-	val arr = make_array(6);
-	for (i in 0..5) {
-		arr[i] = i;
-	}
-	bubbleSort(arr, 6, greater);
-	print("sorted array: ", arr);
-
 	val player = Player("Женя Пригожин");
 	print("Привет, ", player.name, "!");
 
@@ -46,7 +35,6 @@ fun main() {
 	player.takeDamage(42);
 	print("После получения урона: ", player.hp(), "!");
 
-	val dir = Vector2(10.0, 15.0);
-	move(player, dir);
-	move(player, Vector2(15.0, 10.0));
+	val pos = Vec2::<Int>(5, 5).add(7);
+	print(pos.x, ", ", pos.y);
 }

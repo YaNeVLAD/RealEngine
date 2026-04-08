@@ -19,11 +19,13 @@ public:
 	{
 		for (const auto& prog : programs)
 		{
+			m_currentProgram = prog.get();
 			RegisterProgramDeclarations(prog.get());
 		}
 
 		for (const auto& prog : programs)
 		{
+			m_currentProgram = prog.get();
 			m_env.PushScope();
 
 			if (const bool isGlobal = prog->packageName.Empty() || prog->packageName == "global"; !isGlobal)
@@ -48,16 +50,53 @@ public:
 				}
 			}
 
-			for (const auto& stmt : prog->statements)
+			for (std::size_t i = 0; i < prog->statements.size(); ++i)
 			{
-				if (stmt)
+				if (prog->statements[i])
 				{
-					stmt->Accept(*this);
+					prog->statements[i]->Accept(*this);
 				}
 			}
 
 			m_env.PopScope();
 		}
+
+		for (std::size_t i = 0; i < m_pendingInstantiations.size(); ++i)
+		{
+			const auto* decl = m_pendingInstantiations[i];
+			const auto classType = m_instantiatedClasses[decl->name];
+
+			m_env.PushScope();
+
+			if (!classType->moduleName.Empty() && classType->moduleName != "global")
+			{
+				if (const Symbol* modSym = m_env.Resolve(classType->moduleName))
+				{
+					if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
+					{
+						for (const auto& [name, type] : modType->exports)
+							m_env.Define(name, type, true);
+					}
+				}
+			}
+
+			m_env.Define(decl->name, classType, true);
+			for (const auto& type : classType->methods | std::views::values)
+			{
+				m_env.Define(type->name, type, true);
+			}
+
+			m_instantiatedNodes.erase(decl);
+			for (const auto& member : decl->members)
+			{
+				m_instantiatedNodes.erase(member.get());
+			}
+
+			decl->Accept(*this);
+
+			m_env.PopScope();
+		}
+		m_pendingInstantiations.clear();
 	}
 
 	[[nodiscard]] std::unordered_set<re::String> GetGlobalNames() const
@@ -182,6 +221,46 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
+		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+		{ // Instantiating generic class member or function call
+			if (const Symbol* sym = m_env.Resolve(id->name))
+			{
+				if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
+				{
+					if (id->typeArgs.empty())
+					{
+						throw std::runtime_error("Semantic Error: Generic class requires type arguments");
+					}
+
+					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
+					for (const auto& arg : id->typeArgs)
+					{
+						concreteArgs.push_back(ResolveAstType(arg.get()));
+					}
+
+					const auto concreteClass = InstantiateClass(classTmpl, concreteArgs);
+
+					const auto mutableNode = const_cast<ast::CallExpr*>(node);
+					mutableNode->isConstructorCall = true;
+
+					const_cast<ast::IdentifierExpr*>(id)->name = concreteClass->name;
+
+					if (const auto it = concreteClass->methods.find(concreteClass->name); it != concreteClass->methods.end())
+					{
+						const auto ctorType = std::dynamic_pointer_cast<FunctionType>(it->second);
+						ValidateCallArguments(node, ctorType, true);
+						if (!ctorType->isExternal)
+						{
+							mutableNode->staticMethodTarget = ctorType->name;
+						}
+					}
+					m_currentExprType = concreteClass;
+
+					return;
+				}
+			}
+		}
+
 		const auto calleeType = Evaluate(node->callee.get());
 
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
@@ -256,6 +335,11 @@ public:
 
 	void Visit(const ast::ConstructorDecl* node) override
 	{
+		if (m_instantiatedNodes.contains(node))
+		{
+			return;
+		}
+
 		const Symbol* sym = m_env.Resolve(node->name);
 		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
 
@@ -290,6 +374,11 @@ public:
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
+		if (m_instantiatedNodes.contains(node))
+		{
+			return;
+		}
+
 		const Symbol* sym = m_env.Resolve(node->name);
 		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
 
@@ -444,6 +533,16 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
+		if (m_instantiatedNodes.contains(node))
+		{
+			return;
+		}
+
+		if (!node->typeParams.empty())
+		{ // Ignore generic function declarations
+			return;
+		}
+
 		std::shared_ptr<FunctionType> funType;
 
 		if (m_currentFunctionType != nullptr)
@@ -504,8 +603,29 @@ public:
 
 	void Visit(const ast::ClassDecl* node) override
 	{
-		const Symbol* sym = m_env.Resolve(node->name);
-		const auto classType = std::dynamic_pointer_cast<ClassType>(sym->type);
+		if (m_instantiatedNodes.contains(node))
+		{
+			return;
+		}
+
+		if (!node->typeParams.empty())
+		{ // Ignore generic classes declarations
+			return;
+		}
+
+		std::shared_ptr<ClassType> classType;
+		if (const Symbol* sym = m_env.Resolve(node->name))
+		{
+			classType = std::dynamic_pointer_cast<ClassType>(sym->type);
+		}
+		else if (m_instantiatedClasses.contains(node->name))
+		{
+			classType = m_instantiatedClasses.at(node->name);
+		}
+		else
+		{
+			throw std::runtime_error("Semantic Error: Class '" + node->name + "' not found during Visit");
+		}
 
 		const auto previousClass = m_currentClassType;
 		m_currentClassType = classType;
@@ -579,6 +699,11 @@ private:
 	std::shared_ptr<FunctionType> m_currentFunctionType = nullptr;
 	std::shared_ptr<ModuleType> m_currentPackage = nullptr;
 	std::shared_ptr<ClassType> m_currentClassType = nullptr;
+	ast::Program* m_currentProgram = nullptr;
+
+	std::unordered_map<re::String, std::shared_ptr<ClassType>> m_instantiatedClasses;
+	std::vector<ast::ClassDecl*> m_pendingInstantiations;
+	std::unordered_set<const ast::Node*> m_instantiatedNodes;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
@@ -645,6 +770,26 @@ private:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
+				if (!classDecl->typeParams.empty())
+				{ // Generic non-instantiated class
+					auto tmpl = std::make_shared<GenericClassTemplate>(classDecl->name);
+					tmpl->astNode = classDecl;
+					tmpl->typeParams = classDecl->typeParams;
+					tmpl->moduleName = currentModule ? currentModule->name : "global";
+
+					if (isGlobal)
+					{
+						m_env.Define(classDecl->name, tmpl, true);
+					}
+					else
+					{
+						currentModule->exports[classDecl->name] = tmpl;
+					}
+
+					continue;
+				}
+
+				// Non-generic or instantiated class
 				std::shared_ptr<ClassType> classType = nullptr;
 				bool isNewClass = false;
 
@@ -807,6 +952,31 @@ private:
 
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
+				if (!fun->typeParams.empty())
+				{ // Generic non-instantiated function
+					auto tmpl = std::make_shared<GenericFunctionTemplate>(fun->name);
+					tmpl->astNode = fun;
+					tmpl->typeParams = fun->typeParams;
+					tmpl->moduleName = currentModule ? currentModule->name : "global";
+
+					if (isGlobal)
+					{
+						m_env.Define(fun->name, tmpl, true);
+					}
+					else
+					{
+						currentModule->exports[fun->name] = tmpl;
+					}
+
+					if (fun->isExternal)
+					{
+						m_externalFunctions.insert(fun->name);
+					}
+
+					continue;
+				}
+
+				// Non-generic or instantiated function
 				m_allFunctionNames.insert(fun->name);
 
 				auto funType = std::make_shared<FunctionType>(fun->name);
@@ -1042,6 +1212,22 @@ private:
 
 			if (const Symbol* sym = m_env.Resolve(simpleType->name))
 			{
+				if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
+				{ // Instantiate generic class
+					if (simpleType->typeArgs.empty())
+					{
+						throw std::runtime_error("Semantic Error: Generic class '" + simpleType->name + "' requires type arguments");
+					}
+
+					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
+					for (const auto& arg : simpleType->typeArgs)
+					{
+						concreteArgs.push_back(ResolveAstType(arg.get()));
+					}
+
+					return InstantiateClass(classTmpl, concreteArgs);
+				}
+
 				return sym->type;
 			}
 
@@ -1051,6 +1237,11 @@ private:
 				{
 					return it->second;
 				}
+			}
+
+			if (m_instantiatedClasses.contains(simpleType->name))
+			{
+				return m_instantiatedClasses.at(simpleType->name);
 			}
 
 			throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name + "'");
@@ -1072,6 +1263,302 @@ private:
 		}
 
 		return m_tUnit;
+	}
+
+	std::shared_ptr<ClassType> InstantiateClass(const std::shared_ptr<GenericClassTemplate>& tmpl, const std::vector<std::shared_ptr<SemanticType>>& typeArgs)
+	{
+		re::String uniqueName = tmpl->name;
+		for (const auto& arg : typeArgs)
+		{
+			uniqueName = uniqueName + "_" + arg->name;
+		}
+
+		if (m_instantiatedClasses.contains(uniqueName))
+		{
+			return m_instantiatedClasses[uniqueName];
+		}
+
+		ast::TypeEnv typeEnv;
+		std::vector<std::unique_ptr<ast::SimpleTypeNode>> tempNodes;
+
+		for (std::size_t i = 0; i < typeArgs.size(); ++i)
+		{
+			if (tmpl->typeParams[i].boundType)
+			{
+				auto boundSemType = ResolveAstType(tmpl->typeParams[i].boundType.get());
+				ExpectAssignable(typeArgs[i], boundSemType, "type parameter bound");
+			}
+			auto tempNode = std::make_unique<ast::SimpleTypeNode>();
+			tempNode->name = typeArgs[i]->name;
+			typeEnv[tmpl->typeParams[i].name] = tempNode.get();
+			tempNodes.push_back(std::move(tempNode));
+		}
+
+		auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
+		auto realClassDecl = dynamic_cast<ast::ClassDecl*>(clonedDecl.get());
+		realClassDecl->name = uniqueName;
+		realClassDecl->typeParams.clear();
+
+		bool hasConstructor = false;
+		for (const auto& member : realClassDecl->members)
+		{
+			if (dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+			{
+				hasConstructor = true;
+				break;
+			}
+		}
+		if (!hasConstructor)
+		{
+			auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
+			defaultCtor->name = uniqueName;
+			defaultCtor->body = std::make_unique<ast::Block>();
+			realClassDecl->members.push_back(std::move(defaultCtor));
+		}
+
+		auto classType = std::make_shared<ClassType>(uniqueName);
+		classType->moduleName = tmpl->moduleName;
+		m_instantiatedClasses[uniqueName] = classType;
+
+		m_env.Define(uniqueName, classType, true);
+		for (const auto& member : realClassDecl->members)
+		{
+			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+			{
+				auto fieldType = ResolveAstType(varDecl->type.get());
+				if (varDecl->initializer)
+				{
+					auto initType = Evaluate(varDecl->initializer.get());
+					if (!fieldType || fieldType == m_tUnit)
+					{
+						fieldType = initType;
+					}
+				}
+				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
+			}
+			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+			{
+				auto fieldType = ResolveAstType(valDecl->type.get());
+				if (valDecl->initializer)
+				{
+					auto initType = Evaluate(valDecl->initializer.get());
+					if (!fieldType || fieldType == m_tUnit)
+					{
+						fieldType = initType;
+					}
+				}
+				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
+			}
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+			{
+				const auto mutableFun = const_cast<ast::FunDecl*>(fun);
+				const re::String originalName = mutableFun->name;
+
+				ast::FunDecl::Parameter thisParam;
+				thisParam.name = "this";
+				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+				thisTypeNode->name = uniqueName;
+				thisParam.type = std::move(thisTypeNode);
+				mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
+
+				mutableFun->name = uniqueName + "_" + originalName;
+				m_allFunctionNames.insert(mutableFun->name);
+
+				auto funType = std::make_shared<FunctionType>(mutableFun->name);
+				funType->returnType = ResolveAstType(mutableFun->returnType.get());
+				if (funType->returnType == nullptr && !mutableFun->isExprBody)
+				{
+					funType->returnType = m_tUnit;
+				}
+				funType->isVararg = mutableFun->isVararg;
+				for (const auto& [_, type] : mutableFun->parameters)
+				{
+					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+				}
+
+				if (funType->returnType == nullptr && mutableFun->isExprBody)
+				{ // On-demand type evaluation for expression functions
+					m_env.PushScope();
+
+					for (std::size_t j = 0; j < mutableFun->parameters.size(); ++j)
+					{
+						m_env.Define(mutableFun->parameters[j].name, funType->paramTypes[j], false);
+					}
+
+					const auto prevFun = m_currentFunctionType;
+					m_currentFunctionType = funType;
+
+					if (mutableFun->body && !mutableFun->body->statements.empty())
+					{
+						if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(mutableFun->body->statements[0].get()))
+						{
+							funType->returnType = Evaluate(retStmt->expr.get());
+						}
+					}
+
+					m_currentFunctionType = prevFun;
+					m_env.PopScope();
+				}
+
+				funType->visibility = mutableFun->visibility;
+				funType->isExternal = fun->isExternal || realClassDecl->isExternal;
+				if (funType->isExternal)
+					m_externalFunctions.insert(funType->name);
+
+				classType->methods[originalName] = funType;
+			}
+			else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+			{
+				const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
+
+				ast::FunDecl::Parameter thisParam;
+				thisParam.name = "this";
+				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+				thisTypeNode->name = uniqueName;
+				thisParam.type = std::move(thisTypeNode);
+				mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
+
+				mutableCtor->name = uniqueName + "_" + uniqueName;
+				m_allFunctionNames.insert(mutableCtor->name);
+
+				auto funType = std::make_shared<FunctionType>(mutableCtor->name);
+				funType->returnType = m_tUnit;
+				funType->isVararg = mutableCtor->isVararg;
+				for (const auto& [_, type] : mutableCtor->parameters)
+					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+				funType->isExternal = realClassDecl->isExternal;
+
+				classType->methods[uniqueName] = funType;
+			}
+		}
+
+		m_pendingInstantiations.push_back(realClassDecl);
+		m_instantiatedNodes.insert(realClassDecl);
+		for (const auto& member : realClassDecl->members)
+		{
+			m_instantiatedNodes.insert(member.get());
+		}
+
+		m_currentProgram->statements.push_back(std::move(clonedDecl));
+
+		return classType;
+	}
+
+	void RegisterClassMembers(const ast::ClassDecl* classDecl, const std::shared_ptr<ClassType>& classType, const std::shared_ptr<ModuleType>& currentModule)
+	{
+		const bool isGlobal = currentModule == nullptr;
+
+		for (const auto& member : classDecl->members)
+		{
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+			{
+				const auto mutableFun = const_cast<ast::FunDecl*>(fun);
+				const re::String originalName = mutableFun->name;
+
+				ast::FunDecl::Parameter thisParam;
+				thisParam.name = "this";
+				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+				thisTypeNode->name = classDecl->name;
+				thisParam.type = std::move(thisTypeNode);
+				mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
+
+				mutableFun->name = classDecl->name + "_" + originalName;
+				m_allFunctionNames.insert(mutableFun->name);
+
+				auto funType = std::make_shared<FunctionType>(mutableFun->name);
+				funType->returnType = ResolveAstType(mutableFun->returnType.get());
+				if (funType->returnType == nullptr && !mutableFun->isExprBody)
+				{
+					funType->returnType = m_tUnit;
+				}
+				funType->isVararg = mutableFun->isVararg;
+
+				for (const auto& [_, type] : mutableFun->parameters)
+				{
+					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+				}
+
+				funType->visibility = mutableFun->visibility;
+				funType->moduleName = currentModule ? currentModule->name : "global";
+				funType->isExternal = fun->isExternal || classDecl->isExternal;
+
+				if (isGlobal)
+				{
+					m_env.Define(mutableFun->name, funType, true);
+				}
+				else
+				{
+					currentModule->exports[mutableFun->name] = funType;
+				}
+
+				classType->methods[originalName] = funType;
+			}
+			else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+			{
+				const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
+
+				ast::FunDecl::Parameter thisParam;
+				thisParam.name = "this";
+				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+				thisTypeNode->name = classDecl->name;
+				thisParam.type = std::move(thisTypeNode);
+				mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
+
+				mutableCtor->name = classDecl->name + "_" + classDecl->name;
+				m_allFunctionNames.insert(mutableCtor->name);
+
+				auto funType = std::make_shared<FunctionType>(mutableCtor->name);
+				funType->returnType = m_tUnit;
+				funType->isVararg = mutableCtor->isVararg;
+				funType->isExternal = classDecl->isExternal;
+
+				for (const auto& [_, type] : mutableCtor->parameters)
+				{
+					funType->paramTypes.emplace_back(ResolveAstType(type.get()));
+				}
+
+				funType->visibility = mutableCtor->visibility;
+
+				if (isGlobal)
+				{
+					m_env.Define(mutableCtor->name, funType, true);
+				}
+				else
+				{
+					currentModule->exports[mutableCtor->name] = funType;
+				}
+
+				classType->methods[classDecl->name] = funType;
+			}
+			else if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+			{
+				const auto mutableDtor = const_cast<ast::DestructorDecl*>(dtor);
+
+				mutableDtor->name = classDecl->name + "_destructor";
+				m_allFunctionNames.insert(mutableDtor->name);
+
+				auto funType = std::make_shared<FunctionType>(mutableDtor->name);
+				funType->returnType = m_tUnit;
+
+				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+				thisTypeNode->name = classDecl->name;
+				funType->paramTypes.emplace_back(ResolveAstType(thisTypeNode.get()));
+
+				funType->visibility = mutableDtor->visibility;
+				funType->isExternal = classDecl->isExternal;
+
+				if (isGlobal)
+				{
+					m_env.Define(mutableDtor->name, funType, true);
+				}
+				else
+				{
+					currentModule->exports[mutableDtor->name] = funType;
+				}
+
+				classType->methods["~" + classDecl->name] = funType;
+			}
+		}
 	}
 };
 

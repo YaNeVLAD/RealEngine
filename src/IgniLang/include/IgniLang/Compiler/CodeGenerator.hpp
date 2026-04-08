@@ -46,10 +46,20 @@ public:
 		{
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
+				if (!fun->typeParams.empty())
+				{
+					continue;
+				}
+
 				globalFuncs.insert(fun);
 			}
 			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
+				if (!classDecl->typeParams.empty())
+				{
+					continue;
+				}
+
 				for (const auto& member : classDecl->members)
 				{
 					if (const auto memberFun = dynamic_cast<const ast::FunDecl*>(member.get()))
@@ -78,7 +88,7 @@ public:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				if (classDecl->isExternal)
+				if (classDecl->isExternal || !classDecl->typeParams.empty())
 				{
 					continue;
 				}
@@ -124,7 +134,7 @@ public:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				if (classDecl->isExternal)
+				if (classDecl->isExternal || !classDecl->typeParams.empty())
 				{
 					continue;
 				}
@@ -959,6 +969,11 @@ private:
 
 	void GenerateFunction(const ast::FunDecl* fun)
 	{
+		if (!fun->typeParams.empty())
+		{
+			return;
+		}
+
 		m_currentFunction = fun;
 		m_out << "FUN " << m_funcAsmNames.at(fun) << "\n";
 		m_currentLocals.clear();
