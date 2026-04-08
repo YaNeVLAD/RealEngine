@@ -235,16 +235,24 @@ public:
 
 	void Visit(const ast::IndexExpr* node) override
 	{
-		if (const auto arrType = Evaluate(node->array.get()); arrType->name != "Array")
-		{
-			throw std::runtime_error("Semantic Error: Cannot index non-array type '" + arrType->name + "'");
-		}
-
+		const auto arrType = Evaluate(node->array.get());
 		const auto indexType = Evaluate(node->index.get());
+
 		ExpectAssignable(indexType, m_tInt, "array index");
 
-		// TODO: Replace with generic element type when Generics are introduced
-		m_currentExprType = m_tAny;
+		if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
+		{ // allow index access operation to any class with get(Int) method
+			if (const auto it = classType->methods.find("get"); it != classType->methods.end())
+			{
+				if (const auto funType = std::dynamic_pointer_cast<FunctionType>(it->second))
+				{
+					m_currentExprType = funType->returnType;
+					return;
+				}
+			}
+		}
+
+		throw std::runtime_error("Semantic Error: Type '" + arrType->name + "' does not support indexing (missing 'get' method)");
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -321,7 +329,6 @@ public:
 					}
 					else
 					{ // Manually named template arguments
-						// Использование явной "турборыбы"
 						if (id->typeArgs.size() != funTmpl->typeParams.size())
 						{
 							throw std::runtime_error("Semantic Error: Generic function requires exactly " + std::to_string(funTmpl->typeParams.size()) + " type arguments");
@@ -440,7 +447,7 @@ public:
 			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
-				paramType = m_tArray;
+				paramType = GetVarargArrayType(paramType);
 			}
 			m_env.Define(node->parameters[i].name, paramType, false);
 		}
@@ -664,7 +671,7 @@ public:
 			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
-				paramType = m_tArray;
+				paramType = GetVarargArrayType(paramType);
 			}
 			m_env.Define(node->parameters[i].name, paramType, false);
 		}
@@ -809,11 +816,11 @@ private:
 	std::shared_ptr<PrimitiveType> m_tString = std::make_shared<PrimitiveType>("String");
 	std::shared_ptr<PrimitiveType> m_tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<PrimitiveType> m_tAny = std::make_shared<PrimitiveType>("Any");
-	std::shared_ptr<ClassType> m_tArray = std::make_shared<ClassType>("Array");
 
 	// ==========================================
 	// HELPER METHODS
 	// ==========================================
+
 	void InitBuiltins()
 	{
 		m_env.Define("Int", m_tInt, true);
@@ -822,7 +829,6 @@ private:
 		m_env.Define("String", m_tString, true);
 		m_env.Define("Unit", m_tUnit, true);
 		m_env.Define("Any", m_tAny, true);
-		m_env.Define("Array", m_tArray, true);
 	}
 
 	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)
@@ -836,6 +842,21 @@ private:
 		expr->Accept(*this);
 
 		return m_currentExprType;
+	}
+
+	std::shared_ptr<SemanticType> GetVarargArrayType(const std::shared_ptr<SemanticType>& elementType)
+	{
+		if (const Symbol* sym = m_env.Resolve("Array"))
+		{ // Instantiating Array class
+			if (const auto tmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
+			{
+				return InstantiateClass(tmpl, { elementType });
+			}
+
+			return std::dynamic_pointer_cast<SemanticType>(sym->type);
+		}
+
+		return m_tUnit; // Fallback in case stdlib is not loaded
 	}
 
 	void RegisterProgramDeclarations(const ast::Program* node)

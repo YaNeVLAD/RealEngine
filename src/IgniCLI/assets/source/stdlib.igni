@@ -5,11 +5,10 @@ fun greater(lhs: Any, rhs: Any) = lhs > rhs;
 fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
 external fun print(args: Any...): Unit;
-external fun len(arr: Array): Int;
-external fun make_array(size: Int): Array;
+external fun <T> len(arr: Array<T>): Int;
+external fun <T> make_array(size: Int): Array<T>;
 
-// TODO: Add class template parameters
-external class Array {
-  external fun get(index: Int): Any;
-  external fun set(index: Int, value: Any): Unit;
+external class Array <T> {
+  external fun get(index: Int): T;
+  external fun set(index: Int, value: T): Unit;
 }
