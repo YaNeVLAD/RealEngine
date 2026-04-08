@@ -114,6 +114,8 @@ struct ClassType final : SemanticType
 
 	re::String moduleName;
 
+	std::vector<std::shared_ptr<SemanticType>> typeArguments;
+
 	explicit ClassType(const re::String& n) { name = n; }
 };
 

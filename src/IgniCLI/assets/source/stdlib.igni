@@ -5,6 +5,7 @@ fun greater(lhs: Any, rhs: Any) = lhs > rhs;
 fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
 external fun print(args: Any...): Unit;
+external fun println(args: Any...): Unit;
 external fun <T> len(arr: Array<T>): Int;
 
 external class Array <T>(size: Int) {

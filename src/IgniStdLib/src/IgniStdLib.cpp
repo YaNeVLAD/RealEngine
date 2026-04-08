@@ -79,8 +79,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 {
 	using namespace re::rvm;
 
-	auto arrayType = vm->GetTypeByName("Array");
-	if (arrayType)
+	if (const auto arrayType = vm->GetTypeByName("Array"))
 	{
 		InitArrayMethods(arrayType);
 	}
@@ -88,7 +87,6 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 	InitMathModule(vm);
 
 	vm->RegisterNative("print", [](const std::vector<Value>& args) -> Value {
-		std::cout << ">>> [SCRIPT]: ";
 		if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
 		{
 			for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
@@ -103,7 +101,26 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 				std::cout << arg;
 			}
 		}
-		std::cout << "\n";
+
+		return Null;
+	});
+
+	vm->RegisterNative("println", [](const std::vector<Value>& args) -> Value {
+		if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
+		{
+			for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
+			{
+				std::cout << arg;
+			}
+		}
+		else
+		{
+			for (const auto& arg : args)
+			{
+				std::cout << arg;
+			}
+		}
+		std::cout << std::endl;
 
 		return Null;
 	});

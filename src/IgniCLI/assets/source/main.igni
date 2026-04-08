@@ -40,7 +40,11 @@ fun main() {
 	}
 	print("array: ", arr);
 
-	val player = Player("Женя Пригожин");
+	bubbleSort(arr, greater);
+
+	print("sorted array: ", arr);
+
+	val player = Player("Арбуз Арбуз");
 	print("Привет, ", player.name, "!");
 
 	printOnce(42.33);

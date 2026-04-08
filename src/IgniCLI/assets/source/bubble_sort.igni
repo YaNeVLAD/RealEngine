@@ -1,6 +1,8 @@
 package main;
 
-fun bubbleSort(arr: Array, size: Int, comp: (Int, Int) -> Bool) {
+fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool) {
+	val size = len(arr);
+
     var i = 0;
     while (i < size - 1) {
         var j = 0;
@@ -12,14 +14,6 @@ fun bubbleSort(arr: Array, size: Int, comp: (Int, Int) -> Bool) {
             }
             j++;
         }
-        i++;
-    }
-}
-
-fun printArray(arr: Array, size: Int) {
-    var i = 0;
-    while (i < size) {
-        print(arr[i]);
         i++;
     }
 }

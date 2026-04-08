@@ -305,31 +305,21 @@ public:
 					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
 
 					if (id->typeArgs.empty())
-					{ // Type Inference
+					{ // Recursive type inference
 						concreteArgs.resize(funTmpl->typeParams.size(), nullptr);
 						for (std::size_t i = 0; i < node->arguments.size() && i < funTmpl->astNode->parameters.size(); ++i)
 						{
 							const auto argType = Evaluate(node->arguments[i].get());
 							const auto paramTypeAst = funTmpl->astNode->parameters[i].type.get();
 
-							if (const auto simpleAst = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
-							{
-								for (std::size_t k = 0; k < funTmpl->typeParams.size(); ++k)
-								{
-									if (funTmpl->typeParams[k].name == simpleAst->name)
-									{
-										if (!concreteArgs[k])
-											concreteArgs[k] = argType;
-									}
-								}
-							}
+							InferTypeArguments(argType, paramTypeAst, funTmpl->typeParams, concreteArgs);
 						}
 
 						for (std::size_t k = 0; k < concreteArgs.size(); ++k)
 						{
 							if (!concreteArgs[k])
 							{
-								throw std::runtime_error("Semantic Error: Could not infer type argument for '" + funTmpl->typeParams[k].name + "' in generic function '" + funTmpl->name + "'. Use explicit turbofish syntax (e.g. " + funTmpl->name + "::<Type>).");
+								throw std::runtime_error("Semantic Error: Could not infer type argument for '" + funTmpl->typeParams[k].name + "' in generic function '" + funTmpl->name + "'. Use explicit turbofish syntax.");
 							}
 						}
 					}
@@ -854,6 +844,53 @@ private:
 		expr->Accept(*this);
 
 		return m_currentExprType;
+	}
+
+	void InferTypeArguments(const std::shared_ptr<SemanticType>& argType,
+		const ast::TypeNode* paramTypeAst,
+		const std::vector<ast::GenericTypeParam>& typeParams,
+		std::vector<std::shared_ptr<SemanticType>>& outConcreteArgs)
+	{
+		if (!argType || !paramTypeAst)
+			return;
+
+		if (const auto simpleAst = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
+		{
+			for (std::size_t k = 0; k < typeParams.size(); ++k)
+			{ // Basic case: T is T
+				if (typeParams[k].name == simpleAst->name)
+				{
+					if (!outConcreteArgs[k])
+					{
+						outConcreteArgs[k] = argType;
+					}
+					return;
+				}
+			}
+
+			// Рекурсивный случай 1: параметр — это дженерик-класс (например, Array<T>)
+			if (!simpleAst->typeArgs.empty())
+			{ // Recursive case 1: T is generic argument of Class<T>
+				if (const auto classType = std::dynamic_pointer_cast<ClassType>(argType))
+				{
+					for (std::size_t i = 0; i < simpleAst->typeArgs.size() && i < classType->typeArguments.size(); ++i)
+					{
+						InferTypeArguments(classType->typeArguments[i], simpleAst->typeArgs[i].get(), typeParams, outConcreteArgs);
+					}
+				}
+			}
+		}
+		else if (const auto funAst = dynamic_cast<const ast::FunctionTypeNode*>(paramTypeAst))
+		{ // Recursive case 2: T is generic function argument like callback: (T) -> Unit
+			if (const auto funType = std::dynamic_pointer_cast<FunctionType>(argType))
+			{
+				for (std::size_t i = 0; i < funAst->paramTypes.size() && i < funType->paramTypes.size(); ++i)
+				{
+					InferTypeArguments(funType->paramTypes[i], funAst->paramTypes[i].get(), typeParams, outConcreteArgs);
+				}
+				InferTypeArguments(funType->returnType, funAst->returnType.get(), typeParams, outConcreteArgs);
+			}
+		}
 	}
 
 	std::shared_ptr<SemanticType> GetVarargArrayType(const std::shared_ptr<SemanticType>& elementType)
@@ -1444,6 +1481,7 @@ private:
 
 		auto classType = std::make_shared<ClassType>(uniqueName);
 		classType->moduleName = tmpl->moduleName;
+		classType->typeArguments = typeArgs;
 		m_instantiatedClasses[uniqueName] = classType;
 
 		m_env.Define(uniqueName, classType, true);

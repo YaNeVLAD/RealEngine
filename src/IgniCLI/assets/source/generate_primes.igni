@@ -1,28 +1,21 @@
 package main;
 
 fun sieve(n: Int) {
-    // 1. Создаем массив размером n + 1 (чтобы индексы совпадали с числами)
-    val is_prime = make_array(n + 1);
+    val is_prime = Array::<Bool>(n + 1);
 
-    // 2. Инициализируем массив значениями true
     var i = 0;
-    while (i <= n) {
-        is_prime[i] = true;
-        i++;
-    }
+	for (i in 0..n) {
+		is_prime[i] = true;
+	}
 
-    // 0 и 1 не являются простыми числами
     is_prime[0] = false;
     is_prime[1] = false;
 
-    // 3. Основной алгоритм
     var p = 2;
     // Используем p * p <= n вместо вычисления квадратного корня!
     while (p * p <= n) {
-
         // Если p осталось true, значит это простое число
         if (is_prime[p] == true) {
-
             // Вычеркиваем все кратные p, начиная с p^2
             var j = p * p;
             while (j <= n) {
@@ -33,13 +26,13 @@ fun sieve(n: Int) {
         p++;
     }
 
-    // 4. Выводим результаты
-    print("Prime numbers up to", n, ":");
+    print("Prime numbers up to ", n, ": ");
     var k = 2;
     while (k <= n) {
         if (is_prime[k] == true) {
-            print(k);
+            print(k, " ");
         }
         k++;
     }
+	println();
 }
