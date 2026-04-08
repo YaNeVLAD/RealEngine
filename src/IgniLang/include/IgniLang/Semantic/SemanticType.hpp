@@ -49,7 +49,9 @@ struct FunctionType final : SemanticType
 {
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 	std::shared_ptr<SemanticType> returnType;
+
 	bool isVararg = false;
+	bool isExternal = false;
 
 	ast::Visibility visibility = ast::Visibility::Public;
 	re::String moduleName;
@@ -104,6 +106,8 @@ struct ClassType final : SemanticType
 		bool isReadOnly;
 		ast::Visibility visibility = ast::Visibility::Public;
 	};
+
+	bool isExternal = false;
 
 	std::unordered_map<re::String, FieldInfo> fields;
 	std::unordered_map<re::String, std::shared_ptr<FunctionType>> methods;

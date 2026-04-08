@@ -23,7 +23,9 @@ VarDecl -> var ident OptColonType = Expr ;
 ValDecl -> val ident OptColonType = Expr ;
 OptColonType -> : Type | \e
 
-ClassDecl -> class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
+ClassDecl -> OptClassMod class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
+OptClassMod -> external | \e
+
 OptTypeParams -> < TypeParams > | \e
 TypeParams -> TypeParams , ident | ident
 

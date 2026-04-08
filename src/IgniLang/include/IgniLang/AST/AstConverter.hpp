@@ -221,12 +221,19 @@ private:
 
 			return funDecl;
 		}
-		case "ClassDecl"_hs: { // ClassDecl -> class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
+		case "ClassDecl"_hs: { // ClassDecl -> OptClassMod class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
 			auto classDecl = std::make_unique<ast::ClassDecl>();
-			classDecl->name = actualDecl->children[1]->token->lexeme;
 
-			const auto& optPrimaryCtor = actualDecl->children[3];
-			const auto& classMemberList = actualDecl->children[5];
+			if (const auto& optClassMod = actualDecl->children[0];
+				!optClassMod->children.empty() && optClassMod->children[0]->symbol.Hashed() == "external"_hs)
+			{
+				classDecl->isExternal = true;
+			}
+
+			classDecl->name = actualDecl->children[2]->token->lexeme;
+
+			const auto& optPrimaryCtor = actualDecl->children[4];
+			const auto& classMemberList = actualDecl->children[6];
 
 			std::unique_ptr<ast::ConstructorDecl> primaryCtor = nullptr;
 

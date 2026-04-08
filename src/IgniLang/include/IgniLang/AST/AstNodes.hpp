@@ -577,6 +577,7 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 struct ClassDecl final : Visitable<ClassDecl, Decl>
 {
 	re::String name;
+	bool isExternal = false;
 
 	std::vector<re::String> typeParams;
 

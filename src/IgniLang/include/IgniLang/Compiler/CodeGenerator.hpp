@@ -78,6 +78,11 @@ public:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
+				if (classDecl->isExternal)
+				{
+					continue;
+				}
+
 				m_out << "TYPE \"" << classDecl->name << "\"\n";
 
 				for (const auto& member : classDecl->members)
@@ -119,6 +124,11 @@ public:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
+				if (classDecl->isExternal)
+				{
+					continue;
+				}
+
 				for (const auto& member : classDecl->members)
 				{
 					if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
@@ -316,7 +326,14 @@ public:
 				? (node->arguments.size() - node->varargCount + 1)
 				: node->arguments.size();
 
-			m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+			if (!node->staticMethodTarget.Empty())
+			{
+				m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+			}
+			else if (actualArgs > 0)
+			{
+				m_out << "CALL_METHOD \"init\" " << actualArgs << "\n";
+			}
 
 			m_out << "POP\n";
 
@@ -734,7 +751,7 @@ public:
 			node->body->Accept(*this);
 		}
 
-		m_out << "GET " << asmIterName << "\nCONST 1\nADD\nSET " << asmIterName << "\n";
+		m_out << "GET " << asmIterName << "\nINC\nSET " << asmIterName << "\n";
 		m_out << "JMP " << startLabel << "\nLABEL " << endLabel << "\n";
 
 		m_currentLocals.resize(localsCountBefore);

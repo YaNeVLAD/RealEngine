@@ -195,7 +195,10 @@ public:
 
 				ValidateCallArguments(node, ctorType, true);
 
-				mutableNode->staticMethodTarget = ctorType->name;
+				if (!ctorType->isExternal)
+				{
+					mutableNode->staticMethodTarget = ctorType->name;
+				}
 			}
 
 			m_currentExprType = classType;
@@ -216,7 +219,10 @@ public:
 			{
 				isMethodCall = true;
 				const auto mutableNode = const_cast<ast::CallExpr*>(node);
-				mutableNode->staticMethodTarget = classType->name + "_" + memAccess->member;
+				if (!funType->isExternal)
+				{
+					mutableNode->staticMethodTarget = classType->name + "_" + memAccess->member;
+				}
 			}
 		}
 
@@ -639,7 +645,22 @@ private:
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				auto classType = std::make_shared<ClassType>(classDecl->name);
+				std::shared_ptr<ClassType> classType = nullptr;
+				bool isNewClass = false;
+
+				if (isGlobal)
+				{
+					if (const Symbol* existingSym = m_env.Resolve(classDecl->name))
+					{
+						classType = std::dynamic_pointer_cast<ClassType>(existingSym->type);
+					}
+				}
+
+				if (!classType)
+				{
+					classType = std::make_shared<ClassType>(classDecl->name);
+					isNewClass = true;
+				}
 
 				bool hasConstructor = false;
 				for (const auto& member : classDecl->members)
@@ -662,12 +683,11 @@ private:
 
 				classType->moduleName = currentModule ? currentModule->name : "global";
 
-				// --- ИСПРАВЛЕНИЕ: Кладем ТОЛЬКО в m_env ИЛИ ТОЛЬКО в exports ---
-				if (isGlobal)
+				if (isGlobal && isNewClass)
 				{
 					m_env.Define(classDecl->name, classType, true);
 				}
-				else
+				else if (!isGlobal)
 				{
 					currentModule->exports[classDecl->name] = classType;
 				}
@@ -704,8 +724,8 @@ private:
 
 						funType->visibility = mutableFun->visibility;
 						funType->moduleName = currentModule ? currentModule->name : "global";
+						funType->isExternal = fun->isExternal || classDecl->isExternal;
 
-						// --- ИСПРАВЛЕНИЕ: Исправлен баг с classType и логика Scopes ---
 						if (isGlobal)
 						{
 							m_env.Define(mutableFun->name, funType, true);
@@ -734,6 +754,7 @@ private:
 						auto funType = std::make_shared<FunctionType>(mutableCtor->name);
 						funType->returnType = m_tUnit;
 						funType->isVararg = mutableCtor->isVararg;
+						funType->isExternal = classDecl->isExternal;
 
 						for (const auto& [_, type] : mutableCtor->parameters)
 						{
@@ -768,6 +789,7 @@ private:
 						funType->paramTypes.emplace_back(ResolveAstType(thisTypeNode.get()));
 
 						funType->visibility = mutableDtor->visibility;
+						funType->isExternal = classDecl->isExternal;
 
 						if (isGlobal)
 						{

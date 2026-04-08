@@ -32,6 +32,13 @@ fun move(player: Player, dir: Vector2) {
 }
 
 fun main() {
+	val arr = make_array(6);
+	for (i in 0..5) {
+		arr[i] = i;
+	}
+	bubbleSort(arr, 6, greater);
+	print("sorted array: ", arr);
+
 	val player = Player("Женя Пригожин");
 	print("Привет, ", player.name, "!");
 
