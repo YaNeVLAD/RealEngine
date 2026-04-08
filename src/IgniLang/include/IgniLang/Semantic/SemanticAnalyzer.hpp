@@ -61,9 +61,9 @@ public:
 			m_env.PopScope();
 		}
 
-		for (std::size_t i = 0; i < m_pendingInstantiations.size(); ++i)
+		for (std::size_t i = 0; i < m_pendingClassInstantiations.size(); ++i)
 		{
-			const auto* decl = m_pendingInstantiations[i];
+			const auto* decl = m_pendingClassInstantiations[i];
 			const auto classType = m_instantiatedClasses[decl->name];
 
 			m_env.PushScope();
@@ -96,7 +96,35 @@ public:
 
 			m_env.PopScope();
 		}
-		m_pendingInstantiations.clear();
+		m_pendingClassInstantiations.clear();
+
+		for (std::size_t i = 0; i < m_pendingFunInstantiations.size(); ++i)
+		{
+			const auto* decl = m_pendingFunInstantiations[i];
+			auto funType = m_instantiatedFunctions[decl->name];
+
+			m_env.PushScope();
+
+			if (!funType->moduleName.Empty() && funType->moduleName != "global")
+			{
+				if (const Symbol* modSym = m_env.Resolve(funType->moduleName))
+				{
+					if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
+					{
+						for (const auto& [name, type] : modType->exports)
+							m_env.Define(name, type, true);
+					}
+				}
+			}
+
+			m_env.Define(decl->name, funType, true);
+
+			m_instantiatedNodes.erase(decl);
+			decl->Accept(*this);
+
+			m_env.PopScope();
+		}
+		m_pendingFunInstantiations.clear();
 	}
 
 	[[nodiscard]] std::unordered_set<re::String> GetGlobalNames() const
@@ -256,6 +284,67 @@ public:
 					}
 					m_currentExprType = concreteClass;
 
+					return;
+				}
+				if (const auto funTmpl = std::dynamic_pointer_cast<GenericFunctionTemplate>(sym->type))
+				{
+					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
+
+					if (id->typeArgs.empty())
+					{ // Type Inference
+						concreteArgs.resize(funTmpl->typeParams.size(), nullptr);
+						for (std::size_t i = 0; i < node->arguments.size() && i < funTmpl->astNode->parameters.size(); ++i)
+						{
+							const auto argType = Evaluate(node->arguments[i].get());
+							const auto paramTypeAst = funTmpl->astNode->parameters[i].type.get();
+
+							if (const auto simpleAst = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
+							{
+								for (std::size_t k = 0; k < funTmpl->typeParams.size(); ++k)
+								{
+									if (funTmpl->typeParams[k].name == simpleAst->name)
+									{
+										if (!concreteArgs[k])
+											concreteArgs[k] = argType;
+									}
+								}
+							}
+						}
+
+						for (std::size_t k = 0; k < concreteArgs.size(); ++k)
+						{
+							if (!concreteArgs[k])
+							{
+								throw std::runtime_error("Semantic Error: Could not infer type argument for '" + funTmpl->typeParams[k].name + "' in generic function '" + funTmpl->name + "'. Use explicit turbofish syntax (e.g. " + funTmpl->name + "::<Type>).");
+							}
+						}
+					}
+					else
+					{ // Manually named template arguments
+						// Использование явной "турборыбы"
+						if (id->typeArgs.size() != funTmpl->typeParams.size())
+						{
+							throw std::runtime_error("Semantic Error: Generic function requires exactly " + std::to_string(funTmpl->typeParams.size()) + " type arguments");
+						}
+
+						for (const auto& arg : id->typeArgs)
+						{
+							concreteArgs.push_back(ResolveAstType(arg.get()));
+						}
+					}
+
+					const auto concreteFun = InstantiateFunction(funTmpl, concreteArgs);
+
+					const_cast<ast::IdentifierExpr*>(id)->name = concreteFun->name;
+
+					ValidateCallArguments(node, concreteFun, false);
+
+					if (concreteFun->returnType == nullptr)
+					{
+						throw std::runtime_error("Semantic Error: Cannot infer return type for forward call of '" + concreteFun->name + "'.");
+					}
+
+					m_currentExprType = concreteFun->returnType;
 					return;
 				}
 			}
@@ -702,7 +791,11 @@ private:
 	ast::Program* m_currentProgram = nullptr;
 
 	std::unordered_map<re::String, std::shared_ptr<ClassType>> m_instantiatedClasses;
-	std::vector<ast::ClassDecl*> m_pendingInstantiations;
+	std::vector<ast::ClassDecl*> m_pendingClassInstantiations;
+
+	std::unordered_map<re::String, std::shared_ptr<FunctionType>> m_instantiatedFunctions;
+	std::vector<ast::FunDecl*> m_pendingFunInstantiations;
+
 	std::unordered_set<const ast::Node*> m_instantiatedNodes;
 
 	std::unordered_map<re::String, re::String> m_importAliases;
@@ -1432,7 +1525,7 @@ private:
 			}
 		}
 
-		m_pendingInstantiations.push_back(realClassDecl);
+		m_pendingClassInstantiations.push_back(realClassDecl);
 		m_instantiatedNodes.insert(realClassDecl);
 		for (const auto& member : realClassDecl->members)
 		{
@@ -1559,6 +1652,85 @@ private:
 				classType->methods["~" + classDecl->name] = funType;
 			}
 		}
+	}
+
+	std::shared_ptr<FunctionType> InstantiateFunction(const std::shared_ptr<GenericFunctionTemplate>& tmpl, const std::vector<std::shared_ptr<SemanticType>>& typeArgs)
+	{
+		re::String uniqueName = tmpl->name;
+		for (const auto& arg : typeArgs)
+			uniqueName = uniqueName + "_" + arg->name;
+
+		if (m_instantiatedFunctions.contains(uniqueName))
+			return m_instantiatedFunctions[uniqueName];
+
+		ast::TypeEnv typeEnv;
+		std::vector<std::unique_ptr<ast::SimpleTypeNode>> tempNodes;
+
+		for (std::size_t i = 0; i < typeArgs.size(); ++i)
+		{
+			if (tmpl->typeParams[i].boundType)
+			{
+				auto boundSemType = ResolveAstType(tmpl->typeParams[i].boundType.get());
+				ExpectAssignable(typeArgs[i], boundSemType, "type parameter bound");
+			}
+			auto tempNode = std::make_unique<ast::SimpleTypeNode>();
+			tempNode->name = typeArgs[i]->name;
+			typeEnv[tmpl->typeParams[i].name] = tempNode.get();
+			tempNodes.push_back(std::move(tempNode));
+		}
+
+		// Клонируем AST с подстановкой типов
+		auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
+		auto realFunDecl = dynamic_cast<ast::FunDecl*>(clonedDecl.get());
+		realFunDecl->name = uniqueName;
+		realFunDecl->typeParams.clear();
+
+		auto funType = std::make_shared<FunctionType>(uniqueName);
+		funType->moduleName = tmpl->moduleName;
+		funType->isVararg = realFunDecl->isVararg;
+		funType->visibility = realFunDecl->visibility;
+		funType->isExternal = realFunDecl->isExternal;
+
+		for (const auto& p : realFunDecl->parameters)
+		{
+			funType->paramTypes.push_back(ResolveAstType(p.type.get()));
+		}
+		funType->returnType = ResolveAstType(realFunDecl->returnType.get());
+
+		if (funType->returnType == nullptr && realFunDecl->isExprBody)
+		{ // On-demand type evaluation
+			m_env.PushScope();
+			for (std::size_t j = 0; j < realFunDecl->parameters.size(); ++j)
+			{
+				m_env.Define(realFunDecl->parameters[j].name, funType->paramTypes[j], false);
+			}
+
+			const auto prevFun = m_currentFunctionType;
+			m_currentFunctionType = funType;
+
+			if (realFunDecl->body && !realFunDecl->body->statements.empty())
+			{
+				if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(realFunDecl->body->statements[0].get()))
+					funType->returnType = Evaluate(retStmt->expr.get());
+			}
+			m_currentFunctionType = prevFun;
+			m_env.PopScope();
+		}
+		else if (funType->returnType == nullptr && !realFunDecl->isExprBody)
+		{
+			funType->returnType = m_tUnit;
+		}
+
+		m_instantiatedFunctions[uniqueName] = funType;
+		m_env.Define(uniqueName, funType, true);
+		m_allFunctionNames.insert(uniqueName);
+
+		m_pendingFunInstantiations.push_back(realFunDecl);
+		m_instantiatedNodes.insert(realFunDecl);
+
+		m_currentProgram->statements.push_back(std::move(clonedDecl));
+
+		return funType;
 	}
 };
 
