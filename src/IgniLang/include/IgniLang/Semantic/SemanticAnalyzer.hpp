@@ -279,8 +279,14 @@ public:
 					const auto mutableNode = const_cast<ast::CallExpr*>(node);
 					mutableNode->isConstructorCall = true;
 
-					const_cast<ast::IdentifierExpr*>(id)->name = concreteClass->name;
-
+					if (!classTmpl->astNode->isExternal)
+					{ // Mangle name for script-defined classes
+						const_cast<ast::IdentifierExpr*>(id)->name = concreteClass->name;
+					}
+					else
+					{ // Keep original name for external
+						const_cast<ast::IdentifierExpr*>(id)->name = classTmpl->name;
+					}
 					if (const auto it = concreteClass->methods.find(concreteClass->name); it != concreteClass->methods.end())
 					{
 						const auto ctorType = std::dynamic_pointer_cast<FunctionType>(it->second);
@@ -342,8 +348,14 @@ public:
 
 					const auto concreteFun = InstantiateFunction(funTmpl, concreteArgs);
 
-					const_cast<ast::IdentifierExpr*>(id)->name = concreteFun->name;
-
+					if (!funTmpl->astNode->isExternal)
+					{ // Mangle name for script-defined functions
+						const_cast<ast::IdentifierExpr*>(id)->name = concreteFun->name;
+					}
+					else
+					{ // Keep original name for external
+						const_cast<ast::IdentifierExpr*>(id)->name = funTmpl->name;
+					}
 					ValidateCallArguments(node, concreteFun, false);
 
 					if (concreteFun->returnType == nullptr)

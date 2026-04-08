@@ -333,11 +333,11 @@ InterpreterResult VirtualMachine::Run()
 			else if (auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
 			{
 				auto native = *nativePtr;
-				if (native->argCount != argCount)
+				if (native->argCount != static_cast<std::int8_t>(-1) && native->argCount != argCount)
 				{
 					std::cerr << "Runtime Error: Method '"
 							  << methodName
-							  << "' expects " << static_cast<int>(native->argCount)
+							  << "' expects " << native->argCount
 							  << " arguments.\n";
 
 					return InterpreterResult::RuntimeError;
@@ -373,7 +373,7 @@ InterpreterResult VirtualMachine::Run()
 				return InterpreterResult::RuntimeError;
 			}
 
-			auto instance = std::make_shared<Instance>(it->second);
+			auto instance = it->second->allocator(it->second);
 			Push(instance);
 			break;
 		}

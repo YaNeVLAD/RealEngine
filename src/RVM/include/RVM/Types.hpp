@@ -82,9 +82,11 @@ using NativeFn = std::function<Value(std::vector<Value> const&)>;
 struct NativeObject
 {
 	String name;
-	std::uint8_t argCount;
+	std::int8_t argCount;
 	NativeFn function;
 };
+
+using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;
 
 struct TypeInfo
 {
@@ -94,11 +96,15 @@ struct TypeInfo
 
 	std::unordered_map<Hash_t, Value> methods;
 
+	AllocatorFn allocator;
+
 	explicit TypeInfo(String name);
 
 	void AddField(String const& fieldName);
 
-	TypeInfo& AddNativeMethod(String const& methodName, std::uint8_t argCount, NativeFn function);
+	TypeInfo& AddNativeMethod(String const& methodName, std::int8_t argCount, NativeFn function);
+
+	TypeInfo& SetAllocator(AllocatorFn alloc);
 };
 
 enum class OpCode : std::uint8_t

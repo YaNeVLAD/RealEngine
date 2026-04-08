@@ -12,9 +12,29 @@ namespace
 void InitArrayMethods(const re::rvm::TypeInfoPtr& arrayType)
 {
 	using namespace re::rvm;
+	arrayType->SetAllocator([](const TypeInfoPtr& type) {
+		auto arr = std::make_shared<ArrayInstance>();
+		arr->typeInfo = type;
+
+		return arr;
+	});
+
+	arrayType->AddNativeMethod("init", -1, [](const std::vector<Value>& args) -> Value {
+		const auto arr = std::get<ArrayInstancePtr>(args[0]);
+
+		if (args.size() == 2)
+		{
+			const auto size = std::get<Int>(args[1]);
+			arr->elements.resize(size);
+		}
+
+		return arr;
+	});
+
 	arrayType->AddNativeMethod("set", 2, [](const std::vector<Value>& args) -> Value {
 		const auto arr = std::get<ArrayInstancePtr>(args[0]);
 		const auto index = std::get<Int>(args[1]);
+
 		arr->elements[index] = args[2];
 
 		return Null;
@@ -66,16 +86,6 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 	}
 
 	InitMathModule(vm);
-
-	vm->RegisterNative("make_array", [arrayType](const std::vector<Value>& args) -> Value {
-		const auto count = std::get<Int>(args[0]);
-		auto arr = std::make_shared<ArrayInstance>();
-		arr->typeInfo = arrayType;
-
-		arr->elements.resize(count, Null);
-
-		return arr;
-	});
 
 	vm->RegisterNative("print", [](const std::vector<Value>& args) -> Value {
 		std::cout << ">>> [SCRIPT]: ";

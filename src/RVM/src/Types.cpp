@@ -19,6 +19,9 @@ using namespace utils;
 TypeInfo::TypeInfo(String name)
 	: name(std::move(name))
 {
+	allocator = [](TypeInfoPtr const& t) -> Value {
+		return std::make_shared<Instance>(t);
+	};
 }
 
 void TypeInfo::AddField(String const& fieldName)
@@ -30,7 +33,7 @@ void TypeInfo::AddField(String const& fieldName)
 	}
 }
 
-TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::uint8_t argCount, NativeFn function)
+TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::int8_t argCount, NativeFn function)
 {
 	auto nativeObj = std::make_shared<NativeObject>();
 	nativeObj->name = methodName;
@@ -38,6 +41,13 @@ TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::uint8_t
 	nativeObj->function = std::move(function);
 
 	methods[methodName.Hash()] = nativeObj;
+
+	return *this;
+}
+
+TypeInfo& TypeInfo::SetAllocator(AllocatorFn alloc)
+{
+	allocator = std::move(alloc);
 
 	return *this;
 }

@@ -6,9 +6,8 @@ fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
 external fun print(args: Any...): Unit;
 external fun <T> len(arr: Array<T>): Int;
-external fun <T> make_array(size: Int): Array<T>;
 
-external class Array <T> {
+external class Array <T>(size: Int) {
   external fun get(index: Int): T;
   external fun set(index: Int, value: T): Unit;
 }

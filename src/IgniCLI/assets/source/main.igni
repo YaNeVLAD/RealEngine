@@ -34,6 +34,12 @@ fun <T> printOnce(value: T) {
 }
 
 fun main() {
+	val arr = Array::<Int>(6);
+	for (i in 0..5) {
+		arr[i] = i;
+	}
+	print("array: ", arr);
+
 	val player = Player("Женя Пригожин");
 	print("Привет, ", player.name, "!");
 
