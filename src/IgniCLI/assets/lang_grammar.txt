@@ -19,11 +19,15 @@ OptParenExpr -> ( Expr ) | \e
 
 OptVisibility -> public | private | internal | \e
 
-VarDecl -> var ident OptColonType = Expr ;
-ValDecl -> val ident OptColonType = Expr ;
+OptMod -> external | \e
+OptInit -> = Expr | \e
+
+VarDecl -> OptMod var ident OptColonType OptInit ;
+ValDecl -> OptMod val ident OptColonType OptInit ;
 OptColonType -> : Type | \e
 
-ClassDecl -> OptClassMod class ident OptTypeParams OptPrimaryCtor { ClassMemberList }
+ClassDecl -> OptClassMod class OptTypeParams ident OptPrimaryCtor OptBaseClass { ClassMemberList }
+OptBaseClass -> : Type ( OptActPars ) | : Type | \e
 OptClassMod -> external | \e
 
 OptTypeParams -> < TypeParams > | \e
@@ -43,7 +47,7 @@ ConstructorDecl -> ident ( OptFormPars ) Block
 DestructorDecl -> ~ ident ( ) Block
 
 FunDecl -> OptFunMod fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
-FunName -> ident | Type . ident | Type ? . ident
+FunName -> ident | ident . ident
 OptFunMod -> external | compile_time | \e
 OptFormPars -> FormPars | \e
 FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
@@ -96,17 +100,18 @@ UnaryExpr -> + UnaryExpr | - UnaryExpr | ! UnaryExpr | ~ UnaryExpr
 
 PostfixExpr -> Designator ++
              | Designator --
-             | PrimaryExpr
-
-PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr ) | Designator
-
-OptExprTypeArgs -> :: < TypeList > | \e
+             | Designator
 
 Designator -> ident OptExprTypeArgs
+            | PrimaryExpr
             | Designator . ident OptExprTypeArgs
             | Designator [ Expr ]
             | Designator ?. ident OptExprTypeArgs
             | Designator ( OptActPars )
+
+PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr )
+
+OptExprTypeArgs -> :: < TypeList > | \e
 
 OptActPars -> ActPars | \e
 ActPars -> ActPars , Expr | Expr

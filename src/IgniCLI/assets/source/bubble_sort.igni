@@ -1,7 +1,7 @@
 package main;
 
 fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool) {
-	val size = len(arr);
+	val size = arr.size;
 
     var i = 0;
     while (i < size - 1) {

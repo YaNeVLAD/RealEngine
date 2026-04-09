@@ -381,15 +381,21 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::GetProperty: {
 			Value propNameVal = READ_CONSTANT();
 			auto propName = std::get<String>(propNameVal);
-			auto propHash = propName.Hash();
+			auto propHash = propName.Hashed();
 
 			Value objVal = Pop();
-			auto typeInfo = GetType(objVal);
+			auto typeInfo = GetType(objVal); // Ваша ВМ должна уметь возвращать TypeInfo для String!
 
 			if (!typeInfo)
 			{
 				std::cerr << "Runtime Error: Value has no type info\n";
 				return InterpreterResult::RuntimeError;
+			}
+
+			if (auto it = typeInfo->getters.find(propHash); it != typeInfo->getters.end())
+			{
+				Push(it->second(objVal));
+				break;
 			}
 
 			if (auto it = typeInfo->methods.find(propHash); it != typeInfo->methods.end())
@@ -405,43 +411,12 @@ InterpreterResult VirtualMachine::Run()
 					it != instance->typeInfo->fieldIndexes.end())
 				{
 					Push(instance->fields[it->second]);
-				}
-				else
-				{
-					std::cerr << "Runtime Error: Undefined property '" << propName << "'\n";
-					return InterpreterResult::RuntimeError;
+					break;
 				}
 			}
-			else if (auto* arrPtr = std::get_if<ArrayInstancePtr>(&objVal))
-			{
-				if (propHash == "length"_hs)
-				{
-					Push(static_cast<Int>((*arrPtr)->elements.size()));
-				}
-				else
-				{
-					std::cerr << "Runtime Error: Undefined property on Array\n";
-					return InterpreterResult::RuntimeError;
-				}
-			}
-			else if (auto* strPtr = std::get_if<String>(&objVal))
-			{
-				if (propHash == "length"_hs)
-				{
-					Push(static_cast<Int>(strPtr->Length()));
-				}
-				else
-				{
-					std::cerr << "Runtime Error: Undefined property on String\n";
-					return InterpreterResult::RuntimeError;
-				}
-			}
-			else
-			{
-				std::cerr << "Runtime Error: Primitive types have no fields\n";
-				return InterpreterResult::RuntimeError;
-			}
-			break;
+
+			std::cerr << "Runtime Error: Undefined property '" << propName << "' on type '" << typeInfo->name << "'\n";
+			return InterpreterResult::RuntimeError;
 		}
 
 		case OpCode::SetProperty: {

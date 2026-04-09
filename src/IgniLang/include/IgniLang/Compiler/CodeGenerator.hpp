@@ -3,6 +3,7 @@
 #include <Core/HashedString.hpp>
 #include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -22,13 +23,15 @@ public:
 		const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvals,
 		const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
 		const std::unordered_map<re::String, re::String>& importAliases,
-		const std::unordered_set<re::String>& externals)
+		const std::unordered_set<re::String>& externals,
+		const sem::SemanticAnalyzer& semantics)
 		: m_out(out)
 		, m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvals)
 		, m_functionBoxedVars(funcBoxedVars)
 		, m_importAliases(importAliases)
 		, m_externals(externals)
+		, m_semanticAnalyzer(semantics)
 	{
 	}
 
@@ -95,17 +98,14 @@ public:
 
 				m_out << "TYPE \"" << classDecl->name << "\"\n";
 
-				for (const auto& member : classDecl->members)
+				if (const auto classType = m_semanticAnalyzer.GetClassType(classDecl->name))
 				{
-					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+					for (const auto& fieldName : classType->fields | std::views::keys)
 					{
-						m_out << "    FIELD \"" << varDecl->name << "\"\n";
-					}
-					else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
-					{
-						m_out << "    FIELD \"" << valDecl->name << "\"\n";
+						m_out << "    FIELD \"" << fieldName << "\"\n";
 					}
 				}
+
 				m_out << "END_TYPE\n\n";
 			}
 		}
@@ -303,7 +303,21 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		if (node->isConstructorCall)
+		if (node->isSuperCall)
+		{
+			const auto thisExpr = std::make_unique<ast::IdentifierExpr>();
+			thisExpr->name = "this";
+			thisExpr->Accept(*this);
+
+			for (const auto& arg : node->arguments)
+			{
+				arg->Accept(*this);
+			}
+
+			m_out << "CALL " << node->staticMethodTarget << " " << (node->arguments.size() + 1) << "\n";
+			return;
+		}
+		else if (node->isConstructorCall)
 		{
 			re::String className;
 
@@ -859,6 +873,8 @@ private:
 
 	const std::unordered_map<re::String, re::String>& m_importAliases;
 	const std::unordered_set<re::String>& m_externals;
+
+	const sem::SemanticAnalyzer& m_semanticAnalyzer;
 
 	void GenerateConstructor(const ast::ConstructorDecl* ctor, const ast::ClassDecl* classDecl)
 	{

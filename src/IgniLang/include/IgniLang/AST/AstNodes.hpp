@@ -307,6 +307,7 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 	std::size_t varargCount = 0;
 
 	bool isConstructorCall = false;
+	bool isSuperCall = false;
 
 	re::String staticMethodTarget;
 
@@ -348,6 +349,7 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 		clone->isVarargCall = isVarargCall;
 		clone->varargCount = varargCount;
 		clone->isConstructorCall = isConstructorCall;
+		clone->isSuperCall = isSuperCall;
 		clone->staticMethodTarget = staticMethodTarget;
 
 		return clone;
@@ -745,6 +747,7 @@ struct ValDecl final : Visitable<ValDecl, Decl>
 	re::String name;
 	std::unique_ptr<Expr> initializer;
 	std::unique_ptr<TypeNode> type;
+	bool isExternal = false;
 
 	void Print(int depth = 0) const override
 	{
@@ -783,6 +786,7 @@ struct VarDecl final : Visitable<VarDecl, Decl>
 	re::String name;
 	std::unique_ptr<Expr> initializer;
 	std::unique_ptr<TypeNode> type;
+	bool isExternal = false;
 
 	void Print(int depth = 0) const override
 	{
@@ -871,7 +875,9 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 			Parameter newP;
 			newP.name = p.name;
 			if (p.type)
+			{
 				newP.type = p.type->Clone(env);
+			}
 			clone->parameters.push_back(std::move(newP));
 		}
 		clone->isVararg = isVararg;
@@ -891,12 +897,20 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 	}
 };
 
+struct BaseClassInit
+{
+	std::unique_ptr<TypeNode> type;
+	std::vector<std::unique_ptr<Expr>> arguments;
+};
+
 struct ClassDecl final : Visitable<ClassDecl, Decl>
 {
 	re::String name;
 	bool isExternal = false;
 
 	std::vector<GenericTypeParam> typeParams;
+
+	std::unique_ptr<BaseClassInit> baseClass;
 
 	std::vector<std::unique_ptr<Decl>> members;
 
@@ -914,11 +928,24 @@ struct ClassDecl final : Visitable<ClassDecl, Decl>
 		clone->name = name;
 		clone->isExternal = isExternal;
 		clone->typeParams = typeParams;
+
+		if (baseClass)
+		{
+			clone->baseClass->type = baseClass->type->Clone(env);
+			for (const auto& arg : baseClass->arguments)
+			{
+				if (arg)
+				{
+					clone->baseClass->arguments.emplace_back(std::unique_ptr<Expr>(arg->CloneExpr(env).release()));
+				}
+			}
+		}
+
 		for (const auto& member : members)
 		{
 			if (member)
 			{
-				clone->members.push_back(std::unique_ptr<Decl>(static_cast<Decl*>(member->CloneDecl(env).release())));
+				clone->members.emplace_back(std::unique_ptr<Decl>(member->CloneDecl(env).release()));
 			}
 		}
 

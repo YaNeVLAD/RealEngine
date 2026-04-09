@@ -127,6 +127,21 @@ public:
 		m_pendingFunInstantiations.clear();
 	}
 
+	[[nodiscard]] std::shared_ptr<ClassType> GetClassType(const re::String& className) const
+	{
+		if (m_instantiatedClasses.contains(className))
+		{
+			return m_instantiatedClasses.at(className);
+		}
+
+		if (m_allClassTypes.contains(className))
+		{
+			return m_allClassTypes.at(className);
+		}
+
+		return nullptr;
+	}
+
 	[[nodiscard]] std::unordered_set<re::String> GetGlobalNames() const
 	{
 		auto globals = m_env.GetGlobalNames();
@@ -165,6 +180,17 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
+		if (node->name == "super")
+		{
+			if (!m_currentClassType || !m_currentClassType->baseClass)
+			{
+				throw std::runtime_error("Semantic Error: Cannot use 'super' outside of a derived class");
+			}
+			m_currentExprType = m_currentClassType->baseClass;
+
+			return;
+		}
+
 		const Symbol* sym = m_env.Resolve(node->name);
 		if (!sym)
 		{
@@ -257,8 +283,14 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
+		bool isSuperCall = false;
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
 		{ // Instantiating generic class member or function call
+			if (id->name == "super")
+			{
+				isSuperCall = true;
+			}
+
 			if (const Symbol* sym = m_env.Resolve(id->name))
 			{
 				if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
@@ -365,6 +397,7 @@ public:
 		{
 			const auto mutableNode = const_cast<ast::CallExpr*>(node);
 			mutableNode->isConstructorCall = true;
+			mutableNode->isSuperCall = isSuperCall;
 
 			if (const auto it = classType->methods.find(classType->name); it != classType->methods.end())
 			{
@@ -728,40 +761,74 @@ public:
 		const auto previousClass = m_currentClassType;
 		m_currentClassType = classType;
 
+		if (node->baseClass)
+		{
+			const auto baseType = ResolveAstType(node->baseClass->type.get());
+			classType->baseClass = std::dynamic_pointer_cast<ClassType>(baseType);
+
+			if (!classType->baseClass)
+			{
+				throw std::runtime_error("Semantic Error: Base type must be a class");
+			}
+
+			for (const auto& [fieldName, fieldInfo] : classType->baseClass->fields)
+			{ // Copying parent class fields in start of child class
+				classType->fields[fieldName] = fieldInfo;
+			}
+
+			for (const auto& [methodName, methodType] : classType->baseClass->methods)
+			{ // Copying parent class methods
+				if (methodName != classType->baseClass->name && methodName[0] != '~')
+				{
+					classType->methods[methodName] = methodType;
+				}
+			}
+		}
+
+		if (!classType->baseClass && classType->name != "Any")
+		{ // Inherit every class from Any
+			if (const Symbol* anySym = m_env.Resolve("Any"))
+			{
+				classType->baseClass = std::dynamic_pointer_cast<ClassType>(anySym->type);
+			}
+		}
+
 		for (const auto& member : node->members)
 		{ // Register member values
 			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
 			{ // Member var
 				auto fieldType = ResolveAstType(varDecl->type.get());
 				if (varDecl->initializer)
-				{ // Resolve a field type from initializer
-					auto initType = Evaluate(varDecl->initializer.get());
-					if (fieldType == nullptr || fieldType == m_tUnit)
+				{
+					const auto initType = Evaluate(varDecl->initializer.get());
+					if (!fieldType || fieldType == m_tUnit)
 					{
 						fieldType = initType;
 					}
-					else
-					{
-						ExpectAssignable(initType, fieldType, "field initialization");
-					}
 				}
+				else if (!varDecl->isExternal && !node->isExternal && !fieldType)
+				{
+					throw std::runtime_error("Semantic Error: Property '" + varDecl->name + "' must have an initializer or explicit type");
+				}
+
 				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
 			}
 			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
 			{ // Member val
 				auto fieldType = ResolveAstType(valDecl->type.get());
 				if (valDecl->initializer)
-				{ // Resolve a field type from initializer
-					auto initType = Evaluate(valDecl->initializer.get());
-					if (fieldType == nullptr || fieldType == m_tUnit)
+				{
+					const auto initType = Evaluate(valDecl->initializer.get());
+					if (!fieldType || fieldType == m_tUnit)
 					{
 						fieldType = initType;
 					}
-					else
-					{
-						ExpectAssignable(initType, fieldType, "field initialization");
-					}
 				}
+				else if (!valDecl->isExternal && !node->isExternal && !fieldType)
+				{
+					throw std::runtime_error("Semantic Error: Property '" + valDecl->name + "' must have an initializer or explicit type");
+				}
+
 				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
 			}
 		}
@@ -770,6 +837,11 @@ public:
 		{ // Register member functions
 			if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
+				if (node->isExternal && (!funDecl->isExternal || funDecl->body || funDecl->isExprBody))
+				{
+					throw std::runtime_error("Semantic Error: Method '" + funDecl->name + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
+				}
+
 				funDecl->Accept(*this);
 			}
 			else if (const auto ctorDecl = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
@@ -807,6 +879,8 @@ private:
 
 	std::unordered_set<const ast::Node*> m_instantiatedNodes;
 
+	std::unordered_map<re::String, std::shared_ptr<ClassType>> m_allClassTypes;
+
 	std::unordered_map<re::String, re::String> m_importAliases;
 	std::unordered_set<re::String> m_externalFunctions;
 	std::unordered_set<re::String> m_allFunctionNames;
@@ -815,7 +889,7 @@ private:
 	std::shared_ptr<PrimitiveType> m_tInt = std::make_shared<PrimitiveType>("Int");
 	std::shared_ptr<PrimitiveType> m_tDouble = std::make_shared<PrimitiveType>("Double");
 	std::shared_ptr<PrimitiveType> m_tBool = std::make_shared<PrimitiveType>("Bool");
-	std::shared_ptr<PrimitiveType> m_tString = std::make_shared<PrimitiveType>("String");
+	std::shared_ptr<ClassType> m_tString = std::make_shared<ClassType>("String");
 	std::shared_ptr<PrimitiveType> m_tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<PrimitiveType> m_tAny = std::make_shared<PrimitiveType>("Any");
 
@@ -965,10 +1039,16 @@ private:
 				}
 
 				if (!classType)
-				{
+				{ // New previously undefined class
 					classType = std::make_shared<ClassType>(classDecl->name);
 					isNewClass = true;
 				}
+				else
+				{ // Extending already defined class
+					isNewClass = false;
+				}
+
+				m_allClassTypes[classDecl->name] = classType;
 
 				bool hasConstructor = false;
 				for (const auto& member : classDecl->members)
@@ -1492,12 +1572,17 @@ private:
 				auto fieldType = ResolveAstType(varDecl->type.get());
 				if (varDecl->initializer)
 				{
-					auto initType = Evaluate(varDecl->initializer.get());
+					const auto initType = Evaluate(varDecl->initializer.get());
 					if (!fieldType || fieldType == m_tUnit)
 					{
 						fieldType = initType;
 					}
 				}
+				else if (!varDecl->isExternal && !realClassDecl->isExternal && !fieldType)
+				{
+					throw std::runtime_error("Semantic Error: Property '" + varDecl->name + "' must have an initializer or explicit type");
+				}
+
 				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
 			}
 			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
@@ -1505,16 +1590,26 @@ private:
 				auto fieldType = ResolveAstType(valDecl->type.get());
 				if (valDecl->initializer)
 				{
-					auto initType = Evaluate(valDecl->initializer.get());
+					const auto initType = Evaluate(valDecl->initializer.get());
 					if (!fieldType || fieldType == m_tUnit)
 					{
 						fieldType = initType;
 					}
 				}
-				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
+				else if (!valDecl->isExternal && !realClassDecl->isExternal && !fieldType)
+				{
+					throw std::runtime_error("Semantic Error: Property '" + valDecl->name + "' must have an initializer or explicit type");
+				}
+
+				classType->fields[valDecl->name] = { fieldType, false, valDecl->visibility };
 			}
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
+				if (realClassDecl->isExternal && (!fun->isExternal || fun->body || fun->isExprBody))
+				{
+					throw std::runtime_error("Semantic Error: Method '" + fun->name + "' in external class '" + realClassDecl->name + "' must be marked 'external' and cannot have a body.");
+				}
+
 				const auto mutableFun = const_cast<ast::FunDecl*>(fun);
 				const re::String originalName = mutableFun->name;
 

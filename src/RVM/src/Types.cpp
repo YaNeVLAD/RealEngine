@@ -52,6 +52,12 @@ TypeInfo& TypeInfo::SetAllocator(AllocatorFn alloc)
 	return *this;
 }
 
+TypeInfo& TypeInfo::AddNativeGetter(String const& propName, NativeGetterFn function)
+{
+	getters[propName.Hash()] = std::move(function);
+	return *this;
+}
+
 Instance::Instance(TypeInfoPtr const& typeInfo)
 	: typeInfo(typeInfo)
 {

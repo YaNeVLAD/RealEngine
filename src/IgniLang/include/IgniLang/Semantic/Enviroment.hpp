@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace igni::sem
@@ -53,6 +54,19 @@ public:
 			if (it->contains(name))
 			{
 				return &(*it)[name];
+			}
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] const Symbol* Resolve(const re::String& name) const
+	{
+		for (auto it = m_scopes.rbegin(); it != m_scopes.rend(); ++it)
+		{
+			if (it->contains(name))
+			{
+				return &it->at(name);
 			}
 		}
 

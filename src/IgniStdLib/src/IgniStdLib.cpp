@@ -20,7 +20,7 @@ void InitArrayMethods(const re::rvm::TypeInfoPtr& arrayType)
 	});
 
 	arrayType->AddNativeMethod("init", -1, [](const std::vector<Value>& args) -> Value {
-		const auto arr = std::get<ArrayInstancePtr>(args[0]);
+		auto arr = std::get<ArrayInstancePtr>(args[0]);
 
 		if (args.size() == 2)
 		{
@@ -45,6 +45,42 @@ void InitArrayMethods(const re::rvm::TypeInfoPtr& arrayType)
 		const auto index = std::get<Int>(args[1]);
 
 		return arr->elements[index];
+	});
+
+	arrayType->AddNativeGetter("size", [](const Value& obj) -> Value {
+		const auto arr = std::get<ArrayInstancePtr>(obj);
+
+		return static_cast<Int>(arr->elements.size());
+	});
+
+	arrayType->AddNativeGetter("length", [](const Value& obj) -> Value {
+		const auto arr = std::get<ArrayInstancePtr>(obj);
+
+		return static_cast<Int>(arr->elements.size());
+	});
+}
+
+void InitStringMethods(const re::rvm::TypeInfoPtr& arrayType)
+{
+	using namespace re::rvm;
+
+	arrayType->AddNativeGetter("size", [](const Value& obj) -> Value {
+		const auto& str = std::get<re::String>(obj);
+
+		return static_cast<Int>(str.Size());
+	});
+
+	arrayType->AddNativeGetter("length", [](const Value& obj) -> Value {
+		const auto& str = std::get<re::String>(obj);
+
+		return static_cast<Int>(str.Length());
+	});
+
+	arrayType->AddNativeMethod("get", 1, [](const std::vector<Value>& args) -> Value {
+		const auto arr = std::get<re::String>(args[0]);
+		const auto index = std::get<Int>(args[1]);
+
+		return re::String(arr[index]);
 	});
 }
 
@@ -82,6 +118,11 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 	if (const auto arrayType = vm->GetTypeByName("Array"))
 	{
 		InitArrayMethods(arrayType);
+	}
+
+	if (const auto arrayType = vm->GetTypeByName("String"))
+	{
+		InitStringMethods(arrayType);
 	}
 
 	InitMathModule(vm);
@@ -125,12 +166,18 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		return Null;
 	});
 
-	vm->RegisterNative("len", [](const std::vector<Value>& args) -> Value {
-		if (const auto arr = std::get_if<ArrayInstancePtr>(&args[0]))
+	vm->RegisterNative("arrayOf", [](const std::vector<Value>& args) -> Value {
+		if (!std::holds_alternative<ArrayInstancePtr>(args[0]))
 		{
-			return static_cast<Int>((*arr)->elements.size());
+			return Null;
 		}
 
-		return Int{};
+		const auto paramArr = std::get<ArrayInstancePtr>(args[0]);
+		auto returnArr = std::make_shared<ArrayInstance>();
+
+		returnArr->elements = paramArr->elements;
+		returnArr->typeInfo = paramArr->typeInfo;
+
+		return returnArr;
 	});
 }

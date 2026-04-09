@@ -103,7 +103,7 @@ public:
 		// --- PHASE 4: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
 		compiler::TextCompiler textCompiler;
-		std::string assembly = textCompiler.Compile(linkedProgram.get(), globalNames, importAliases, externals);
+		std::string assembly = textCompiler.Compile(linkedProgram.get(), globalNames, importAliases, externals, semanticAnalyzer);
 
 		return assembly;
 	}

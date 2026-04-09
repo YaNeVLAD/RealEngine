@@ -116,7 +116,29 @@ struct ClassType final : SemanticType
 
 	std::vector<std::shared_ptr<SemanticType>> typeArguments;
 
+	std::shared_ptr<ClassType> baseClass = nullptr;
+
 	explicit ClassType(const re::String& n) { name = n; }
+
+	bool IsAssignableTo(const SemanticType* other) const override
+	{
+		if (SemanticType::IsAssignableTo(other))
+		{
+			return true;
+		}
+
+		const ClassType* current = baseClass.get();
+		while (current != nullptr)
+		{
+			if (current->name == other->name)
+			{
+				return true;
+			}
+			current = current->baseClass.get();
+		}
+
+		return false;
+	}
 };
 
 struct GenericFunctionTemplate final : SemanticType

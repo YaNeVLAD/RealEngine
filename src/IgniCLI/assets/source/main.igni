@@ -9,7 +9,7 @@ class Player {
 		this.name = _name;
 	}
 
-	~Player() { print("~Player"); }
+	~Player() { println("~Player"); }
 
 	fun hp() = this._hp;
 
@@ -18,44 +18,52 @@ class Player {
 	}
 
 	fun move(dx: Double, dy: Double) {
-		print("dx: ", dx,", ", "dy: ", dy);
+		println("dx: ", dx,", ", "dy: ", dy);
 	}
 
 }
 
-class Vec2 <T>(val x: T, val y: T) {
+class <T> Vec2(val x: T, val y: T) {
 	fun add(rhs: T) = Vec2::<T>(this.x + rhs, this.y + rhs);
 
 	fun mul(rhs: T): Vec2<T> = Vec2::<T>(this.x * rhs, this.y * rhs);
 }
 
 fun <T> printOnce(value: T) {
-	print(value);
+	println(value);
 }
 
+class Entity(val id: Int) {}
+
+class Enemy(id: Int, val name: String) : Entity(id) {}
+
 fun main() {
-	val arr = Array::<Int>(6);
-	for (i in 0..5) {
-		arr[i] = i;
-	}
-	print("array: ", arr);
+	val enemy = Enemy(1, "Aboba");
+	println("enemy: ", enemy.id, " ",enemy.name);
+
+	val arr = arrayOf(1, 2, 3, 4, 5);
+	println("array: ", arr);
+	println("array_size: ", arr.size);
 
 	bubbleSort(arr, greater);
 
-	print("sorted array: ", arr);
+	println("sorted array: ", arr);
 
 	val player = Player("Арбуз Арбуз");
-	print("Привет, ", player.name, "!");
+	println("Привет, ", player.name, "!");
 
 	printOnce(42.33);
 
-	print("До получения урона: ", player.hp(), "!");
+	println("string_literal", "length".length);
+	println("string_literal", "size".size);
+
+	println("До получения урона: ", player.hp(), "!");
 	player.takeDamage(42);
-	print("После получения урона: ", player.hp(), "!");
+	println("После получения урона: ", player.hp(), "!");
 
 	val pos = Vec2::<Int>(5, 5).add(7).mul(2);
-	print(pos.x, ", ", pos.y);
+	println(pos.x, ", ", pos.y);
 
 	val dpos = Vec2::<Double>(10.0, 10.0).mul(1.5);
-	print(dpos.x, ", ", dpos.y);
+	println(dpos.x, ", ", dpos.y);
 }

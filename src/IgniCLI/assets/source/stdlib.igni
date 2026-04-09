@@ -6,9 +6,20 @@ fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
 external fun print(args: Any...): Unit;
 external fun println(args: Any...): Unit;
-external fun <T> len(arr: Array<T>): Int;
 
-external class Array <T>(size: Int) {
+external class <T> Array(size: Int) {
+  external val size: Int;
+  external val length: Int;
+
   external fun get(index: Int): T;
   external fun set(index: Int, value: T): Unit;
 }
+
+external class String {
+  external val size: Int;
+  external val length: Int;
+
+  external fun get(index: Int): String;
+}
+
+external fun <T> arrayOf(elements: T...): Array<T>;

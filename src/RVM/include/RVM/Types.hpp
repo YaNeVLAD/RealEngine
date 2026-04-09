@@ -87,6 +87,7 @@ struct NativeObject
 };
 
 using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;
+using NativeGetterFn = std::function<Value(const Value& obj)>;
 
 struct TypeInfo
 {
@@ -95,6 +96,8 @@ struct TypeInfo
 	std::vector<String> fieldNames;
 
 	std::unordered_map<Hash_t, Value> methods;
+
+	std::unordered_map<Hash_t, NativeGetterFn> getters;
 
 	AllocatorFn allocator;
 
@@ -105,6 +108,8 @@ struct TypeInfo
 	TypeInfo& AddNativeMethod(String const& methodName, std::int8_t argCount, NativeFn function);
 
 	TypeInfo& SetAllocator(AllocatorFn alloc);
+
+	TypeInfo& AddNativeGetter(String const& propName, NativeGetterFn function);
 };
 
 enum class OpCode : std::uint8_t

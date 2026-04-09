@@ -150,31 +150,47 @@ private:
 		{
 		case "ValDecl"_hs:
 		case "VarDecl"_hs: {
-			auto decl = actualDecl->symbol.Hashed() == "ValDecl"_hs
-				? std::unique_ptr<ast::Decl>(std::make_unique<ast::ValDecl>())
-				: std::unique_ptr<ast::Decl>(std::make_unique<ast::VarDecl>());
-
-			const auto& optColon = actualDecl->children[2];
-
-			if (const auto val = dynamic_cast<ast::ValDecl*>(decl.get()))
+			// VarDecl/ValDecl -> OptMod [0] var/val [1] ident [2] OptColonType [3] OptInit [4] ; [5]
+			bool isExternal = false;
+			if (const auto& optMod = actualDecl->children[0];
+				!optMod->children.empty() && optMod->children[0]->symbol.Hashed() == "external"_hs)
 			{
-				val->name = actualDecl->children[1]->token->lexeme;
-				val->initializer = ConvertExpr(actualDecl->children[4].get());
-				if (optColon->children.size() == 2)
-				{
-					val->type = ConvertType(optColon->children[1].get());
-				}
+				isExternal = true;
 			}
-			else if (const auto var = dynamic_cast<ast::VarDecl*>(decl.get()))
+
+			const re::String name = actualDecl->children[2]->token->lexeme;
+
+			std::unique_ptr<ast::TypeNode> explicitType = nullptr;
+			if (const auto& optColon = actualDecl->children[3]; optColon->children.size() == 2)
 			{
-				var->name = actualDecl->children[1]->token->lexeme;
-				var->initializer = ConvertExpr(actualDecl->children[4].get());
-				if (optColon->children.size() == 2)
-				{
-					var->type = ConvertType(optColon->children[1].get());
-				}
+				explicitType = ConvertType(optColon->children[1].get());
 			}
-			return decl;
+
+			std::unique_ptr<ast::Expr> initializerExpr = nullptr;
+			if (const auto& optInit = actualDecl->children[4];
+				!optInit->children.empty() && optInit->children[0]->symbol.Hashed() == "="_hs)
+			{
+				initializerExpr = ConvertExpr(optInit->children[1].get());
+			}
+
+			if (actualDecl->symbol.Hashed() == "ValDecl"_hs)
+			{
+				auto val = std::make_unique<ast::ValDecl>();
+				val->name = name;
+				val->type = std::move(explicitType);
+				val->initializer = std::move(initializerExpr);
+				val->isExternal = isExternal;
+
+				return val;
+			}
+
+			auto var = std::make_unique<ast::VarDecl>();
+			var->name = name;
+			var->type = std::move(explicitType);
+			var->initializer = std::move(initializerExpr);
+			var->isExternal = isExternal;
+
+			return var;
 		}
 		case "FunDecl"_hs: { // FunDecl -> OptFunMod [0] fun [1] OptTypeParams [2] FunName [3] ( [4] OptFormPars [5] ) [6] OptColonType [7] FunBody [8]
 			auto funDecl = std::make_unique<ast::FunDecl>();
@@ -223,7 +239,9 @@ private:
 
 			return funDecl;
 		}
-		case "ClassDecl"_hs: { // ClassDecl -> OptClassMod [0] class [1] ident [2] OptTypeParams [3] OptPrimaryCtor [4] { [5] ClassMemberList [6] } [7]
+		case "ClassDecl"_hs: {
+			// ClassDecl -> OptClassMod [0] class [1] OptTypeParams [2] ident [3] OptPrimaryCtor [4] OptBaseClass [5] { [6] ClassMemberList [7] } [8]
+			// OptBaseClass -> : Type [0] ( [1] OptActPars [2] ) [3] | : [0] Type [1] | \e
 			auto classDecl = std::make_unique<ast::ClassDecl>();
 
 			if (const auto& optClassMod = actualDecl->children[0];
@@ -232,12 +250,27 @@ private:
 				classDecl->isExternal = true;
 			}
 
-			classDecl->name = actualDecl->children[2]->token->lexeme;
+			classDecl->name = actualDecl->children[3]->token->lexeme;
 
-			ExtractTypeParams(actualDecl->children[3].get(), classDecl->typeParams);
+			if (const auto& optBaseClass = actualDecl->children[5];
+				!optBaseClass->children.empty() && optBaseClass->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+			{
+				classDecl->baseClass = std::make_unique<ast::BaseClassInit>();
+
+				// OptBaseClass -> : [0] Type [1]
+				classDecl->baseClass->type = ConvertType(optBaseClass->children[1].get());
+
+				// OptBaseClass -> : [0] Type [1] ( [2] OptActPars [3] ) [4]
+				if (optBaseClass->children.size() == 5)
+				{
+					ExtractArguments(optBaseClass->children[3].get(), classDecl->baseClass->arguments);
+				}
+			}
+
+			ExtractTypeParams(actualDecl->children[2].get(), classDecl->typeParams);
 
 			const auto& optPrimaryCtor = actualDecl->children[4];
-			const auto& classMemberList = actualDecl->children[6];
+			const auto& classMemberList = actualDecl->children[7];
 
 			std::unique_ptr<ast::ConstructorDecl> primaryCtor = nullptr;
 
@@ -248,6 +281,30 @@ private:
 				primaryCtor->body = std::make_unique<ast::Block>();
 
 				ExtractPrimaryCtorParams(optPrimaryCtor->children[1].get(), classDecl.get(), primaryCtor.get());
+			}
+			else if (classDecl->baseClass && !classDecl->baseClass->arguments.empty())
+			{ // Empty parent constructor
+				primaryCtor = std::make_unique<ast::ConstructorDecl>();
+				primaryCtor->name = classDecl->name;
+				primaryCtor->body = std::make_unique<ast::Block>();
+			}
+
+			if (primaryCtor && classDecl->baseClass && !classDecl->baseClass->arguments.empty())
+			{
+				auto superCall = std::make_unique<ast::CallExpr>();
+				auto superId = std::make_unique<ast::IdentifierExpr>();
+				superId->name = "super";
+				superCall->callee = std::move(superId);
+
+				for (const auto& arg : classDecl->baseClass->arguments)
+				{
+					superCall->arguments.push_back(arg->CloneExpr());
+				}
+
+				auto exprStmt = std::make_unique<ast::ExprStmt>();
+				exprStmt->expr = std::move(superCall);
+
+				primaryCtor->body->statements.insert(primaryCtor->body->statements.begin(), std::move(exprStmt));
 			}
 
 			ExtractClassMembers(classMemberList.get(), classDecl->members);
