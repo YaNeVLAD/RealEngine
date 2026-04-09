@@ -195,10 +195,16 @@ private:
 		case "FunDecl"_hs: { // FunDecl -> OptFunMod [0] fun [1] OptTypeParams [2] FunName [3] ( [4] OptFormPars [5] ) [6] OptColonType [7] FunBody [8]
 			auto funDecl = std::make_unique<ast::FunDecl>();
 
-			if (const auto& optFunMod = actualDecl->children[0];
-				!optFunMod->children.empty() && optFunMod->children[0]->symbol.Hashed() == "external"_hs)
+			if (const auto& optFunMod = actualDecl->children[0]; !optFunMod->children.empty())
 			{ // External modifier [0]
-				funDecl->isExternal = true;
+				if (optFunMod->children[0]->symbol.Hashed() == "external"_hs)
+				{
+					funDecl->isExternal = true;
+				}
+				if (optFunMod->children[0]->symbol.Hashed() == "override"_hs)
+				{
+					funDecl->isOverride = true;
+				}
 			}
 
 			if (const auto& funNameNode = actualDecl->children[3]; funNameNode->children.size() == 1)

@@ -195,7 +195,12 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
-		const auto& name = node->name;
+		auto name = node->name;
+		if (name.Hashed() == "super"_hs)
+		{ // Aliasing super keyword
+			name = "this";
+		}
+
 		if (m_importAliases.contains(name))
 		{
 			m_out << "GET_GLOBAL \"" << m_importAliases.at(name) << "\"\n";

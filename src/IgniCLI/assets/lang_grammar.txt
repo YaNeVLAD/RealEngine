@@ -48,7 +48,7 @@ DestructorDecl -> ~ ident ( ) Block
 
 FunDecl -> OptFunMod fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
 FunName -> ident | ident . ident
-OptFunMod -> external | compile_time | \e
+OptFunMod -> external | compile_time | override | \e
 OptFormPars -> FormPars | \e
 FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
 NormalPars -> NormalPars , FormPar | FormPar

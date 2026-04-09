@@ -33,13 +33,18 @@ fun <T> printOnce(value: T) {
 	println(value);
 }
 
-class Entity(val id: Int) {}
+class Entity(val id: Int) {
+	fun print() { println("entity"); }
+}
 
-class Enemy(id: Int, val name: String) : Entity(id) {}
+class Enemy(id: Int, val name: String) : Entity(id) {
+	override fun print() { super.print(); println("enemy"); }
+}
 
 fun main() {
 	val enemy = Enemy(1, "Aboba");
 	println("enemy: ", enemy.id, " ",enemy.name);
+	enemy.print();
 
 	val arr = arrayOf(1, 2, 3, 4, 5);
 	println("array: ", arr);

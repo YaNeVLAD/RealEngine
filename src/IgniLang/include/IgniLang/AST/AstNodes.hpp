@@ -833,6 +833,7 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 	bool isVararg = false;
 	bool isExternal = false;
 	bool isExprBody = false;
+	bool isOverride = false;
 
 	std::unique_ptr<Block> body;
 	std::unique_ptr<TypeNode> returnType;
@@ -880,9 +881,12 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 			}
 			clone->parameters.push_back(std::move(newP));
 		}
+
 		clone->isVararg = isVararg;
 		clone->isExternal = isExternal;
 		clone->isExprBody = isExprBody;
+		clone->isOverride = isOverride;
+
 		if (body)
 		{
 			clone->body.reset(dynamic_cast<Block*>(body->CloneStmt(env).release()));

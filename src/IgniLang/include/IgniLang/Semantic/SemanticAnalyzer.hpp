@@ -777,10 +777,13 @@ public:
 			}
 
 			for (const auto& [methodName, methodType] : classType->baseClass->methods)
-			{ // Copying parent class methods
+			{ // Copying parent class methods without overriding child class methods
 				if (methodName != classType->baseClass->name && methodName[0] != '~')
 				{
-					classType->methods[methodName] = methodType;
+					if (!classType->methods.contains(methodName))
+					{
+						classType->methods[methodName] = methodType;
+					} // --------------------------------------------------------
 				}
 			}
 		}
@@ -837,9 +840,21 @@ public:
 		{ // Register member functions
 			if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
+				re::String originalName = funDecl->name.Substring(node->name.Length() + 1);
+
+				const bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
+				if (funDecl->isOverride && !existsInBase)
+				{
+					throw std::runtime_error("Semantic Error: Method '" + originalName + "' is marked 'override' but no matching method found in base class");
+				}
+				if (!funDecl->isOverride && existsInBase)
+				{
+					throw std::runtime_error("Semantic Error: Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
+				}
+
 				if (node->isExternal && (!funDecl->isExternal || funDecl->body || funDecl->isExprBody))
 				{
-					throw std::runtime_error("Semantic Error: Method '" + funDecl->name + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
+					throw std::runtime_error("Semantic Error: Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
 				}
 
 				funDecl->Accept(*this);
@@ -1662,7 +1677,20 @@ private:
 				funType->visibility = mutableFun->visibility;
 				funType->isExternal = fun->isExternal || realClassDecl->isExternal;
 				if (funType->isExternal)
+				{
 					m_externalFunctions.insert(funType->name);
+				}
+
+				bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
+
+				if (mutableFun->isOverride && !existsInBase)
+				{
+					throw std::runtime_error("Semantic Error: Method '" + originalName + "' is marked 'override' but no matching method found in base class '" + classType->baseClass->name + "'");
+				}
+				if (!mutableFun->isOverride && existsInBase)
+				{
+					throw std::runtime_error("Semantic Error: Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
+				}
 
 				classType->methods[originalName] = funType;
 			}

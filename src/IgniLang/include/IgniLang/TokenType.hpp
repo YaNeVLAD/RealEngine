@@ -24,6 +24,7 @@ namespace igni
     TOKEN(KwPrivate,    R"(private\b)",        "private") \
     TOKEN(KwInternal,   R"(internal\b)",       "internal") \
     TOKEN(KwExternal,   R"(external\b)",       "external") \
+    TOKEN(KwOverride,   R"(override\b)",       "override") \
     TOKEN(KwCompileTime,R"(compile_time\b)",   "compile_time") \
     TOKEN(KwTrue,       R"(true\b)",           "true") \
     TOKEN(KwFalse,      R"(false\b)",          "false") \
