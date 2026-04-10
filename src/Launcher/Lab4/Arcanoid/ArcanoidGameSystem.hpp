@@ -1,10 +1,11 @@
 #pragma once
 
-#include "Components.hpp"
-#include "Constants.hpp"
 #include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <Runtime/Components.hpp>
+
+#include "Components.hpp"
+#include "Constants.hpp"
 
 namespace arcanoid
 {
@@ -18,7 +19,7 @@ class ArcanoidGameSystem final : public re::ecs::System
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
-		UpdatePaddle(scene, dt);
+		UpdatePaddle(scene);
 		HandleCollisions(scene);
 		UpdateBallAttached(scene);
 		KeepBallSpeedConstant(scene);
@@ -35,11 +36,7 @@ private:
 				continue;
 			}
 
-			// Высчитываем скорость вращения.
-			// Длина окружности = 2 * PI * r. При радиусе 0.5 это ~3.14 метра.
-			// Чтобы проехать 3.14 метра, шару нужно повернуться на 360 градусов.
-			// Значит, на 1 единицу скорости нужно 360 / 3.1415 ~= 114.6 градусов вращения.
-			const float spinFactor = 114.6f * dt;
+			const float spinFactor = constants::BallRotation * dt;
 
 			transform.rotation.x += rb.linearVelocity.z * spinFactor;
 			transform.rotation.z -= rb.linearVelocity.x * spinFactor;
@@ -70,11 +67,10 @@ private:
 			}
 
 			const re::Vector3f currentVel = rb.linearVelocity;
-			const float currentSpeed = std::sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
+			const float currentSpeed = currentVel.Length();
 			if (currentSpeed > std::numeric_limits<float>::epsilon())
 			{
-				// Если скорость отличается от желаемой (ball.speed)
-				if (std::abs(currentSpeed - ball.speed) > 0.01f)
+				if (std::abs(currentSpeed - ball.speed) > std::numeric_limits<float>::epsilon())
 				{
 					rb.linearVelocity.x = (currentVel.x / currentSpeed) * ball.speed;
 					rb.linearVelocity.z = (currentVel.z / currentSpeed) * ball.speed;
@@ -89,20 +85,23 @@ private:
 		}
 	}
 
-	static void UpdatePaddle(re::ecs::Scene& scene, const float dt)
+	static void UpdatePaddle(re::ecs::Scene& scene)
 	{
 		for (auto&& [entity, transform, paddle, rb] : *scene.CreateView<re::TransformComponent, PaddleComponent, re::physics::RigidBody>())
 		{
-			rb.linearVelocity.x = paddle.moveDir * paddle.speed;
+			rb.linearVelocity.x = static_cast<float>(paddle.moveDir) * paddle.speed;
 			rb.isVelocityDirty = true;
 
 			const float limit = constants::FieldLimitX - (paddle.width * 0.5f);
 			if (transform.position.x > limit || transform.position.x < -limit)
 			{
+				rb.linearVelocity = re::Vector3f::Zero();
+
 				transform.position.x = std::clamp(transform.position.x, -limit, limit);
 				rb.position = transform.position;
-				scene.MakeDirty<re::TransformComponent>(entity);
 			}
+
+			scene.MakeDirty<re::TransformComponent>(entity);
 		}
 	}
 
@@ -125,7 +124,7 @@ private:
 				transform.position.x = paddlePos.x;
 				transform.position.z = paddlePos.z - 1.0f;
 
-				rb.linearVelocity = { 0.f, 0.f, 0.f };
+				rb.linearVelocity = re::Vector3f::Zero();
 				rb.isVelocityDirty = true;
 
 				scene.MakeDirty<re::TransformComponent>(entity);
@@ -143,10 +142,10 @@ private:
 
 		auto& [collisions] = scene.GetComponent<re::PhysicsEventsComponent>(std::get<0>(*eventView->begin()));
 
-		for (const auto& collision : collisions)
+		for (const auto& [A, B] : collisions)
 		{
-			const re::ecs::Entity entityA{ collision.entityA };
-			const re::ecs::Entity entityB{ collision.entityB };
+			const re::ecs::Entity entityA{ A };
+			const re::ecs::Entity entityB{ B };
 
 			if (!scene.IsValid(entityA) || !scene.IsValid(entityB))
 			{
@@ -200,8 +199,7 @@ private:
 
 	static void NormalizeSpeed(re::Vector3f& vel, const float targetSpeed)
 	{
-		const float currentSpeed = std::sqrt(vel.x * vel.x + vel.z * vel.z);
-		if (currentSpeed > std::numeric_limits<float>::epsilon())
+		if (const float currentSpeed = vel.Length(); currentSpeed > std::numeric_limits<float>::epsilon())
 		{
 			vel.x = (vel.x / currentSpeed) * targetSpeed;
 			vel.z = (vel.z / currentSpeed) * targetSpeed;
@@ -226,17 +224,19 @@ private:
 		for (auto&& [entity, ball] : *scene.CreateView<BallComponent>())
 		{
 			ball.isAttachedToPaddle = true;
-			ball.velocity = { 0.f, 0.f, 0.f };
+			ball.velocity = re::Vector3f::Zero();
 		}
 	}
 
 	static void AddScore(re::ecs::Scene& scene, const int score)
 	{
-		for (auto&& [entity, state] : *scene.CreateView<GameStateComponent>())
+		const auto state = scene.FindComponent<GameStateComponent>();
+		if (!state)
 		{
-			state.score += score;
-			break;
+			return;
 		}
+
+		state->score += score;
 	}
 };
 

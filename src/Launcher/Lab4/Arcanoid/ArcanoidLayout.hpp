@@ -47,6 +47,7 @@ public:
 		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::White);
 		m_cubeMesh = std::make_shared<re::StaticMesh>(cubeV, cubeI);
 
+		// Поизучать как тестуры натянуть на сферу
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::White);
 		m_sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
 
@@ -125,7 +126,7 @@ private:
 		auto& scene = GetScene();
 		using namespace arcanoid::constants;
 
-		const auto paddleTex = m_manager.Get<re::Texture>("textures/paddle.png");
+		const auto paddleTex = m_manager.Get<re::Texture>("arcanoid/paddle.png");
 		const auto ballTex = m_manager.Get<re::Texture>("arcanoid/ball.png");
 
 		scene.CreateEntity()
@@ -252,7 +253,7 @@ private:
 		{
 			for (int col = 0; col < MaxCols; ++col)
 			{
-				const int hp = (row > 0 && row % 4 == 0) ? 2 : 1;
+				const int hp = (row > 0 && row % 3 == 0) ? 2 : 1;
 				const auto currentTex = (hp == 2) ? tex2 : tex1;
 
 				scene.CreateEntity()
