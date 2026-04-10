@@ -24,12 +24,14 @@ struct overloaded : Ts...
 	using Ts::operator()...;
 };
 
-template <typename T>
+template <typename T, typename TPtr = std::shared_ptr<T>>
 struct Prototype
 {
+	using ReturnType = TPtr;
+
 	virtual ~Prototype() = default;
 
-	virtual std::shared_ptr<T> Clone() const = 0;
+	virtual ReturnType Clone() const = 0;
 };
 
 template <typename TDerived, typename TBase>
@@ -38,7 +40,7 @@ struct SharedClone : TBase
 {
 	using TBase::TBase;
 
-	std::shared_ptr<TBase> Clone() const override
+	typename TBase::ReturnType Clone() const override
 	{
 		return std::make_shared<TDerived>(static_cast<const TDerived&>(*this));
 	}
