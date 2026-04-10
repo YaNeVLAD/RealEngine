@@ -176,6 +176,11 @@ public:
 	{
 		const auto leftType = Evaluate(node->object.get());
 
+		if (leftType->isNullable && !node->isSafe)
+		{
+			throw std::runtime_error("Semantic Error: Cannot perform unsafe member access of nullable type '" + leftType->name + "'");
+		}
+
 		if (const auto modType = std::dynamic_pointer_cast<ModuleType>(leftType))
 		{
 			m_currentExprType = Export::Resolve(modType, node->member);

@@ -15,7 +15,6 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 	}
 
 	std::shared_ptr<SemanticType> resolvedBaseType = nullptr;
-
 	if (const auto simpleType = dynamic_cast<const ast::SimpleTypeNode*>(node))
 	{
 		using namespace re::literals;
@@ -23,13 +22,13 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 		// clang-format off
 		switch (simpleType->name.Hashed())
 		{
-		case "Int"_hs:    return ctx.tInt;
-		case "Double"_hs: return ctx.tDouble;
-		case "Bool"_hs:   return ctx.tBool;
-		case "String"_hs: return ctx.tString;
-		case "Unit"_hs:   return ctx.tUnit;
-		case "Null"_hs:   return ctx.tNull;
-		case "Any"_hs:    return ctx.tAny;
+		case "Int"_hs:    resolvedBaseType = ctx.tInt; break;
+		case "Double"_hs: resolvedBaseType = ctx.tDouble; break;
+		case "Bool"_hs:   resolvedBaseType = ctx.tBool; break;
+		case "String"_hs: resolvedBaseType = ctx.tString; break;
+		case "Unit"_hs:   resolvedBaseType = ctx.tUnit; break;
+		case "Null"_hs:   resolvedBaseType = ctx.tNull; break;
+		case "Any"_hs:    resolvedBaseType = ctx.tAny; break;
 		default:          break;
 		}
 		// clang-format on
@@ -108,7 +107,7 @@ inline void ExpectAssignable(const SemanticType* actual, const SemanticType* exp
 {
 	if (!actual->IsAssignableTo(expected))
 	{
-		throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + ", got " + actual->name);
+		throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
 	}
 }
 

@@ -461,7 +461,9 @@ private:
 			}
 			// Designator -> Designator [0] . [1] ident [2] OptExprTypeArgs [3]
 			// Designator -> Designator [0] ?. [1] ident [2] OptExprTypeArgs [3]
-			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "."_hs)
+			if (exprNode->children.size() == 4
+				&& (exprNode->children[1]->symbol.Hashed() == "."_hs
+					|| exprNode->children[1]->symbol.Hashed() == "?."_hs))
 			{
 				auto memberAccess = std::make_unique<ast::MemberAccessExpr>();
 				memberAccess->object = ConvertExpr(exprNode->children[0].get());
@@ -613,14 +615,18 @@ private:
 
 		switch (typeNode->children[0]->symbol.Hashed())
 		{
-		case "ident"_hs: {
+		case "ident"_hs: { // Type -> ident [0] OptTypeArgs [1] OptQuestion [2] | ( [0] OptTypeList [1] ) [2] -> [3] Type [4] OptQuestion [5]
 			auto simpleType = std::make_unique<ast::SimpleTypeNode>();
 			simpleType->name = typeNode->children[0]->token->lexeme;
 
 			if (const auto& optTypeArgs = typeNode->children[1]; optTypeArgs->children.size() == 3)
+			{
 				ExtractTypeList(optTypeArgs->children[1].get(), simpleType->typeArgs);
+			}
 
-			simpleType->isNullable = (!typeNode->children[2]->children.empty() && typeNode->children[2]->children[0]->symbol.Hashed() == "?"_hs);
+			const auto& optQuestion = typeNode->children[2];
+			simpleType->isNullable = (!optQuestion->children.empty() && optQuestion->children[0]->symbol.Hashed() != "<EPSILON>"_hs);
+
 			return simpleType;
 		}
 		case "("_hs: {

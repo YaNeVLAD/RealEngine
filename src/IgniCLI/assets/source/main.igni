@@ -1,6 +1,13 @@
 package main;
 
+class A(val a: Int){}
+
 fun main() {
+	var a: A? = null;
+	a = A(42);
+
+	println(a.a);
+
 	val arr = arrayOf(1, 2, 3, 5, 8, 12);
 
 	bubbleSort(arr, greater);

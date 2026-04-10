@@ -32,12 +32,17 @@ struct SemanticType : re::utils::Prototype<SemanticType>
 			return other->isNullable;
 		}
 
+		if (name != other->name)
+		{
+			return false;
+		}
+
 		if (isNullable && !other->isNullable)
 		{
 			return false;
 		}
 
-		return name == other->name;
+		return true;
 	}
 };
 
