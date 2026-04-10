@@ -14,26 +14,45 @@ template <typename T>
 	requires std::floating_point<T> || std::integral<T>
 struct Vector3
 {
-	[[nodiscard]] constexpr Vector3 Cross(Vector3 const& rhs) const;
+	constexpr Vector3() noexcept = default;
+	constexpr explicit Vector3(T value) noexcept;
+	constexpr Vector3(T x, T y, T z) noexcept;
 
-	[[nodiscard]] constexpr T Dot(Vector3 const& rhs) const;
+	constexpr Vector3(const Vector3& other) noexcept = default;
+	constexpr Vector3& operator=(const Vector3& other) noexcept = default;
 
-	[[nodiscard]] constexpr T LengthSq() const;
+	constexpr Vector3(Vector3&& other) noexcept = default;
+	constexpr Vector3& operator=(Vector3&& other) noexcept = default;
 
-	[[nodiscard]] auto Length() const;
+	[[nodiscard]] constexpr Vector3 Cross(Vector3 const& rhs) const noexcept;
 
-	[[nodiscard]] Vector3 Normalized() const
+	[[nodiscard]] constexpr T Dot(Vector3 const& rhs) const noexcept;
+
+	[[nodiscard]] constexpr T LengthSq() const noexcept;
+
+	[[nodiscard]] auto Length() const noexcept;
+
+	[[nodiscard]] Vector3 Normalized() const noexcept
 		requires std::floating_point<T>;
 
-	[[nodiscard]] Vector3& Normalize() const
+	[[nodiscard]] Vector3& Normalize() noexcept
 		requires std::floating_point<T>;
+
+	[[nodiscard]] static constexpr Vector3 Zero() noexcept;
+
+	[[nodiscard]] static constexpr Vector3 Up() noexcept;
+	[[nodiscard]] static constexpr Vector3 Down() noexcept;
+	[[nodiscard]] static constexpr Vector3 Left() noexcept;
+	[[nodiscard]] static constexpr Vector3 Right() noexcept;
+	[[nodiscard]] static constexpr Vector3 Forward() noexcept;
+	[[nodiscard]] static constexpr Vector3 Backward() noexcept;
 
 	template <typename U>
-	constexpr explicit operator Vector3<U>() const;
+	constexpr explicit operator Vector3<U>() const noexcept;
 
-	[[nodiscard]] constexpr Vector3 operator-() const;
+	[[nodiscard]] constexpr Vector3 operator-() const noexcept;
 
-	constexpr auto operator<=>(Vector3 const&) const = default;
+	constexpr auto operator<=>(Vector3 const&) const noexcept = default;
 
 	T x{};
 	T y{};
@@ -46,34 +65,34 @@ using Vector3f = Vector3<float>;
 using Vector3d = Vector3<double>;
 
 template <typename T>
-[[nodiscard]] constexpr Vector3<T> operator+(Vector3<T> const& left, Vector3<T> const& right);
+[[nodiscard]] constexpr Vector3<T> operator+(Vector3<T> const& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
-constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> const& right);
+constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector3<T> operator-(Vector3<T> const& left, Vector3<T> const& right);
+[[nodiscard]] constexpr Vector3<T> operator-(Vector3<T> const& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
-constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> const& right);
+constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector3<T> operator*(Vector3<T> const& left, T right);
+[[nodiscard]] constexpr Vector3<T> operator*(Vector3<T> const& left, T right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector3<T> operator*(T left, Vector3<T> const& right);
+[[nodiscard]] constexpr Vector3<T> operator*(T left, Vector3<T> const& right) noexcept;
 
 template <typename T>
-constexpr Vector3<T>& operator*=(Vector3<T>& left, T right);
+constexpr Vector3<T>& operator*=(Vector3<T>& left, T right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector3<T> operator/(Vector3<T> const& left, T right);
+[[nodiscard]] constexpr Vector3<T> operator/(Vector3<T> const& left, T right) noexcept;
 
 template <typename T>
-constexpr Vector3<T>& operator/=(Vector3<T>& left, T right);
+constexpr Vector3<T>& operator/=(Vector3<T>& left, T right) noexcept;
 
 template <typename T, std::floating_point U = T>
-[[nodiscard]] constexpr Vector3<T> Lerp(Vector3<T> const& a, Vector3<T> const& b, U t);
+[[nodiscard]] constexpr Vector3<T> Lerp(Vector3<T> const& a, Vector3<T> const& b, U t) noexcept;
 
 } // namespace re
 
