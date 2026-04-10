@@ -200,7 +200,7 @@ void GLFWWindow::Init(const std::string& title)
 		data.width = width;
 		data.height = height;
 
-		data.eventQueue.emplace_back(Event::Resized{ (uint32_t)width, (uint32_t)height });
+		data.eventQueue.emplace_back(Event::Resized{ {(uint32_t)width, (uint32_t)height }});
 	});
 
 	// Close

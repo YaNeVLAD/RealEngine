@@ -15,6 +15,7 @@ template <typename T>
 struct Vector3
 {
 	constexpr Vector3() noexcept = default;
+
 	constexpr explicit Vector3(T value) noexcept;
 	constexpr Vector3(T x, T y, T z) noexcept;
 
