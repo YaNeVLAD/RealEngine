@@ -43,6 +43,7 @@ struct SemanticContext
 	std::shared_ptr<ClassType> tString = std::make_shared<ClassType>("String");
 	std::shared_ptr<PrimitiveType> tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<ClassType> tAny = std::make_shared<ClassType>("Any");
+	std::shared_ptr<PrimitiveType> tNull = std::make_shared<PrimitiveType>("Null");
 
 	std::function<std::shared_ptr<ClassType>(
 		std::shared_ptr<GenericClassTemplate>,

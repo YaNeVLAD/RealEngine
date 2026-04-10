@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/String.hpp>
+#include <Core/Utils.hpp>
 
 #include <IgniLang/AST/AstNodes.hpp>
 
@@ -11,43 +12,48 @@
 namespace igni::sem
 {
 
-struct SemanticType
+struct SemanticType : re::utils::Prototype<SemanticType>
 {
-	virtual ~SemanticType() = default;
-
 	re::String name;
+
+	bool isNullable = false;
 
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
 		using namespace re::literals;
 
-		if (name.Hashed() == "Any"_hs)
-		{ // TODO: Remove after Generics and typecast
+		if (name.Hashed() == "Any"_hs || other->name.Hashed() == "Any"_hs)
+		{
 			return true;
 		}
 
-		if (other->name.Hashed() == "Any"_hs)
+		if (name.Hashed() == "Null"_hs)
 		{
-			return true;
+			return other->isNullable;
+		}
+
+		if (isNullable && !other->isNullable)
+		{
+			return false;
 		}
 
 		return name == other->name;
 	}
 };
 
-struct PrimitiveType final : SemanticType
+struct PrimitiveType final : re::utils::SharedClone<PrimitiveType, SemanticType>
 {
 	explicit PrimitiveType(const re::String& n) { name = n; }
 };
 
-struct ModuleType final : SemanticType
+struct ModuleType final : re::utils::SharedClone<ModuleType, SemanticType>
 {
 	std::unordered_map<re::String, std::shared_ptr<SemanticType>> exports;
 
 	explicit ModuleType(const re::String& n) { name = n; }
 };
 
-struct FunctionType final : SemanticType
+struct FunctionType final : re::utils::SharedClone<FunctionType, SemanticType>
 {
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 	std::shared_ptr<SemanticType> returnType;
@@ -102,7 +108,7 @@ struct FunctionType final : SemanticType
 	}
 };
 
-struct ClassType final : SemanticType
+struct ClassType final : re::utils::SharedClone<ClassType, SemanticType>
 {
 	struct FieldInfo
 	{
@@ -145,7 +151,7 @@ struct ClassType final : SemanticType
 	}
 };
 
-struct GenericFunctionTemplate final : SemanticType
+struct GenericFunctionTemplate final : re::utils::SharedClone<GenericFunctionTemplate, SemanticType>
 {
 	const ast::FunDecl* astNode{};
 	std::vector<ast::GenericTypeParam> typeParams;
@@ -157,7 +163,7 @@ struct GenericFunctionTemplate final : SemanticType
 	explicit GenericFunctionTemplate(const re::String& n) { name = n; }
 };
 
-struct GenericClassTemplate final : SemanticType
+struct GenericClassTemplate final : re::utils::SharedClone<GenericClassTemplate, SemanticType>
 {
 	const ast::ClassDecl* astNode{};
 	std::vector<ast::GenericTypeParam> typeParams;

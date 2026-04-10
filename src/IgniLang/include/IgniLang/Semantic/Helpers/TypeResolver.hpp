@@ -14,6 +14,8 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 		return nullptr;
 	}
 
+	std::shared_ptr<SemanticType> resolvedBaseType = nullptr;
+
 	if (const auto simpleType = dynamic_cast<const ast::SimpleTypeNode*>(node))
 	{
 		using namespace re::literals;
@@ -26,60 +28,80 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 		case "Bool"_hs:   return ctx.tBool;
 		case "String"_hs: return ctx.tString;
 		case "Unit"_hs:   return ctx.tUnit;
+		case "Null"_hs:   return ctx.tNull;
 		case "Any"_hs:    return ctx.tAny;
 		default:          break;
 		}
 		// clang-format on
 
-		if (const Symbol* sym = ctx.env.Resolve(simpleType->name))
+		if (!resolvedBaseType)
 		{
-			if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
+			if (const Symbol* sym = ctx.env.Resolve(simpleType->name))
 			{
-				if (simpleType->typeArgs.empty())
+				if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
 				{
-					throw std::runtime_error("Semantic Error: Generic class '" + simpleType->name + "' requires type arguments");
-				}
+					if (simpleType->typeArgs.empty())
+					{
+						throw std::runtime_error("Semantic Error: Generic class '" + simpleType->name + "' requires type arguments");
+					}
 
-				std::vector<std::shared_ptr<SemanticType>> concreteArgs;
-				for (const auto& arg : simpleType->typeArgs)
+					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
+					for (const auto& arg : simpleType->typeArgs)
+					{
+						concreteArgs.push_back(Resolve(arg.get(), ctx));
+					}
+
+					resolvedBaseType = ctx.instantiateClassCallback(classTmpl, concreteArgs);
+				}
+				else
 				{
-					concreteArgs.push_back(Resolve(arg.get(), ctx));
+					resolvedBaseType = std::dynamic_pointer_cast<SemanticType>(sym->type);
 				}
-
-				return ctx.instantiateClassCallback(classTmpl, concreteArgs);
 			}
-			return sym->type;
-		}
-
-		if (ctx.location.currentPackage)
-		{
-			if (const auto it = ctx.location.currentPackage->exports.find(simpleType->name);
-				it != ctx.location.currentPackage->exports.end())
+			else if (ctx.location.currentPackage && ctx.location.currentPackage->exports.contains(simpleType->name))
 			{
-				return it->second;
+				resolvedBaseType = ctx.location.currentPackage->exports.at(simpleType->name);
+			}
+			else if (ctx.instantiatedClasses.contains(simpleType->name))
+			{
+				resolvedBaseType = ctx.instantiatedClasses.at(simpleType->name);
+			}
+			else
+			{
+				throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name + "'");
 			}
 		}
-
-		if (ctx.instantiatedClasses.contains(simpleType->name))
-		{
-			return ctx.instantiatedClasses.at(simpleType->name);
-		}
-
-		throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name + "'");
 	}
-
-	if (const auto funTypeNode = dynamic_cast<const ast::FunctionTypeNode*>(node))
+	else if (const auto funTypeNode = dynamic_cast<const ast::FunctionTypeNode*>(node))
 	{
-		auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
+		const auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
 		for (const auto& pType : funTypeNode->paramTypes)
 		{
 			semFunType->paramTypes.push_back(Resolve(pType.get(), ctx));
 		}
 		semFunType->returnType = Resolve(funTypeNode->returnType.get(), ctx);
-		return semFunType;
+
+		resolvedBaseType = semFunType;
+	}
+	else
+	{
+		resolvedBaseType = ctx.tUnit;
 	}
 
-	return ctx.tUnit;
+	if (node->isNullable)
+	{
+		if (resolvedBaseType->isNullable || resolvedBaseType == ctx.tNull)
+		{
+			return resolvedBaseType;
+		}
+
+		auto nullableType = resolvedBaseType->Clone();
+		nullableType->isNullable = true;
+
+		return nullableType;
+	}
+
+	return resolvedBaseType;
 }
 
 inline void ExpectAssignable(const SemanticType* actual, const SemanticType* expected, const std::string& contextMsg)

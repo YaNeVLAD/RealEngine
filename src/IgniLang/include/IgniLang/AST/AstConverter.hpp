@@ -467,7 +467,9 @@ private:
 				memberAccess->object = ConvertExpr(exprNode->children[0].get());
 				memberAccess->member = exprNode->children[2]->token->lexeme;
 
-				if (const auto& optTypeArgs = exprNode->children[1];
+				memberAccess->isSafe = (exprNode->children[1]->symbol.Hashed() == "?."_hs);
+
+				if (const auto& optTypeArgs = exprNode->children[3];
 					!optTypeArgs->children.empty() && optTypeArgs->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 				{
 					ExtractTypeList(optTypeArgs->children[2].get(), memberAccess->typeArgs);
@@ -482,6 +484,7 @@ private:
 			const auto& child = exprNode->children[0];
 			switch (child->symbol.Hashed())
 			{
+			case "null"_hs:
 			case "true"_hs:
 			case "false"_hs:
 			case "intCon"_hs:

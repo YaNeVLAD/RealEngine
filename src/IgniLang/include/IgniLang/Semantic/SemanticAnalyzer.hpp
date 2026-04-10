@@ -143,6 +143,7 @@ public:
 		case TokenType::IntConst:    m_currentExprType = m_context.tInt; break;
 		case TokenType::FloatConst:  m_currentExprType = m_context.tDouble; break;
 		case TokenType::StringConst: m_currentExprType = m_context.tString; break;
+		case TokenType::KwNull:      m_currentExprType = m_context.tNull; break;
 		case TokenType::KwTrue:
 		case TokenType::KwFalse:     m_currentExprType = m_context.tBool; break;
 		default:                     m_currentExprType = m_context.tUnit; break;

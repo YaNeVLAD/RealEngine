@@ -127,6 +127,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			const auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
 			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
+		else if (arg.type == TokenType::Identifier && arg.lexeme == "null")
+		{
+			outChunk.Write(outChunk.AddConstant(Null));
+		}
 		else
 		{
 			std::cerr << "Expected number or string after CONST\n";

@@ -450,6 +450,8 @@ struct MemberAccessExpr final : Visitable<MemberAccessExpr, Expr>
 	re::String member;
 	std::vector<std::unique_ptr<TypeNode>> typeArgs;
 
+	bool isSafe = true;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
