@@ -110,7 +110,7 @@ struct ClassType final : SemanticType
 	bool isExternal = false;
 
 	std::unordered_map<re::String, FieldInfo> fields;
-	std::unordered_map<re::String, std::shared_ptr<FunctionType>> methods;
+	std::unordered_map<re::String, std::shared_ptr<SemanticType>> methods;
 
 	re::String moduleName;
 
@@ -146,6 +146,9 @@ struct GenericFunctionTemplate final : SemanticType
 	const ast::FunDecl* astNode{};
 	std::vector<ast::GenericTypeParam> typeParams;
 	re::String moduleName;
+
+	ast::Visibility visibility = ast::Visibility::Public;
+	bool isExternal = false;
 
 	explicit GenericFunctionTemplate(const re::String& n) { name = n; }
 };

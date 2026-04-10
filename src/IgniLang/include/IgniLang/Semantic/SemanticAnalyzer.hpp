@@ -393,6 +393,63 @@ public:
 
 		const auto calleeType = Evaluate(node->callee.get());
 
+		if (const auto funTmpl = std::dynamic_pointer_cast<GenericFunctionTemplate>(calleeType))
+		{
+			std::vector<std::shared_ptr<SemanticType>> concreteArgs;
+			bool isMethodCall = false;
+
+			if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+			{
+				isMethodCall = true;
+
+				if (!memAccess->typeArgs.empty())
+				{ // obj.method<T>
+					for (const auto& arg : memAccess->typeArgs)
+					{
+						concreteArgs.push_back(ResolveAstType(arg.get()));
+					}
+				}
+				else
+				{ // obj.method(T)
+					concreteArgs.resize(funTmpl->typeParams.size(), nullptr);
+
+					for (std::size_t i = 0; i < node->arguments.size() && (i + 1) < funTmpl->astNode->parameters.size(); ++i)
+					{ // reserve first argument for 'this'
+						const auto argType = Evaluate(node->arguments[i].get());
+						const auto paramTypeAst = funTmpl->astNode->parameters[i + 1].type.get();
+						InferTypeArguments(argType, paramTypeAst, funTmpl->typeParams, concreteArgs);
+					}
+
+					for (std::size_t k = 0; k < concreteArgs.size(); ++k)
+					{
+						if (!concreteArgs[k])
+						{
+							throw std::runtime_error("Semantic Error: Could not infer type argument for method '" + funTmpl->name + "'");
+						}
+					}
+				}
+			}
+
+			// Генерируем реальную функцию (она автоматически добавится в глобальные statements)
+			const auto concreteFun = InstantiateFunction(funTmpl, concreteArgs);
+			const auto mutableNode = const_cast<ast::CallExpr*>(node);
+
+			if (!funTmpl->astNode->isExternal)
+			{
+				mutableNode->staticMethodTarget = concreteFun->name; // Статическая диспетчеризация!
+			}
+
+			ValidateCallArguments(node, concreteFun, isMethodCall);
+
+			if (concreteFun->returnType == nullptr)
+			{
+				throw std::runtime_error("Semantic Error: Cannot infer return type for forward call of '" + concreteFun->name + "'.");
+			}
+
+			m_currentExprType = concreteFun->returnType;
+			return;
+		}
+
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
 		{
 			const auto mutableNode = const_cast<ast::CallExpr*>(node);
@@ -1102,15 +1159,29 @@ private:
 						const auto mutableFun = const_cast<ast::FunDecl*>(fun);
 						const re::String originalName = mutableFun->name;
 
-						ast::FunDecl::Parameter thisParam;
-						thisParam.name = "this";
-						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-						thisTypeNode->name = classDecl->name;
-						thisParam.type = std::move(thisTypeNode);
-						mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
+						if (mutableFun->parameters.empty() || mutableFun->parameters[0].name != "this")
+						{
+							ast::FunDecl::Parameter thisParam;
+							thisParam.name = "this";
+							auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
+							thisTypeNode->name = classDecl->name;
+							thisParam.type = std::move(thisTypeNode);
+							mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
+						}
 
 						mutableFun->name = classDecl->name + "_" + originalName;
 						m_allFunctionNames.insert(mutableFun->name);
+
+						if (!mutableFun->typeParams.empty())
+						{
+							auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
+							tmpl->astNode = mutableFun;
+							tmpl->typeParams = mutableFun->typeParams;
+							tmpl->moduleName = currentModule ? currentModule->name : "global";
+
+							classType->methods[originalName] = tmpl;
+							continue;
+						}
 
 						auto funType = std::make_shared<FunctionType>(mutableFun->name);
 						funType->returnType = ResolveAstType(mutableFun->returnType.get());
@@ -1326,7 +1397,14 @@ private:
 		else if (const auto methodIt = classType->methods.find(member); methodIt != classType->methods.end())
 		{
 			resolvedType = methodIt->second;
-			vis = methodIt->second->visibility;
+			if (const auto funType = std::dynamic_pointer_cast<FunctionType>(resolvedType))
+			{
+				vis = funType->visibility;
+			}
+			else if (const auto tmplType = std::dynamic_pointer_cast<GenericFunctionTemplate>(resolvedType))
+			{
+				vis = tmplType->visibility;
+			}
 		}
 		else
 		{
