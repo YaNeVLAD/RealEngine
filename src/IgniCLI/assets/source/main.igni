@@ -1,74 +1,15 @@
 package main;
 
-class Player {
-
-	private var _hp: Int = 100;
-	val name: String = "Hero";
-
-	Player(_name: String) {
-		this.name = _name;
-	}
-
-	~Player() { println("~Player"); }
-
-	fun hp() = this._hp;
-
-	fun takeDamage(amount: Int) {
-		this._hp = this._hp - amount;
-	}
-
-	fun move(dx: Double, dy: Double) {
-		println("dx: ", dx,", ", "dy: ", dy);
-	}
-
-}
-
-class <T> Vec2(val x: T, val y: T) {
-	fun add(rhs: T) = Vec2::<T>(this.x + rhs, this.y + rhs);
-
-	fun mul(rhs: T): Vec2<T> = Vec2::<T>(this.x * rhs, this.y * rhs);
-}
-
-fun <T> printOnce(value: T) {
-	println(value);
-}
-
-class Entity(val id: Int) {
-	fun print() { println("entity"); }
-}
-
-class Enemy(id: Int, val name: String) : Entity(id) {
-	override fun print() { super.print(); println("enemy"); }
+class <T> A(val a: T) {
+	fun <U> print(value: U) { println(value); }
 }
 
 fun main() {
-	val enemy = Enemy(1, "Aboba");
-	println("enemy: ", enemy.id, " ",enemy.name);
-	enemy.print();
+	val i = A(42);
 
-	val arr = arrayOf(1, 2, 3, 4, 5);
-	println("array: ", arr);
-	println("array_size: ", arr.size);
+	val a = 42;
 
-	bubbleSort(arr, greater);
-
-	println("sorted array: ", arr);
-
-	val player = Player("Арбуз Арбуз");
-	println("Привет, ", player.name, "!");
-
-	printOnce(42.33);
-
-	println("string_literal", "length".length);
-	println("string_literal", "size".size);
-
-	println("До получения урона: ", player.hp(), "!");
-	player.takeDamage(42);
-	println("После получения урона: ", player.hp(), "!");
-
-	val pos = Vec2::<Int>(5, 5).add(7).mul(2);
-	println(pos.x, ", ", pos.y);
-
-	val dpos = Vec2::<Double>(10.0, 10.0).mul(1.5);
-	println(dpos.x, ", ", dpos.y);
+	println(i.a);
+	i.print("Pivo");
+	i.print(64);
 }

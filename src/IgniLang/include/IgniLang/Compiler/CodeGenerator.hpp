@@ -371,9 +371,12 @@ public:
 
 		if (!node->staticMethodTarget.Empty())
 		{
-			if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()); memberAccess->object)
+			if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()); memberAccess)
 			{
-				memberAccess->object->Accept(*this);
+				if (memberAccess->object)
+				{
+					memberAccess->object->Accept(*this);
+				}
 			}
 
 			// 2. Кладем остальные аргументы
