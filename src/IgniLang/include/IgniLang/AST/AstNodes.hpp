@@ -268,7 +268,7 @@ struct LiteralExpr final : Visitable<LiteralExpr, Expr>
 		std::cout << "LiteralExpr [value: '" << token.lexeme << "']\n";
 	}
 
-	std::unique_ptr<Expr> CloneExpr(const TypeEnv* env = nullptr) const override
+	std::unique_ptr<Expr> CloneExpr(const TypeEnv* = nullptr) const override
 	{
 		return std::make_unique<LiteralExpr>(*this);
 	}
@@ -985,10 +985,10 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 		auto clone = std::make_unique<ConstructorDecl>();
 		clone->visibility = visibility;
 		clone->name = name;
-		for (const auto& [name, type] : parameters)
+		for (const auto& [pName, type] : parameters)
 		{
 			FunDecl::Parameter newP;
-			newP.name = name;
+			newP.name = pName;
 			if (type)
 			{
 				newP.type = type->Clone(env);
@@ -1046,7 +1046,7 @@ struct ImportDecl final : Visitable<ImportDecl>
 				  << (isStar ? ".*" : "") << "]\n";
 	}
 
-	std::unique_ptr<Node> CloneNode(const TypeEnv* env = nullptr) const override
+	std::unique_ptr<Node> CloneNode(const TypeEnv* = nullptr) const override
 	{
 		auto clone = std::make_unique<ImportDecl>();
 		clone->path = path;

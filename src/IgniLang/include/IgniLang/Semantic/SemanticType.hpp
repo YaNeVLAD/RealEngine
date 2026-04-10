@@ -19,6 +19,8 @@ struct SemanticType
 
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
+		using namespace re::literals;
+
 		if (name.Hashed() == "Any"_hs)
 		{ // TODO: Remove after Generics and typecast
 			return true;
@@ -60,6 +62,8 @@ struct FunctionType final : SemanticType
 
 	bool IsAssignableTo(const SemanticType* other) const override
 	{
+		using namespace re::literals;
+
 		if (name.Hashed() == "Any"_hs)
 		{ // TODO: Remove after Generics and typecast
 			return true;

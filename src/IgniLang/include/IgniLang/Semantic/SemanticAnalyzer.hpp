@@ -1,12 +1,16 @@
 #pragma once
 
-#include "CallValidator.hpp"
-#include "MemberResolver.hpp"
-#include "TypeResolver.hpp"
-
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
+#include <IgniLang/Semantic/Helpers/CallValidator.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Variable.hpp>
+#include <IgniLang/Semantic/Helpers/Export.hpp>
+#include <IgniLang/Semantic/Helpers/Generic/Class.hpp>
+#include <IgniLang/Semantic/Helpers/Generic/Function.hpp>
+#include <IgniLang/Semantic/Helpers/Import.hpp>
+#include <IgniLang/Semantic/Helpers/MemberResolver.hpp>
+#include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 #include <algorithm>
@@ -20,12 +24,16 @@ class SemanticAnalyzer final : public ast::BaseAstVisitor
 public:
 	SemanticAnalyzer()
 	{
+		m_context.evaluateFunctionCallback = [this](const auto& node) {
+			return this->Evaluate(node);
+		};
+
 		m_context.instantiateClassCallback = [this](const auto& tmpl, const auto& args) {
-			return this->InstantiateClass(tmpl, args);
+			return Generic::Class::Instantiate(tmpl, args, m_context);
 		};
 
 		m_context.instantiateFunctionCallback = [this](const auto& tmpl, const auto& args) {
-			return this->InstantiateFunction(tmpl, args);
+			return Generic::Function::Instantiate(tmpl, args, m_context);
 		};
 
 		InitBuiltins();
@@ -89,75 +97,6 @@ public:
 
 			m_context.env.PopScope();
 		}
-
-		// for (std::size_t i = 0; i < m_pendingClassInstantiations.size(); ++i)
-		// {
-		// 	const auto* decl = m_pendingClassInstantiations[i];
-		// 	const auto classType = m_context.instantiatedClasses[decl->name];
-		//
-		// 	m_context.env.PushScope();
-		//
-		// 	if (!classType->moduleName.Empty() && classType->moduleName != "global")
-		// 	{
-		// 		if (const Symbol* modSym = m_context.env.Resolve(classType->moduleName))
-		// 		{
-		// 			if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
-		// 			{
-		// 				for (const auto& [name, type] : modType->exports)
-		// 				{
-		// 					m_context.env.Define(name, type, true);
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-		//
-		// 	m_context.env.Define(decl->name, classType, true);
-		// 	for (const auto& type : classType->methods | std::views::values)
-		// 	{
-		// 		m_context.env.Define(type->name, type, true);
-		// 	}
-		//
-		// 	m_instantiatedNodes.erase(decl);
-		// 	for (const auto& member : decl->members)
-		// 	{
-		// 		m_instantiatedNodes.erase(member.get());
-		// 	}
-		//
-		// 	decl->Accept(*this);
-		//
-		// 	m_context.env.PopScope();
-		// }
-		// m_pendingClassInstantiations.clear();
-		//
-		// for (std::size_t i = 0; i < m_pendingFunInstantiations.size(); ++i)
-		// {
-		// 	const auto* decl = m_pendingFunInstantiations[i];
-		// 	auto funType = m_context.instantiatedFunctions[decl->name];
-		//
-		// 	m_context.env.PushScope();
-		//
-		// 	if (!funType->moduleName.Empty() && funType->moduleName != "global")
-		// 	{
-		// 		if (const Symbol* modSym = m_context.env.Resolve(funType->moduleName))
-		// 		{
-		// 			if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
-		// 			{
-		// 				for (const auto& [name, type] : modType->exports)
-		// 				{
-		// 					m_context.env.Define(name, type, true);
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-		//
-		// 	m_context.env.Define(decl->name, funType, true);
-		//
-		// 	m_instantiatedNodes.erase(decl);
-		// 	decl->Accept(*this);
-		//
-		// 	m_context.env.PopScope();
-		// }
-		// m_pendingFunInstantiations.clear();
 	}
 
 	[[nodiscard]] std::shared_ptr<ClassType> GetClassType(const re::String& className) const
@@ -238,7 +177,7 @@ public:
 
 		if (const auto modType = std::dynamic_pointer_cast<ModuleType>(leftType))
 		{
-			m_currentExprType = ResolveExport(modType, node->member);
+			m_currentExprType = Export::Resolve(modType, node->member);
 		}
 		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(leftType))
 		{
@@ -440,16 +379,16 @@ public:
 			throw std::runtime_error("Internal Compiler Error: concreteTarget is null for call to '" + re::String(node->callee ? "some callee" : "unknown") + "'");
 		}
 
+		mutableNode->staticMethodTarget = "";
 		if (concreteTarget->isExternal)
 		{
-			mutableNode->staticMethodTarget = "";
 
 			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
 			{ // Disable mangling for external functions
 				id->name = concreteTarget->name;
 			}
 		}
-		else
+		else if (isMethodCall || node->isConstructorCall)
 		{
 			mutableNode->staticMethodTarget = concreteTarget->name;
 		}
@@ -481,14 +420,15 @@ public:
 	// ==========================================
 	// INSTRUCTIONS
 	// ==========================================
+
 	void Visit(const ast::VarDecl* node) override
 	{
-		HandleVariableDeclaration(node->name, node->initializer.get(), node->type.get(), false);
+		Declaration::Var(node->name, node->initializer.get(), node->type.get(), m_context);
 	}
 
 	void Visit(const ast::ValDecl* node) override
 	{
-		HandleVariableDeclaration(node->name, node->initializer.get(), node->type.get(), true);
+		Declaration::Val(node->name, node->initializer.get(), node->type.get(), m_context);
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -498,7 +438,7 @@ public:
 
 	void Visit(const ast::ConstructorDecl* node) override
 	{
-		if (m_instantiatedNodes.contains(node))
+		if (m_context.m_instantiatedNodes.contains(node))
 		{
 			return;
 		}
@@ -537,7 +477,7 @@ public:
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
-		if (m_instantiatedNodes.contains(node))
+		if (m_context.m_instantiatedNodes.contains(node))
 		{
 			return;
 		}
@@ -697,7 +637,7 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		if (m_instantiatedNodes.contains(node))
+		if (m_context.m_instantiatedNodes.contains(node))
 		{
 			return;
 		}
@@ -730,6 +670,11 @@ public:
 		else
 		{ // Global function
 			const Symbol* sym = m_context.env.Resolve(node->name);
+			if (!sym)
+			{
+				throw std::runtime_error("Semantic Error: Cannot resolve '" + node->name + "'");
+			}
+
 			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
 		}
 
@@ -767,7 +712,7 @@ public:
 
 	void Visit(const ast::ClassDecl* node) override
 	{
-		if (m_instantiatedNodes.contains(node))
+		if (m_context.m_instantiatedNodes.contains(node))
 		{
 			return;
 		}
@@ -907,7 +852,7 @@ public:
 
 	void Visit(const ast::ImportDecl* node) override
 	{
-		ProcessImport(node);
+		Import::Process(node, m_context);
 	}
 
 private:
@@ -915,10 +860,6 @@ private:
 
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	ast::Program* m_currentProgram = nullptr;
-
-	std::vector<ast::ClassDecl*> m_pendingClassInstantiations;
-	std::vector<ast::FunDecl*> m_pendingFunInstantiations;
-	std::unordered_set<const ast::Node*> m_instantiatedNodes;
 
 	// --- Type Definitions ---
 
@@ -955,7 +896,7 @@ private:
 		{ // Instantiating Array class
 			if (const auto tmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
 			{
-				return InstantiateClass(tmpl, { elementType });
+				return m_context.instantiateClassCallback(tmpl, { elementType });
 			}
 
 			return std::dynamic_pointer_cast<SemanticType>(sym->type);
@@ -1267,462 +1208,6 @@ private:
 		}
 
 		m_context.location.currentPackage = nullptr;
-	}
-
-	void HandleVariableDeclaration(const re::String& name, const ast::Expr* initializer, const ast::TypeNode* explicitTypeNode, bool isReadOnly)
-	{
-		auto varType = Evaluate(initializer);
-
-		if (explicitTypeNode)
-		{
-			const auto declaredType = TypeResolver::Resolve(explicitTypeNode, m_context);
-			if (initializer)
-			{
-				TypeResolver::ExpectAssignable(varType.get(), declaredType.get(), "variable initialization");
-			}
-			varType = declaredType;
-		}
-
-		if (varType == m_context.tUnit && !explicitTypeNode)
-		{
-			throw std::runtime_error("Semantic Error: Cannot infer type for variable '" + name + "'");
-		}
-
-		m_context.env.Define(name, varType, isReadOnly);
-	}
-
-	static std::shared_ptr<SemanticType> ResolveExport(const std::shared_ptr<ModuleType>& modType, const re::String& member)
-	{
-		if (const auto it = modType->exports.find(member); it != modType->exports.end())
-		{
-			return it->second;
-		}
-		throw std::runtime_error("Semantic Error: Module '" + modType->name + "' has no export named '" + member + "'");
-	}
-
-	void ValidateCallArguments(const ast::CallExpr* node, const std::shared_ptr<FunctionType>& funType, bool isMethodCall = false)
-	{
-		const std::size_t thisOffset = isMethodCall ? 1 : 0;
-
-		if (funType->isVararg)
-		{
-			const std::size_t fixedParams = funType->paramTypes.size() - 1 - thisOffset;
-			if (node->arguments.size() < fixedParams)
-			{
-				throw std::runtime_error("Semantic Error: Not enough arguments for vararg function");
-			}
-
-			const auto mutableNode = const_cast<ast::CallExpr*>(node);
-			mutableNode->isVarargCall = true;
-			mutableNode->varargCount = node->arguments.size() - fixedParams;
-		}
-		else if (node->arguments.size() + thisOffset != funType->paramTypes.size())
-		{
-			throw std::runtime_error("Semantic Error: Argument count mismatch");
-		}
-
-		for (std::size_t i = 0; i < node->arguments.size(); ++i)
-		{
-			const auto argType = Evaluate(node->arguments[i].get());
-
-			std::shared_ptr<SemanticType> expectedType = (funType->isVararg && i + thisOffset >= funType->paramTypes.size() - 1)
-				? funType->paramTypes.back()
-				: funType->paramTypes[i + thisOffset];
-
-			TypeResolver::ExpectAssignable(argType.get(), expectedType.get(), "argument " + std::to_string(i + 1));
-		}
-	}
-
-	void ProcessImport(const ast::ImportDecl* node)
-	{
-		const re::String fullPath = node->path;
-
-		if (node->isStar)
-		{ // import module.*
-			const Symbol* modSym = m_context.env.Resolve(fullPath);
-			if (!modSym)
-			{
-				throw std::runtime_error("Semantic Error: Unknown module '" + fullPath + "' in import");
-			}
-
-			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
-			if (!modType)
-			{
-				throw std::runtime_error("Semantic Error: '" + fullPath + "' is not a module");
-			}
-
-			for (const auto& [exportName, exportType] : modType->exports)
-			{
-				m_context.env.Define(exportName, exportType, true);
-				m_context.importAliases[exportName] = fullPath;
-			}
-		}
-		else
-		{ // import module.ident
-			const std::size_t dotPos = fullPath.Find('.');
-			if (dotPos == re::String::NPos)
-			{
-				return;
-			}
-
-			const auto modName = fullPath.Substring(0, dotPos);
-			const auto memberName = fullPath.Substring(dotPos + 1);
-
-			const Symbol* modSym = m_context.env.Resolve(modName);
-			if (!modSym)
-			{
-				throw std::runtime_error("Semantic Error: Unknown module '" + modName + "' in import");
-			}
-
-			const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
-			if (!modType)
-			{
-				throw std::runtime_error("Semantic Error: '" + modName + "' is not a module");
-			}
-
-			if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
-			{
-				m_context.env.Define(memberName, it->second, true);
-				m_context.importAliases[memberName] = modName;
-			}
-			else
-			{
-				throw std::runtime_error("Semantic Error: Module '" + modName + "' has no export named '" + memberName + "'");
-			}
-		}
-	}
-
-	std::shared_ptr<ClassType> InstantiateClass(const std::shared_ptr<GenericClassTemplate>& tmpl, const std::vector<std::shared_ptr<SemanticType>>& typeArgs)
-	{
-		if (typeArgs.size() != tmpl->typeParams.size())
-		{
-			throw std::runtime_error("Semantic Error: Generic class '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
-		}
-
-		re::String uniqueName = tmpl->name;
-		for (const auto& arg : typeArgs)
-		{
-			uniqueName = uniqueName + "_" + arg->name;
-		}
-
-		if (m_context.instantiatedClasses.contains(uniqueName))
-		{
-			return m_context.instantiatedClasses[uniqueName];
-		}
-
-		ast::TypeEnv typeEnv;
-		std::vector<std::unique_ptr<ast::SimpleTypeNode>> tempNodes;
-
-		for (std::size_t i = 0; i < typeArgs.size(); ++i)
-		{
-			if (tmpl->typeParams[i].boundType)
-			{
-				auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i].boundType.get(), m_context);
-				TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound");
-			}
-			auto tempNode = std::make_unique<ast::SimpleTypeNode>();
-			tempNode->name = typeArgs[i]->name;
-			typeEnv[tmpl->typeParams[i].name] = tempNode.get();
-			tempNodes.push_back(std::move(tempNode));
-		}
-
-		auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
-		auto realClassDecl = dynamic_cast<ast::ClassDecl*>(clonedDecl.get());
-		realClassDecl->name = uniqueName;
-		realClassDecl->typeParams.clear();
-
-		bool hasConstructor = false;
-		for (const auto& member : realClassDecl->members)
-		{
-			if (dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-			{
-				hasConstructor = true;
-				break;
-			}
-		}
-		if (!hasConstructor)
-		{
-			auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
-			defaultCtor->name = uniqueName;
-			defaultCtor->body = std::make_unique<ast::Block>();
-			realClassDecl->members.push_back(std::move(defaultCtor));
-		}
-
-		auto classType = std::make_shared<ClassType>(uniqueName);
-		classType->moduleName = tmpl->moduleName;
-		classType->typeArguments = typeArgs;
-		m_context.instantiatedClasses[uniqueName] = classType;
-
-		m_context.env.Define(uniqueName, classType, true);
-		for (const auto& member : realClassDecl->members)
-		{
-			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
-			{
-				auto fieldType = TypeResolver::Resolve(varDecl->type.get(), m_context);
-				if (varDecl->initializer)
-				{
-					const auto initType = Evaluate(varDecl->initializer.get());
-					if (!fieldType || fieldType == m_context.tUnit)
-					{
-						fieldType = initType;
-					}
-				}
-				else if (!varDecl->isExternal && !realClassDecl->isExternal && !fieldType)
-				{
-					throw std::runtime_error("Semantic Error: Property '" + varDecl->name + "' must have an initializer or explicit type");
-				}
-
-				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
-			}
-			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
-			{
-				auto fieldType = TypeResolver::Resolve(valDecl->type.get(), m_context);
-				if (valDecl->initializer)
-				{
-					const auto initType = Evaluate(valDecl->initializer.get());
-					if (!fieldType || fieldType == m_context.tUnit)
-					{
-						fieldType = initType;
-					}
-				}
-				else if (!valDecl->isExternal && !realClassDecl->isExternal && !fieldType)
-				{
-					throw std::runtime_error("Semantic Error: Property '" + valDecl->name + "' must have an initializer or explicit type");
-				}
-
-				classType->fields[valDecl->name] = { fieldType, false, valDecl->visibility };
-			}
-			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
-			{
-				if (realClassDecl->isExternal && (!fun->isExternal || fun->body || fun->isExprBody))
-				{
-					throw std::runtime_error("Semantic Error: Method '" + fun->name + "' in external class '" + realClassDecl->name + "' must be marked 'external' and cannot have a body.");
-				}
-
-				const auto mutableFun = const_cast<ast::FunDecl*>(fun);
-				const re::String originalName = mutableFun->name;
-
-				if (mutableFun->parameters.empty() || mutableFun->parameters[0].name != "this")
-				{
-					ast::FunDecl::Parameter thisParam;
-					thisParam.name = "this";
-					auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-					thisTypeNode->name = uniqueName;
-					thisParam.type = std::move(thisTypeNode);
-					mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
-				}
-
-				mutableFun->name = uniqueName + "_" + originalName;
-				m_context.allFunctionNames.insert(mutableFun->name);
-
-				if (!mutableFun->typeParams.empty())
-				{
-					if (mutableFun->isOverride)
-					{
-						throw std::runtime_error("Semantic Error: Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
-					}
-
-					auto fnTmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
-					fnTmpl->astNode = mutableFun;
-					fnTmpl->typeParams = mutableFun->typeParams;
-					fnTmpl->moduleName = tmpl->moduleName;
-
-					fnTmpl->visibility = mutableFun->visibility;
-					fnTmpl->isExternal = fun->isExternal || realClassDecl->isExternal;
-
-					classType->methods[originalName] = fnTmpl;
-					continue;
-				}
-
-				auto funType = std::make_shared<FunctionType>(mutableFun->name);
-				funType->returnType = TypeResolver::Resolve(mutableFun->returnType.get(), m_context);
-				if (funType->returnType == nullptr && !mutableFun->isExprBody)
-				{
-					funType->returnType = m_context.tUnit;
-				}
-				funType->isVararg = mutableFun->isVararg;
-				for (const auto& [_, type] : mutableFun->parameters)
-				{
-					funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-				}
-
-				if (funType->returnType == nullptr && mutableFun->isExprBody)
-				{ // On-demand type evaluation for expression functions
-					m_context.env.PushScope();
-
-					for (std::size_t j = 0; j < mutableFun->parameters.size(); ++j)
-					{
-						m_context.env.Define(mutableFun->parameters[j].name, funType->paramTypes[j], false);
-					}
-
-					const auto prevFun = m_context.location.currentFunction;
-					m_context.location.currentFunction = funType;
-
-					if (mutableFun->body && !mutableFun->body->statements.empty())
-					{
-						if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(mutableFun->body->statements[0].get()))
-						{
-							funType->returnType = Evaluate(retStmt->expr.get());
-						}
-					}
-
-					m_context.location.currentFunction = prevFun;
-					m_context.env.PopScope();
-				}
-
-				funType->visibility = mutableFun->visibility;
-				funType->isExternal = fun->isExternal || realClassDecl->isExternal;
-
-				if (funType->isExternal)
-				{
-					m_context.externalFunctions.insert(funType->name);
-				}
-
-				bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
-
-				if (mutableFun->isOverride && !existsInBase)
-				{
-					throw std::runtime_error("Semantic Error: Method '" + originalName + "' is marked 'override' but no matching method found in base class '" + classType->baseClass->name + "'");
-				}
-				if (!mutableFun->isOverride && existsInBase)
-				{
-					throw std::runtime_error("Semantic Error: Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
-				}
-
-				classType->methods[originalName] = funType;
-			}
-			else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-			{
-				const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
-
-				ast::FunDecl::Parameter thisParam;
-				thisParam.name = "this";
-				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-				thisTypeNode->name = uniqueName;
-				thisParam.type = std::move(thisTypeNode);
-				mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
-
-				mutableCtor->name = uniqueName + "_" + uniqueName;
-				m_context.allFunctionNames.insert(mutableCtor->name);
-
-				auto funType = std::make_shared<FunctionType>(mutableCtor->name);
-				funType->returnType = m_context.tUnit;
-				funType->isVararg = mutableCtor->isVararg;
-				for (const auto& [_, type] : mutableCtor->parameters)
-				{
-					funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-				}
-				funType->isExternal = realClassDecl->isExternal;
-
-				classType->methods[uniqueName] = funType;
-			}
-		}
-
-		m_pendingClassInstantiations.push_back(realClassDecl);
-		m_instantiatedNodes.insert(realClassDecl);
-		for (const auto& member : realClassDecl->members)
-		{
-			m_instantiatedNodes.insert(member.get());
-		}
-
-		m_context.pendingStatements.push_back(std::move(clonedDecl));
-
-		return classType;
-	}
-
-	std::shared_ptr<FunctionType> InstantiateFunction(const std::shared_ptr<GenericFunctionTemplate>& tmpl, const std::vector<std::shared_ptr<SemanticType>>& typeArgs)
-	{
-		if (typeArgs.size() != tmpl->typeParams.size())
-		{
-			throw std::runtime_error("Semantic Error: Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
-		}
-
-		re::String uniqueName = tmpl->name;
-		for (const auto& arg : typeArgs)
-		{
-			if (!arg)
-			{
-				throw std::runtime_error("Semantic Error: Invalid or unknown type argument for '" + tmpl->name + "'");
-			}
-			uniqueName = uniqueName + "_" + arg->name;
-		}
-
-		if (m_context.instantiatedFunctions.contains(uniqueName))
-			return m_context.instantiatedFunctions[uniqueName];
-
-		ast::TypeEnv typeEnv;
-		std::vector<std::unique_ptr<ast::SimpleTypeNode>> tempNodes;
-
-		for (std::size_t i = 0; i < typeArgs.size(); ++i)
-		{
-			if (tmpl->typeParams[i].boundType)
-			{
-				auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i].boundType.get(), m_context);
-				TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound");
-			}
-			auto tempNode = std::make_unique<ast::SimpleTypeNode>();
-			tempNode->name = typeArgs[i]->name;
-			typeEnv[tmpl->typeParams[i].name] = tempNode.get();
-			tempNodes.push_back(std::move(tempNode));
-		}
-
-		// Клонируем AST с подстановкой типов
-		auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
-		const auto realFunDecl = dynamic_cast<ast::FunDecl*>(clonedDecl.get());
-		realFunDecl->name = uniqueName;
-		realFunDecl->typeParams.clear();
-
-		auto funType = std::make_shared<FunctionType>(uniqueName);
-		funType->moduleName = tmpl->moduleName;
-		funType->isVararg = realFunDecl->isVararg;
-		funType->visibility = realFunDecl->visibility;
-		funType->isExternal = tmpl->isExternal;
-
-		for (const auto& p : realFunDecl->parameters)
-		{
-			funType->paramTypes.push_back(TypeResolver::Resolve(p.type.get(), m_context));
-		}
-		funType->returnType = TypeResolver::Resolve(realFunDecl->returnType.get(), m_context);
-
-		if (funType->returnType == nullptr && realFunDecl->isExprBody)
-		{ // On-demand type evaluation
-			m_context.env.PushScope();
-			for (std::size_t j = 0; j < realFunDecl->parameters.size(); ++j)
-			{
-				m_context.env.Define(realFunDecl->parameters[j].name, funType->paramTypes[j], false);
-			}
-
-			const auto prevFun = m_context.location.currentFunction;
-			m_context.location.currentFunction = funType;
-
-			if (realFunDecl->body && !realFunDecl->body->statements.empty())
-			{
-				if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(realFunDecl->body->statements[0].get()))
-					funType->returnType = Evaluate(retStmt->expr.get());
-			}
-			m_context.location.currentFunction = prevFun;
-			m_context.env.PopScope();
-		}
-		else if (funType->returnType == nullptr && !realFunDecl->isExprBody)
-		{
-			funType->returnType = m_context.tUnit;
-		}
-
-		m_context.instantiatedFunctions[uniqueName] = funType;
-		m_context.env.Define(uniqueName, funType, true);
-		m_context.allFunctionNames.insert(uniqueName);
-
-		if (funType->isExternal)
-		{
-			m_context.externalFunctions.insert(uniqueName);
-		}
-
-		m_pendingFunInstantiations.push_back(realFunDecl);
-		m_instantiatedNodes.insert(realFunDecl);
-
-		m_context.pendingStatements.push_back(std::move(clonedDecl));
-
-		return funType;
 	}
 };
 

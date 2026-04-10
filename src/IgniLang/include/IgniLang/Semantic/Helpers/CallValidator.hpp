@@ -1,9 +1,8 @@
 #pragma once
 
-#include "TypeResolver.hpp"
-
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::CallValidator

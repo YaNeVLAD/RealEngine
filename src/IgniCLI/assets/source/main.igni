@@ -1,15 +1,9 @@
 package main;
 
-class <T> A(val a: T) {
-	fun <U> print(value: U) { println(value); }
-}
-
 fun main() {
-	val i = A(42);
+	val arr = arrayOf(1, 2, 3, 5, 8, 12);
 
-	val a = 42;
+	bubbleSort(arr, greater);
 
-	println(i.a);
-	i.print("Pivo");
-	i.print(64);
+	println(arr);
 }

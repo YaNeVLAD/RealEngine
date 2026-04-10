@@ -25,13 +25,17 @@ struct SemanticContext
 	std::unordered_map<re::String, re::String> importAliases;
 
 	std::unordered_map<re::String, std::shared_ptr<ClassType>> allClassTypes;
-	std::unordered_map<re::String, std::shared_ptr<ClassType>> instantiatedClasses;
 
 	std::unordered_set<re::String> allFunctionNames;
 	std::unordered_set<re::String> externalFunctions;
-	std::unordered_map<re::String, std::shared_ptr<FunctionType>> instantiatedFunctions;
 
 	std::vector<std::unique_ptr<ast::Statement>> pendingStatements;
+	std::vector<ast::FunDecl*> m_pendingFunInstantiations;
+	std::vector<ast::ClassDecl*> m_pendingClassInstantiations;
+
+	std::unordered_set<const ast::Node*> m_instantiatedNodes;
+	std::unordered_map<re::String, std::shared_ptr<ClassType>> instantiatedClasses;
+	std::unordered_map<re::String, std::shared_ptr<FunctionType>> instantiatedFunctions;
 
 	std::shared_ptr<PrimitiveType> tInt = std::make_shared<PrimitiveType>("Int");
 	std::shared_ptr<PrimitiveType> tDouble = std::make_shared<PrimitiveType>("Double");
@@ -49,6 +53,7 @@ struct SemanticContext
 		const std::shared_ptr<GenericFunctionTemplate>&,
 		const std::vector<std::shared_ptr<SemanticType>>&)>
 		instantiateFunctionCallback;
-};
 
+	std::function<std::shared_ptr<SemanticType>(const ast::Expr* expr)> evaluateFunctionCallback;
+};
 } // namespace igni::sem
