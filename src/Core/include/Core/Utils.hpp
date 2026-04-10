@@ -36,7 +36,7 @@ struct Prototype
 
 template <typename TDerived, typename TBase>
 	requires std::derived_from<TBase, Prototype<TBase>>
-struct SharedClone : TBase
+struct Clonable : TBase
 {
 	using TBase::TBase;
 

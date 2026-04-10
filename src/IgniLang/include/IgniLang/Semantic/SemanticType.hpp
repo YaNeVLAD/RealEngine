@@ -41,19 +41,19 @@ struct SemanticType : re::utils::Prototype<SemanticType>
 	}
 };
 
-struct PrimitiveType final : re::utils::SharedClone<PrimitiveType, SemanticType>
+struct PrimitiveType final : re::utils::Clonable<PrimitiveType, SemanticType>
 {
 	explicit PrimitiveType(const re::String& n) { name = n; }
 };
 
-struct ModuleType final : re::utils::SharedClone<ModuleType, SemanticType>
+struct ModuleType final : re::utils::Clonable<ModuleType, SemanticType>
 {
 	std::unordered_map<re::String, std::shared_ptr<SemanticType>> exports;
 
 	explicit ModuleType(const re::String& n) { name = n; }
 };
 
-struct FunctionType final : re::utils::SharedClone<FunctionType, SemanticType>
+struct FunctionType final : re::utils::Clonable<FunctionType, SemanticType>
 {
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 	std::shared_ptr<SemanticType> returnType;
@@ -108,7 +108,7 @@ struct FunctionType final : re::utils::SharedClone<FunctionType, SemanticType>
 	}
 };
 
-struct ClassType final : re::utils::SharedClone<ClassType, SemanticType>
+struct ClassType final : re::utils::Clonable<ClassType, SemanticType>
 {
 	struct FieldInfo
 	{
@@ -151,7 +151,7 @@ struct ClassType final : re::utils::SharedClone<ClassType, SemanticType>
 	}
 };
 
-struct GenericFunctionTemplate final : re::utils::SharedClone<GenericFunctionTemplate, SemanticType>
+struct GenericFunctionTemplate final : re::utils::Clonable<GenericFunctionTemplate, SemanticType>
 {
 	const ast::FunDecl* astNode{};
 	std::vector<ast::GenericTypeParam> typeParams;
@@ -163,7 +163,7 @@ struct GenericFunctionTemplate final : re::utils::SharedClone<GenericFunctionTem
 	explicit GenericFunctionTemplate(const re::String& n) { name = n; }
 };
 
-struct GenericClassTemplate final : re::utils::SharedClone<GenericClassTemplate, SemanticType>
+struct GenericClassTemplate final : re::utils::Clonable<GenericClassTemplate, SemanticType>
 {
 	const ast::ClassDecl* astNode{};
 	std::vector<ast::GenericTypeParam> typeParams;
