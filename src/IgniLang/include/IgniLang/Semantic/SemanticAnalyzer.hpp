@@ -1,7 +1,5 @@
 #pragma once
 
-#include "SemanticError.hpp"
-
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
@@ -13,6 +11,7 @@
 #include <IgniLang/Semantic/Helpers/Import.hpp>
 #include <IgniLang/Semantic/Helpers/MemberResolver.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 #include <algorithm>
