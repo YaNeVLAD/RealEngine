@@ -386,13 +386,14 @@ public:
 			IGNI_INTERNAL_ERR("concreteTarget is null for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
-		mutableNode->staticMethodTarget = "";
 		if (concreteTarget->isExternal)
 		{
-
 			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
-			{ // Disable mangling for external functions
-				id->name = concreteTarget->name;
+			{
+				if (!node->isConstructorCall)
+				{
+					id->name = concreteTarget->name;
+				}
 			}
 		}
 		else if (isMethodCall || node->isConstructorCall)
@@ -644,13 +645,13 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		if (m_context.m_instantiatedNodes.contains(node))
-		{
+		if (!node->typeParams.empty())
+		{ // Ignore generic function declarations
 			return;
 		}
 
-		if (!node->typeParams.empty())
-		{ // Ignore generic function declarations
+		if (node->isExternal)
+		{ // External functions have no body to analyze
 			return;
 		}
 
@@ -660,14 +661,12 @@ public:
 		{ // Local function
 			funType = std::make_shared<FunctionType>(node->name);
 			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
-
 			if (funType->returnType == nullptr && !node->isExprBody)
 			{
 				funType->returnType = m_context.tUnit;
 			}
 
 			funType->isVararg = node->isVararg;
-
 			for (const auto& [_, type] : node->parameters)
 			{
 				funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
@@ -675,14 +674,31 @@ public:
 			m_context.env.Define(node->name, funType, true);
 		}
 		else
-		{ // Global function
+		{ // Global function or Class method
 			const Symbol* sym = m_context.env.Resolve(node->name);
-			if (!sym)
+			if (sym)
 			{
-				IGNI_SEM_ERR("Cannot resolve '" + node->name + "'");
+				funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
 			}
 
-			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+			if (!funType && m_context.location.currentClass)
+			{ // Find function in Class methods
+				re::String originalName = node->name.Substring(m_context.location.currentClass->name.Length() + 1);
+				if (m_context.location.currentClass->methods.contains(originalName))
+				{
+					funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[originalName]);
+				}
+			}
+
+			if (!funType && m_context.instantiatedFunctions.contains(node->name))
+			{ // Find instantiated function
+				funType = m_context.instantiatedFunctions.at(node->name);
+			}
+
+			if (!funType)
+			{
+				IGNI_SEM_ERR(node, "Cannot resolve function '" + node->name + "'");
+			}
 		}
 
 		m_context.env.PushScope();

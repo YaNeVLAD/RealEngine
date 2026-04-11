@@ -1,16 +1,26 @@
 package main;
 
-class A(val a: Int){}
+fun <T, R> map(arr: Array<T>, mapper: (T) -> R) : Array<R> {
+	val size = arr.size;
+	val result = Array::<R>(size);
+
+	for (i in 0..size - 1) {
+		result[i] = mapper(arr[i]);
+	}
+
+	return result;
+}
+
+fun square(value: Int): Int {
+	return value * value;
+}
+
+fun even(value: Int): Bool = value / 2 == 0;
 
 fun main() {
-	var a: A? = null;
-	a = A(42);
-
-	println(a?.a);
-
 	val arr = arrayOf(1, 2, 3, 5, 8, 12);
 
-	bubbleSort(arr, greater);
+	val evens = map(arr, even);
 
-	println(arr);
+	println(evens);
 }

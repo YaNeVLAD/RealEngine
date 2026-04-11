@@ -72,6 +72,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 	}
 
 	auto classType = std::make_shared<ClassType>(uniqueName, tmpl->astNode);
+	classType->classDecl = realClassDecl;
 	classType->moduleName = tmpl->moduleName;
 	classType->typeArguments = typeArgs;
 	m_context.instantiatedClasses[uniqueName] = classType;
