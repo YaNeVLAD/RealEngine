@@ -48,7 +48,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
 					for (const auto& arg : simpleType->typeArgs)
 					{
-						concreteArgs.push_back(Resolve(arg.get(), ctx));
+						concreteArgs.emplace_back(Resolve(arg.get(), ctx));
 					}
 
 					resolvedBaseType = ctx.instantiateClassCallback(classTmpl, concreteArgs);
@@ -77,7 +77,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 		const auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
 		for (const auto& pType : funTypeNode->paramTypes)
 		{
-			semFunType->paramTypes.push_back(Resolve(pType.get(), ctx));
+			semFunType->paramTypes.emplace_back(Resolve(pType.get(), ctx));
 		}
 		semFunType->returnType = Resolve(funTypeNode->returnType.get(), ctx);
 

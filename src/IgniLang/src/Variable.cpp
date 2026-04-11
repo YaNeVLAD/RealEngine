@@ -19,7 +19,7 @@ void DeclareVariable(
 		const auto declaredType = igni::sem::TypeResolver::Resolve(explicitTypeNode, m_context);
 		if (initializer)
 		{
-			igni::sem::TypeResolver::ExpectAssignable(varType.get(), declaredType.get(), "variable initialization");
+			igni::sem::TypeResolver::ExpectAssignable(varType.get(), declaredType.get(), "variable initialization", initializer);
 		}
 		varType = declaredType;
 	}
