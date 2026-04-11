@@ -97,7 +97,8 @@ private:
 
 			auto importDecl = std::make_unique<ast::ImportDecl>();
 
-			// declNode->children[0] = "import"
+			importDecl->token = *declNode->children[0]->token;
+
 			// declNode->children[1] = ImportPath
 			importDecl->path = ExtractPathString(declNode->children[1].get());
 
@@ -176,6 +177,7 @@ private:
 			if (actualDecl->symbol.Hashed() == "ValDecl"_hs)
 			{
 				auto val = std::make_unique<ast::ValDecl>();
+				val->token = *actualDecl->children[1]->token;
 				val->name = name;
 				val->type = std::move(explicitType);
 				val->initializer = std::move(initializerExpr);
@@ -185,6 +187,7 @@ private:
 			}
 
 			auto var = std::make_unique<ast::VarDecl>();
+			var->token = *actualDecl->children[1]->token;
 			var->name = name;
 			var->type = std::move(explicitType);
 			var->initializer = std::move(initializerExpr);
@@ -194,6 +197,7 @@ private:
 		}
 		case "FunDecl"_hs: { // FunDecl -> OptFunMod [0] fun [1] OptTypeParams [2] FunName [3] ( [4] OptFormPars [5] ) [6] OptColonType [7] FunBody [8]
 			auto funDecl = std::make_unique<ast::FunDecl>();
+			funDecl->token = *actualDecl->children[1]->token;
 
 			if (const auto& optFunMod = actualDecl->children[0]; !optFunMod->children.empty())
 			{ // External modifier [0]
@@ -237,9 +241,11 @@ private:
 				auto expr = ConvertExpr(funBody->children[1].get());
 
 				auto returnStatement = std::make_unique<ast::ReturnStmt>();
+				returnStatement->token = *funBody->children[0]->token;
 				returnStatement->expr = std::move(expr);
 
 				funDecl->body = std::make_unique<ast::Block>();
+				funDecl->body->token = returnStatement->token;
 				funDecl->body->statements.push_back(std::move(returnStatement));
 			}
 
@@ -249,6 +255,7 @@ private:
 			// ClassDecl -> OptClassMod [0] class [1] OptTypeParams [2] ident [3] OptPrimaryCtor [4] OptBaseClass [5] { [6] ClassMemberList [7] } [8]
 			// OptBaseClass -> : Type [0] ( [1] OptActPars [2] ) [3] | : [0] Type [1] | \e
 			auto classDecl = std::make_unique<ast::ClassDecl>();
+			classDecl->token = *actualDecl->children[1]->token;
 
 			if (const auto& optClassMod = actualDecl->children[0];
 				!optClassMod->children.empty() && optClassMod->children[0]->symbol.Hashed() == "external"_hs)
@@ -283,22 +290,28 @@ private:
 			if (!optPrimaryCtor->children.empty() && optPrimaryCtor->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 			{
 				primaryCtor = std::make_unique<ast::ConstructorDecl>();
+				primaryCtor->token = *optPrimaryCtor->children[0]->token;
 				primaryCtor->name = classDecl->name;
 				primaryCtor->body = std::make_unique<ast::Block>();
+				primaryCtor->body->token = primaryCtor->token;
 
 				ExtractPrimaryCtorParams(optPrimaryCtor->children[1].get(), classDecl.get(), primaryCtor.get());
 			}
 			else if (classDecl->baseClass && !classDecl->baseClass->arguments.empty())
 			{ // Empty parent constructor
 				primaryCtor = std::make_unique<ast::ConstructorDecl>();
+				primaryCtor->token = classDecl->token;
 				primaryCtor->name = classDecl->name;
 				primaryCtor->body = std::make_unique<ast::Block>();
+				primaryCtor->body->token = primaryCtor->token;
 			}
 
 			if (primaryCtor && classDecl->baseClass && !classDecl->baseClass->arguments.empty())
 			{
 				auto superCall = std::make_unique<ast::CallExpr>();
+				superCall->token = classDecl->token;
 				auto superId = std::make_unique<ast::IdentifierExpr>();
+				superId->token = classDecl->token;
 				superId->name = "super";
 				superCall->callee = std::move(superId);
 
@@ -308,6 +321,7 @@ private:
 				}
 
 				auto exprStmt = std::make_unique<ast::ExprStmt>();
+				exprStmt->token = superCall->token;
 				exprStmt->expr = std::move(superCall);
 
 				primaryCtor->body->statements.insert(primaryCtor->body->statements.begin(), std::move(exprStmt));
@@ -324,7 +338,7 @@ private:
 		}
 		case "ConstructorDecl"_hs: { // ConstructorDecl -> ident [0] ( [1] OptFormPars [2] ) [3] Block [4]
 			auto ctorDecl = std::make_unique<ast::ConstructorDecl>();
-
+			ctorDecl->token = *actualDecl->children[0]->token;
 			ctorDecl->name = actualDecl->children[0]->token->lexeme;
 
 			// Reuse FunDecl for temporary storage
@@ -340,9 +354,9 @@ private:
 			return ctorDecl;
 		}
 		case "DestructorDecl"_hs: {
-			// DestructorDecl -> ~ ident ( ) Block
+			// DestructorDecl -> ~ [0] ident [1] ( ) Block
 			auto dtorDecl = std::make_unique<ast::DestructorDecl>();
-
+			dtorDecl->token = *actualDecl->children[0]->token;
 			dtorDecl->name = actualDecl->children[1]->token->lexeme;
 
 			const auto& bodyNode = actualDecl->children[4];
@@ -358,6 +372,7 @@ private:
 	static std::unique_ptr<ast::Block> ConvertBlock(const CstNode* blockNode)
 	{
 		auto block = std::make_unique<ast::Block>();
+		block->token = *blockNode->children[0]->token;
 		FlattenStatements(blockNode->children[1].get(), block->statements);
 		return block;
 	}
@@ -385,6 +400,7 @@ private:
 				break;
 			case "return"_hs: {
 				auto ret = std::make_unique<ast::ReturnStmt>();
+				ret->token = *stmtNode->children[0]->token;
 				if (stmtNode->children[1]->symbol.Hashed() != "<EPSILON>"_hs)
 				{
 					ret->expr = ConvertExpr(stmtNode->children[1]->children[0].get());
@@ -395,6 +411,7 @@ private:
 			case "Expr"_hs: {
 				auto exprStmt = std::make_unique<ast::ExprStmt>();
 				exprStmt->expr = ConvertExpr(actualStmt.get());
+				exprStmt->token = exprStmt->expr->token;
 				outStmts.push_back(std::move(exprStmt));
 				break;
 			}
@@ -431,6 +448,7 @@ private:
 			if (exprNode->children.size() == 2 && exprNode->children[0]->symbol.Hashed() == "ident"_hs)
 			{
 				auto id = std::make_unique<ast::IdentifierExpr>();
+				id->token = *exprNode->children[0]->token;
 				id->name = exprNode->children[0]->token->lexeme;
 
 				if (const auto& optTypeArgs = exprNode->children[1];
@@ -445,6 +463,7 @@ private:
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "("_hs)
 			{
 				auto call = std::make_unique<ast::CallExpr>();
+				call->token = *exprNode->children[1]->token;
 				call->callee = ConvertExpr(exprNode->children[0].get());
 				ExtractArguments(exprNode->children[2].get(), call->arguments);
 
@@ -454,6 +473,7 @@ private:
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "["_hs)
 			{
 				auto idx = std::make_unique<ast::IndexExpr>();
+				idx->token = *exprNode->children[1]->token;
 				idx->array = ConvertExpr(exprNode->children[0].get());
 				idx->index = ConvertExpr(exprNode->children[2].get());
 
@@ -466,6 +486,7 @@ private:
 					|| exprNode->children[1]->symbol.Hashed() == "?."_hs))
 			{
 				auto memberAccess = std::make_unique<ast::MemberAccessExpr>();
+				memberAccess->token = *exprNode->children[1]->token;
 				memberAccess->object = ConvertExpr(exprNode->children[0].get());
 				memberAccess->member = exprNode->children[2]->token->lexeme;
 
@@ -508,6 +529,7 @@ private:
 			if (exprNode->children.size() == 2)
 			{
 				auto unExpr = std::make_unique<ast::UnaryExpr>();
+				unExpr->token = *exprNode->children[1]->token;
 				unExpr->operand = ConvertExpr(exprNode->children[0].get());
 				unExpr->op = exprNode->children[1]->symbol;
 				unExpr->isPostfix = true;
@@ -519,6 +541,7 @@ private:
 			if (exprNode->children.size() == 2)
 			{
 				auto unExpr = std::make_unique<ast::UnaryExpr>();
+				unExpr->token = *exprNode->children[0]->token;
 				unExpr->op = exprNode->children[0]->symbol;
 				unExpr->operand = ConvertExpr(exprNode->children[1].get());
 				unExpr->isPostfix = false;
@@ -544,12 +567,14 @@ private:
 			if (exprNode->children[1]->symbol.Hashed() == "="_hs)
 			{
 				auto assign = std::make_unique<ast::AssignExpr>();
+				assign->token = *exprNode->children[1]->token;
 				assign->target = ConvertExpr(exprNode->children[0].get());
 				assign->value = ConvertExpr(exprNode->children[2].get());
 				return assign;
 			}
 
 			auto binExpr = std::make_unique<ast::BinaryExpr>();
+			binExpr->token = *exprNode->children[1]->token;
 			binExpr->left = ConvertExpr(exprNode->children[0].get());
 			binExpr->op = exprNode->children[1]->symbol;
 			binExpr->right = ConvertExpr(exprNode->children[2].get());
@@ -564,6 +589,7 @@ private:
 	static std::unique_ptr<ast::IfStmt> ConvertIfStmt(const CstNode* ifNode)
 	{
 		auto ifStmt = std::make_unique<ast::IfStmt>();
+		ifStmt->token = *ifNode->children[0]->token;
 		ifStmt->condition = ConvertExpr(ifNode->children[2].get());
 		ifStmt->thenBranch = ConvertBlock(ifNode->children[4].get());
 
@@ -589,6 +615,7 @@ private:
 	static std::unique_ptr<ast::WhileStmt> ConvertWhileStmt(const CstNode* whileNode)
 	{
 		auto stmt = std::make_unique<ast::WhileStmt>();
+		stmt->token = *whileNode->children[0]->token;
 		stmt->condition = ConvertExpr(whileNode->children[2].get());
 		stmt->body = ConvertBlock(whileNode->children[4].get());
 
@@ -598,6 +625,7 @@ private:
 	static std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
 		auto stmt = std::make_unique<ast::ForStmt>();
+		stmt->token = *forNode->children[0]->token;
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
 		stmt->startExpr = ConvertExpr(forNode->children[4].get());
 		stmt->endExpr = ConvertExpr(forNode->children[6].get());
@@ -615,8 +643,9 @@ private:
 
 		switch (typeNode->children[0]->symbol.Hashed())
 		{
-		case "ident"_hs: { // Type -> ident [0] OptTypeArgs [1] OptQuestion [2] | ( [0] OptTypeList [1] ) [2] -> [3] Type [4] OptQuestion [5]
+		case "ident"_hs: { // Type -> ident [0] OptTypeArgs [1] OptQuestion [2]
 			auto simpleType = std::make_unique<ast::SimpleTypeNode>();
+			simpleType->token = *typeNode->children[0]->token;
 			simpleType->name = typeNode->children[0]->token->lexeme;
 
 			if (const auto& optTypeArgs = typeNode->children[1]; optTypeArgs->children.size() == 3)
@@ -629,8 +658,9 @@ private:
 
 			return simpleType;
 		}
-		case "("_hs: {
+		case "("_hs: { // Type -> ( [0] OptTypeList [1] ) [2] -> [3] Type [4] OptQuestion [5]
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
+			funType->token = *typeNode->children[0]->token;
 
 			if (const auto& optTypeList = typeNode->children[1]; optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 			{
@@ -638,7 +668,10 @@ private:
 			}
 
 			funType->returnType = ConvertType(typeNode->children[4].get());
-			funType->isNullable = (!typeNode->children[5]->children.empty() && typeNode->children[5]->children[0]->symbol.Hashed() == "?"_hs);
+
+			const auto& optQuestion = typeNode->children[5];
+			funType->isNullable = (!optQuestion->children.empty() && optQuestion->children[0]->symbol.Hashed() != "<EPSILON>"_hs);
+
 			return funType;
 		}
 		default:
@@ -847,6 +880,7 @@ private:
 			if (const re::String valVar = optValVarNode->children[0]->token->lexeme; valVar.Hashed() == "val"_hs)
 			{ // val
 				auto valDecl = std::make_unique<ast::ValDecl>();
+				valDecl->token = *optValVarNode->children[0]->token;
 				valDecl->name = name;
 				valDecl->type = typeNode->Clone();
 				valDecl->visibility = ast::Visibility::Public;
@@ -855,6 +889,7 @@ private:
 			else if (valVar.Hashed() == "var"_hs)
 			{ // var
 				auto varDecl = std::make_unique<ast::VarDecl>();
+				varDecl->token = *optValVarNode->children[0]->token;
 				varDecl->name = name;
 				varDecl->type = typeNode->Clone();
 				varDecl->visibility = ast::Visibility::Public;
@@ -862,19 +897,24 @@ private:
 			}
 
 			auto assignExpr = std::make_unique<ast::AssignExpr>();
+			assignExpr->token = *optValVarNode->children[0]->token;
 
 			auto memAccess = std::make_unique<ast::MemberAccessExpr>();
+			memAccess->token = assignExpr->token;
 			auto thisId = std::make_unique<ast::IdentifierExpr>();
+			thisId->token = assignExpr->token;
 			thisId->name = "this";
 			memAccess->object = std::move(thisId);
 			memAccess->member = name;
 			assignExpr->target = std::move(memAccess);
 
 			auto valId = std::make_unique<ast::IdentifierExpr>();
+			valId->token = assignExpr->token;
 			valId->name = name;
 			assignExpr->value = std::move(valId);
 
 			auto exprStmt = std::make_unique<ast::ExprStmt>();
+			exprStmt->token = assignExpr->token;
 			exprStmt->expr = std::move(assignExpr);
 
 			ctorDecl->body->statements.push_back(std::move(exprStmt));

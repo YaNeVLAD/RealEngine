@@ -45,7 +45,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		if (tmpl->typeParams[i].boundType)
 		{
 			auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i].boundType.get(), m_context);
-			TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound");
+			TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound", tmpl->astNode);
 		}
 		auto tempNode = std::make_unique<ast::SimpleTypeNode>();
 		tempNode->name = typeArgs[i]->name;

@@ -3,12 +3,14 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::CallValidator
 {
 
-inline void ValidateArguments(const ast::CallExpr* node,
+inline void ValidateArguments(
+	const ast::CallExpr* node,
 	const FunctionType* funType,
 	const std::vector<std::shared_ptr<SemanticType>>& argTypes,
 	const bool isMethodCall)
@@ -20,7 +22,7 @@ inline void ValidateArguments(const ast::CallExpr* node,
 		const std::size_t fixedParams = funType->paramTypes.size() - 1 - thisOffset;
 		if (argTypes.size() < fixedParams)
 		{
-			throw std::runtime_error("Semantic Error: Not enough arguments for vararg function '" + funType->name + "'");
+			SemanticError(node, "Not enough arguments for vararg function '" + funType->name + "'");
 		}
 
 		const auto mutableNode = const_cast<ast::CallExpr*>(node);
@@ -29,7 +31,7 @@ inline void ValidateArguments(const ast::CallExpr* node,
 	}
 	else if (argTypes.size() + thisOffset != funType->paramTypes.size())
 	{
-		throw std::runtime_error("Semantic Error: Argument count mismatch for '" + funType->name + "'");
+		SemanticError(node, "Argument count mismatch for '" + funType->name + "'");
 	}
 
 	for (std::size_t i = 0; i < argTypes.size(); ++i)
@@ -38,7 +40,7 @@ inline void ValidateArguments(const ast::CallExpr* node,
 			? funType->paramTypes.back()
 			: funType->paramTypes[i + thisOffset];
 
-		TypeResolver::ExpectAssignable(argTypes[i].get(), expectedType.get(), "argument " + std::to_string(i + 1));
+		TypeResolver::ExpectAssignable(argTypes[i].get(), expectedType.get(), "argument " + std::to_string(i + 1), node);
 	}
 }
 
@@ -70,7 +72,7 @@ inline std::shared_ptr<FunctionType> ResolveAndInstantiateGeneric(
 		{
 			if (!concreteArg)
 			{
-				throw std::runtime_error("Semantic Error: Could not infer type argument for method '" + funTmpl->name + "'");
+				SemanticError(funTmpl->astNode, "Semantic Error: Could not infer type argument for method '" + funTmpl->name + "'");
 			}
 		}
 	}

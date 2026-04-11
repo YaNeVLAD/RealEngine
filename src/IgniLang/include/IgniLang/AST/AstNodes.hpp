@@ -69,6 +69,8 @@ struct Node
 {
 	virtual ~Node() = default;
 
+	fsm::token<TokenType> token;
+
 	virtual void Print(int depth = 0) const = 0;
 	virtual void Accept(IAstVisitor& visitor) const = 0;
 
@@ -260,8 +262,6 @@ struct BinaryExpr final : Visitable<BinaryExpr, Expr>
 
 struct LiteralExpr final : Visitable<LiteralExpr, Expr>
 {
-	fsm::token<TokenType> token;
-
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);

@@ -1,12 +1,14 @@
 #pragma once
 
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::MemberResolver
 {
 
-inline std::shared_ptr<SemanticType> ResolveAccess(const std::shared_ptr<ClassType>& classType,
+inline std::shared_ptr<SemanticType> ResolveAccess(
+	const std::shared_ptr<ClassType>& classType,
 	const re::String& memberName,
 	const SemanticContext& ctx)
 {
@@ -32,14 +34,14 @@ inline std::shared_ptr<SemanticType> ResolveAccess(const std::shared_ptr<ClassTy
 	}
 	else
 	{
-		throw std::runtime_error("Semantic Error: Class '" + classType->name + "' has no field or method named '" + memberName + "'");
+		SemanticError(classType->classDecl, "Class '" + classType->name + "' has no field or method named '" + memberName + "'");
 	}
 
 	if (vis == ast::Visibility::Private)
 	{
 		if (!ctx.location.currentClass || ctx.location.currentClass->name != classType->name)
 		{
-			throw std::runtime_error("Semantic Error: Cannot access private member '" + memberName + "' of class '" + classType->name + "'");
+			SemanticError(classType->classDecl, "Cannot access private member '" + memberName + "' of class '" + classType->name + "'");
 		}
 	}
 	else if (vis == ast::Visibility::Internal)
@@ -48,7 +50,7 @@ inline std::shared_ptr<SemanticType> ResolveAccess(const std::shared_ptr<ClassTy
 		const re::String targetPkg = classType->moduleName.Empty() ? "global" : classType->moduleName;
 		if (currentPkg != targetPkg)
 		{
-			throw std::runtime_error("Semantic Error: Cannot access internal member '" + memberName + "' outside of its package '" + targetPkg + "'");
+			SemanticError(classType->classDecl, "Cannot access internal member '" + memberName + "' outside of its package '" + targetPkg + "'");
 		}
 	}
 

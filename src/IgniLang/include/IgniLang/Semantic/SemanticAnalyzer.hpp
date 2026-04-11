@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SemanticError.hpp"
+
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
@@ -157,7 +159,7 @@ public:
 		{
 			if (!m_context.location.currentClass || !m_context.location.currentClass->baseClass)
 			{
-				throw std::runtime_error("Semantic Error: Cannot use 'super' outside of a derived class");
+				SemanticError(node, "Cannot use 'super' outside of a derived class");
 			}
 			m_currentExprType = m_context.location.currentClass->baseClass;
 
@@ -167,7 +169,7 @@ public:
 		const Symbol* sym = m_context.env.Resolve(node->name);
 		if (!sym)
 		{
-			throw std::runtime_error("Semantic Error: Undefined variable '" + node->name + "'");
+			SemanticError(node, "Undefined variable '" + node->name + "'");
 		}
 		m_currentExprType = sym->type;
 	}
@@ -178,12 +180,12 @@ public:
 
 		if (leftType->isNullable && !node->isSafe)
 		{
-			throw std::runtime_error("Semantic Error: Cannot perform unsafe member access of nullable type '" + leftType->name + "'");
+			SemanticError(node, "Cannot perform unsafe member access of nullable type '" + leftType->name + "'");
 		}
 
 		if (const auto modType = std::dynamic_pointer_cast<ModuleType>(leftType))
 		{
-			m_currentExprType = Export::Resolve(modType, node->member);
+			m_currentExprType = Export::Resolve(modType, node);
 		}
 		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(leftType))
 		{
@@ -191,7 +193,7 @@ public:
 		}
 		else
 		{
-			throw std::runtime_error("Semantic Error: Cannot access member '" + node->member + "' on primitive type '" + leftType->name + "'");
+			SemanticError(node, "Cannot access member '" + node->member + "' on primitive type '" + leftType->name + "'");
 		}
 	}
 
@@ -202,7 +204,7 @@ public:
 		const auto leftType = Evaluate(node->left.get());
 		const auto rightType = Evaluate(node->right.get());
 
-		std::shared_ptr<SemanticType> mathType = TypeResolver::PromoteMathTypes(leftType.get(), rightType.get(), m_context);
+		std::shared_ptr<SemanticType> mathType = TypeResolver::PromoteMathTypes(leftType.get(), rightType.get(), node, m_context);
 		if (!mathType)
 		{
 			mathType = leftType;
@@ -234,7 +236,7 @@ public:
 		const auto arrType = Evaluate(node->array.get());
 		const auto indexType = Evaluate(node->index.get());
 
-		TypeResolver::ExpectAssignable(indexType.get(), m_context.tInt.get(), "array index");
+		TypeResolver::ExpectAssignable(indexType.get(), m_context.tInt.get(), "array index", node);
 
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
 		{ // allow index access operation to any class with get(Int) method
@@ -248,7 +250,7 @@ public:
 			}
 		}
 
-		throw std::runtime_error("Semantic Error: Type '" + arrType->name + "' does not support indexing (missing 'get' method)");
+		SemanticError(node, "Type '" + arrType->name + "' does not support indexing (missing 'get' method)");
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -320,20 +322,20 @@ public:
 					{
 						if (!arg)
 						{
-							throw std::runtime_error("Semantic Error: Could not infer type arguments for generic class '" + classTmpl->name + "'. Use explicit ::<T> syntax.");
+							SemanticError(node, "Could not infer type arguments for generic class '" + classTmpl->name + "'. Use explicit ::<T> syntax.");
 						}
 					}
 				}
 				else
 				{
-					throw std::runtime_error("Semantic Error: Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
+					SemanticError(node, "Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
 				}
 			}
 			const auto concreteClass = m_context.instantiateClassCallback(classTmpl, explicitTypeArgs);
 			const auto it = concreteClass->methods.find(concreteClass->name);
 			if (it == concreteClass->methods.end())
 			{
-				throw std::runtime_error("Semantic Error: Constructor not found for generic class '" + concreteClass->name + "'");
+				SemanticError(node, "Constructor not found for generic class '" + concreteClass->name + "'");
 			}
 			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
 
@@ -350,7 +352,7 @@ public:
 			const auto it = classType->methods.find(classType->name);
 			if (it == classType->methods.end())
 			{
-				throw std::runtime_error("Semantic Error: Constructor not found for class '" + classType->name + "'");
+				SemanticError(node, "Constructor not found for class '" + classType->name + "'");
 			}
 			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
 
@@ -374,7 +376,7 @@ public:
 		}
 		else
 		{
-			throw std::runtime_error("Semantic Error: Attempt to call a non-callable type");
+			SemanticError(node, "Attempt to call a non-callable type");
 		}
 
 		const auto mutableNode = const_cast<ast::CallExpr*>(node);
@@ -382,7 +384,7 @@ public:
 
 		if (!concreteTarget)
 		{
-			throw std::runtime_error("Internal Compiler Error: concreteTarget is null for call to '" + re::String(node->callee ? "some callee" : "unknown") + "'");
+			InternalError(node, "concreteTarget is null for call to '" + re::String(node->callee ? "some callee" : "unknown") + "'");
 		}
 
 		mutableNode->staticMethodTarget = "";
@@ -403,7 +405,7 @@ public:
 
 		if (concreteTarget->returnType == nullptr)
 		{
-			throw std::runtime_error("Semantic Error: Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
+			SemanticError(node, "Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
 		}
 
 		if (node->isConstructorCall)
@@ -521,7 +523,7 @@ public:
 		{ // val ident
 			if (const Symbol* sym = m_context.env.Resolve(id->name); sym && sym->isReadOnly)
 			{
-				throw std::runtime_error("Semantic Error: Cannot reassign to read-only variable '" + id->name + "'");
+				SemanticError(node, "Cannot reassign to read-only variable '" + id->name + "'");
 			}
 		}
 		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
@@ -554,25 +556,25 @@ public:
 
 						if (!isInsideCtor || !isThisAccess)
 						{
-							throw std::runtime_error("Semantic Error: Cannot reassign read-only field '" + memAccess->member + "' of class '" + classType->name + "'");
+							SemanticError(node, "Cannot reassign read-only field '" + memAccess->member + "' of class '" + classType->name + "'");
 						}
 					}
 				}
 				else
 				{
-					throw std::runtime_error("Semantic Error: Cannot assign method '" + memAccess->member + "'");
+					SemanticError(node, "Semantic Error: Cannot assign method '" + memAccess->member + "'");
 				}
 			}
 		}
 
-		TypeResolver::ExpectAssignable(valueType.get(), targetType.get(), "assignment");
+		TypeResolver::ExpectAssignable(valueType.get(), targetType.get(), "assignment", node);
 		m_currentExprType = valueType;
 	}
 
 	void Visit(const ast::IfStmt* node) override
 	{
 		const auto condType = Evaluate(node->condition.get());
-		TypeResolver::ExpectAssignable(condType.get(), m_context.tBool.get(), "if condition");
+		TypeResolver::ExpectAssignable(condType.get(), m_context.tBool.get(), "if condition", node);
 
 		if (node->thenBranch)
 		{
@@ -587,7 +589,7 @@ public:
 	void Visit(const ast::WhileStmt* node) override
 	{
 		const auto condType = Evaluate(node->condition.get());
-		TypeResolver::ExpectAssignable(condType.get(), m_context.tBool.get(), "while condition");
+		TypeResolver::ExpectAssignable(condType.get(), m_context.tBool.get(), "while condition", node);
 
 		if (node->body)
 		{
@@ -637,7 +639,7 @@ public:
 		}
 		else if (m_context.location.currentReturnType)
 		{
-			TypeResolver::ExpectAssignable(retType.get(), m_context.location.currentReturnType.get(), "return statement");
+			TypeResolver::ExpectAssignable(retType.get(), m_context.location.currentReturnType.get(), "return statement", node);
 		}
 	}
 
@@ -678,7 +680,7 @@ public:
 			const Symbol* sym = m_context.env.Resolve(node->name);
 			if (!sym)
 			{
-				throw std::runtime_error("Semantic Error: Cannot resolve '" + node->name + "'");
+				SemanticError(node, "Cannot resolve '" + node->name + "'");
 			}
 
 			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
@@ -739,7 +741,7 @@ public:
 		}
 		else
 		{
-			throw std::runtime_error("Semantic Error: Class '" + node->name + "' not found during Visit");
+			SemanticError(node, "Class '" + node->name + "' not found during Visit");
 		}
 
 		const auto previousClass = m_context.location.currentClass;
@@ -752,7 +754,7 @@ public:
 
 			if (!classType->baseClass)
 			{
-				throw std::runtime_error("Semantic Error: Base type must be a class");
+				SemanticError(node, "Base type must be a class");
 			}
 
 			for (const auto& [fieldName, fieldInfo] : classType->baseClass->fields)
@@ -795,7 +797,7 @@ public:
 				}
 				else if (!varDecl->isExternal && !node->isExternal && !fieldType)
 				{
-					throw std::runtime_error("Semantic Error: Property '" + varDecl->name + "' must have an initializer or explicit type");
+					SemanticError(varDecl, "Property '" + varDecl->name + "' must have an initializer or explicit type");
 				}
 
 				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
@@ -813,7 +815,7 @@ public:
 				}
 				else if (!valDecl->isExternal && !node->isExternal && !fieldType)
 				{
-					throw std::runtime_error("Semantic Error: Property '" + valDecl->name + "' must have an initializer or explicit type");
+					SemanticError(valDecl, "Property '" + valDecl->name + "' must have an initializer or explicit type");
 				}
 
 				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
@@ -829,16 +831,16 @@ public:
 				const bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
 				if (funDecl->isOverride && !existsInBase)
 				{
-					throw std::runtime_error("Semantic Error: Method '" + originalName + "' is marked 'override' but no matching method found in base class");
+					SemanticError(member.get(), "Method '" + originalName + "' is marked 'override' but no matching method found in base class");
 				}
 				if (!funDecl->isOverride && existsInBase)
 				{
-					throw std::runtime_error("Semantic Error: Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
+					SemanticError(member.get(), "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
 				}
 
 				if (node->isExternal && (!funDecl->isExternal || funDecl->body || funDecl->isExprBody))
 				{
-					throw std::runtime_error("Semantic Error: Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
+					SemanticError(member.get(), "Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
 				}
 
 				funDecl->Accept(*this);
@@ -971,7 +973,7 @@ private:
 
 				if (!classType)
 				{ // New previously undefined class
-					classType = std::make_shared<ClassType>(classDecl->name);
+					classType = std::make_shared<ClassType>(classDecl->name, classDecl);
 					isNewClass = true;
 				}
 				else
@@ -1035,7 +1037,7 @@ private:
 						{
 							if (mutableFun->isOverride)
 							{
-								throw std::runtime_error("Semantic Error: Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
+								SemanticError(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
 							}
 
 							auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);

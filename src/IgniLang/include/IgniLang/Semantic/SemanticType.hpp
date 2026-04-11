@@ -133,7 +133,15 @@ struct ClassType final : re::utils::Clonable<ClassType, SemanticType>
 
 	std::shared_ptr<ClassType> baseClass = nullptr;
 
+	const ast::ClassDecl* classDecl = nullptr;
+
 	explicit ClassType(const re::String& n) { name = n; }
+
+	explicit ClassType(const re::String& n, const ast::ClassDecl* classDecl)
+		: classDecl(classDecl)
+	{
+		name = n;
+	}
 
 	bool IsAssignableTo(const SemanticType* other) const override
 	{

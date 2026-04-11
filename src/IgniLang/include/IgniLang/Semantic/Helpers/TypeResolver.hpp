@@ -2,6 +2,7 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::TypeResolver
@@ -41,7 +42,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 				{
 					if (simpleType->typeArgs.empty())
 					{
-						throw std::runtime_error("Semantic Error: Generic class '" + simpleType->name + "' requires type arguments");
+						SemanticError(node, "Generic class '" + simpleType->name + "' requires type arguments");
 					}
 
 					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
@@ -67,7 +68,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 			}
 			else
 			{
-				throw std::runtime_error("Semantic Error: Unknown type '" + simpleType->name + "'");
+				SemanticError(node, "Unknown type '" + simpleType->name + "'");
 			}
 		}
 	}
@@ -103,15 +104,17 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 	return resolvedBaseType;
 }
 
-inline void ExpectAssignable(const SemanticType* actual, const SemanticType* expected, const std::string& contextMsg)
+inline void ExpectAssignable(const SemanticType* actual, const SemanticType* expected, const std::string& contextMsg, const ast::Node* node = nullptr)
 {
 	if (!actual->IsAssignableTo(expected))
 	{
-		throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
+		node
+			? SemanticError(node, "Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""))
+			: throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
 	}
 }
 
-inline std::shared_ptr<SemanticType> PromoteMathTypes(const SemanticType* lhs, const SemanticType* rhs, SemanticContext& ctx)
+inline std::shared_ptr<SemanticType> PromoteMathTypes(const SemanticType* lhs, const SemanticType* rhs, const ast::BinaryExpr* node, SemanticContext& ctx)
 {
 	const bool isNumeric = (lhs == ctx.tInt.get() || lhs == ctx.tDouble.get()) && (rhs == ctx.tInt.get() || rhs == ctx.tDouble.get());
 
@@ -120,7 +123,7 @@ inline std::shared_ptr<SemanticType> PromoteMathTypes(const SemanticType* lhs, c
 		return (lhs == ctx.tDouble.get() || rhs == ctx.tDouble.get()) ? ctx.tDouble : ctx.tInt;
 	}
 
-	ExpectAssignable(rhs, lhs, "binary expression");
+	ExpectAssignable(rhs, lhs, "binary expression", node);
 
 	return nullptr;
 }
