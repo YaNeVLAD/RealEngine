@@ -14,7 +14,7 @@ inline std::shared_ptr<SemanticType> Resolve(const std::shared_ptr<ModuleType>& 
 		return it->second;
 	}
 
-	SemanticError(node, "Module '" + modType->name + "' has no export named '" + member + "'");
+	IGNI_SEM_ERR("Module '" + modType->name + "' has no export named '" + member + "'");
 }
 
 } // namespace igni::sem::Export

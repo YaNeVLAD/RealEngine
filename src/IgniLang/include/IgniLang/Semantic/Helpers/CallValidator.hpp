@@ -22,7 +22,7 @@ inline void ValidateArguments(
 		const std::size_t fixedParams = funType->paramTypes.size() - 1 - thisOffset;
 		if (argTypes.size() < fixedParams)
 		{
-			SemanticError(node, "Not enough arguments for vararg function '" + funType->name + "'");
+			IGNI_SEM_ERR("Not enough arguments for vararg function '" + funType->name + "'");
 		}
 
 		const auto mutableNode = const_cast<ast::CallExpr*>(node);
@@ -31,7 +31,7 @@ inline void ValidateArguments(
 	}
 	else if (argTypes.size() + thisOffset != funType->paramTypes.size())
 	{
-		SemanticError(node, "Argument count mismatch for '" + funType->name + "'");
+		IGNI_SEM_ERR("Argument count mismatch for '" + funType->name + "'");
 	}
 
 	for (std::size_t i = 0; i < argTypes.size(); ++i)
@@ -72,7 +72,7 @@ inline std::shared_ptr<FunctionType> ResolveAndInstantiateGeneric(
 		{
 			if (!concreteArg)
 			{
-				SemanticError(funTmpl->astNode, "Semantic Error: Could not infer type argument for method '" + funTmpl->name + "'");
+				IGNI_SEM_ERR(funTmpl->astNode, "Semantic Error: Could not infer type argument for method '" + funTmpl->name + "'");
 			}
 		}
 	}

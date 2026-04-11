@@ -18,13 +18,13 @@ inline void Process(const ast::ImportDecl* node, SemanticContext& m_context)
 		const Symbol* modSym = m_context.env.Resolve(fullPath);
 		if (!modSym)
 		{
-			SemanticError(node, "Unknown module '" + fullPath + "' in import");
+			IGNI_SEM_ERR("Unknown module '" + fullPath + "' in import");
 		}
 
 		const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
 		if (!modType)
 		{
-			SemanticError(node, "'" + fullPath + "' is not a module");
+			IGNI_SEM_ERR("'" + fullPath + "' is not a module");
 		}
 
 		for (const auto& [exportName, exportType] : modType->exports)
@@ -47,13 +47,13 @@ inline void Process(const ast::ImportDecl* node, SemanticContext& m_context)
 		const Symbol* modSym = m_context.env.Resolve(modName);
 		if (!modSym)
 		{
-			SemanticError(node, "Unknown module '" + modName + "' in import");
+			IGNI_SEM_ERR("Unknown module '" + modName + "' in import");
 		}
 
 		const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type);
 		if (!modType)
 		{
-			SemanticError(node, "'" + modName + "' is not a module");
+			IGNI_SEM_ERR("'" + modName + "' is not a module");
 		}
 
 		if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
@@ -63,7 +63,7 @@ inline void Process(const ast::ImportDecl* node, SemanticContext& m_context)
 		}
 		else
 		{
-			SemanticError(node, "Module '" + modName + "' has no export named '" + memberName + "'");
+			IGNI_SEM_ERR("Module '" + modName + "' has no export named '" + memberName + "'");
 		}
 	}
 }

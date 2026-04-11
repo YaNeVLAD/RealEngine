@@ -158,7 +158,7 @@ public:
 		{
 			if (!m_context.location.currentClass || !m_context.location.currentClass->baseClass)
 			{
-				SemanticError(node, "Cannot use 'super' outside of a derived class");
+				IGNI_SEM_ERR("Cannot use 'super' outside of a derived class");
 			}
 			m_currentExprType = m_context.location.currentClass->baseClass;
 
@@ -168,7 +168,7 @@ public:
 		const Symbol* sym = m_context.env.Resolve(node->name);
 		if (!sym)
 		{
-			SemanticError(node, "Undefined variable '" + node->name + "'");
+			IGNI_SEM_ERR("Undefined variable '" + node->name + "'");
 		}
 		m_currentExprType = sym->type;
 	}
@@ -179,7 +179,7 @@ public:
 
 		if (leftType->isNullable && !node->isSafe)
 		{
-			SemanticError(node, "Cannot perform unsafe member access of nullable type '" + leftType->name + "'");
+			IGNI_SEM_ERR("Cannot perform unsafe member access of nullable type '" + leftType->name + "'");
 		}
 
 		if (const auto modType = std::dynamic_pointer_cast<ModuleType>(leftType))
@@ -192,7 +192,7 @@ public:
 		}
 		else
 		{
-			SemanticError(node, "Cannot access member '" + node->member + "' on primitive type '" + leftType->name + "'");
+			IGNI_SEM_ERR("Cannot access member '" + node->member + "' on primitive type '" + leftType->name + "'");
 		}
 	}
 
@@ -249,7 +249,7 @@ public:
 			}
 		}
 
-		SemanticError(node, "Type '" + arrType->name + "' does not support indexing (missing 'get' method)");
+		IGNI_SEM_ERR("Type '" + arrType->name + "' does not support indexing (missing 'get' method)");
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -321,20 +321,20 @@ public:
 					{
 						if (!arg)
 						{
-							SemanticError(node, "Could not infer type arguments for generic class '" + classTmpl->name + "'. Use explicit ::<T> syntax.");
+							IGNI_SEM_ERR("Could not infer type arguments for generic class '" + classTmpl->name + "'. Use explicit ::<T> syntax.");
 						}
 					}
 				}
 				else
 				{
-					SemanticError(node, "Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
+					IGNI_SEM_ERR("Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
 				}
 			}
 			const auto concreteClass = m_context.instantiateClassCallback(classTmpl, explicitTypeArgs);
 			const auto it = concreteClass->methods.find(concreteClass->name);
 			if (it == concreteClass->methods.end())
 			{
-				SemanticError(node, "Constructor not found for generic class '" + concreteClass->name + "'");
+				IGNI_SEM_ERR("Constructor not found for generic class '" + concreteClass->name + "'");
 			}
 			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
 
@@ -351,7 +351,7 @@ public:
 			const auto it = classType->methods.find(classType->name);
 			if (it == classType->methods.end())
 			{
-				SemanticError(node, "Constructor not found for class '" + classType->name + "'");
+				IGNI_SEM_ERR("Constructor not found for class '" + classType->name + "'");
 			}
 			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
 
@@ -375,7 +375,7 @@ public:
 		}
 		else
 		{
-			SemanticError(node, "Attempt to call a non-callable type");
+			IGNI_SEM_ERR("Attempt to call a non-callable type");
 		}
 
 		const auto mutableNode = const_cast<ast::CallExpr*>(node);
@@ -383,7 +383,7 @@ public:
 
 		if (!concreteTarget)
 		{
-			InternalError(node, "concreteTarget is null for call to '" + re::String(node->callee ? "some callee" : "unknown") + "'");
+			IGNI_INTERNAL_ERR("concreteTarget is null for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
 		mutableNode->staticMethodTarget = "";
@@ -404,7 +404,7 @@ public:
 
 		if (concreteTarget->returnType == nullptr)
 		{
-			SemanticError(node, "Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
+			IGNI_SEM_ERR("Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
 		}
 
 		if (node->isConstructorCall)
@@ -522,7 +522,7 @@ public:
 		{ // val ident
 			if (const Symbol* sym = m_context.env.Resolve(id->name); sym && sym->isReadOnly)
 			{
-				SemanticError(node, "Cannot reassign to read-only variable '" + id->name + "'");
+				IGNI_SEM_ERR("Cannot reassign to read-only variable '" + id->name + "'");
 			}
 		}
 		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
@@ -555,13 +555,13 @@ public:
 
 						if (!isInsideCtor || !isThisAccess)
 						{
-							SemanticError(node, "Cannot reassign read-only field '" + memAccess->member + "' of class '" + classType->name + "'");
+							IGNI_SEM_ERR("Cannot reassign read-only field '" + memAccess->member + "' of class '" + classType->name + "'");
 						}
 					}
 				}
 				else
 				{
-					SemanticError(node, "Semantic Error: Cannot assign method '" + memAccess->member + "'");
+					IGNI_SEM_ERR("Semantic Error: Cannot assign method '" + memAccess->member + "'");
 				}
 			}
 		}
@@ -679,7 +679,7 @@ public:
 			const Symbol* sym = m_context.env.Resolve(node->name);
 			if (!sym)
 			{
-				SemanticError(node, "Cannot resolve '" + node->name + "'");
+				IGNI_SEM_ERR("Cannot resolve '" + node->name + "'");
 			}
 
 			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
@@ -740,7 +740,7 @@ public:
 		}
 		else
 		{
-			SemanticError(node, "Class '" + node->name + "' not found during Visit");
+			IGNI_SEM_ERR("Class '" + node->name + "' not found during Visit");
 		}
 
 		const auto previousClass = m_context.location.currentClass;
@@ -753,7 +753,7 @@ public:
 
 			if (!classType->baseClass)
 			{
-				SemanticError(node, "Base type must be a class");
+				IGNI_SEM_ERR("Base type must be a class");
 			}
 
 			for (const auto& [fieldName, fieldInfo] : classType->baseClass->fields)
@@ -796,7 +796,7 @@ public:
 				}
 				else if (!varDecl->isExternal && !node->isExternal && !fieldType)
 				{
-					SemanticError(varDecl, "Property '" + varDecl->name + "' must have an initializer or explicit type");
+					IGNI_SEM_ERR(varDecl, "Property '" + varDecl->name + "' must have an initializer or explicit type");
 				}
 
 				classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
@@ -814,7 +814,7 @@ public:
 				}
 				else if (!valDecl->isExternal && !node->isExternal && !fieldType)
 				{
-					SemanticError(valDecl, "Property '" + valDecl->name + "' must have an initializer or explicit type");
+					IGNI_SEM_ERR(valDecl, "Property '" + valDecl->name + "' must have an initializer or explicit type");
 				}
 
 				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
@@ -830,16 +830,16 @@ public:
 				const bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
 				if (funDecl->isOverride && !existsInBase)
 				{
-					SemanticError(member.get(), "Method '" + originalName + "' is marked 'override' but no matching method found in base class");
+					IGNI_SEM_ERR(member.get(), "Method '" + originalName + "' is marked 'override' but no matching method found in base class");
 				}
 				if (!funDecl->isOverride && existsInBase)
 				{
-					SemanticError(member.get(), "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
+					IGNI_SEM_ERR(member.get(), "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
 				}
 
 				if (node->isExternal && (!funDecl->isExternal || funDecl->body || funDecl->isExprBody))
 				{
-					SemanticError(member.get(), "Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
+					IGNI_SEM_ERR(member.get(), "Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
 				}
 
 				funDecl->Accept(*this);
@@ -1036,7 +1036,7 @@ private:
 						{
 							if (mutableFun->isOverride)
 							{
-								SemanticError(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
+								IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
 							}
 
 							auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);

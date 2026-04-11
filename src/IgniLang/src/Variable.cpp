@@ -26,7 +26,7 @@ void DeclareVariable(
 
 	if (varType == m_context.tUnit && !explicitTypeNode)
 	{
-		throw std::runtime_error("Semantic Error: Cannot infer type for variable '" + name + "'");
+		IGNI_SEM_ERR(initializer, "Semantic Error: Cannot infer type for variable '" + name + "'");
 	}
 
 	m_context.env.Define(name, varType, isReadOnly);

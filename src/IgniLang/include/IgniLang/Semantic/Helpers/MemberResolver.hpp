@@ -12,6 +12,8 @@ inline std::shared_ptr<SemanticType> ResolveAccess(
 	const re::String& memberName,
 	const SemanticContext& ctx)
 {
+	const auto* node = classType->classDecl;
+
 	auto vis = ast::Visibility::Public;
 	std::shared_ptr<SemanticType> resolvedType = nullptr;
 
@@ -34,14 +36,14 @@ inline std::shared_ptr<SemanticType> ResolveAccess(
 	}
 	else
 	{
-		SemanticError(classType->classDecl, "Class '" + classType->name + "' has no field or method named '" + memberName + "'");
+		IGNI_SEM_ERR("Class '" + classType->name + "' has no field or method named '" + memberName + "'");
 	}
 
 	if (vis == ast::Visibility::Private)
 	{
 		if (!ctx.location.currentClass || ctx.location.currentClass->name != classType->name)
 		{
-			SemanticError(classType->classDecl, "Cannot access private member '" + memberName + "' of class '" + classType->name + "'");
+			IGNI_SEM_ERR("Cannot access private member '" + memberName + "' of class '" + classType->name + "'");
 		}
 	}
 	else if (vis == ast::Visibility::Internal)
@@ -50,7 +52,7 @@ inline std::shared_ptr<SemanticType> ResolveAccess(
 		const re::String targetPkg = classType->moduleName.Empty() ? "global" : classType->moduleName;
 		if (currentPkg != targetPkg)
 		{
-			SemanticError(classType->classDecl, "Cannot access internal member '" + memberName + "' outside of its package '" + targetPkg + "'");
+			IGNI_SEM_ERR("Cannot access internal member '" + memberName + "' outside of its package '" + targetPkg + "'");
 		}
 	}
 

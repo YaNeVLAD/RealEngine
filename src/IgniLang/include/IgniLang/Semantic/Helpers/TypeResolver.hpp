@@ -42,7 +42,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 				{
 					if (simpleType->typeArgs.empty())
 					{
-						SemanticError(node, "Generic class '" + simpleType->name + "' requires type arguments");
+						IGNI_SEM_ERR("Generic class '" + simpleType->name + "' requires type arguments");
 					}
 
 					std::vector<std::shared_ptr<SemanticType>> concreteArgs;
@@ -68,7 +68,7 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 			}
 			else
 			{
-				SemanticError(node, "Unknown type '" + simpleType->name + "'");
+				IGNI_SEM_ERR("Unknown type '" + simpleType->name + "'");
 			}
 		}
 	}
@@ -109,7 +109,7 @@ inline void ExpectAssignable(const SemanticType* actual, const SemanticType* exp
 	if (!actual->IsAssignableTo(expected))
 	{
 		node
-			? SemanticError(node, "Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""))
+			? IGNI_SEM_ERR("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""))
 			: throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
 	}
 }
