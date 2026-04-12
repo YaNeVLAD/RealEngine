@@ -123,6 +123,12 @@ Value operator/(const Value& lhs, const Value& rhs)
 	// clang-format on
 }
 
+Value operator%(Value const& lhs, Value const& rhs)
+{
+	Value lhs1(lhs);
+	return lhs1 %= rhs;
+}
+
 Value OpLess(Value const& lhs, Value const& rhs)
 {
 	return std::visit(overloaded{

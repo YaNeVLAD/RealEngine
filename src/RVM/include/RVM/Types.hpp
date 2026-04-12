@@ -202,6 +202,8 @@ enum class OpCode : std::uint8_t
 	// Description: Performs bitwise NOT on the top stack value.
 	BitNot,
 
+	Mod,
+
 	// ---------------------------------------------------------
 	// COMPARISON
 	// ---------------------------------------------------------
@@ -363,6 +365,7 @@ RE_RVM_API Value operator+(Value const& lhs, Value const& rhs);
 RE_RVM_API Value operator-(Value const& lhs, Value const& rhs);
 RE_RVM_API Value operator*(Value const& lhs, Value const& rhs);
 RE_RVM_API Value operator/(Value const& lhs, Value const& rhs);
+RE_RVM_API Value operator%(Value const& lhs, Value const& rhs);
 
 RE_RVM_API Value OpLess(Value const& lhs, Value const& rhs);
 RE_RVM_API Value OpEqual(Value const& lhs, Value const& rhs);
