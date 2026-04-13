@@ -634,6 +634,7 @@ public:
 		case "-"_hs:  m_out << "SUB\n"; break;
 		case "*"_hs:  m_out << "MUL\n"; break;
 		case "/"_hs:  m_out << "DIV\n"; break;
+		case "%"_hs:  m_out << "MOD\n"; break;
 		case "<"_hs:  m_out << "LESS\n"; break;
 		case ">"_hs:  m_out << "GREATER\n"; break;
 		case "<="_hs: m_out << "LESS_EQUAL\n"; break;

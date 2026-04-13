@@ -58,7 +58,7 @@ namespace igni
     TOKEN(Minus,        R"(\-)",               "-") \
     TOKEN(Star,         R"(\*)",               "*") \
     TOKEN(Slash,        R"(/)",                "/") \
-    TOKEN(Mod,          R"(%)",                "%") \
+    TOKEN(Mod,          R"(\%)",               "%") \
     TOKEN(Dot,          R"(\.)",               ".") \
     TOKEN(Question,     R"(\?)",               "?") \
     TOKEN(Comma,        R"(,)",                ",") \

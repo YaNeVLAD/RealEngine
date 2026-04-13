@@ -75,6 +75,15 @@ Value operator+(const Value& lhs, const Value& rhs)
 		[](String const& a, String const& b) -> Value { return a + b; },
 		[](String const& a, const Int b)     -> Value { return a + std::to_string(b); },
 		[](String const& a, const Double b)  -> Value { return a + std::to_string(b); },
+		[](ArrayInstancePtr const& a, ArrayInstancePtr const& b) -> Value {
+			auto result = std::make_shared<ArrayInstance>();
+			result->elements.reserve(std::max(a->elements.size(), b->elements.size()));
+
+			result->elements.append_range(a->elements);
+			result->elements.append_range(b->elements);
+
+			return result;
+		},
 		[](const auto&, const auto&)		 -> Value { return Null; }
 	}, lhs, rhs);
 	// clang-format on
@@ -125,8 +134,19 @@ Value operator/(const Value& lhs, const Value& rhs)
 
 Value operator%(Value const& lhs, Value const& rhs)
 {
-	Value lhs1(lhs);
-	return lhs1 %= rhs;
+	// clang-format off
+	return std::visit(overloaded{
+		[](const Int a, const Int b) -> Value {
+			if (b == 0) return Null; // integer division by 0
+
+			return a % b;
+		},
+		[](const Double a, const Double b) -> Value { return std::fmod(a, b); },
+		[](const Int a, const Double b)    -> Value { return std::fmod(static_cast<Double>(a), b); },
+		[](const Double a, const Int b)    -> Value { return std::fmod(a, static_cast<Double>(b)); },
+		[](const auto&, const auto&)       -> Value { return Null; }
+	}, lhs, rhs);
+	// clang-format on
 }
 
 Value OpLess(Value const& lhs, Value const& rhs)

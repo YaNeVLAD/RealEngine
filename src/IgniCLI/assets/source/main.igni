@@ -15,12 +15,17 @@ fun square(value: Int): Int {
 	return value * value;
 }
 
-fun even(value: Int): Bool = value / 2 == 0;
+fun even(value: Int) = value % 2 == 0;
+fun odd(value: Int) = value % 2 != 0;
 
 fun main() {
 	val arr = arrayOf(1, 2, 3, 5, 8, 12);
 
 	val evens = map(arr, even);
+	val odds = map(arr, odd);
 
 	println(evens);
+	println(odds);
+
+	println(evens + odds);
 }

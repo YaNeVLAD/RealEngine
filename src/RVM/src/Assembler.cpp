@@ -551,8 +551,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		  case "LESS"_hs:   	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
 		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;
+		  case "NOT_EQUAL"_hs:     outChunk.Write(static_cast<std::uint8_t>(OpCode::NotEqual)); break;
 		  case "GREATER"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::Greater)); break;
 		  case "LESS_EQUAL"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::LessEqual)); break;
+		  case "GREATER_EQUAL"_hs: outChunk.Write(static_cast<std::uint8_t>(OpCode::GreaterEqual)); break;
 
 		  case "LABEL"_hs:		   if (!parseLabel()) return false; break;
 		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
