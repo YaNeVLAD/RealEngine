@@ -27,5 +27,7 @@ fun main() {
 	println(evens);
 	println(odds);
 
-	println(evens + odds);
+	val result = evens + odds;
+	bubbleSort(result, less);
+	println(result);
 }

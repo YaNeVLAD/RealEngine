@@ -77,7 +77,8 @@ Value operator+(const Value& lhs, const Value& rhs)
 		[](String const& a, const Double b)  -> Value { return a + std::to_string(b); },
 		[](ArrayInstancePtr const& a, ArrayInstancePtr const& b) -> Value {
 			auto result = std::make_shared<ArrayInstance>();
-			result->elements.reserve(std::max(a->elements.size(), b->elements.size()));
+			result->elements.reserve(a->elements.size() + b->elements.size());
+			result->typeInfo = a->typeInfo;
 
 			result->elements.append_range(a->elements);
 			result->elements.append_range(b->elements);
