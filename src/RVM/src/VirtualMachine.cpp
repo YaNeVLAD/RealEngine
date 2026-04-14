@@ -3,30 +3,43 @@
 #include <RVM/VirtualMachine.hpp>
 
 #include <Core/Assert.hpp>
-#include <Core/HashedString.hpp>
 #include <Core/Meta/TypeInfo.hpp>
 
 #include <iostream>
 
 #define READ_BYTE() (*m_ip++)
 #define READ_CONSTANT() (m_chunk->GetConstants()[READ_BYTE()])
-#define BINARY_OP(op_func, op_name)                                            \
-	do                                                                         \
-	{                                                                          \
-		Value _b = Pop();                                                      \
-		Value _a = Pop();                                                      \
-		Value res = op_func(_a, _b);                                           \
-		if (std::holds_alternative<std::monostate>(res))                       \
-		{                                                                      \
-			std::cerr << "Runtime Error: Invalid operands for " #op_name "\n"; \
-			return InterpreterResult::RuntimeError;                            \
-		}                                                                      \
-		Push(res);                                                             \
-	} while (false)
 
 #define EXIT_WITH_ERROR(expr)       \
 	std::cerr << expr << std::endl; \
 	return InterpreterResult::RuntimeError
+
+#define BINARY_OP(op_func, op_name)                                           \
+	do                                                                        \
+	{                                                                         \
+		Value _b = Pop();                                                     \
+		Value _a = Pop();                                                     \
+		Value res = op_func(_a, _b);                                          \
+		if (std::holds_alternative<Null_t>(res))                              \
+		{                                                                     \
+			EXIT_WITH_ERROR("Runtime Error: Invalid operands for " #op_name); \
+		}                                                                     \
+		Push(res);                                                            \
+	} while (false)
+
+#define JUMP_IF_LOCAL(operation)                                                             \
+	do                                                                                       \
+	{                                                                                        \
+		const std::uint8_t slotI = READ_BYTE();                                              \
+		const std::uint8_t slotLimit = READ_BYTE();                                          \
+		Value offsetVal = READ_CONSTANT();                                                   \
+		const std::size_t idxI = m_currentLocalsBase + slotI;                                \
+		const std::size_t idxLimit = m_currentLocalsBase + slotLimit;                        \
+		if (std::get<Int>(m_variables[idxI]) operation std::get<Int>(m_variables[idxLimit])) \
+		{                                                                                    \
+			m_ip = m_chunk->GetCode().data() + std::get<std::int64_t>(offsetVal);            \
+		}                                                                                    \
+	} while (false)
 
 namespace re::rvm
 {
@@ -544,7 +557,7 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::LoadNative: {
 			Value nameVal = READ_CONSTANT();
 			auto funcName = std::get<String>(nameVal);
-			std::uint8_t argCount = READ_BYTE();
+			std::int8_t argCount = READ_BYTE();
 
 			const auto it = m_natives.find(funcName);
 			if (it == m_natives.end())
@@ -599,6 +612,26 @@ InterpreterResult VirtualMachine::Run()
 			it->second->methods[methodName] = std::move(closureVal);
 			break;
 		}
+
+		case OpCode::IncLocal: {
+			const std::uint8_t slot = READ_BYTE();
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+
+			if (auto* i = std::get_if<Int>(&m_variables[actualIndex]))
+			{
+				(*i)++;
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error: INC_LOCAL expected Int");
+			}
+			break;
+		}
+
+			// clang-format off
+		case OpCode::JmpIfGreaterEqualLocal: JUMP_IF_LOCAL(>=); break;
+		case OpCode::JmpIfGreaterLocal:      JUMP_IF_LOCAL(>); break;
+			// clang-format on
 
 		case OpCode::Return: {
 			Value retVal = Null;

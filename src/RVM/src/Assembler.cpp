@@ -545,6 +545,56 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseIncLocal = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt)
+		{
+			return false;
+		}
+
+		const std::string varName(argOpt->lexeme);
+		const auto slotOpt = ResolveVariable(varName);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::IncLocal));
+		outChunk.Write(slotOpt.value());
+
+		return true;
+	};
+
+	auto parseJmpIfGeLocal = [&]() -> bool {
+		const auto varIOpt = lexer.next();
+		const auto varLimitOpt = lexer.next();
+		const auto labelOpt = lexer.next();
+		if (!varIOpt || !varLimitOpt || !labelOpt)
+		{
+			return false;
+		}
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::JmpIfGreaterEqualLocal));
+		outChunk.Write(ResolveVariable(std::string(varIOpt->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string(varLimitOpt->lexeme)).value());
+
+		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
+		outChunk.Write(PATCH_VALUE);
+		return true;
+	};
+
+	auto parseJmpIfGtLocal = [&]() -> bool {
+		const auto varIOpt = lexer.next();
+		const auto varLimitOpt = lexer.next();
+		const auto labelOpt = lexer.next();
+		if (!varIOpt || !varLimitOpt || !labelOpt)
+			return false;
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::JmpIfGreaterLocal));
+		outChunk.Write(ResolveVariable(std::string(varIOpt->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string(varLimitOpt->lexeme)).value());
+
+		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
+		outChunk.Write(PATCH_VALUE);
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -557,61 +607,65 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		switch (HashedString(token.lexeme))
 		{
 			// clang-format off
-          case "ADD"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Add)); break;
-          case "SUB"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Sub)); break;
-          case "MUL"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Mul)); break;
-          case "DIV"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Div)); break;
-		  case "INC"_hs:           outChunk.Write(static_cast<std::uint8_t>(OpCode::Inc)); break;
-		  case "DEC"_hs:           outChunk.Write(static_cast<std::uint8_t>(OpCode::Dec)); break;
-		  case "MOD"_hs:           outChunk.Write(static_cast<std::uint8_t>(OpCode::Mod)); break;
-		  case "BIT_NOT"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::BitNot)); break;
-          case "POP"_hs:    	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Pop)); break;
-          case "RETURN"_hs: 	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Return)); break;
-		  case "DUP"_hs:           outChunk.Write(static_cast<std::uint8_t>(OpCode::Dup)); break;
+          case "ADD"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Add)); break;
+          case "SUB"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Sub)); break;
+          case "MUL"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Mul)); break;
+          case "DIV"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Div)); break;
+		  case "INC"_hs:             outChunk.Write(static_cast<std::uint8_t>(OpCode::Inc)); break;
+		  case "DEC"_hs:             outChunk.Write(static_cast<std::uint8_t>(OpCode::Dec)); break;
+		  case "MOD"_hs:             outChunk.Write(static_cast<std::uint8_t>(OpCode::Mod)); break;
+		  case "BIT_NOT"_hs:         outChunk.Write(static_cast<std::uint8_t>(OpCode::BitNot)); break;
+          case "POP"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Pop)); break;
+          case "RETURN"_hs: 	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Return)); break;
+		  case "DUP"_hs:             outChunk.Write(static_cast<std::uint8_t>(OpCode::Dup)); break;
 
-		  case "LESS"_hs:   	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
-		  case "EQUAL"_hs:  	   outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;
-		  case "NOT_EQUAL"_hs:     outChunk.Write(static_cast<std::uint8_t>(OpCode::NotEqual)); break;
-		  case "GREATER"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::Greater)); break;
-		  case "LESS_EQUAL"_hs:    outChunk.Write(static_cast<std::uint8_t>(OpCode::LessEqual)); break;
-		  case "GREATER_EQUAL"_hs: outChunk.Write(static_cast<std::uint8_t>(OpCode::GreaterEqual)); break;
+		  case "LESS"_hs:   	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Less)); break;
+		  case "EQUAL"_hs:  	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Equal)); break;
+		  case "NOT_EQUAL"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::NotEqual)); break;
+		  case "GREATER"_hs:         outChunk.Write(static_cast<std::uint8_t>(OpCode::Greater)); break;
+		  case "LESS_EQUAL"_hs:      outChunk.Write(static_cast<std::uint8_t>(OpCode::LessEqual)); break;
+		  case "GREATER_EQUAL"_hs:   outChunk.Write(static_cast<std::uint8_t>(OpCode::GreaterEqual)); break;
 
-		  case "LABEL"_hs:		   if (!parseLabel()) return false; break;
-		  case "JMP"_hs:		   if (!parseJump(OpCode::Jmp)) return false; break;
-		  case "JMP_IF_FALSE"_hs:  if (!parseJump(OpCode::JmpIfFalse)) return false; break;
+		  case "LABEL"_hs:		     if (!parseLabel()) return false; break;
+		  case "JMP"_hs:		     if (!parseJump(OpCode::Jmp)) return false; break;
+		  case "JMP_IF_FALSE"_hs:    if (!parseJump(OpCode::JmpIfFalse)) return false; break;
 
-          case "CONST"_hs:  	   if (!parseConst()) return false; break;
-          case "SET"_hs:    	   if (!parseSetLocal()) return false; break;
-          case "GET"_hs:    	   if (!parseGetLocal()) return false; break;
-		  case "SET_GLOBAL"_hs:    if (!parseSetGlobal()) return false; break;
-		  case "GET_GLOBAL"_hs:    if (!parseGetGlobal()) return false; break;
-          case "FUN"_hs:    	   if (!parseDef()) return false; break;
+          case "CONST"_hs:  	     if (!parseConst()) return false; break;
+          case "SET"_hs:    	     if (!parseSetLocal()) return false; break;
+          case "GET"_hs:    	     if (!parseGetLocal()) return false; break;
+		  case "SET_GLOBAL"_hs:      if (!parseSetGlobal()) return false; break;
+		  case "GET_GLOBAL"_hs:      if (!parseGetGlobal()) return false; break;
+		  case "INC_LOCAL"_hs:       if (!parseIncLocal()) return false; break;
+          case "FUN"_hs:    	     if (!parseDef()) return false; break;
 
-		  case "NEW"_hs:           if (!parseNew()) return false; break;
-		  case "GET_PROPERTY"_hs:  if (!parseGetProperty()) return false; break;
-		  case "SET_PROPERTY"_hs:  if (!parseSetProperty()) return false; break;
-		  case "TYPE_OF"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::TypeOf)); break;
-		  case "TYPE"_hs:          if (!parseType()) return false; break;
+		  case "JMP_IF_GE_LOCAL"_hs: if (!parseJmpIfGeLocal()) return false; break;
+		  case "JMP_IF_GT_LOCAL"_hs: if (!parseJmpIfGtLocal()) return false; break;
 
-		  case "BOX"_hs:           outChunk.Write(static_cast<uint8_t>(OpCode::Box)); break;
-		  case "UNBOX"_hs:         outChunk.Write(static_cast<uint8_t>(OpCode::Unbox)); break;
-		  case "STORE_BOX"_hs:     outChunk.Write(static_cast<uint8_t>(OpCode::StoreBox)); break;
+		  case "NEW"_hs:             if (!parseNew()) return false; break;
+		  case "GET_PROPERTY"_hs:    if (!parseGetProperty()) return false; break;
+		  case "SET_PROPERTY"_hs:    if (!parseSetProperty()) return false; break;
+		  case "TYPE_OF"_hs:         outChunk.Write(static_cast<std::uint8_t>(OpCode::TypeOf)); break;
+		  case "TYPE"_hs:            if (!parseType()) return false; break;
 
-		  case "GET_UPVALUE"_hs:   parseGetUpValue(); break;
-		  case "SET_UPVALUE"_hs:   parseSetUpValue(); break;
+		  case "BOX"_hs:             outChunk.Write(static_cast<uint8_t>(OpCode::Box)); break;
+		  case "UNBOX"_hs:           outChunk.Write(static_cast<uint8_t>(OpCode::Unbox)); break;
+		  case "STORE_BOX"_hs:       outChunk.Write(static_cast<uint8_t>(OpCode::StoreBox)); break;
 
-		  case "BIND_METHOD"_hs:   if (!parseBindMethod()) return false; break;
+		  case "GET_UPVALUE"_hs:     parseGetUpValue(); break;
+		  case "SET_UPVALUE"_hs:     parseSetUpValue(); break;
 
-		  case "MAKE_CLOSURE"_hs:  if (!parseMakeClosure()) return false; break;
-		  case "LOAD_NATIVE"_hs:   if (!parseLoadNative()) return false; break;
+		  case "BIND_METHOD"_hs:     if (!parseBindMethod()) return false; break;
 
-		  case "PACK_ARRAY"_hs:    if (!parsePackArray()) return false; break;
+		  case "MAKE_CLOSURE"_hs:    if (!parseMakeClosure()) return false; break;
+		  case "LOAD_NATIVE"_hs:     if (!parseLoadNative()) return false; break;
 
-		  case "CALL_METHOD"_hs:   if (!parseCallMethod()) return false; break;
-		  case "CALL"_hs:   	   if (!parseCall())   return false; break;
-          case "NATIVE"_hs: 	   if (!parseNative()) return false; break;
-		  case "LOAD_FUN"_hs:      if (!parseLoadFun()) return false; break;
-		  case "CALL_INDIRECT"_hs: if (!parseCallIndirect()) return false; break;
+		  case "PACK_ARRAY"_hs:      if (!parsePackArray()) return false; break;
+
+		  case "CALL_METHOD"_hs:     if (!parseCallMethod()) return false; break;
+		  case "CALL"_hs:   	     if (!parseCall())   return false; break;
+          case "NATIVE"_hs: 	     if (!parseNative()) return false; break;
+		  case "LOAD_FUN"_hs:        if (!parseLoadFun()) return false; break;
+		  case "CALL_INDIRECT"_hs:   if (!parseCallIndirect()) return false; break;
 			// clang-format on
 		default:
 			std::cerr << "Unknown instruction: " << token.lexeme << "\n";

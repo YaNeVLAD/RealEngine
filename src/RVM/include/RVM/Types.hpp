@@ -136,7 +136,7 @@ enum class OpCode : std::uint8_t
 	Dup,
 
 	// ---------------------------------------------------------
-	// LOCAL VARIABLES
+	// LOCAL & GLOBAL VARIABLES
 	// ---------------------------------------------------------
 
 	// Bytecode: [GetLocal, slot_index]
@@ -151,20 +151,38 @@ enum class OpCode : std::uint8_t
 	// from the stack and stores it in the variable array (m_variables[slot_index] = value).
 	SetLocal,
 
-	// Bytecode: [LoadNative, const_index, arg_count]
-	// Stack: ... -> ..., [NativeObjectPtr]
-	// Description: Reads 1 byte (name index) and 1 byte (arg count). Finds the
-	// function in the registry by name and pushes a new NativeObject onto the stack.
-	LoadNative,
-
-	// Reads hash, pushes value from m_globals
+	// Bytecode: [GetGlobal, hash_index]
+	// Stack: ... -> ..., [value]
+	// Description: Reads a hash index. Fetches the value associated with this
+	// name from the global storage (m_globals) and pushes it onto the stack.
 	GetGlobal,
 
-	// Reads hash, pops value, stores in m_globals
+	// Bytecode: [SetGlobal, hash_index]
+	// Stack: ..., [value] -> ...
+	// Description: Reads a hash index. Pops the top value and stores it
+	// in the global storage (m_globals) under the associated name.
 	SetGlobal,
 
+	// Bytecode: [IncLocal, slot_index]
+	// Stack: ... -> ...
+	// Description: Reads 1 byte (variable index). Directly increments the value
+	// in the variable array at slot_index without affecting the stack.
+	IncLocal,
+
+	// Bytecode: [JmpIfGreaterEqualLocal, slot_i, slot_limit, offset]
+	// Stack: ... -> ...
+	// Description: Compares values in two local slots (i >= limit). If true,
+	// moves the IP by the provided offset.
+	JmpIfGreaterEqualLocal,
+
+	// Bytecode: [JmpIfGreaterLocal, slot_i, slot_limit, offset]
+	// Stack: ... -> ...
+	// Description: Compares values in two local slots (i > limit). If true,
+	// moves the IP by the provided offset.
+	JmpIfGreaterLocal,
+
 	// ---------------------------------------------------------
-	// ARITHMETIC
+	// ARITHMETIC & LOGIC
 	// ---------------------------------------------------------
 
 	// Bytecode: [Add]
@@ -187,6 +205,11 @@ enum class OpCode : std::uint8_t
 	// Description: Pops 2 values. Divides the lower value (a) by the top value (b).
 	Div,
 
+	// Bytecode: [Mod]
+	// Stack: ..., [a], [b] -> ..., [a % b]
+	// Description: Pops 2 values. Performs modulo (a % b) and pushes the result back.
+	Mod,
+
 	// Bytecode: [Inc]
 	// Stack: ..., [a] -> ..., [a + 1]
 	// Description: Pops the top value, increments it by 1, and pushes it back.
@@ -202,8 +225,6 @@ enum class OpCode : std::uint8_t
 	// Description: Performs bitwise NOT on the top stack value.
 	BitNot,
 
-	Mod,
-
 	// ---------------------------------------------------------
 	// COMPARISON
 	// ---------------------------------------------------------
@@ -218,16 +239,24 @@ enum class OpCode : std::uint8_t
 	// Description: Pops B and A. Pushes 1 (true) if A == B, else 0 (false).
 	Equal,
 
-	// A > B
+	// Bytecode: [Greater]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A > B, else 0 (false).
 	Greater,
 
-	// A <= B
+	// Bytecode: [LessEqual]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A <= B, else 0 (false).
 	LessEqual,
 
-	// A >= B
+	// Bytecode: [GreaterEqual]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A >= B, else 0 (false).
 	GreaterEqual,
 
-	// A != B
+	// Bytecode: [NotEqual]
+	// Stack: ..., [a], [b] -> ..., [bool]
+	// Description: Pops B and A. Pushes 1 (true) if A != B, else 0 (false).
 	NotEqual,
 
 	// ---------------------------------------------------------
@@ -297,17 +326,22 @@ enum class OpCode : std::uint8_t
 	// and pushes the return value back onto the stack.
 	Native,
 
+	// Bytecode: [LoadNative, const_index, arg_count]
+	// Stack: ... -> ..., [NativeObjectPtr]
+	// Description: Reads 1 byte (name index) and 1 byte (arg count). Finds the
+	// function in the registry by name and pushes a new NativeObject onto the stack.
+	LoadNative,
+
 	// Bytecode: [CallIndirect]
 	// Stack: ..., [function_ptr], [args...] -> ...
 	// Description: Similar to Call, but the target function is popped from the stack.
-	// And can be any Callable object like NativeObjectPtr or ClosurePtr
+	// Can be any Callable object like NativeObjectPtr or ClosurePtr.
 	CallIndirect,
 
-	// Bytecode: [CallMethod, const_index(name_hash), uint8(arg_count)]
+	// Bytecode: [CallMethod, const_index, arg_count]
 	// Stack: ..., [InstancePtr], [arg1], ..., [argN] -> ..., [return_value]
-	// Description: Reads 1 constant (method name string) and 1 byte (arg count).
-	// Pops N arguments, then pops the object instance (self).
-	// Looks up the method by name in the object's TypeInfo and invokes it.
+	// Description: Reads 1 constant (method name hash) and 1 byte (arg count).
+	// Pops N arguments, then pops the object instance. Looks up and invokes the method.
 	CallMethod,
 
 	// ---------------------------------------------------------
@@ -322,8 +356,8 @@ enum class OpCode : std::uint8_t
 
 	// Bytecode: [GetProperty, name_hash]
 	// Stack: ..., [InstancePtr] -> ..., [value]
-	// Description: Reads a hash (usually 4-8 bytes). Pops the instance,
-	// looks up the field by hash, and pushes the field's value.
+	// Description: Reads a hash. Pops the instance, looks up the field
+	// by hash, and pushes the field's value.
 	GetProperty,
 
 	// Bytecode: [SetProperty, name_hash]
@@ -343,16 +377,20 @@ enum class OpCode : std::uint8_t
 	// to register a new TypeInfo structure in the VM.
 	DefType,
 
-	// Bytecode: [BindMethod] <classNameConst> <methodNameConst>
+	// Bytecode: [BindMethod, class_const, method_const]
 	// Stack: ..., [Closure] -> ...
-	// Description: Pops a closure. Binds it as a method to the specified class.
+	// Description: Reads two constant indices. Pops a closure and binds it
+	// as a method to the specified class.
 	BindMethod,
 
 	// ---------------------------------------------------------
 	// ARRAYS
 	// ---------------------------------------------------------
 
-	// Читает 1 байт (количество), снимает N элементов, пушит Array
+	// Bytecode: [PackArray, count]
+	// Stack: ..., [val1], ..., [valN] -> ..., [ArrayObjectPtr]
+	// Description: Reads 1 byte (count). Pops N elements from the stack,
+	// packs them into a new Array object, and pushes the array back.
 	PackArray,
 
 	// ---------------------------------------------------------
@@ -362,7 +400,7 @@ enum class OpCode : std::uint8_t
 	// Bytecode: [Return]
 	// Stack: ..., [return_value] -> ..., [return_value]
 	// Description: Ends execution of the current function. Pops the return address
-	// from the CallStack and restore the instruction pointer. If CallStack is empty, terminates the VM.
+	// from the CallStack and restores the IP. If CallStack is empty, terminates the VM.
 	Return = std::numeric_limits<std::uint8_t>::max(),
 };
 

@@ -775,10 +775,7 @@ public:
 
 			m_out << "LABEL " << startLabel << "\n";
 
-			m_out << "GET " << asmIndexName << "\n";
-			m_out << "GET " << asmSizeName << "\n";
-			m_out << "LESS\n";
-			m_out << "JMP_IF_FALSE " << endLabel << "\n";
+			m_out << "JMP_IF_GE_LOCAL " << asmIndexName << " " << asmSizeName << " " << endLabel << "\n";
 
 			m_out << "GET " << asmArrName << "\n";
 			m_out << "GET " << asmIndexName << "\n";
@@ -791,9 +788,7 @@ public:
 				node->body->Accept(*this);
 			}
 
-			m_out << "GET " << asmIndexName << "\n";
-			m_out << "INC\n";
-			m_out << "SET " << asmIndexName << "\n";
+			m_out << "INC_LOCAL " << asmIndexName << "\n";
 
 			m_out << "JMP " << startLabel << "\n";
 			m_out << "LABEL " << endLabel << "\n";
@@ -816,19 +811,21 @@ public:
 			{
 				node->endExpr->Accept(*this);
 			}
+
 			const auto asmLimitName = DeclareLocal(limitName);
 			m_out << "SET " << asmLimitName << "\n";
 
 			m_out << "LABEL " << startLabel << "\n";
-			m_out << "CONST 1\nGET " << asmLimitName << "\nGET " << asmIterName << "\nLESS\nSUB\n";
-			m_out << "JMP_IF_FALSE " << endLabel << "\n";
+
+			m_out << "JMP_IF_GT_LOCAL " << asmIterName << " " << asmLimitName << " " << endLabel << "\n";
 
 			if (node->body)
 			{
 				node->body->Accept(*this);
 			}
 
-			m_out << "GET " << asmIterName << "\nINC\nSET " << asmIterName << "\n";
+			m_out << "INC_LOCAL " << asmIterName << "\n";
+
 			m_out << "JMP " << startLabel << "\nLABEL " << endLabel << "\n";
 		}
 
