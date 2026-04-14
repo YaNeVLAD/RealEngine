@@ -19,6 +19,7 @@ enum class TokenType
 	Integer,
 	Double,
 	String,
+	Label,
 	Comment,
 	Whitespace,
 };
@@ -93,6 +94,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	fsm::lexer<TokenType, fsm::std_regex_matcher> lexer(source);
 	lexer
+		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*:)", TokenType::Label)
 		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*)", TokenType::Identifier)
 		.add_rule(R"(\-*[0-9]+\.[0-9]+)", TokenType::Double)
 		.add_rule(R"(\-*[0-9]+)", TokenType::Integer)
@@ -100,7 +102,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		.add_rule("//.*", TokenType::Comment, true)
 		.add_rule(R"([ \t\r\n]+)", TokenType::Whitespace, true);
 
-	std::unordered_map<Hash_t, std::int64_t> labels;
+	std::unordered_map<String, std::int64_t> labels;
 	std::vector<Fixup> fixups;
 
 	auto parseConst = [&]() -> bool {
@@ -237,7 +239,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		m_locals.clear();
 		m_localsCount = 0;
 
-		labels[String(funcNameOpt->lexeme).Hash()] = outChunk.Size();
+		labels[String(funcNameOpt->lexeme)] = outChunk.Size();
 
 		return true;
 	};
@@ -293,7 +295,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		{
 			return false;
 		}
-		labels[String(nameOpt->lexeme).Hash()] = outChunk.Size();
+		labels[String(nameOpt->lexeme)] = static_cast<std::int64_t>(outChunk.Size());
 
 		return true;
 	};
@@ -598,6 +600,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
+
+		if (token.type == TokenType::Label)
+		{
+			std::string labelName(token.lexeme.substr(0, token.lexeme.size() - 1));
+			labels[String(labelName)] = static_cast<std::int64_t>(outChunk.Size());
+			continue;
+		}
+
 		if (token.type != TokenType::Identifier)
 		{
 			std::cerr << "Unexpected token: " << token.lexeme << "\n";
@@ -675,14 +685,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	for (const auto& [codeOffset, funcName] : fixups)
 	{
-		auto hash = funcName.Hash();
-		if (!labels.contains(hash))
+		if (!labels.contains(funcName))
 		{
 			std::cerr << "Error: Undefined function '" << funcName << "'\n";
 			return false;
 		}
 
-		outChunk.Patch(codeOffset, outChunk.AddConstant(labels[hash]));
+		outChunk.Patch(codeOffset, outChunk.AddConstant(labels[funcName]));
 	}
 
 	return true;

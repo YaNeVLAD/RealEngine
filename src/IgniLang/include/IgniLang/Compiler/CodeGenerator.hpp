@@ -71,7 +71,6 @@ public:
 					}
 				}
 			}
-			// --------------------------
 		}
 
 		for (const ast::FunDecl* fun : m_flatFunctions)
@@ -628,7 +627,7 @@ public:
 		}
 
 		// clang-format off
-		switch (node->op.Hash())
+		switch (node->op.Hashed())
 		{
 		case "+"_hs:  m_out << "ADD\n"; break;
 		case "-"_hs:  m_out << "SUB\n"; break;
