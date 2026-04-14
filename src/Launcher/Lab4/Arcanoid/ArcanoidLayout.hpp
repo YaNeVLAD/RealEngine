@@ -131,10 +131,12 @@ private:
 
 		scene.CreateEntity()
 			.Add<arcanoid::PaddleComponent>()
-			.Add<re::RigidBodyComponent>({ .type = re::physics::BodyType::Kinematic,
-				.collider = { re::physics::ColliderType::Box, { PaddleWidth * 0.5f, PaddleHeight * 0.5f, PaddleDepth * 0.5f } },
+			.Add<re::RigidBodyComponent>({
+				.type = re::physics::BodyType::Kinematic,
+				.collider = { re::physics::ColliderType::Box },
 				.friction = 0.0f,
-				.restitution = 1.0f })
+				.restitution = 1.0f,
+			})
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
@@ -148,7 +150,7 @@ private:
 			.Add<arcanoid::BallComponent>()
 			.Add<re::RigidBodyComponent>({
 				.type = re::physics::BodyType::Dynamic,
-				.collider = { re::physics::ColliderType::Sphere, { 0.f, 0.f, 0.f }, BallRadius },
+				.collider = { .type = re::physics::ColliderType::Sphere, .radius = BallRadius },
 				.friction = 0.0f,
 				.restitution = 1.0f,
 				.gravityFactor = 0.0f,

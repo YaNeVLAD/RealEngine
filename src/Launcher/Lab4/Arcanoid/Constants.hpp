@@ -22,7 +22,7 @@ constexpr re::Vector3f PaddleSpawnPos = { 0.f, 0.f, 7.f };
 constexpr float PaddleBounceFactor = 0.8f;
 
 constexpr re::Vector3f BallSpawnPos = { 0.f, 0.f, 6.f };
-constexpr float BallSpeed = 15.0f;
+constexpr float BallSpeed = 20.0f;
 constexpr float BallRadius = 0.5f;
 constexpr float BallRotation = 360.f / (2.f * std::numbers::pi_v<float> * BallRadius);
 
