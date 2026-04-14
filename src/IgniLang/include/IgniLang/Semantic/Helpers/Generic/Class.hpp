@@ -2,6 +2,7 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::Generic::Class
@@ -14,7 +15,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 {
 	if (typeArgs.size() != tmpl->typeParams.size())
 	{
-		throw std::runtime_error("Semantic Error: Generic class '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
+		IGNI_SEM_ERR(tmpl->astNode, "Generic class '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
 	re::String uniqueName = tmpl->name;
@@ -22,7 +23,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 	{
 		if (!arg)
 		{
-			throw std::runtime_error("Semantic Error: Invalid or unknown type argument for '" + tmpl->name + "'");
+			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 		}
 
 		uniqueName = uniqueName + "__" + arg->name;
@@ -93,7 +94,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 			}
 			else if (!varDecl->isExternal && !realClassDecl->isExternal && !fieldType)
 			{
-				throw std::runtime_error("Semantic Error: Property '" + varDecl->name + "' must have an initializer or explicit type");
+				IGNI_SEM_ERR(varDecl, "Property '" + varDecl->name + "' must have an initializer or explicit type");
 			}
 
 			classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
@@ -111,18 +112,13 @@ inline std::shared_ptr<ClassType> Instantiate(
 			}
 			else if (!valDecl->isExternal && !realClassDecl->isExternal && !fieldType)
 			{
-				throw std::runtime_error("Semantic Error: Property '" + valDecl->name + "' must have an initializer or explicit type");
+				IGNI_SEM_ERR(valDecl, "Property '" + valDecl->name + "' must have an initializer or explicit type");
 			}
 
 			classType->fields[valDecl->name] = { fieldType, false, valDecl->visibility };
 		}
 		if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 		{
-			if (realClassDecl->isExternal && (!fun->isExternal || fun->body || fun->isExprBody))
-			{
-				throw std::runtime_error("Semantic Error: Method '" + fun->name + "' in external class '" + realClassDecl->name + "' must be marked 'external' and cannot have a body.");
-			}
-
 			const auto mutableFun = const_cast<ast::FunDecl*>(fun);
 			const re::String originalName = mutableFun->name;
 
@@ -143,7 +139,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 			{
 				if (mutableFun->isOverride)
 				{
-					throw std::runtime_error("Semantic Error: Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
+					IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
 				}
 
 				auto fnTmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
@@ -152,7 +148,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 				fnTmpl->moduleName = tmpl->moduleName;
 
 				fnTmpl->visibility = mutableFun->visibility;
-				fnTmpl->isExternal = fun->isExternal || realClassDecl->isExternal;
+				fnTmpl->isExternal = fun->isExternal;
 
 				classType->methods[originalName] = fnTmpl;
 				continue;
@@ -195,7 +191,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 			}
 
 			funType->visibility = mutableFun->visibility;
-			funType->isExternal = fun->isExternal || realClassDecl->isExternal;
+			funType->isExternal = fun->isExternal;
 
 			if (funType->isExternal)
 			{
@@ -206,11 +202,11 @@ inline std::shared_ptr<ClassType> Instantiate(
 
 			if (mutableFun->isOverride && !existsInBase)
 			{
-				throw std::runtime_error("Semantic Error: Method '" + originalName + "' is marked 'override' but no matching method found in base class '" + classType->baseClass->name + "'");
+				IGNI_SEM_ERR(mutableFun, "Method '" + originalName + "' is marked 'override' but no matching method found in base class '" + classType->baseClass->name + "'");
 			}
 			if (!mutableFun->isOverride && existsInBase)
 			{
-				throw std::runtime_error("Semantic Error: Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
+				IGNI_SEM_ERR(mutableFun, "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
 			}
 
 			classType->methods[originalName] = funType;

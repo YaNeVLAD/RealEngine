@@ -754,38 +754,83 @@ public:
 		const re::String startLabel = "L_for_start_" + std::to_string(labelId);
 		const re::String endLabel = "L_for_end_" + std::to_string(labelId);
 
-		const auto& iterName = node->iteratorName;
-		const re::String limitName = "_for_limit_" + std::to_string(labelId);
-
 		const std::size_t localsCountBefore = m_currentLocals.size();
 
-		m_out << "// --- for (" << iterName << ") ---\n";
-
-		if (node->startExpr)
+		if (node->isForEach)
 		{
+			m_out << "// --- for-each (" << node->iteratorName << ") ---\n";
+
 			node->startExpr->Accept(*this);
-		}
-		const auto asmIterName = DeclareLocal(iterName);
-		m_out << "SET " << asmIterName << "\n";
+			const auto asmArrName = DeclareLocal("__range" + std::to_string(labelId));
+			m_out << "SET " << asmArrName << "\n";
 
-		if (node->endExpr)
+			m_out << "GET " << asmArrName << "\n";
+			m_out << "GET_PROPERTY \"size\"\n";
+			const auto asmSizeName = DeclareLocal("__size" + std::to_string(labelId));
+			m_out << "SET " << asmSizeName << "\n";
+
+			m_out << "CONST 0\n";
+			const auto asmIndexName = DeclareLocal("__it" + std::to_string(labelId));
+			m_out << "SET " << asmIndexName << "\n";
+
+			m_out << "LABEL " << startLabel << "\n";
+
+			m_out << "GET " << asmIndexName << "\n";
+			m_out << "GET " << asmSizeName << "\n";
+			m_out << "LESS\n";
+			m_out << "JMP_IF_FALSE " << endLabel << "\n";
+
+			m_out << "GET " << asmArrName << "\n";
+			m_out << "GET " << asmIndexName << "\n";
+			m_out << "CALL_METHOD \"get\" 1\n";
+			const auto asmIterName = DeclareLocal(node->iteratorName);
+			m_out << "SET " << asmIterName << "\n";
+
+			if (node->body)
+			{
+				node->body->Accept(*this);
+			}
+
+			m_out << "GET " << asmIndexName << "\n";
+			m_out << "INC\n";
+			m_out << "SET " << asmIndexName << "\n";
+
+			m_out << "JMP " << startLabel << "\n";
+			m_out << "LABEL " << endLabel << "\n";
+		}
+		else
 		{
-			node->endExpr->Accept(*this);
+			const auto& iterName = node->iteratorName;
+			const re::String limitName = "_for_limit_" + std::to_string(labelId);
+
+			m_out << "// --- for (" << iterName << ") ---\n";
+
+			if (node->startExpr)
+			{
+				node->startExpr->Accept(*this);
+			}
+			const auto asmIterName = DeclareLocal(iterName);
+			m_out << "SET " << asmIterName << "\n";
+
+			if (node->endExpr)
+			{
+				node->endExpr->Accept(*this);
+			}
+			const auto asmLimitName = DeclareLocal(limitName);
+			m_out << "SET " << asmLimitName << "\n";
+
+			m_out << "LABEL " << startLabel << "\n";
+			m_out << "CONST 1\nGET " << asmLimitName << "\nGET " << asmIterName << "\nLESS\nSUB\n";
+			m_out << "JMP_IF_FALSE " << endLabel << "\n";
+
+			if (node->body)
+			{
+				node->body->Accept(*this);
+			}
+
+			m_out << "GET " << asmIterName << "\nINC\nSET " << asmIterName << "\n";
+			m_out << "JMP " << startLabel << "\nLABEL " << endLabel << "\n";
 		}
-		const auto asmLimitName = DeclareLocal(limitName);
-		m_out << "SET " << asmLimitName << "\n";
-
-		m_out << "LABEL " << startLabel << "\n";
-		m_out << "CONST 1\nGET " << asmLimitName << "\nGET " << asmIterName << "\nLESS\nSUB\n";
-		m_out << "JMP_IF_FALSE " << endLabel << "\n";
-
-		if (node->body)
-		{
-			node->body->Accept(*this);
-		}
-
-		m_out << "GET " << asmIterName << "\nINC\nSET " << asmIterName << "\n";
-		m_out << "JMP " << startLabel << "\nLABEL " << endLabel << "\n";
 
 		m_currentLocals.resize(localsCountBefore);
 	}

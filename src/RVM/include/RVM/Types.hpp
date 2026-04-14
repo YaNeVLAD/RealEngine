@@ -92,12 +92,12 @@ using NativeGetterFn = std::function<Value(const Value& obj)>;
 struct TypeInfo
 {
 	String name;
-	std::unordered_map<Hash_t, std::size_t> fieldIndexes;
+	std::unordered_map<String, std::size_t> fieldIndexes;
 	std::vector<String> fieldNames;
 
-	std::unordered_map<Hash_t, Value> methods;
+	std::unordered_map<String, Value> methods;
 
-	std::unordered_map<Hash_t, NativeGetterFn> getters;
+	std::unordered_map<String, NativeGetterFn> getters;
 
 	AllocatorFn allocator;
 
@@ -342,6 +342,11 @@ enum class OpCode : std::uint8_t
 	// Description: Reads 1 byte (fields count). Pops field names and the type name
 	// to register a new TypeInfo structure in the VM.
 	DefType,
+
+	// Bytecode: [BindMethod] <classNameConst> <methodNameConst>
+	// Stack: ..., [Closure] -> ...
+	// Description: Pops a closure. Binds it as a method to the specified class.
+	BindMethod,
 
 	// ---------------------------------------------------------
 	// ARRAYS

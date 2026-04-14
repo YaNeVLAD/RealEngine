@@ -525,6 +525,26 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseBindMethod = [&]() -> bool {
+		const auto classNameOpt = lexer.next();
+		const auto methodNameOpt = lexer.next();
+
+		if (!classNameOpt || !methodNameOpt || classNameOpt->type != TokenType::String || methodNameOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected class name and method name strings after BIND_METHOD\n";
+			return false;
+		}
+
+		const auto classStr = classNameOpt->lexeme.substr(1, classNameOpt->lexeme.size() - 2);
+		const auto methodStr = methodNameOpt->lexeme.substr(1, methodNameOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::BindMethod));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(classStr))));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(methodStr))));
+
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -579,6 +599,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		  case "GET_UPVALUE"_hs:   parseGetUpValue(); break;
 		  case "SET_UPVALUE"_hs:   parseSetUpValue(); break;
+
+		  case "BIND_METHOD"_hs:   if (!parseBindMethod()) return false; break;
 
 		  case "MAKE_CLOSURE"_hs:  if (!parseMakeClosure()) return false; break;
 		  case "LOAD_NATIVE"_hs:   if (!parseLoadNative()) return false; break;

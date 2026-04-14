@@ -665,6 +665,8 @@ struct ForStmt final : Visitable<ForStmt, Statement>
 	std::unique_ptr<Expr> endExpr;
 	std::unique_ptr<Block> body;
 
+	bool isForEach = false;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);

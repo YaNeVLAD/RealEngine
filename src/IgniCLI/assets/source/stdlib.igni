@@ -8,18 +8,29 @@ external fun print(args: Any...): Unit;
 external fun println(args: Any...): Unit;
 
 external class <T> Array(size: Int) {
-  external val size: Int;
-  external val length: Int;
+    external val size: Int;
+    external val length: Int;
 
-  external fun get(index: Int): T;
-  external fun set(index: Int, value: T): Unit;
+    external fun get(index: Int): T;
+    external fun set(index: Int, value: T): Unit;
+
+    fun <R> map(mapper: (T) -> R) : Array<R> {
+        val size = this.size;
+        val result = Array::<R>(size);
+
+        for (i in 0..size - 1) {
+            result[i] = mapper(this[i]);
+        }
+
+        return result;
+    }
 }
 
 external class String {
-  external val size: Int;
-  external val length: Int;
+    external val size: Int;
+    external val length: Int;
 
-  external fun get(index: Int): String;
+    external fun get(index: Int): String;
 }
 
 external fun <T> arrayOf(elements: T...): Array<T>;

@@ -26,9 +26,9 @@ TypeInfo::TypeInfo(String name)
 
 void TypeInfo::AddField(String const& fieldName)
 {
-	if (!fieldIndexes.contains(fieldName.Hash()))
+	if (!fieldIndexes.contains(fieldName))
 	{
-		fieldIndexes[fieldName.Hash()] = fieldNames.size();
+		fieldIndexes[fieldName] = fieldNames.size();
 		fieldNames.push_back(fieldName);
 	}
 }
@@ -40,7 +40,7 @@ TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::int8_t 
 	nativeObj->argCount = argCount;
 	nativeObj->function = std::move(function);
 
-	methods[methodName.Hash()] = nativeObj;
+	methods[methodName] = nativeObj;
 
 	return *this;
 }
@@ -54,7 +54,7 @@ TypeInfo& TypeInfo::SetAllocator(AllocatorFn alloc)
 
 TypeInfo& TypeInfo::AddNativeGetter(String const& propName, NativeGetterFn function)
 {
-	getters[propName.Hash()] = std::move(function);
+	getters[propName] = std::move(function);
 	return *this;
 }
 

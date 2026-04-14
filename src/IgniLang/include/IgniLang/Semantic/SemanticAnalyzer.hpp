@@ -601,10 +601,33 @@ public:
 	{
 		m_context.env.PushScope();
 
-		Evaluate(node->startExpr.get());
-		Evaluate(node->endExpr.get());
+		if (!node->isForEach)
+		{
+			Evaluate(node->startExpr.get());
+			Evaluate(node->endExpr.get());
 
-		m_context.env.Define(node->iteratorName, m_context.tInt, false);
+			m_context.env.Define(node->iteratorName, m_context.tInt, false);
+		}
+		else
+		{
+			const auto collectionType = Evaluate(node->startExpr.get());
+			std::shared_ptr<SemanticType> elementType = nullptr;
+
+			if (const auto classType = std::dynamic_pointer_cast<ClassType>(collectionType))
+			{
+				if (classType->name.Find("Array") != re::String::NPos && !classType->typeArguments.empty())
+				{
+					elementType = classType->typeArguments[0];
+				}
+			}
+
+			if (!elementType)
+			{
+				IGNI_SEM_ERR("For-each loop requires an Array collection, but got '" + collectionType->name + "'");
+			}
+
+			m_context.env.Define(node->iteratorName, elementType, false);
+		}
 
 		if (node->body)
 		{
@@ -853,11 +876,6 @@ public:
 					IGNI_SEM_ERR(member.get(), "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
 				}
 
-				if (node->isExternal && (!funDecl->isExternal || funDecl->body || funDecl->isExprBody))
-				{
-					IGNI_SEM_ERR(member.get(), "Method '" + originalName + "' in external class '" + node->name + "' must be marked 'external' and cannot have a body.");
-				}
-
 				funDecl->Accept(*this);
 			}
 			else if (const auto ctorDecl = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
@@ -1061,7 +1079,7 @@ private:
 							tmpl->moduleName = currentModule ? currentModule->name : "global";
 
 							tmpl->visibility = mutableFun->visibility;
-							tmpl->isExternal = fun->isExternal || classType->isExternal;
+							tmpl->isExternal = fun->isExternal;
 
 							classType->methods[originalName] = tmpl;
 							continue;
@@ -1082,7 +1100,7 @@ private:
 
 						funType->visibility = mutableFun->visibility;
 						funType->moduleName = currentModule ? currentModule->name : "global";
-						funType->isExternal = fun->isExternal || classDecl->isExternal;
+						funType->isExternal = fun->isExternal;
 
 						if (isGlobal)
 						{

@@ -83,7 +83,7 @@ OptElse -> else ElseBody | \e
 ElseBody -> IfStmt | Block
 
 WhileStmt -> while ( Expr ) Block
-ForStmt -> for ( ident in Expr .. Expr ) Block
+ForStmt -> for ( ident in Expr .. Expr ) Block | for ( ident in Expr ) Block
 
 Expr -> LogOrExpr = Expr | LogOrExpr
 

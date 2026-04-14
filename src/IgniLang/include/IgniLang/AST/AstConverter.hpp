@@ -624,12 +624,26 @@ private:
 
 	static std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
+		// ForStmt -> for [0] ( [1] ident [2] in [3] Expr [4] .. [5] Expr [6] ) [7] Block [8]
+		// ForStmt -> for [0] ( [1] ident [2] in [3] Expr [4] ) [5] Block [6]
+
 		auto stmt = std::make_unique<ast::ForStmt>();
-		stmt->token = *forNode->children[0]->token;
+		stmt->token = *forNode->children[0]->token; // Токен 'for'
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
 		stmt->startExpr = ConvertExpr(forNode->children[4].get());
-		stmt->endExpr = ConvertExpr(forNode->children[6].get());
-		stmt->body = ConvertBlock(forNode->children[8].get());
+
+		if (forNode->children.size() == 9) // for ( ident in Expr .. Expr ) Block
+		{
+			stmt->isForEach = false;
+			stmt->endExpr = ConvertExpr(forNode->children[6].get());
+			stmt->body = ConvertBlock(forNode->children[8].get());
+		}
+		else if (forNode->children.size() == 7) // for ( ident in Expr ) Block
+		{
+			stmt->isForEach = true;
+			stmt->endExpr = nullptr;
+			stmt->body = ConvertBlock(forNode->children[6].get());
+		}
 
 		return stmt;
 	}

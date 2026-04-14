@@ -3,6 +3,7 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 namespace igni::sem::Generic::Function
@@ -15,7 +16,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 {
 	if (typeArgs.size() != tmpl->typeParams.size())
 	{
-		throw std::runtime_error("Semantic Error: Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
+		IGNI_SEM_ERR(tmpl->astNode, "Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
 	re::String uniqueName = tmpl->name;
@@ -25,7 +26,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		{
 			if (!arg)
 			{
-				throw std::runtime_error("Semantic Error: Invalid or unknown type argument for '" + tmpl->name + "'");
+				IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 			}
 
 			uniqueName = uniqueName + "__" + arg->name;

@@ -1,16 +1,5 @@
 package main;
 
-fun <T, R> map(arr: Array<T>, mapper: (T) -> R) : Array<R> {
-	val size = arr.size;
-	val result = Array::<R>(size);
-
-	for (i in 0..size - 1) {
-		result[i] = mapper(arr[i]);
-	}
-
-	return result;
-}
-
 fun square(value: Int): Int {
 	return value * value;
 }
@@ -21,8 +10,12 @@ fun odd(value: Int) = value % 2 != 0;
 fun main() {
 	val arr = arrayOf(1, 2, 3, 5, 8, 12);
 
-	val evens = map(arr, even);
-	val odds = map(arr, odd);
+	for (item in arr) {
+		println(item);
+	}
+
+	val evens = arr.map(even);
+	val odds = arr.map(odd);
 
 	println(evens);
 	println(odds);

@@ -24,6 +24,10 @@
 		Push(res);                                                             \
 	} while (false)
 
+#define EXIT_WITH_ERROR(expr)       \
+	std::cerr << expr << std::endl; \
+	return InterpreterResult::RuntimeError
+
 namespace re::rvm
 {
 
@@ -101,8 +105,7 @@ InterpreterResult VirtualMachine::Run()
 				a);
 			if (!result)
 			{
-				std::cerr << "Runtime Error (INC): Expected a number, but got type index " << a.index() << "\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error (INC): Expected a number, but got type index " << a.index());
 			}
 			break;
 		}
@@ -118,8 +121,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
-				std::cerr << "Runtime Error (DEC): Expected a number, but got type index " << a.index() << "\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error (DEC): Expected a number, but got type index " << a.index());
 			}
 			break;
 		}
@@ -131,8 +133,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
-				std::cerr << "Runtime Error (BIT_NOT): Expected a number, but got type index " << a.index() << "\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error (BIT_NOT): Expected a number, but got type index " << a.index());
 			}
 			break;
 		}
@@ -174,8 +175,7 @@ InterpreterResult VirtualMachine::Run()
 			auto it = m_globals.find(std::get<String>(nameVal));
 			if (it == m_globals.end())
 			{
-				std::cerr << "Runtime Error: Undefined global variable/module." + nameVal + "\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Undefined global variable/module." + nameVal);
 			}
 			Push(it->second);
 			break;
@@ -215,7 +215,7 @@ InterpreterResult VirtualMachine::Run()
 			const auto it = m_natives.find(funcName);
 			if (it == m_natives.end())
 			{
-				throw std::runtime_error("Unknown native function " + funcName);
+				EXIT_WITH_ERROR("Unknown native function " + funcName);
 			}
 
 			std::vector<Value> args(argCount);
@@ -282,8 +282,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
-				std::cerr << "Runtime Error: Attempt to call a non-callable object\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Attempt to call a non-callable object" << callableVal);
 			}
 			break;
 		}
@@ -291,7 +290,6 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::CallMethod: {
 			Value nameVal = READ_CONSTANT();
 			auto methodName = std::get<String>(nameVal);
-			auto methodHash = methodName.Hash();
 
 			std::uint8_t argCount = READ_BYTE();
 
@@ -302,15 +300,13 @@ InterpreterResult VirtualMachine::Run()
 			auto typeInfo = GetType(selfVal);
 			if (!typeInfo)
 			{
-				std::cerr << "Runtime Error: Value has no type info\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Value has no type info");
 			}
 
-			auto methodIt = typeInfo->methods.find(methodHash);
+			auto methodIt = typeInfo->methods.find(methodName);
 			if (methodIt == typeInfo->methods.end())
 			{
-				std::cerr << "Runtime Error: Undefined method '" << methodName << "'\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Undefined method '" << methodName);
 			}
 
 			Value callableVal = methodIt->second;
@@ -336,12 +332,7 @@ InterpreterResult VirtualMachine::Run()
 				auto native = *nativePtr;
 				if (native->argCount != static_cast<std::int8_t>(-1) && native->argCount != argCount)
 				{
-					std::cerr << "Runtime Error: Method '"
-							  << methodName
-							  << "' expects " << native->argCount
-							  << " arguments.\n";
-
-					return InterpreterResult::RuntimeError;
+					EXIT_WITH_ERROR("Runtime Error: Method '" << methodName << "' expects " << native->argCount << " arguments");
 				}
 
 				// Collect arguments INCLUDING 'self' as the first argument
@@ -357,8 +348,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
-				std::cerr << "Runtime Error: Method is not callable\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Method is not callable");
 			}
 			break;
 		}
@@ -370,8 +360,7 @@ InterpreterResult VirtualMachine::Run()
 			const auto it = m_types.find(className);
 			if (it == m_types.end())
 			{
-				std::cerr << "Runtime Error: Unknown class '" << className << "'\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Unknown class '" << className);
 			}
 
 			auto instance = it->second->allocator(it->second);
@@ -382,24 +371,22 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::GetProperty: {
 			Value propNameVal = READ_CONSTANT();
 			auto propName = std::get<String>(propNameVal);
-			auto propHash = propName.Hashed();
 
 			Value objVal = Pop();
-			auto typeInfo = GetType(objVal); // Ваша ВМ должна уметь возвращать TypeInfo для String!
+			auto typeInfo = GetType(objVal);
 
 			if (!typeInfo)
 			{
-				std::cerr << "Runtime Error: Value has no type info\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Value has no type info");
 			}
 
-			if (auto it = typeInfo->getters.find(propHash); it != typeInfo->getters.end())
+			if (auto it = typeInfo->getters.find(propName); it != typeInfo->getters.end())
 			{
 				Push(it->second(objVal));
 				break;
 			}
 
-			if (auto it = typeInfo->methods.find(propHash); it != typeInfo->methods.end())
+			if (auto it = typeInfo->methods.find(propName); it != typeInfo->methods.end())
 			{
 				Push(it->second);
 				break;
@@ -408,7 +395,7 @@ InterpreterResult VirtualMachine::Run()
 			if (auto* instPtr = std::get_if<InstancePtr>(&objVal))
 			{
 				auto& instance = *instPtr;
-				if (const auto it = instance->typeInfo->fieldIndexes.find(propHash);
+				if (const auto it = instance->typeInfo->fieldIndexes.find(propName);
 					it != instance->typeInfo->fieldIndexes.end())
 				{
 					Push(instance->fields[it->second]);
@@ -416,30 +403,26 @@ InterpreterResult VirtualMachine::Run()
 				}
 			}
 
-			std::cerr << "Runtime Error: Undefined property '" << propName << "' on type '" << typeInfo->name << "'\n";
-			return InterpreterResult::RuntimeError;
+			EXIT_WITH_ERROR("Runtime Error: Undefined property '" << propName << "' on type '" << typeInfo->name << "'");
 		}
 
 		case OpCode::SetProperty: {
-			Value propNameVal = READ_CONSTANT();
-			auto propNameHash = std::get<String>(propNameVal).Hash();
+			auto& propName = std::get<String>(READ_CONSTANT());
 
 			Value valueToSet = Pop();
 			Value objVal = Pop();
 
 			if (!std::holds_alternative<InstancePtr>(objVal))
 			{
-				std::cerr << "Runtime Error: Only instances have properties.\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Only instances have properties");
 			}
 
 			auto instance = std::get<InstancePtr>(objVal);
-			auto it = instance->typeInfo->fieldIndexes.find(propNameHash);
+			auto it = instance->typeInfo->fieldIndexes.find(propName);
 
 			if (it == instance->typeInfo->fieldIndexes.end())
 			{
-				std::cerr << "Runtime Error: Undefined property.\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Undefined property '" << propName << "'");
 			}
 
 			instance->fields[it->second] = std::move(valueToSet);
@@ -465,8 +448,7 @@ InterpreterResult VirtualMachine::Run()
 
 			if (!std::holds_alternative<Int>(countVal) || !std::holds_alternative<String>(nameVal))
 			{
-				std::cerr << "Runtime Error: Invalid arguments for DefType\n";
-				return InterpreterResult::RuntimeError;
+				EXIT_WITH_ERROR("Runtime Error: Invalid arguments for DefType");
 			}
 
 			auto fieldCount = std::get<Int>(countVal);
@@ -482,8 +464,7 @@ InterpreterResult VirtualMachine::Run()
 				}
 				else
 				{
-					std::cerr << "Runtime Error: Field name must be a string\n";
-					return InterpreterResult::RuntimeError;
+					EXIT_WITH_ERROR("Runtime Error: Field name must be a string");
 				}
 			}
 
@@ -568,7 +549,7 @@ InterpreterResult VirtualMachine::Run()
 			const auto it = m_natives.find(funcName);
 			if (it == m_natives.end())
 			{
-				throw std::runtime_error("Unknown native function " + funcName);
+				EXIT_WITH_ERROR("Unknown native function " + funcName);
 			}
 
 			auto nativeObj = std::make_shared<NativeObject>();
@@ -593,6 +574,29 @@ InterpreterResult VirtualMachine::Run()
 			}
 
 			Push(arr);
+			break;
+		}
+
+		case OpCode::BindMethod: {
+			Value classNameVal = READ_CONSTANT();
+			Value methodNameVal = READ_CONSTANT();
+			Value closureVal = Pop();
+
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: BIND_METHOD expects a closure on the stack");
+			}
+
+			auto className = std::get<String>(classNameVal);
+			auto methodName = std::get<String>(methodNameVal);
+
+			auto it = m_types.find(className);
+			if (it == m_types.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Cannot bind method to unknown class '" << className);
+			}
+
+			it->second->methods[methodName] = std::move(closureVal);
 			break;
 		}
 
@@ -625,7 +629,7 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 		default:
-			return InterpreterResult::RuntimeError;
+			EXIT_WITH_ERROR("Unsupported Opcode" << instruction);
 		}
 	}
 }
