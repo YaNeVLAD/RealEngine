@@ -2,6 +2,7 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
@@ -48,7 +49,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		auto tempNode = std::make_unique<ast::SimpleTypeNode>();
 		tempNode->name = typeArgs[i]->name;
 		typeEnv[tmpl->typeParams[i].name] = tempNode.get();
-		tempNodes.push_back(std::move(tempNode));
+		tempNodes.emplace_back(std::move(tempNode));
 	}
 
 	auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
@@ -56,55 +57,14 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	realFunDecl->name = uniqueName;
 	realFunDecl->typeParams.clear();
 
-	auto funType = std::make_shared<FunctionType>(uniqueName);
-	funType->moduleName = tmpl->moduleName;
-	funType->isVararg = realFunDecl->isVararg;
-	funType->visibility = realFunDecl->visibility;
-	funType->isExternal = tmpl->isExternal;
-
-	for (const auto& p : realFunDecl->parameters)
-	{
-		funType->paramTypes.push_back(TypeResolver::Resolve(p.type.get(), m_context));
-	}
-	funType->returnType = TypeResolver::Resolve(realFunDecl->returnType.get(), m_context);
-
-	if (funType->returnType == nullptr && realFunDecl->isExprBody)
-	{ // On-demand type evaluation
-		m_context.env.PushScope();
-		for (std::size_t j = 0; j < realFunDecl->parameters.size(); ++j)
-		{
-			m_context.env.Define(realFunDecl->parameters[j].name, funType->paramTypes[j], false);
-		}
-
-		const auto prevFun = m_context.location.currentFunction;
-		m_context.location.currentFunction = funType;
-
-		if (realFunDecl->body && !realFunDecl->body->statements.empty())
-		{
-			if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(realFunDecl->body->statements[0].get()))
-				funType->returnType = m_context.evaluateFunctionCallback(retStmt->expr.get());
-		}
-		m_context.location.currentFunction = prevFun;
-		m_context.env.PopScope();
-	}
-	else if (funType->returnType == nullptr && !realFunDecl->isExprBody)
-	{
-		funType->returnType = m_context.tUnit;
-	}
+	auto funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
 
 	m_context.instantiatedFunctions[uniqueName] = funType;
 	m_context.env.Define(uniqueName, funType, true);
-	m_context.allFunctionNames.insert(uniqueName);
 
-	if (funType->isExternal)
-	{
-		m_context.externalFunctions.insert(uniqueName);
-	}
-
-	m_context.m_pendingFunInstantiations.push_back(realFunDecl);
+	m_context.m_pendingFunInstantiations.emplace_back(realFunDecl);
 	m_context.m_instantiatedNodes.insert(realFunDecl);
-
-	m_context.pendingStatements.push_back(std::move(clonedDecl));
+	m_context.pendingStatements.emplace_back(std::move(clonedDecl));
 
 	return funType;
 }

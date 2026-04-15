@@ -2,6 +2,7 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
@@ -120,33 +121,19 @@ inline std::shared_ptr<ClassType> Instantiate(
 		if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 		{
 			const auto mutableFun = const_cast<ast::FunDecl*>(fun);
-			const re::String originalName = mutableFun->name;
-
-			if (mutableFun->parameters.empty() || mutableFun->parameters[0].name != "this")
-			{
-				ast::FunDecl::Parameter thisParam;
-				thisParam.name = "this";
-				auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-				thisTypeNode->name = uniqueName;
-				thisParam.type = std::move(thisTypeNode);
-				mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
-			}
-
-			mutableFun->name = uniqueName + "_" + originalName;
-			m_context.allFunctionNames.insert(mutableFun->name);
+			const re::String originalName = Declaration::InjectThisKeyword(mutableFun, uniqueName);
 
 			if (!mutableFun->typeParams.empty())
 			{
 				if (mutableFun->isOverride)
 				{
-					IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
+					IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override'");
 				}
 
-				auto fnTmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
+				const auto fnTmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
 				fnTmpl->astNode = mutableFun;
 				fnTmpl->typeParams = mutableFun->typeParams;
 				fnTmpl->moduleName = tmpl->moduleName;
-
 				fnTmpl->visibility = mutableFun->visibility;
 				fnTmpl->isExternal = fun->isExternal;
 
@@ -154,87 +141,11 @@ inline std::shared_ptr<ClassType> Instantiate(
 				continue;
 			}
 
-			auto funType = std::make_shared<FunctionType>(mutableFun->name);
-			funType->returnType = TypeResolver::Resolve(mutableFun->returnType.get(), m_context);
-			if (funType->returnType == nullptr && !mutableFun->isExprBody)
-			{
-				funType->returnType = m_context.tUnit;
-			}
-			funType->isVararg = mutableFun->isVararg;
-			for (const auto& [_, type] : mutableFun->parameters)
-			{
-				funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-			}
-
-			if (funType->returnType == nullptr && mutableFun->isExprBody)
-			{ // On-demand type evaluation for expression functions
-				m_context.env.PushScope();
-
-				for (std::size_t j = 0; j < mutableFun->parameters.size(); ++j)
-				{
-					m_context.env.Define(mutableFun->parameters[j].name, funType->paramTypes[j], false);
-				}
-
-				const auto prevFun = m_context.location.currentFunction;
-				m_context.location.currentFunction = funType;
-
-				if (mutableFun->body && !mutableFun->body->statements.empty())
-				{
-					if (const auto retStmt = dynamic_cast<const ast::ReturnStmt*>(mutableFun->body->statements[0].get()))
-					{
-						funType->returnType = m_context.evaluateFunctionCallback(retStmt->expr.get());
-					}
-				}
-
-				m_context.location.currentFunction = prevFun;
-				m_context.env.PopScope();
-			}
-
-			funType->visibility = mutableFun->visibility;
-			funType->isExternal = fun->isExternal;
-
-			if (funType->isExternal)
-			{
-				m_context.externalFunctions.insert(funType->name);
-			}
-
-			bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
-
-			if (mutableFun->isOverride && !existsInBase)
-			{
-				IGNI_SEM_ERR(mutableFun, "Method '" + originalName + "' is marked 'override' but no matching method found in base class '" + classType->baseClass->name + "'");
-			}
-			if (!mutableFun->isOverride && existsInBase)
-			{
-				IGNI_SEM_ERR(mutableFun, "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
-			}
-
-			classType->methods[originalName] = funType;
+			Declaration::Method(mutableFun, originalName, classType, m_context);
 		}
-		else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+		else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 		{
-			const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
-
-			ast::FunDecl::Parameter thisParam;
-			thisParam.name = "this";
-			auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-			thisTypeNode->name = uniqueName;
-			thisParam.type = std::move(thisTypeNode);
-			mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
-
-			mutableCtor->name = uniqueName + "_" + uniqueName;
-			m_context.allFunctionNames.insert(mutableCtor->name);
-
-			auto funType = std::make_shared<FunctionType>(mutableCtor->name);
-			funType->returnType = m_context.tUnit;
-			funType->isVararg = mutableCtor->isVararg;
-			for (const auto& [_, type] : mutableCtor->parameters)
-			{
-				funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-			}
-			funType->isExternal = realClassDecl->isExternal;
-
-			classType->methods[uniqueName] = funType;
+			Declaration::Constructor(ctor, classType, realClassDecl->isExternal, m_context);
 		}
 	}
 

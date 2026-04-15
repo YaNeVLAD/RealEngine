@@ -4,6 +4,7 @@
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
 #include <IgniLang/Semantic/Helpers/CallValidator.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Variable.hpp>
 #include <IgniLang/Semantic/Helpers/Export.hpp>
 #include <IgniLang/Semantic/Helpers/Generic/Class.hpp>
@@ -1044,20 +1045,7 @@ private:
 					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
 						const auto mutableFun = const_cast<ast::FunDecl*>(fun);
-						const re::String originalName = mutableFun->name;
-
-						if (mutableFun->parameters.empty() || mutableFun->parameters[0].name != "this")
-						{
-							ast::FunDecl::Parameter thisParam;
-							thisParam.name = "this";
-							auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-							thisTypeNode->name = classDecl->name;
-							thisParam.type = std::move(thisTypeNode);
-							mutableFun->parameters.insert(mutableFun->parameters.begin(), std::move(thisParam));
-						}
-
-						mutableFun->name = classDecl->name + "_" + originalName;
-						m_context.allFunctionNames.insert(mutableFun->name);
+						const re::String originalName = Declaration::InjectThisKeyword(mutableFun, classDecl->name);
 
 						if (!mutableFun->typeParams.empty())
 						{
@@ -1066,11 +1054,10 @@ private:
 								IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
 							}
 
-							auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
+							const auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
 							tmpl->astNode = mutableFun;
 							tmpl->typeParams = mutableFun->typeParams;
 							tmpl->moduleName = currentModule ? currentModule->name : "global";
-
 							tmpl->visibility = mutableFun->visibility;
 							tmpl->isExternal = fun->isExternal;
 
@@ -1078,98 +1065,39 @@ private:
 							continue;
 						}
 
-						auto funType = std::make_shared<FunctionType>(mutableFun->name);
-						funType->returnType = TypeResolver::Resolve(mutableFun->returnType.get(), m_context);
-						if (funType->returnType == nullptr && !mutableFun->isExprBody)
-						{
-							funType->returnType = m_context.tUnit;
-						}
-						funType->isVararg = mutableFun->isVararg;
-
-						for (const auto& [_, type] : mutableFun->parameters)
-						{
-							funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-						}
-
-						funType->visibility = mutableFun->visibility;
-						funType->moduleName = currentModule ? currentModule->name : "global";
-						funType->isExternal = fun->isExternal;
-
+						auto funType = Declaration::Method(mutableFun, originalName, classType, m_context);
 						if (isGlobal)
 						{
-							m_context.env.Define(mutableFun->name, funType, true);
+							m_context.env.Define(funType->name, funType, true);
 						}
 						else
 						{
-							currentModule->exports[mutableFun->name] = funType;
+							currentModule->exports[funType->name] = funType;
 						}
-
-						classType->methods[originalName] = funType;
 					}
-					else if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+					else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 					{
-						const auto mutableCtor = const_cast<ast::ConstructorDecl*>(ctor);
-
-						ast::FunDecl::Parameter thisParam;
-						thisParam.name = "this";
-						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-						thisTypeNode->name = classDecl->name;
-						thisParam.type = std::move(thisTypeNode);
-						mutableCtor->parameters.insert(mutableCtor->parameters.begin(), std::move(thisParam));
-
-						mutableCtor->name = classDecl->name + "_" + classDecl->name;
-						m_context.allFunctionNames.insert(mutableCtor->name);
-
-						auto funType = std::make_shared<FunctionType>(mutableCtor->name);
-						funType->returnType = m_context.tUnit;
-						funType->isVararg = mutableCtor->isVararg;
-						funType->isExternal = classDecl->isExternal;
-
-						for (const auto& [_, type] : mutableCtor->parameters)
-						{
-							funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-						}
-
-						funType->visibility = mutableCtor->visibility;
-
+						auto funType = Declaration::Constructor(ctor, classType, classDecl->isExternal, m_context);
 						if (isGlobal)
 						{
-							m_context.env.Define(mutableCtor->name, funType, true);
+							m_context.env.Define(funType->name, funType, true);
 						}
 						else
 						{
-							currentModule->exports[mutableCtor->name] = funType;
+							currentModule->exports[funType->name] = funType;
 						}
-
-						classType->methods[classDecl->name] = funType;
 					}
-					else if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+					else if (const auto dtor = dynamic_cast<ast::DestructorDecl*>(member.get()))
 					{
-						const auto mutableDtor = const_cast<ast::DestructorDecl*>(dtor);
-
-						mutableDtor->name = classDecl->name + "_destructor";
-						m_context.allFunctionNames.insert(mutableDtor->name);
-
-						auto funType = std::make_shared<FunctionType>(mutableDtor->name);
-						funType->returnType = m_context.tUnit;
-
-						auto thisTypeNode = std::make_unique<ast::SimpleTypeNode>();
-						thisTypeNode->name = classDecl->name;
-						funType->paramTypes.emplace_back(TypeResolver::Resolve(thisTypeNode.get(), m_context));
-
-						funType->visibility = mutableDtor->visibility;
-						funType->isExternal = classDecl->isExternal;
-
+						auto funType = Declaration::Destructor(dtor, classType, classDecl->isExternal, m_context);
 						if (isGlobal)
 						{
-							m_context.env.Define(mutableDtor->name, funType, true);
+							m_context.env.Define(funType->name, funType, true);
 						}
 						else
 						{
-							currentModule->exports[mutableDtor->name] = funType;
+							currentModule->exports[funType->name] = funType;
 						}
-
-						classType->methods["~" + classDecl->name] = funType;
 					}
 				}
 			}
@@ -1179,10 +1107,9 @@ private:
 				if (!fun->typeParams.empty())
 				{ // Generic non-instantiated function
 					auto tmpl = std::make_shared<GenericFunctionTemplate>(fun->name);
-					tmpl->astNode = fun;
+					tmpl->astNode = const_cast<ast::FunDecl*>(fun);
 					tmpl->typeParams = fun->typeParams;
 					tmpl->moduleName = currentModule ? currentModule->name : "global";
-
 					tmpl->visibility = fun->visibility;
 					tmpl->isExternal = fun->isExternal;
 
@@ -1199,31 +1126,11 @@ private:
 					{
 						m_context.externalFunctions.insert(fun->name);
 					}
-
 					continue;
 				}
 
 				// Non-generic or instantiated function
-				m_context.allFunctionNames.insert(fun->name);
-
-				auto funType = std::make_shared<FunctionType>(fun->name);
-				funType->returnType = TypeResolver::Resolve(fun->returnType.get(), m_context);
-
-				if (funType->returnType == nullptr && !fun->isExprBody)
-				{
-					funType->returnType = m_context.tUnit;
-				}
-
-				funType->isVararg = fun->isVararg;
-
-				for (const auto& [_, type] : fun->parameters)
-				{
-					funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
-				}
-
-				funType->visibility = fun->visibility;
-				funType->moduleName = currentModule ? currentModule->name : "global";
-				funType->isExternal = fun->isExternal;
+				auto funType = Declaration::Function(const_cast<ast::FunDecl*>(fun), m_context, currentModule ? currentModule->name : "global");
 
 				if (isGlobal)
 				{
@@ -1232,11 +1139,6 @@ private:
 				else
 				{
 					currentModule->exports[funType->name] = funType;
-				}
-
-				if (fun->isExternal)
-				{
-					m_context.externalFunctions.insert(fun->name);
 				}
 			}
 		}
