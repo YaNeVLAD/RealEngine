@@ -14,6 +14,15 @@ fun main() {
 		println(item);
 	}
 
+	val matrix: Array<Array<Int>> = arrayOf(arrayOf(1,2,3), arrayOf(1,2,3), arrayOf(1,2,3));
+	//val matrix: Array<Array<Int>> = Array::<Array<Int>>(3);
+	//val matrix: Array<Array<Int>>;
+
+	matrix[0] = arrayOf(1, 2, 3);
+	matrix[1] = arrayOf(1, 2, 3);
+	matrix[2] = arrayOf(1, 2, 3);
+	println(matrix);
+
 	val evens = arr.map(even);
 	val odds = arr.map(odd);
 

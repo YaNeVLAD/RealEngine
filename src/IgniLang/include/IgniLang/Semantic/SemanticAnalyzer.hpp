@@ -387,14 +387,7 @@ public:
 		}
 
 		if (concreteTarget->isExternal)
-		{
-			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
-			{
-				if (!node->isConstructorCall)
-				{
-					id->name = concreteTarget->name;
-				}
-			}
+		{ // Keep external function original name for code generator
 		}
 		else if (isMethodCall || node->isConstructorCall)
 		{

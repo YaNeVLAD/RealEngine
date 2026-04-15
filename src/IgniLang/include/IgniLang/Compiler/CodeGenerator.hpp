@@ -321,7 +321,8 @@ public:
 			m_out << "CALL " << node->staticMethodTarget << " " << (node->arguments.size() + 1) << "\n";
 			return;
 		}
-		else if (node->isConstructorCall)
+
+		if (node->isConstructorCall)
 		{
 			re::String className;
 
@@ -1022,15 +1023,9 @@ private:
 
 	bool IsLocal(const re::String& name) const
 	{
-		for (const auto& key : m_currentLocals | std::views::keys)
-		{
-			if (key == name)
-			{
-				return true;
-			}
-		}
-
-		return false;
+		return std::ranges::any_of(m_currentLocals, [&name](const auto& it) {
+			return it.first == name;
+		});
 	}
 
 	void GenerateFunction(const ast::FunDecl* fun)

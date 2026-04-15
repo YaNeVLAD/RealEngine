@@ -20,22 +20,19 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	}
 
 	re::String uniqueName = tmpl->name;
-	if (!tmpl->isExternal)
+	for (const auto& arg : typeArgs)
 	{
-		for (const auto& arg : typeArgs)
+		if (!arg)
 		{
-			if (!arg)
-			{
-				IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
-			}
-
-			uniqueName = uniqueName + "__" + arg->name;
+			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 		}
 
-		if (m_context.instantiatedFunctions.contains(uniqueName))
-		{
-			return m_context.instantiatedFunctions[uniqueName];
-		}
+		uniqueName = uniqueName + "__" + arg->name;
+	}
+
+	if (m_context.instantiatedFunctions.contains(uniqueName))
+	{
+		return m_context.instantiatedFunctions[uniqueName];
 	}
 
 	ast::TypeEnv typeEnv;

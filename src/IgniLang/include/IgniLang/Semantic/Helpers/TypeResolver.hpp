@@ -108,9 +108,7 @@ inline void ExpectAssignable(const SemanticType* actual, const SemanticType* exp
 {
 	if (!actual->IsAssignableTo(expected))
 	{
-		node
-			? IGNI_SEM_ERR("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""))
-			: throw std::runtime_error("Semantic Error: Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
+		IGNI_SEM_ERR("Type mismatch in " + contextMsg + ". Expected " + expected->name + (expected->isNullable ? "?" : "") + ", got " + actual->name + (actual->isNullable ? "?" : ""));
 	}
 }
 
@@ -131,47 +129,50 @@ inline std::shared_ptr<SemanticType> PromoteMathTypes(const SemanticType* lhs, c
 inline void InferTypeArguments(const std::shared_ptr<SemanticType>& argType,
 	const ast::TypeNode* paramTypeAst,
 	const std::vector<ast::GenericTypeParam>& typeParams,
-	std::vector<std::shared_ptr<SemanticType>>& outConcreteArgs)
+	std::vector<std::shared_ptr<SemanticType>>& outTypeArgs)
 {
 	if (!argType || !paramTypeAst)
 	{
 		return;
 	}
 
-	if (const auto simpleAst = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
+	if (const auto simpleParam = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
 	{
-		for (std::size_t k = 0; k < typeParams.size(); ++k)
-		{ // Basic case: T is T
-			if (typeParams[k].name == simpleAst->name)
+		const auto it = std::ranges::find_if(typeParams,
+			[&](const auto& p) { return p.name == simpleParam->name; });
+
+		if (it != typeParams.end())
+		{ // T = T
+			const std::size_t index = std::distance(typeParams.begin(), it);
+
+			if (!outTypeArgs[index])
 			{
-				if (!outConcreteArgs[k])
-				{
-					outConcreteArgs[k] = argType;
-				}
-				return;
+				outTypeArgs[index] = argType;
 			}
 		}
-
-		if (!simpleAst->typeArgs.empty())
-		{ // Recursive case 1: T is generic argument of Class<T>
+		else if (!simpleParam->typeArgs.empty())
+		{ // T = class <T> or fun <T>
 			if (const auto classType = std::dynamic_pointer_cast<ClassType>(argType))
 			{
-				for (std::size_t i = 0; i < simpleAst->typeArgs.size() && i < classType->typeArguments.size(); ++i)
+				if (classType->typeArguments.size() == simpleParam->typeArgs.size())
 				{
-					InferTypeArguments(classType->typeArguments[i], simpleAst->typeArgs[i].get(), typeParams, outConcreteArgs);
+					for (std::size_t i = 0; i < simpleParam->typeArgs.size(); ++i)
+					{
+						InferTypeArguments(classType->typeArguments[i], simpleParam->typeArgs[i].get(), typeParams, outTypeArgs);
+					}
 				}
 			}
 		}
 	}
-	else if (const auto funAst = dynamic_cast<const ast::FunctionTypeNode*>(paramTypeAst))
-	{ // Recursive case 2: T is generic function argument like callback: (T) -> Unit
+	else if (const auto funParam = dynamic_cast<const ast::FunctionTypeNode*>(paramTypeAst))
+	{ // T = (T, S, ...) -> R
 		if (const auto funType = std::dynamic_pointer_cast<FunctionType>(argType))
 		{
-			for (std::size_t i = 0; i < funAst->paramTypes.size() && i < funType->paramTypes.size(); ++i)
+			for (std::size_t i = 0; i < funParam->paramTypes.size() && i < funType->paramTypes.size(); ++i)
 			{
-				InferTypeArguments(funType->paramTypes[i], funAst->paramTypes[i].get(), typeParams, outConcreteArgs);
+				InferTypeArguments(funType->paramTypes[i], funParam->paramTypes[i].get(), typeParams, outTypeArgs);
 			}
-			InferTypeArguments(funType->returnType, funAst->returnType.get(), typeParams, outConcreteArgs);
+			InferTypeArguments(funType->returnType, funParam->returnType.get(), typeParams, outTypeArgs);
 		}
 	}
 }
