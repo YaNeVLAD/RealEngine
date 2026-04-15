@@ -43,8 +43,8 @@ ClassMemberList -> ClassMemberList ClassMember | \e
 ClassMember -> AnnotationList OptVisibility ClassMemberDecl
 ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
 
-ConstructorDecl -> ident ( OptFormPars ) Block
-DestructorDecl -> ~ ident ( ) Block
+ConstructorDecl -> OptFunMod ident ( OptFormPars ) FunBody
+DestructorDecl -> OptFunMod ~ ident ( ) FunBody
 
 FunDecl -> OptFunMod fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
 FunName -> ident | ident . ident

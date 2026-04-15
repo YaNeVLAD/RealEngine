@@ -4,33 +4,101 @@ fun less(lhs: Any, rhs: Any) = lhs < rhs;
 fun greater(lhs: Any, rhs: Any) = lhs > rhs;
 fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
+//fun min(a: Int, b: Int): Int = if (a < b) a else b;
+//fun max(a: Int, b: Int): Int = if (a > b) a else b;
+//fun abs(value: Int): Int = if (value < 0) -value else value;
+
+//fun min(a: Double, b: Double): Double = if (a < b) a else b;
+//fun max(a: Double, b: Double): Double = if (a > b) a else b;
+//fun abs(value: Double): Double = if (value < 0.0) -value else value;
+
 external fun print(args: Any...): Unit;
 external fun println(args: Any...): Unit;
 
 external class <T> Array(size: Int) {
+
     external val size: Int;
     external val length: Int;
 
     external fun get(index: Int): T;
-    external fun set(index: Int, value: T): Unit;
+
+    fun isEmpty() = this.size == 0;
+    fun isNotEmpty() = this.size != 0;
+
+    fun forEach(action: (T) -> Unit) {
+        for (item in this) {
+            action(item);
+        }
+    }
 
     fun <R> map(mapper: (T) -> R) : Array<R> {
-        val size = this.size;
-        val result = Array::<R>(size);
-
-        for (i in 0..size - 1) {
+        val result = MutableArray::<R>(this.size);
+        for (i in 0..this.size - 1) {
             result[i] = mapper(this[i]);
         }
 
-        return result;
+        return result.toArray();
     }
+
+    fun <R> fold(initial: R, accumulator: (R, T) -> R): R {
+        var current = initial;
+        for (item in this) {
+            current = accumulator(current, item);
+        }
+
+        return current;
+    }
+
+    fun contains(element: T): Bool {
+        for (item in this) {
+            if (item == element) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fun mutate(): MutableArray<T> {
+            val result = MutableArray::<T>(this.size);
+            for (i in 0..this.size - 1) {
+                result[i] = this[i];
+            }
+            return result;
+    }
+
 }
 
+external fun <T> arrayOf(elements: T...): Array<T>;
+
+external class <T> MutableArray(size: Int) : Array<T> {
+
+    external MutableArray(array: Array<T>);
+
+    external fun set(index: Int, value: T): Unit;
+
+	external fun push(value: T): Unit;
+
+	external fun toArray(): Array<T>;
+
+    fun fill(value: T): Unit {
+        for (i in 0..this.size - 1) {
+            this[i] = value;
+        }
+    }
+
+}
+
+external fun <T> mutableArrayOf(elements: T...): MutableArray<T>;
+
 external class String {
+
     external val size: Int;
     external val length: Int;
 
     external fun get(index: Int): String;
-}
 
-external fun <T> arrayOf(elements: T...): Array<T>;
+    fun isEmpty() = this.size == 0;
+    fun isNotEmpty() = this.size != 0;
+
+}

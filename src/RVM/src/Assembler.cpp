@@ -586,7 +586,9 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		const auto varLimitOpt = lexer.next();
 		const auto labelOpt = lexer.next();
 		if (!varIOpt || !varLimitOpt || !labelOpt)
+		{
 			return false;
+		}
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::JmpIfGreaterLocal));
 		outChunk.Write(ResolveVariable(std::string(varIOpt->lexeme)).value());

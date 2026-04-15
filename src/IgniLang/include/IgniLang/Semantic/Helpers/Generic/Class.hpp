@@ -80,6 +80,42 @@ inline std::shared_ptr<ClassType> Instantiate(
 	m_context.instantiatedClasses[uniqueName] = classType;
 
 	m_context.env.Define(uniqueName, classType, true);
+
+	if (realClassDecl->baseClass)
+	{
+		const auto baseType = TypeResolver::Resolve(realClassDecl->baseClass->type.get(), m_context);
+		classType->baseClass = std::dynamic_pointer_cast<ClassType>(baseType);
+
+		if (!classType->baseClass)
+		{
+			IGNI_SEM_ERR(tmpl->astNode, "Base type must be a class");
+		}
+
+		for (const auto& [fieldName, fieldInfo] : classType->baseClass->fields)
+		{ // Copying base class fields
+			classType->fields[fieldName] = fieldInfo;
+		}
+
+		for (const auto& [methodName, methodType] : classType->baseClass->methods)
+		{ // Copying base class methods
+			if (methodName != classType->baseClass->name && methodName[0] != '~')
+			{
+				if (!classType->methods.contains(methodName))
+				{
+					classType->methods[methodName] = methodType;
+				}
+			}
+		}
+	}
+
+	if (!classType->baseClass && classType->name != "Any")
+	{ // Inherit Any
+		if (const Symbol* anySym = m_context.env.Resolve("Any"))
+		{
+			classType->baseClass = std::dynamic_pointer_cast<ClassType>(anySym->type);
+		}
+	}
+
 	for (const auto& member : realClassDecl->members)
 	{
 		if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))

@@ -387,6 +387,27 @@ public:
 			IGNI_INTERNAL_ERR("concreteTarget is null for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
+		if (isSuperCall)
+		{ // super(Args...) constructor call
+			auto thisExpr = std::make_unique<ast::IdentifierExpr>();
+			thisExpr->name = "this";
+			thisExpr->token = node->token;
+
+			const auto thisType = Evaluate(thisExpr.get());
+
+			mutableNode->arguments.insert(mutableNode->arguments.begin(), std::move(thisExpr));
+			argTypes.insert(argTypes.begin(), thisType);
+
+			mutableNode->isConstructorCall = false;
+			isMethodCall = false;
+			mutableNode->staticMethodTarget = concreteTarget->name;
+
+			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
+			{
+				id->name = concreteTarget->name;
+			}
+		}
+
 		if (concreteTarget->isExternal)
 		{ // Keep external function original name for code generator
 		}
@@ -440,13 +461,26 @@ public:
 
 	void Visit(const ast::ConstructorDecl* node) override
 	{
-		if (m_context.m_instantiatedNodes.contains(node))
+		std::shared_ptr<FunctionType> funType;
+		const Symbol* sym = m_context.env.Resolve(node->name);
+
+		const auto currentClass = m_context.location.currentClass;
+		if (sym)
 		{
-			return;
+			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+		}
+		else if (currentClass)
+		{
+			if (const re::String ctorName = currentClass->name; currentClass->methods.contains(ctorName))
+			{
+				funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[ctorName]);
+			}
 		}
 
-		const Symbol* sym = m_context.env.Resolve(node->name);
-		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+		if (!funType)
+		{
+			IGNI_SEM_ERR("Cannot resolve constructor '" + node->name + "'");
+		}
 
 		m_context.env.PushScope();
 
@@ -471,6 +505,10 @@ public:
 		{
 			node->body->Accept(*this);
 		}
+		else if (!node->isExternal)
+		{
+			IGNI_SEM_ERR("Non-external constructor must have a body");
+		}
 
 		m_context.location.currentReturnType = previousReturnType;
 		m_context.location.currentFunction = previousFunctionType;
@@ -479,13 +517,26 @@ public:
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
-		if (m_context.m_instantiatedNodes.contains(node))
+		std::shared_ptr<FunctionType> funType;
+		const Symbol* sym = m_context.env.Resolve(node->name);
+
+		const auto currentClass = m_context.location.currentClass;
+		if (sym)
 		{
-			return;
+			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+		}
+		else if (currentClass)
+		{
+			if (const re::String ctorName = currentClass->name; currentClass->methods.contains(ctorName))
+			{
+				funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[ctorName]);
+			}
 		}
 
-		const Symbol* sym = m_context.env.Resolve(node->name);
-		const auto funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
+		if (!funType)
+		{
+			IGNI_SEM_ERR("Cannot resolve constructor '" + node->name + "'");
+		}
 
 		m_context.env.PushScope();
 
@@ -557,6 +608,17 @@ public:
 				else
 				{
 					IGNI_SEM_ERR("Semantic Error: Cannot assign method '" + memAccess->member + "'");
+				}
+			}
+		}
+		else if (const auto idxAccess = dynamic_cast<const ast::IndexExpr*>(node->target.get()))
+		{
+			const auto arrType = Evaluate(idxAccess->array.get());
+			if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
+			{
+				if (!classType->methods.contains("set"))
+				{
+					IGNI_SEM_ERR("Type '" + classType->name + "' does not support indexed assignment (missing 'set' method)");
 				}
 			}
 		}
@@ -752,11 +814,6 @@ public:
 
 	void Visit(const ast::ClassDecl* node) override
 	{
-		if (m_context.m_instantiatedNodes.contains(node))
-		{
-			return;
-		}
-
 		if (!node->typeParams.empty())
 		{ // Ignore generic classes declarations
 			return;
@@ -1006,6 +1063,47 @@ private:
 				else
 				{ // Extending already defined class
 					isNewClass = false;
+				}
+
+				// clang-format off
+				switch (classDecl->name.Hashed())
+				{
+				case "String"_hs: m_context.tString = classType; break;
+				case "Int"_hs:    m_context.tInt = classType; break;
+				case "Double"_hs: m_context.tDouble = classType; break;
+				case "Bool"_hs:   m_context.tBool = classType; break;
+				case "Any"_hs:    m_context.tAny = classType; break;
+				default: break;
+				}
+				// clang-format on
+
+				classType->moduleName = currentModule ? currentModule->name : "global";
+
+				if (isGlobal && isNewClass)
+				{
+					m_context.env.Define(classDecl->name, classType, true);
+				}
+				else if (!isGlobal)
+				{
+					currentModule->exports[classDecl->name] = classType;
+				}
+
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+					{
+						if (varDecl->type)
+						{
+							classType->fields[varDecl->name] = { TypeResolver::Resolve(varDecl->type.get(), m_context), false, varDecl->visibility };
+						}
+					}
+					else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+					{
+						if (valDecl->type)
+						{
+							classType->fields[valDecl->name] = { TypeResolver::Resolve(valDecl->type.get(), m_context), true, valDecl->visibility };
+						}
+					}
 				}
 
 				m_context.allClassTypes[classDecl->name] = classType;

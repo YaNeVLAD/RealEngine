@@ -37,12 +37,12 @@ struct SemanticContext
 	std::unordered_map<re::String, std::shared_ptr<ClassType>> instantiatedClasses;
 	std::unordered_map<re::String, std::shared_ptr<FunctionType>> instantiatedFunctions;
 
-	std::shared_ptr<PrimitiveType> tInt = std::make_shared<PrimitiveType>("Int");
-	std::shared_ptr<PrimitiveType> tDouble = std::make_shared<PrimitiveType>("Double");
-	std::shared_ptr<PrimitiveType> tBool = std::make_shared<PrimitiveType>("Bool");
+	std::shared_ptr<ClassType> tInt = std::make_shared<ClassType>("Int");
+	std::shared_ptr<ClassType> tDouble = std::make_shared<ClassType>("Double");
+	std::shared_ptr<ClassType> tBool = std::make_shared<ClassType>("Bool");
 	std::shared_ptr<ClassType> tString = std::make_shared<ClassType>("String");
-	std::shared_ptr<PrimitiveType> tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<ClassType> tAny = std::make_shared<ClassType>("Any");
+	std::shared_ptr<PrimitiveType> tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<PrimitiveType> tNull = std::make_shared<PrimitiveType>("Null");
 
 	std::function<std::shared_ptr<ClassType>(

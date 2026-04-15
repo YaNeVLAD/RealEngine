@@ -44,13 +44,17 @@ public:
 
 		m_funcAsmNames.clear();
 		std::size_t funcId = 0;
+
 		std::unordered_set<const ast::FunDecl*> globalFuncs;
+		std::unordered_set<const ast::FunDecl*> ignoredFuncs;
+
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
 				if (!fun->typeParams.empty())
 				{
+					ignoredFuncs.insert(fun);
 					continue;
 				}
 
@@ -60,6 +64,13 @@ public:
 			{
 				if (!classDecl->typeParams.empty())
 				{
+					for (const auto& member : classDecl->members)
+					{
+						if (const auto memberFun = dynamic_cast<const ast::FunDecl*>(member.get()))
+						{
+							ignoredFuncs.insert(memberFun);
+						}
+					}
 					continue;
 				}
 
@@ -75,6 +86,11 @@ public:
 
 		for (const ast::FunDecl* fun : m_flatFunctions)
 		{
+			if (ignoredFuncs.contains(fun))
+			{
+				continue;
+			}
+
 			if (globalFuncs.contains(fun))
 			{
 				m_funcAsmNames[fun] = fun->name;
@@ -125,6 +141,11 @@ public:
 		m_out << "// --- Function Definitions ---\n";
 		for (const ast::FunDecl* fun : m_flatFunctions)
 		{
+			if (ignoredFuncs.contains(fun))
+			{
+				continue;
+			}
+
 			GenerateFunction(fun);
 		}
 
@@ -308,17 +329,25 @@ public:
 	void Visit(const ast::CallExpr* node) override
 	{
 		if (node->isSuperCall)
-		{
-			const auto thisExpr = std::make_unique<ast::IdentifierExpr>();
-			thisExpr->name = "this";
-			thisExpr->Accept(*this);
-
+		{ // Requires 'this' as the first argument
 			for (const auto& arg : node->arguments)
 			{
-				arg->Accept(*this);
+				if (arg)
+				{
+					arg->Accept(*this);
+				}
 			}
 
-			m_out << "CALL " << node->staticMethodTarget << " " << (node->arguments.size() + 1) << "\n";
+			if (node->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+			}
+
+			const std::size_t actualArgs = node->isVarargCall
+				? (node->arguments.size() - node->varargCount + 1)
+				: node->arguments.size();
+
+			m_out << "CALL " << node->staticMethodTarget << " " << actualArgs << "\n";
 			return;
 		}
 

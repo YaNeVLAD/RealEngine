@@ -1,19 +1,26 @@
 package main;
 
-fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool) {
+fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool): Array<T> {
 	val size = arr.size;
+
+	val result = MutableArray::<T>(size);
+    for (k in 0..size - 1) {
+        result[k] = arr[k];
+    }
 
     var i = 0;
     while (i < size - 1) {
         var j = 0;
         while (j < size - i - 1) {
-            if (comp(arr[j + 1], arr[j])) {
-                var temp = arr[j];
-                arr[j] = arr[j + 1];
-                arr[j + 1] = temp;
+            if (comp(result[j + 1], result[j])) {
+                var temp = result[j];
+                result[j] = result[j + 1];
+                result[j + 1] = temp;
             }
             j++;
         }
         i++;
     }
+
+	return result.toArray();
 }

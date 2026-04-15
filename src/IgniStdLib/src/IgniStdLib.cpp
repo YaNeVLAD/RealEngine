@@ -9,35 +9,37 @@
 namespace
 {
 
-void InitArrayMethods(const re::rvm::TypeInfoPtr& arrayType)
+void InitArrayMethods(re::rvm::VirtualMachine* vm, const re::rvm::TypeInfoPtr& arrayType)
 {
 	using namespace re::rvm;
-	arrayType->SetAllocator([](const TypeInfoPtr& type) {
+
+	const auto mutableArrayType = std::make_shared<TypeInfo>("MutableArray");
+	vm->RegisterType(mutableArrayType);
+
+	auto allocator = [](const TypeInfoPtr& type) {
 		auto arr = std::make_shared<ArrayInstance>();
 		arr->typeInfo = type;
-
 		return arr;
-	});
+	};
+	arrayType->SetAllocator(allocator);
+	mutableArrayType->SetAllocator(allocator);
 
 	arrayType->AddNativeMethod("init", -1, [](const std::vector<Value>& args) -> Value {
 		auto arr = std::get<ArrayInstancePtr>(args[0]);
 
 		if (args.size() == 2)
 		{
-			const auto size = std::get<Int>(args[1]);
-			arr->elements.resize(size);
+			if (auto* sizePtr = std::get_if<Int>(&args[1]))
+			{
+				arr->elements.resize(*sizePtr);
+			}
+			else if (auto* otherArrPtr = std::get_if<ArrayInstancePtr>(&args[1]))
+			{
+				arr->elements = (*otherArrPtr)->elements;
+			}
 		}
 
 		return arr;
-	});
-
-	arrayType->AddNativeMethod("set", 2, [](const std::vector<Value>& args) -> Value {
-		const auto arr = std::get<ArrayInstancePtr>(args[0]);
-		const auto index = std::get<Int>(args[1]);
-
-		arr->elements[index] = args[2];
-
-		return Null;
 	});
 
 	arrayType->AddNativeMethod("get", 1, [](const std::vector<Value>& args) -> Value {
@@ -57,6 +59,37 @@ void InitArrayMethods(const re::rvm::TypeInfoPtr& arrayType)
 		const auto arr = std::get<ArrayInstancePtr>(obj);
 
 		return static_cast<Int>(arr->elements.size());
+	});
+
+	mutableArrayType->methods = arrayType->methods;
+	mutableArrayType->getters = arrayType->getters;
+
+	mutableArrayType->AddNativeMethod("set", 2, [](const std::vector<Value>& args) -> Value {
+		const auto arr = std::get<ArrayInstancePtr>(args[0]);
+		const auto index = std::get<Int>(args[1]);
+
+		arr->elements[index] = args[2];
+
+		return Null;
+	});
+
+	mutableArrayType->AddNativeMethod("push", 1, [](const std::vector<Value>& args) -> Value {
+		const auto arr = std::get<ArrayInstancePtr>(args[0]);
+		arr->elements.push_back(args[1]);
+
+		return Null;
+	});
+
+	mutableArrayType->AddNativeMethod("toArray", 0, [arrayType](const std::vector<Value>& args) -> Value {
+		const auto mutArr = std::get<ArrayInstancePtr>(args[0]);
+
+		auto readOnlyArr = std::make_shared<ArrayInstance>();
+
+		readOnlyArr->elements = mutArr->elements;
+
+		readOnlyArr->typeInfo = arrayType;
+
+		return readOnlyArr;
 	});
 }
 
@@ -117,7 +150,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 
 	if (const auto arrayType = vm->GetTypeByName("Array"))
 	{
-		InitArrayMethods(arrayType);
+		InitArrayMethods(vm, arrayType);
 	}
 
 	if (const auto arrayType = vm->GetTypeByName("String"))
@@ -166,7 +199,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		return Null;
 	});
 
-	vm->RegisterNative("arrayOf", [](const std::vector<Value>& args) -> Value {
+	vm->RegisterNative("arrayOf", [vm](const std::vector<Value>& args) -> Value {
 		if (!std::holds_alternative<ArrayInstancePtr>(args[0]))
 		{
 			return Null;
@@ -176,7 +209,22 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		auto returnArr = std::make_shared<ArrayInstance>();
 
 		returnArr->elements = paramArr->elements;
-		returnArr->typeInfo = paramArr->typeInfo;
+		returnArr->typeInfo = vm->GetTypeByName("Array");
+
+		return returnArr;
+	});
+
+	vm->RegisterNative("arrayOf", [vm](const std::vector<Value>& args) -> Value {
+		if (!std::holds_alternative<ArrayInstancePtr>(args[0]))
+		{
+			return Null;
+		}
+
+		const auto paramArr = std::get<ArrayInstancePtr>(args[0]);
+		auto returnArr = std::make_shared<ArrayInstance>();
+
+		returnArr->elements = paramArr->elements;
+		returnArr->typeInfo = vm->GetTypeByName("MutableArray");
 
 		return returnArr;
 	});

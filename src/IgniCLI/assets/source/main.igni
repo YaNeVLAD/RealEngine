@@ -7,8 +7,13 @@ fun square(value: Int): Int {
 fun even(value: Int) = value % 2 == 0;
 fun odd(value: Int) = value % 2 != 0;
 
+class <T> A(value: T) {}
+class <U> B(value: U): A<U>(value) {}
+
 fun main() {
 	val arr = arrayOf(1, 2, 3, 5, 8, 12);
+
+	val b = B(42);
 
 	for (item in arr) {
 		println(item);
@@ -18,9 +23,6 @@ fun main() {
 	//val matrix: Array<Array<Int>> = Array::<Array<Int>>(3);
 	//val matrix: Array<Array<Int>>;
 
-	matrix[0] = arrayOf(1, 2, 3);
-	matrix[1] = arrayOf(1, 2, 3);
-	matrix[2] = arrayOf(1, 2, 3);
 	println(matrix);
 
 	val evens = arr.map(even);
@@ -29,7 +31,6 @@ fun main() {
 	println(evens);
 	println(odds);
 
-	val result = evens + odds;
-	bubbleSort(result, less);
+	val result = bubbleSort(evens + odds, less);
 	println(result);
 }

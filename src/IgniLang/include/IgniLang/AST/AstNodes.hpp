@@ -698,6 +698,7 @@ struct ForStmt final : Visitable<ForStmt, Statement>
 	{
 		auto clone = std::make_unique<ForStmt>();
 		clone->iteratorName = iteratorName;
+		clone->isForEach = isForEach;
 		if (startExpr)
 		{
 			clone->startExpr = startExpr->CloneExpr(env);
@@ -939,7 +940,12 @@ struct ClassDecl final : Visitable<ClassDecl, Decl>
 
 		if (baseClass)
 		{
-			clone->baseClass->type = baseClass->type->Clone(env);
+			clone->baseClass = std::make_unique<BaseClassInit>();
+			if (baseClass->type)
+			{
+				clone->baseClass->type = baseClass->type->Clone(env);
+			}
+
 			for (const auto& arg : baseClass->arguments)
 			{
 				if (arg)
@@ -965,8 +971,10 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 {
 	re::String name;
 	std::vector<FunDecl::Parameter> parameters;
-	bool isVararg = false;
 	std::unique_ptr<Block> body;
+
+	bool isVararg = false;
+	bool isExternal = false;
 
 	void Print(int depth = 0) const override
 	{
@@ -989,6 +997,8 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 		auto clone = std::make_unique<ConstructorDecl>();
 		clone->visibility = visibility;
 		clone->name = name;
+		clone->isExternal = isExternal;
+		clone->isVararg = isVararg;
 		for (const auto& [pName, type] : parameters)
 		{
 			FunDecl::Parameter newP;
@@ -999,7 +1009,6 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 			}
 			clone->parameters.push_back(std::move(newP));
 		}
-		clone->isVararg = isVararg;
 		if (body)
 		{
 			clone->body.reset(dynamic_cast<Block*>(body->CloneStmt(env).release()));
@@ -1014,6 +1023,8 @@ struct DestructorDecl final : Visitable<DestructorDecl, Decl>
 	re::String name;
 	std::unique_ptr<Block> body;
 
+	bool isExternal = false;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
@@ -1026,6 +1037,7 @@ struct DestructorDecl final : Visitable<DestructorDecl, Decl>
 		auto clone = std::make_unique<DestructorDecl>();
 		clone->visibility = visibility;
 		clone->name = name;
+		clone->isExternal = isExternal;
 		if (body)
 		{
 			clone->body.reset(static_cast<Block*>(body->CloneStmt(env).release()));

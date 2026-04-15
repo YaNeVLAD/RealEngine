@@ -9,6 +9,11 @@ namespace igni::sem
 
 [[noreturn]] inline void SemanticError(const ast::Node* node, const re::String& message)
 {
+	if (!node)
+	{
+		throw std::runtime_error("SemanticError: " + message);
+	}
+
 	const re::String location = "[Line: " + std::to_string(node->token.line) + ", Col: " + std::to_string(node->token.column) + "]";
 
 	const re::String fullMessage = location + " Semantic Error: " + message + "\n    Near: '" + std::string(node->token.lexeme) + "'";

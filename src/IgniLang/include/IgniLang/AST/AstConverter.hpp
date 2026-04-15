@@ -336,31 +336,53 @@ private:
 
 			return classDecl;
 		}
-		case "ConstructorDecl"_hs: { // ConstructorDecl -> ident [0] ( [1] OptFormPars [2] ) [3] Block [4]
+		case "ConstructorDecl"_hs: { // ConstructorDecl -> OptFunMod [0] ident [1] ( [2] OptFormPars [3] ) [4] FunBody [5]
 			auto ctorDecl = std::make_unique<ast::ConstructorDecl>();
-			ctorDecl->token = *actualDecl->children[0]->token;
-			ctorDecl->name = actualDecl->children[0]->token->lexeme;
+			ctorDecl->token = *actualDecl->children[1]->token;
+			ctorDecl->name = actualDecl->children[1]->token->lexeme;
+
+			for (const auto& mod : actualDecl->children[0]->children)
+			{
+				if (mod->symbol.Hashed() == "external"_hs)
+				{
+					ctorDecl->isExternal = true;
+				}
+			}
 
 			// Reuse FunDecl for temporary storage
 			ast::FunDecl tempFun;
-			ExtractParameters(actualDecl->children[2].get(), &tempFun);
+			ExtractParameters(actualDecl->children[3].get(), &tempFun);
 
 			ctorDecl->parameters = std::move(tempFun.parameters);
 			ctorDecl->isVararg = tempFun.isVararg;
 
-			const auto& bodyNode = actualDecl->children[4];
-			ctorDecl->body = ConvertBlock(bodyNode.get());
+			if (!ctorDecl->isExternal)
+			{
+				const auto& bodyNode = actualDecl->children[5];
+				ctorDecl->body = ConvertBlock(bodyNode.get());
+			}
 
 			return ctorDecl;
 		}
-		case "DestructorDecl"_hs: {
-			// DestructorDecl -> ~ [0] ident [1] ( ) Block
+		case "DestructorDecl"_hs: { // DestructorDecl -> OptFunMod [0] ~ [1] ident [2] ( [3] ) [4] FunBody [5]
 			auto dtorDecl = std::make_unique<ast::DestructorDecl>();
-			dtorDecl->token = *actualDecl->children[0]->token;
-			dtorDecl->name = actualDecl->children[1]->token->lexeme;
 
-			const auto& bodyNode = actualDecl->children[4];
-			dtorDecl->body = ConvertBlock(bodyNode.get());
+			dtorDecl->token = *actualDecl->children[2]->token;
+			dtorDecl->name = actualDecl->children[2]->token->lexeme;
+
+			for (const auto& mod : actualDecl->children[0]->children)
+			{
+				if (mod->symbol.Hashed() == "external"_hs)
+				{
+					dtorDecl->isExternal = true;
+				}
+			}
+
+			if (!dtorDecl->isExternal)
+			{
+				const auto& bodyNode = actualDecl->children[5];
+				dtorDecl->body = ConvertBlock(bodyNode.get());
+			}
 
 			return dtorDecl;
 		}
