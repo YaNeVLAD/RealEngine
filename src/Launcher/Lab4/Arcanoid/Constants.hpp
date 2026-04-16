@@ -45,4 +45,14 @@ constexpr re::Vector3f LightRot = { -45.f, -45.f, 0.f };
 constexpr re::Vector3f BgPos = { 0.f, -2.f, -5.f };
 constexpr re::Vector3f BgScale = { 25.f, 0.1f, 30.f };
 
+constexpr float BonusDropChance = 0.2f;
+constexpr float BonusDropSpeed = 10.0f;
+constexpr float PowerupDuration = 10.0f;
+
+constexpr float PaddleWidthExpanded = 7.0f;
+constexpr float PaddleWidthShrunk = 2.0f;
+
+constexpr float BallSpeedSlow = 12.0f;
+constexpr float BallSpeedFast = 28.0f;
+
 } // namespace arcanoid::constants

@@ -19,14 +19,62 @@ class ArcanoidGameSystem final : public re::ecs::System
 public:
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
+		UpdateTimers(scene, dt);
 		UpdatePaddle(scene);
 		HandleCollisions(scene);
 		UpdateBallAttached(scene);
-		KeepBallSpeedConstant(scene);
+		ClampBallSpeed(scene);
 		AnimateBallRotation(scene, dt);
 	}
 
 private:
+	static void UpdateTimers(re::ecs::Scene& scene, const float dt)
+	{
+		const auto stateComp = scene.FindComponent<GameStateComponent>();
+		if (!stateComp)
+		{
+			return;
+		}
+
+		if (stateComp->paddleSizeTimer > 0.0f)
+		{
+			stateComp->paddleSizeTimer -= dt;
+			if (stateComp->paddleSizeTimer <= 0.0f)
+			{
+				ResetPaddleSize(scene);
+			}
+		}
+
+		if (stateComp->ballSpeedTimer > 0.0f)
+		{
+			stateComp->ballSpeedTimer -= dt;
+			if (stateComp->ballSpeedTimer <= 0.0f)
+			{
+				ResetBallSpeed(scene);
+			}
+		}
+	}
+
+	static void ResetPaddleSize(re::ecs::Scene& scene)
+	{
+		for (auto&& [entity, transform, paddle] : *scene.CreateView<re::TransformComponent, PaddleComponent>())
+		{
+			paddle.width = constants::PaddleWidth;
+			transform.scale.x = paddle.width;
+			scene.MakeDirty<re::TransformComponent>(entity);
+		}
+	}
+
+	static void ResetBallSpeed(re::ecs::Scene& scene)
+	{
+		for (auto&& [entity, ball, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
+		{
+			ball.speed = constants::BallSpeed;
+			NormalizeSpeed(rb.linearVelocity, ball.speed);
+			rb.isVelocityDirty = true;
+		}
+	}
+
 	static void AnimateBallRotation(re::ecs::Scene& scene, const float dt)
 	{
 		for (auto&& [entity, transform, ball, rb] : *scene.CreateView<re::TransformComponent, BallComponent, re::physics::RigidBody>())
@@ -57,7 +105,7 @@ private:
 		}
 	}
 
-	static void KeepBallSpeedConstant(re::ecs::Scene& scene)
+	static void ClampBallSpeed(re::ecs::Scene& scene)
 	{
 		for (auto&& [entity, ball, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
 		{
@@ -154,6 +202,9 @@ private:
 
 			CheckBallCollision(scene, entityA, entityB);
 			CheckBallCollision(scene, entityB, entityA);
+
+			CheckBonusCollision(scene, entityA, entityB);
+			CheckBonusCollision(scene, entityB, entityA);
 		}
 	}
 
@@ -165,17 +216,28 @@ private:
 		}
 
 		const auto& ball = scene.GetComponent<BallComponent>(ballEntity);
+		if (ball.isAttachedToPaddle)
+		{
+			return;
+		}
+
 		auto& ballRb = scene.GetComponent<re::physics::RigidBody>(ballEntity);
 		const auto& ballTrans = scene.GetComponent<re::TransformComponent>(ballEntity);
 
 		if (scene.HasComponent<BrickComponent>(otherEntity))
 		{
 			auto& brick = scene.GetComponent<BrickComponent>(otherEntity);
+			const auto brickTransform = scene.GetComponent<re::TransformComponent>(otherEntity);
 			brick.health--;
 			if (brick.health <= 0)
 			{
 				scene.DestroyEntity(otherEntity);
 				AddScore(scene, brick.scoreValue);
+			}
+
+			if (static_cast<float>(std::rand()) / RAND_MAX < constants::BonusDropChance)
+			{
+				SpawnBonus(scene, brickTransform.position);
 			}
 		}
 		else if (scene.HasComponent<PaddleComponent>(otherEntity))
@@ -193,7 +255,20 @@ private:
 		}
 		else if (scene.HasComponent<BottomDeathZoneTag>(otherEntity))
 		{
-			LoseLife(scene);
+			int activeBallsCount = 0;
+			for (auto&& [_, __] : *scene.CreateView<BallComponent>())
+			{
+				activeBallsCount++;
+			}
+
+			if (activeBallsCount > 1)
+			{
+				scene.DestroyEntity(ballEntity);
+			}
+			else
+			{
+				LoseLife(scene);
+			}
 		}
 	}
 
@@ -208,23 +283,30 @@ private:
 
 	static void LoseLife(re::ecs::Scene& scene)
 	{
-		for (auto&& [entity, state] : *scene.CreateView<GameStateComponent>())
+		const auto state = scene.FindComponent<GameStateComponent>();
+		if (state)
 		{
-			state.lives--;
-			if (state.lives <= 0)
+			state->lives--;
+			if (state->lives <= 0)
 			{
-				state.lives = constants::StartingLives;
-				state.score = 0;
-				state.currentLevel = 1;
-				state.requestNextLevel = true;
+				state->lives = constants::StartingLives;
+				state->score = 0;
+				state->currentLevel = 1;
+				state->requestNextLevel = true;
 			}
-			break;
+			state->paddleSizeTimer = 0.0f;
+			state->ballSpeedTimer = 0.0f;
 		}
 
-		for (auto&& [entity, ball] : *scene.CreateView<BallComponent>())
+		ResetPaddleSize(scene);
+		ResetBallSpeed(scene);
+
+		for (auto&& [entity, ball, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
 		{
 			ball.isAttachedToPaddle = true;
-			ball.velocity = re::Vector3f::Zero();
+
+			rb.linearVelocity = re::Vector3f::Zero();
+			rb.isVelocityDirty = true;
 		}
 	}
 
@@ -237,6 +319,178 @@ private:
 		}
 
 		state->score += score;
+	}
+
+	static void CheckBonusCollision(re::ecs::Scene& scene, const re::ecs::Entity bonusEntity, const re::ecs::Entity otherEntity)
+	{
+		if (!scene.HasComponent<BonusComponent>(bonusEntity))
+		{
+			return;
+		}
+
+		const auto& [type] = scene.GetComponent<BonusComponent>(bonusEntity);
+
+		if (scene.HasComponent<PaddleComponent>(otherEntity))
+		{
+			ApplyBonus(scene, type);
+			scene.DestroyEntity(bonusEntity);
+		}
+		else if (scene.HasComponent<BottomDeathZoneTag>(otherEntity))
+		{
+			scene.DestroyEntity(bonusEntity);
+		}
+	}
+
+	static void SpawnBonus(re::ecs::Scene& scene, const re::Vector3f& pos)
+	{
+		const auto type = static_cast<BonusType>(std::rand() % 6);
+		re::Color color;
+
+		switch (type) // clang-format off
+		{
+		case BonusType::ExtraLife: color = { 255, 50, 50, 255 }; break;
+		case BonusType::Expand:    color = { 50, 255, 50, 255 }; break;
+		case BonusType::Shrink:    color = { 150, 0, 0, 255 }; break;
+		case BonusType::Slow:      color = { 50, 150, 255, 255 }; break;
+		case BonusType::Fast:      color = { 255, 255, 50, 255 }; break;
+		case BonusType::MultiBall: color = { 50, 255, 255, 255 }; break;
+		} // clang-format on
+
+		std::shared_ptr<re::StaticMesh> mesh;
+		for (auto&& [e, sm] : *scene.CreateView<re::StaticMeshComponent3D>())
+		{
+			mesh = sm.mesh;
+			break;
+		}
+
+		scene.CreateEntity()
+			.Add<BonusComponent>({ type })
+			.Add<re::RigidBodyComponent>({
+				.type = re::physics::BodyType::Kinematic,
+				.collider = { re::physics::ColliderType::Box, { 0.75f, 0.25f, 0.5f } },
+				.friction = 0.f,
+				.gravityFactor = 0.f,
+				.linearVelocity = { 0.f, 0.f, constants::BonusDropSpeed },
+				.isVelocityDirty = true,
+				.isSensor = true,
+			})
+			.Add<re::detail::OpaqueTag>()
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({
+				.position = pos,
+				.scale = { 1.5f, 0.5f, 1.0f },
+			})
+			.Add<re::MaterialComponent>(
+				re::Color{ 50, 50, 50, 255 }, color, re::Color::White, re::Color{ 0, 0, 0, 255 })
+			.Add<re::StaticMeshComponent3D>(mesh);
+	}
+
+	static void ApplyBonus(re::ecs::Scene& scene, const BonusType type)
+	{
+		const auto state = scene.FindComponent<GameStateComponent>();
+		if (!state)
+		{
+			return;
+		}
+
+		switch (type)
+		{
+		case BonusType::ExtraLife:
+			state->lives++;
+			break;
+		case BonusType::Expand:
+			state->paddleSizeTimer = constants::PowerupDuration;
+			for (auto&& [e, t, p] : *scene.CreateView<re::TransformComponent, PaddleComponent>())
+			{
+				p.width = constants::PaddleWidthExpanded;
+				t.scale.x = p.width;
+				scene.MakeDirty<re::TransformComponent>(e);
+			}
+			break;
+		case BonusType::Shrink:
+			state->paddleSizeTimer = constants::PowerupDuration;
+			for (auto&& [e, t, p] : *scene.CreateView<re::TransformComponent, PaddleComponent>())
+			{
+				p.width = constants::PaddleWidthShrunk;
+				t.scale.x = p.width;
+				scene.MakeDirty<re::TransformComponent>(e);
+			}
+			break;
+		case BonusType::Slow:
+			state->ballSpeedTimer = constants::PowerupDuration;
+			for (auto&& [e, b, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
+			{
+				b.speed = constants::BallSpeedSlow;
+				NormalizeSpeed(rb.linearVelocity, b.speed);
+				rb.isVelocityDirty = true;
+			}
+			break;
+		case BonusType::Fast:
+			state->ballSpeedTimer = constants::PowerupDuration;
+			for (auto&& [e, b, rb] : *scene.CreateView<BallComponent, re::physics::RigidBody>())
+			{
+				b.speed = constants::BallSpeedFast;
+				NormalizeSpeed(rb.linearVelocity, b.speed);
+				rb.isVelocityDirty = true;
+			}
+			break;
+		case BonusType::MultiBall:
+			SpawnMultiBalls(scene);
+			break;
+		}
+	}
+
+	static void SpawnMultiBalls(re::ecs::Scene& scene)
+	{
+		struct BallData
+		{
+			re::TransformComponent t;
+			BallComponent b;
+			re::Vector3f vel;
+			std::shared_ptr<re::StaticMesh> mesh;
+			re::MaterialComponent mat;
+		};
+		std::vector<BallData> clones;
+
+		for (auto&& [e, t, b, rb, sm, mat] : *scene.CreateView<re::TransformComponent, BallComponent, re::physics::RigidBody, re::StaticMeshComponent3D, re::MaterialComponent>())
+		{
+			if (b.isAttachedToPaddle)
+			{
+				continue;
+			}
+
+			BallData d1 = { t, b, rb.linearVelocity, sm.mesh, mat };
+			BallData d2 = { t, b, rb.linearVelocity, sm.mesh, mat };
+
+			NormalizeSpeed(d1.vel, b.speed);
+			NormalizeSpeed(d2.vel, b.speed);
+
+			clones.push_back(d1);
+			clones.push_back(d2);
+		}
+
+		for (const auto& [transform, ball, vel, mesh, material] : clones)
+		{
+			scene.CreateEntity()
+				.Add<BallComponent>(ball)
+				.Add<re::RigidBodyComponent>({
+					.type = re::physics::BodyType::Dynamic,
+					.collider = { .type = re::physics::ColliderType::Sphere, .radius = constants::BallRadius },
+					.friction = 0.0f,
+					.restitution = 1.0f,
+					.gravityFactor = 0.0f,
+					.linearDamping = 0.f,
+					.linearVelocity = vel,
+					.lockTranslation = { false, true, false },
+					.lockRotation = re::Vector3(true),
+					.isVelocityDirty = true,
+				})
+				.Add<re::detail::OpaqueTag>()
+				.Add<re::Dirty<re::TransformComponent>>()
+				.Add<re::TransformComponent>(transform)
+				.Add<re::MaterialComponent>(material)
+				.Add<re::StaticMeshComponent3D>(mesh);
+		}
 	}
 };
 

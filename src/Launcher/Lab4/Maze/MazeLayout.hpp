@@ -151,7 +151,7 @@ private:
 							.collider = { .type = re::physics::ColliderType::Capsule, .radius = 0.4f, .height = 1.0f },
 							.mass = 80.0f,
 							.friction = 0.0f,
-							.lockRotation = true })
+							.lockRotation = re::Vector3(true) })
 						.Add<MazePlayerStateComponent>()
 						.Add<re::MouseLookComponent>()
 						.Add<re::LightComponent>(re::LightComponent::CreateSpotlight(re::Color{ 255, 255, 240, 255 }, 60.0f, 2.0f));

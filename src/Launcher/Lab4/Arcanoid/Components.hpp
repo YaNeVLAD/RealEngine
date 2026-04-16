@@ -17,7 +17,6 @@ struct PaddleComponent
 
 struct BallComponent
 {
-	re::Vector3f velocity = { 0.f, 0.f, 0.f };
 	float radius = constants::BallRadius;
 	float speed = constants::BallSpeed;
 	bool isAttachedToPaddle = true;
@@ -37,6 +36,23 @@ struct GameStateComponent
 	int lives = constants::StartingLives;
 	int currentLevel = 1;
 	bool requestNextLevel = false;
+	float paddleSizeTimer = 0.0f;
+	float ballSpeedTimer = 0.0f;
 };
 
-} // namespace arkanoid
+enum class BonusType
+{
+	ExtraLife,
+	Expand,
+	Shrink,
+	Slow,
+	Fast,
+	MultiBall
+};
+
+struct BonusComponent
+{
+	BonusType type;
+};
+
+} // namespace arcanoid

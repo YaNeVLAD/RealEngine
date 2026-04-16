@@ -52,7 +52,7 @@ struct MenuLayout final : re::Layout
 			.friction = 0.0f,
 			.gravityFactor = 0.0f,
 			.linearDamping = 10.0f,
-			.lockRotation = true,
+			.lockRotation = re::Vector3(true),
 		});
 
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);

@@ -155,7 +155,8 @@ private:
 				.restitution = 1.0f,
 				.gravityFactor = 0.0f,
 				.linearDamping = 0.f,
-				.lockRotation = true,
+				.lockTranslation = { false, true, false },
+				.lockRotation = re::Vector3(true),
 			})
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::Dirty<re::TransformComponent>>()
@@ -244,6 +245,18 @@ private:
 		for (auto&& [entity, ball] : *scene.CreateView<arcanoid::BallComponent>())
 		{
 			ball.isAttachedToPaddle = true;
+		}
+
+		for (auto&& [entity, bonus] : *scene.CreateView<arcanoid::BonusComponent>())
+		{
+			scene.DestroyEntity(entity);
+		}
+
+		for (auto&& [entity, ball, rb] : *scene.CreateView<arcanoid::BallComponent, re::RigidBodyComponent>())
+		{
+			ball.isAttachedToPaddle = true;
+			rb.linearVelocity = re::Vector3f::Zero();
+			rb.isVelocityDirty = true;
 		}
 
 		const auto tex1 = m_manager.Get<re::Texture>("arcanoid/brick_hp1.png");
