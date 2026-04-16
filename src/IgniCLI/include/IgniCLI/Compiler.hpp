@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IgniLang/Optimization/DeadCodeEliminator.hpp"
+
 #include <IgniLang/AST/AstConverter.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
@@ -99,6 +101,9 @@ public:
 				linkedProgram->statements.push_back(std::move(stmt));
 			}
 		}
+
+		opt::DeadCodeEliminator dce;
+		dce.Eliminate(linkedProgram.get());
 
 		// --- PHASE 4: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
