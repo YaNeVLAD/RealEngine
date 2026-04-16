@@ -28,11 +28,11 @@ public:
 								.Add<arcanoid::GameStateComponent>()
 								.GetEntity();
 
-		for (auto&& [_, transform, camera] : *scene.CreateView<re::TransformComponent, re::CameraComponent>())
-		{
-			transform.position = arcanoid::constants::CameraPos;
-			transform.rotation = arcanoid::constants::CameraRot;
-		}
+		auto camera = scene.FindFirstWith<re::CameraComponent>();
+		auto& transform = camera.Get<re::TransformComponent>();
+
+		transform.position = arcanoid::constants::CameraPos;
+		transform.rotation = arcanoid::constants::CameraRot;
 
 		scene.CreateEntity()
 			.Add<re::Dirty<re::TransformComponent>>()

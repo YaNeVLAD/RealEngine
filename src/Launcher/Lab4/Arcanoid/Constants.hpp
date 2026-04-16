@@ -37,8 +37,8 @@ constexpr float LevelStartZ = -10.0f;
 constexpr float SpacingX = 1.2f;
 constexpr float SpacingZ = 1.2f;
 
-constexpr re::Vector3f CameraPos = { 0.f, 15.f, 22.f };
-constexpr re::Vector3f CameraRot = { -40.f, -90.f, 0.f };
+constexpr re::Vector3f CameraPos = { 0.f, 20, 16.5 };
+constexpr re::Vector3f CameraRot = { -50, 270, 0 };
 constexpr re::Vector3f LightPos = { 0.f, 3.f, 0.f };
 constexpr re::Vector3f LightRot = { -45.f, -45.f, 0.f };
 
