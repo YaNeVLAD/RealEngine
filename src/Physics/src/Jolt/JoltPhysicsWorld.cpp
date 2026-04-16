@@ -125,6 +125,74 @@ public:
 	}
 };
 
+JPH::Vec3 ToJPH(const re::Vector3f& v)
+{
+	return { v.x, v.y, v.z };
+}
+
+re::Vector3f FromJPH(const JPH::Vec3& v)
+{
+	return { v.GetX(), v.GetY(), v.GetZ() };
+}
+
+JPH::RefConst<JPH::Shape> CreateShape(const re::physics::RigidBody& desc)
+{
+	using namespace re::physics;
+
+	switch (desc.collider.type)
+	{
+	case ColliderType::Box: {
+		const JPH::Vec3 scaledExtents(
+			desc.collider.halfExtends.x * std::abs(desc.scale.x),
+			desc.collider.halfExtends.y * std::abs(desc.scale.y),
+			desc.collider.halfExtends.z * std::abs(desc.scale.z));
+		return new JPH::BoxShape(scaledExtents);
+	}
+	case ColliderType::Sphere: {
+		const float maxScale = std::max({ std::abs(desc.scale.x), std::abs(desc.scale.y), std::abs(desc.scale.z) });
+		return new JPH::SphereShape(desc.collider.radius * maxScale);
+	}
+	case ColliderType::Capsule: {
+		const float radiusScale = std::max(std::abs(desc.scale.x), std::abs(desc.scale.z));
+		const float heightScale = std::abs(desc.scale.y);
+		return new JPH::CapsuleShape(desc.collider.height * 0.5f * heightScale, desc.collider.radius * radiusScale);
+	}
+	case ColliderType::ConvexMesh: {
+		RE_ASSERT(desc.collider.vertices && desc.collider.vertexCount > 0, "No vertices provided for ConvexMesh!");
+
+		JPH::Array<JPH::Vec3> joltVertices;
+		joltVertices.reserve(desc.collider.vertexCount);
+		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		{
+			joltVertices.push_back(ToJPH(desc.collider.vertices[i] * desc.scale));
+		}
+		return JPH::ConvexHullShapeSettings(joltVertices).Create().Get();
+	}
+	case ColliderType::TriangleMesh: {
+		RE_ASSERT(desc.collider.vertices && desc.collider.indices, "No data for TriangleMesh!");
+		RE_ASSERT(desc.type == BodyType::Static, "TriangleMesh must be static!");
+
+		JPH::VertexList joltVertices;
+		joltVertices.reserve(desc.collider.vertexCount);
+		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		{
+			joltVertices.push_back(JPH::Float3(
+				desc.collider.vertices[i].x * desc.scale.x,
+				desc.collider.vertices[i].y * desc.scale.y,
+				desc.collider.vertices[i].z * desc.scale.z));
+		}
+		JPH::IndexedTriangleList joltTriangles;
+		for (size_t i = 0; i < desc.collider.indexCount; i += 3)
+		{
+			joltTriangles.push_back({ desc.collider.indices[i], desc.collider.indices[i + 1], desc.collider.indices[i + 2] });
+		}
+		return JPH::MeshShapeSettings(joltVertices, joltTriangles).Create().Get();
+	}
+	default:
+		return nullptr;
+	}
+}
+
 } // namespace
 
 namespace re::physics
@@ -173,85 +241,10 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 {
 	RE_ASSERT(m_state, "JoltState is nullptr. Have you forgot to call JoltPhysicsWorld::Init()?");
 
-	JPH::BodyInterface& bodyInterface = m_state->physicsSystem.GetBodyInterface();
-
-	JPH::RefConst<JPH::Shape> shape;
-
-	// 1. Создаем форму
-	switch (desc.collider.type)
-	{
-	case ColliderType::Box: {
-		JPH::Vec3 scaledExtents(
-			desc.collider.halfExtends.x * std::abs(desc.scale.x),
-			desc.collider.halfExtends.y * std::abs(desc.scale.y),
-			desc.collider.halfExtends.z * std::abs(desc.scale.z));
-		shape = new JPH::BoxShape(scaledExtents);
-
-		break;
-	}
-	case ColliderType::Sphere: {
-		const float maxScale = std::max({ std::abs(desc.scale.x), std::abs(desc.scale.y), std::abs(desc.scale.z) });
-		shape = new JPH::SphereShape(desc.collider.radius * maxScale);
-
-		break;
-	}
-	case ColliderType::Capsule: {
-		const float radiusScale = std::max(std::abs(desc.scale.x), std::abs(desc.scale.z));
-		const float heightScale = std::abs(desc.scale.y);
-		shape = new JPH::CapsuleShape(desc.collider.height * 0.5f * heightScale, desc.collider.radius * radiusScale);
-
-		break;
-	}
-	case ColliderType::ConvexMesh: {
-		RE_ASSERT(desc.collider.vertices && desc.collider.vertexCount > 0, "No vertices provided for ConvexMesh!");
-
-		JPH::Array<JPH::Vec3> joltVertices;
-		joltVertices.reserve(desc.collider.vertexCount);
-		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
-		{
-			// Запекаем скейл прямо в вершины
-			joltVertices.push_back(JPH::Vec3(
-				desc.collider.vertices[i].x * desc.scale.x,
-				desc.collider.vertices[i].y * desc.scale.y,
-				desc.collider.vertices[i].z * desc.scale.z));
-		}
-
-		JPH::ConvexHullShapeSettings convexSettings(joltVertices);
-
-		shape = convexSettings.Create().Get();
-		break;
-	}
-	case ColliderType::TriangleMesh: {
-		RE_ASSERT(desc.collider.vertices && desc.collider.indices, "No data for TriangleMesh!");
-		RE_ASSERT(desc.type == BodyType::Static, "TriangleMesh must be static!");
-
-		JPH::VertexList joltVertices;
-		joltVertices.reserve(desc.collider.vertexCount);
-		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
-		{
-			joltVertices.push_back(JPH::Float3(
-				desc.collider.vertices[i].x * desc.scale.x,
-				desc.collider.vertices[i].y * desc.scale.y,
-				desc.collider.vertices[i].z * desc.scale.z));
-		}
-
-		JPH::IndexedTriangleList joltTriangles;
-		joltTriangles.reserve(desc.collider.indexCount / 3);
-		for (size_t i = 0; i < desc.collider.indexCount; i += 3)
-		{
-			joltTriangles.push_back(JPH::IndexedTriangle(desc.collider.indices[i], desc.collider.indices[i + 1], desc.collider.indices[i + 2]));
-		}
-
-		JPH::MeshShapeSettings meshSettings(joltVertices, joltTriangles);
-
-		shape = meshSettings.Create().Get();
-		break;
-	}
-	}
-
+	const auto shape = CreateShape(desc);
 	auto motionType = JPH::EMotionType::Dynamic;
-	auto layer = Layers::MOVING;
 
+	auto layer = Layers::MOVING;
 	if (desc.type == BodyType::Static)
 	{
 		motionType = JPH::EMotionType::Static;
@@ -262,40 +255,37 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		motionType = JPH::EMotionType::Kinematic;
 	}
 
-	const float radX = JPH::DegreesToRadians(desc.rotationEuler.x);
-	const float radY = JPH::DegreesToRadians(desc.rotationEuler.y);
-	const float radZ = JPH::DegreesToRadians(desc.rotationEuler.z);
-	const JPH::Quat rotation = JPH::Quat::sEulerAngles(JPH::Vec3(radX, radY, radZ));
+	const JPH::Quat rotation = JPH::Quat::sEulerAngles(ToJPH(desc.rotationEuler) * (std::numbers::phi_v<float> / 180.0f));
 
-	JPH::BodyCreationSettings bodySettings(
-		shape,
-		JPH::Vec3(desc.position.x, desc.position.y, desc.position.z),
-		rotation,
-		motionType,
-		layer);
+	JPH::BodyCreationSettings settings(shape, ToJPH(desc.position), rotation, motionType, layer);
 
-	bodySettings.mUserData = desc.entityId;
-	bodySettings.mGravityFactor = desc.gravityFactor;
-	bodySettings.mIsSensor = desc.isSensor;
-	bodySettings.mLinearDamping = desc.linearDamping;
+	settings.mUserData = desc.entityId;
+	settings.mGravityFactor = desc.gravityFactor;
+	settings.mIsSensor = desc.isSensor;
+	settings.mLinearDamping = desc.linearDamping;
+	settings.mFriction = desc.friction;
+	settings.mRestitution = desc.restitution;
 
-	if (desc.lockRotation)
-	{
-		bodySettings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationY | JPH::EAllowedDOFs::TranslationZ;
-	}
+	auto degreesOfFreedom = JPH::EAllowedDOFs::All;
 
-	bodySettings.mFriction = desc.friction;
-	bodySettings.mRestitution = desc.restitution;
+	// clang-format off
+	if (desc.lockTranslation.x) degreesOfFreedom &= ~JPH::EAllowedDOFs::TranslationX;
+	if (desc.lockTranslation.y) degreesOfFreedom &= ~JPH::EAllowedDOFs::TranslationY;
+	if (desc.lockTranslation.z) degreesOfFreedom &= ~JPH::EAllowedDOFs::TranslationZ;
+
+	if (desc.lockRotation.x) degreesOfFreedom &= ~JPH::EAllowedDOFs::RotationX;
+	if (desc.lockRotation.y) degreesOfFreedom &= ~JPH::EAllowedDOFs::RotationY;
+	if (desc.lockRotation.z) degreesOfFreedom &= ~JPH::EAllowedDOFs::RotationZ;
+	// clang-format on
+	settings.mAllowedDOFs = degreesOfFreedom;
 
 	if (desc.type == BodyType::Dynamic)
 	{
-		bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-		bodySettings.mMassPropertiesOverride.mMass = desc.mass;
+		settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+		settings.mMassPropertiesOverride.mMass = desc.mass;
 	}
 
-	const JPH::BodyID bodyID = bodyInterface.CreateAndAddBody(bodySettings, JPH::EActivation::Activate);
-
-	return bodyID.GetIndexAndSequenceNumber();
+	return m_state->physicsSystem.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate).GetIndexAndSequenceNumber();
 }
 
 void JoltPhysicsWorld::DestroyBody(const BodyHandle handle)
@@ -323,8 +313,7 @@ void JoltPhysicsWorld::SetPosition(const BodyHandle handle, const Vector3f& posi
 		return;
 	}
 
-	JPH::BodyInterface& bodyInterface = m_state->physicsSystem.GetBodyInterface();
-	bodyInterface.SetPosition(JPH::BodyID(handle), JPH::Vec3(position.x, position.y, position.z), JPH::EActivation::Activate);
+	m_state->physicsSystem.GetBodyInterface().SetPosition(JPH::BodyID(handle), ToJPH(position), JPH::EActivation::Activate);
 }
 
 Vector3f JoltPhysicsWorld::GetPosition(const BodyHandle handle) const
@@ -336,10 +325,7 @@ Vector3f JoltPhysicsWorld::GetPosition(const BodyHandle handle) const
 		return { 0.f, 0.f, 0.f };
 	}
 
-	const JPH::BodyInterface& bodyInterface = m_state->physicsSystem.GetBodyInterface();
-	const JPH::Vec3 pos = bodyInterface.GetPosition(JPH::BodyID(handle));
-
-	return { pos.GetX(), pos.GetY(), pos.GetZ() };
+	return FromJPH(m_state->physicsSystem.GetBodyInterface().GetPosition(JPH::BodyID(handle)));
 }
 
 void JoltPhysicsWorld::SetLinearVelocity(const BodyHandle handle, const Vector3f& velocity)
@@ -352,12 +338,12 @@ void JoltPhysicsWorld::SetLinearVelocity(const BodyHandle handle, const Vector3f
 	}
 
 	JPH::BodyInterface& bodyInterface = m_state->physicsSystem.GetBodyInterface();
-	bodyInterface.SetLinearVelocity(JPH::BodyID(handle), JPH::Vec3(velocity.x, velocity.y, velocity.z));
 
+	bodyInterface.SetLinearVelocity(JPH::BodyID(handle), ToJPH(velocity));
 	bodyInterface.ActivateBody(JPH::BodyID(handle));
 }
 
-Vector3f JoltPhysicsWorld::GetLinearVelocity(BodyHandle handle) const
+Vector3f JoltPhysicsWorld::GetLinearVelocity(const BodyHandle handle) const
 {
 	RE_ASSERT(m_state, "JoltState is nullptr. Have you forgot to call JoltPhysicsWorld::Init()?");
 
@@ -366,8 +352,22 @@ Vector3f JoltPhysicsWorld::GetLinearVelocity(BodyHandle handle) const
 		return { 0.f, 0.f, 0.f };
 	}
 
-	const JPH::Vec3 vel = m_state->physicsSystem.GetBodyInterface().GetLinearVelocity(JPH::BodyID(handle));
-	return { vel.GetX(), vel.GetY(), vel.GetZ() };
+	return FromJPH(m_state->physicsSystem.GetBodyInterface().GetLinearVelocity(JPH::BodyID(handle)));
+}
+
+void JoltPhysicsWorld::UpdateScale(const BodyHandle handle, const RigidBody& desc)
+{
+	RE_ASSERT(m_state, "JoltState is nullptr");
+	if (handle == INVALID_BODY_HANDLE)
+	{
+		return;
+	}
+
+	const auto shape = CreateShape(desc);
+	if (shape)
+	{
+		m_state->physicsSystem.GetBodyInterface().SetShape(JPH::BodyID(handle), shape, false, JPH::EActivation::Activate);
+	}
 }
 
 std::vector<CollisionPair> JoltPhysicsWorld::GetAndClearCollisions()

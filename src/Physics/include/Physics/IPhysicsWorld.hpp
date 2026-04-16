@@ -28,6 +28,8 @@ public:
 	virtual void SetLinearVelocity(BodyHandle handle, const Vector3f& velocity) = 0;
 	[[nodiscard]] virtual Vector3f GetLinearVelocity(BodyHandle handle) const = 0;
 
+	virtual void UpdateScale(BodyHandle handle, const RigidBody& desc) = 0;
+
 	virtual std::vector<CollisionPair> GetAndClearCollisions() = 0;
 
 	static std::unique_ptr<IPhysicsWorld> Create();

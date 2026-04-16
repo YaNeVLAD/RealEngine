@@ -23,6 +23,8 @@ public:
 	void SetLinearVelocity(BodyHandle handle, const Vector3f& velocity) override;
 	[[nodiscard]] Vector3f GetLinearVelocity(BodyHandle handle) const override;
 
+	void UpdateScale(BodyHandle handle, const RigidBody& desc) override;
+
 	std::vector<CollisionPair> GetAndClearCollisions() override;
 
 private:

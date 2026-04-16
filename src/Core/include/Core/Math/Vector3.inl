@@ -190,6 +190,44 @@ constexpr Vector3<T> operator*(T left, Vector3<T> const& right) noexcept
 }
 
 template <typename T>
+constexpr Vector3<T> operator*(Vector3<T> const& left, Vector3<T> const& right) noexcept
+{
+	return Vector3<T>{ left.x * right.x, left.y * right.y, left.z * right.z };
+}
+
+template <typename T>
+constexpr Vector3<T>& operator*=(Vector3<T>& left, Vector3<T> const& right) noexcept
+{
+	left.x *= right.x;
+	left.y *= right.y;
+	left.z *= right.z;
+
+	return left;
+}
+
+template <typename T>
+constexpr Vector3<T> operator/(Vector3<T> const& left, Vector3<T> const& right) noexcept
+{
+	constexpr static auto ZERO = static_cast<T>(0);
+	RE_ASSERT(right.x != ZERO && right.y != ZERO && right.z != ZERO, "Vector3::operator/= cannot divide by 0");
+
+	return Vector3<T>{ left.x / right.x, left.y / right.y, left.z / right.z };
+}
+
+template <typename T>
+constexpr Vector3<T>& operator/=(Vector3<T>& left, Vector3<T> const& right) noexcept
+{
+	constexpr static auto ZERO = static_cast<T>(0);
+	RE_ASSERT(right.x != ZERO && right.y != ZERO && right.z != ZERO, "Vector3::operator/= cannot divide by 0");
+
+	left.x /= right.x;
+	left.y /= right.y;
+	left.z /= right.z;
+
+	return left;
+}
+
+template <typename T>
 constexpr Vector3<T>& operator*=(Vector3<T>& left, T right) noexcept
 {
 	left.x *= right;
@@ -202,7 +240,7 @@ constexpr Vector3<T>& operator*=(Vector3<T>& left, T right) noexcept
 template <typename T>
 constexpr Vector3<T> operator/(Vector3<T> const& left, T right) noexcept
 {
-	RE_ASSERT(right != 0, "Vector3::operator/ cannot divide by 0");
+	RE_ASSERT(right != static_cast<T>(0), "Vector3::operator/ cannot divide by 0");
 
 	return Vector3<T>{ left.x / right, left.y / right, left.z / right };
 }
@@ -210,7 +248,7 @@ constexpr Vector3<T> operator/(Vector3<T> const& left, T right) noexcept
 template <typename T>
 constexpr Vector3<T>& operator/=(Vector3<T>& left, T right) noexcept
 {
-	RE_ASSERT(right != 0, "Vector3::operator/= cannot divide by 0");
+	RE_ASSERT(right != static_cast<T>(0), "Vector3::operator/= cannot divide by 0");
 
 	left.x /= right;
 	left.y /= right;

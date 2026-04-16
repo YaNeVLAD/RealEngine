@@ -3,11 +3,11 @@
 namespace
 {
 
-bool IsMoved(re::TransformComponent const& transform, re::Vector3f const& newPos)
+bool HasChanged(re::Vector3f const& newValue, re::Vector3f const& oldValue)
 {
-	const bool xPosChanged = std::abs(transform.position.x - newPos.x) > std::numeric_limits<float>::epsilon();
-	const bool yPosChanged = std::abs(transform.position.y - newPos.y) > std::numeric_limits<float>::epsilon();
-	const bool zPosChanged = std::abs(transform.position.z - newPos.z) > std::numeric_limits<float>::epsilon();
+	const bool xPosChanged = std::abs(newValue.x - oldValue.x) > std::numeric_limits<float>::epsilon();
+	const bool yPosChanged = std::abs(newValue.y - oldValue.y) > std::numeric_limits<float>::epsilon();
+	const bool zPosChanged = std::abs(newValue.z - oldValue.z) > std::numeric_limits<float>::epsilon();
 
 	return xPosChanged || yPosChanged || zPosChanged;
 }
@@ -44,21 +44,24 @@ void PhysicsSystem::Update(ecs::Scene& scene, const core::TimeDelta dt)
 
 			rb.handle = m_world->CreateBody(rb);
 		}
-		else
-		{
-			if (scene.HasComponent<Dirty<TransformComponent>>(entity))
-			{
-				if (const auto pos = m_world->GetPosition(rb.handle); IsMoved(transform, pos))
-				{
-					m_world->SetPosition(rb.handle, transform.position);
-				}
-			}
 
-			if (rb.isVelocityDirty)
+		if (scene.HasComponent<Dirty<TransformComponent>>(entity))
+		{
+			if (const auto pos = m_world->GetPosition(rb.handle); HasChanged(transform.position, pos))
 			{
-				m_world->SetLinearVelocity(rb.handle, rb.linearVelocity);
-				rb.isVelocityDirty = false;
+				m_world->SetPosition(rb.handle, transform.position);
 			}
+			if (HasChanged(transform.scale, rb.scale))
+			{
+				rb.scale = transform.scale;
+				m_world->UpdateScale(rb.handle, rb);
+			}
+		}
+
+		if (rb.isVelocityDirty)
+		{
+			m_world->SetLinearVelocity(rb.handle, rb.linearVelocity);
+			rb.isVelocityDirty = false;
 		}
 	}
 
@@ -72,7 +75,7 @@ void PhysicsSystem::Update(ecs::Scene& scene, const core::TimeDelta dt)
 			const Vector3f newPosition = m_world->GetPosition(rb.handle);
 			rb.linearVelocity = m_world->GetLinearVelocity(rb.handle);
 
-			if (IsMoved(transform, newPosition))
+			if (HasChanged(newPosition, transform.position))
 			{
 				transform.position = newPosition;
 

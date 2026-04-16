@@ -8,14 +8,17 @@
 #if defined(_MSC_VER)
 
 #define RE_DEBUG_BREAK() __debugbreak()
+#define RE_ASSUME(cond) __assume(cond)
 
 #elif defined(__GNUC__) || defined(__clang__)
 
 #define RE_DEBUG_BREAK() __builtin_trap()
+#define RE_ASSUME(cond) ((cond) ? static_cast<void>(0) : __builtin_unreachable())
 
 #else
 
 #define RE_DEBUG_BREAK() std::abort()
+#define RE_ASSUME(cond) static_cast<void>(0)
 
 #endif
 
@@ -63,6 +66,7 @@ constexpr void ReportAssertionFailure(
 }
 
 #if defined(RE_DEBUG)
+
 #define RE_ASSERT(expr, ...)                                                                         \
 	do                                                                                               \
 	{                                                                                                \
@@ -71,13 +75,14 @@ constexpr void ReportAssertionFailure(
 			re::detail::ReportAssertionFailure(#expr, std::source_location::current(), __VA_ARGS__); \
 			RE_DEBUG_BREAK();                                                                        \
 		}                                                                                            \
+		RE_ASSUME(expr);                                                                             \
 	} while (false)
+
 #else
-#define RE_ASSERT(expr, ...) \
-	do                       \
-	{                        \
-		(void)sizeof(expr);  \
-	} while (false)
+
+#define RE_ASSERT(expr, ...) RE_ASSUME(expr)
+// #define RE_ASSUME(cond) (void)0
+
 #endif
 
 } // namespace re::detail

@@ -57,8 +57,10 @@ struct RigidBody
 	Vector3f linearVelocity = { 0.f, 0.f, 0.f };
 	Vector3f scale = { 1.f, 1.f, 1.f };
 
+	Vector3<bool> lockTranslation = { false, false, false };
+	Vector3<bool> lockRotation = { false, false, false };
+
 	bool isVelocityDirty = false;
-	bool lockRotation = false;
 	bool isSensor = false;
 
 	std::uint32_t entityId = 0xFFFFFFFF;
