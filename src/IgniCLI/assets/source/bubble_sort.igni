@@ -1,4 +1,4 @@
-package main;
+package program;
 
 fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool): Array<T> {
 	val size = arr.size;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Helpers/Declaration/Overload.hpp"
+
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
@@ -171,6 +173,21 @@ public:
 		{
 			IGNI_SEM_ERR("Undefined variable '" + node->name + "'");
 		}
+
+		if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(sym->type))
+		{
+			if (group->overloads.size() == 1 && group->templates.empty())
+			{
+				m_currentExprType = group->overloads.front();
+
+				const_cast<ast::IdentifierExpr*>(node)->name = group->overloads.front()->isExternal
+					? group->name
+					: group->overloads.front()->name;
+
+				return;
+			}
+		}
+
 		m_currentExprType = sym->type;
 	}
 
@@ -190,6 +207,18 @@ public:
 		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(leftType))
 		{
 			m_currentExprType = MemberResolver::ResolveAccess(classType, node->member, m_context);
+
+			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(m_currentExprType))
+			{
+				if (group->overloads.size() == 1 && group->templates.empty())
+				{
+					m_currentExprType = group->overloads.front();
+
+					const_cast<ast::MemberAccessExpr*>(node)->member = group->overloads.front()->isExternal
+						? group->name
+						: group->overloads.front()->name;
+				}
+			}
 		}
 		else
 		{
@@ -242,10 +271,30 @@ public:
 		{ // allow index access operation to any class with get(Int) method
 			if (const auto it = classType->methods.find("get"); it != classType->methods.end())
 			{
-				if (const auto funType = std::dynamic_pointer_cast<FunctionType>(it->second))
+				if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
 				{
-					m_currentExprType = funType->returnType;
-					return;
+					const std::vector argTypes = { indexType };
+					std::shared_ptr<FunctionType> bestMatch = nullptr;
+					int matchCount = 0;
+
+					for (const auto& overload : group->overloads)
+					{
+						if (CallValidator::IsApplicable(overload.get(), argTypes, true))
+						{
+							bestMatch = overload;
+							matchCount++;
+						}
+					}
+
+					if (matchCount == 1)
+					{
+						m_currentExprType = bestMatch->returnType;
+						return;
+					}
+					if (matchCount > 1)
+					{
+						IGNI_SEM_ERR(node, "Ambiguous indexing: multiple matching 'get' overloads found for type '" + classType->name + "'");
+					}
 				}
 			}
 		}
@@ -285,23 +334,34 @@ public:
 		std::shared_ptr<FunctionType> concreteTarget = nullptr;
 		bool isMethodCall = false;
 
+		auto resolveOverload = [&](const std::shared_ptr<FunctionGroup>& group, bool isMethod) -> std::shared_ptr<FunctionType> {
+			std::shared_ptr<FunctionType> bestMatch = nullptr;
+			int matchCount = 0;
+			for (const auto& overload : group->overloads)
+			{
+				if (CallValidator::IsApplicable(overload.get(), argTypes, isMethod))
+				{
+					bestMatch = overload;
+					matchCount++;
+				}
+			}
+			if (matchCount > 1)
+			{
+				IGNI_SEM_ERR(node, "Ambiguous call: multiple matching overloads found");
+			}
+			return bestMatch;
+		};
+		// ==========================================
+
 		if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(calleeType))
 		{ // Generic class constructor
 			if (explicitTypeArgs.empty())
 			{
 				const ast::ConstructorDecl* ctorAst = nullptr;
-				const auto it = std::ranges::find_if(classTmpl->astNode->members, [](const auto& member) {
-					return dynamic_cast<const ast::ConstructorDecl*>(member.get());
-				});
-				if (it != classTmpl->astNode->members.end())
-				{
-					ctorAst = dynamic_cast<const ast::ConstructorDecl*>(it->get());
-				}
-
 				for (const auto& member : classTmpl->astNode->members)
 				{ // Finding constructor in class members
 					if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-					{
+					{ // TODO: Add generics overload for constructors
 						ctorAst = ctor;
 						break;
 					}
@@ -331,13 +391,18 @@ public:
 					IGNI_SEM_ERR("Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
 				}
 			}
+
 			const auto concreteClass = m_context.instantiateClassCallback(classTmpl, explicitTypeArgs);
 			const auto it = concreteClass->methods.find(concreteClass->name);
 			if (it == concreteClass->methods.end())
 			{
 				IGNI_SEM_ERR("Constructor not found for generic class '" + concreteClass->name + "'");
 			}
-			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
+
+			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
+			{
+				concreteTarget = resolveOverload(group, true);
+			}
 
 			const_cast<ast::CallExpr*>(node)->isConstructorCall = true;
 			isMethodCall = true;
@@ -354,23 +419,43 @@ public:
 			{
 				IGNI_SEM_ERR("Constructor not found for class '" + classType->name + "'");
 			}
-			concreteTarget = std::dynamic_pointer_cast<FunctionType>(it->second);
+
+			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
+			{
+				concreteTarget = resolveOverload(group, true);
+			}
 
 			const_cast<ast::CallExpr*>(node)->isConstructorCall = true;
 			isMethodCall = true;
 		}
-		else if (const auto funTmpl = std::dynamic_pointer_cast<GenericFunctionTemplate>(calleeType))
-		{ // Generic function
+		else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
+		{ // Function or Method call overloads
 			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
-			concreteTarget = CallValidator::ResolveAndInstantiateGeneric(funTmpl, explicitTypeArgs, argTypes, m_context);
+			concreteTarget = resolveOverload(group, isMethodCall);
+
+			if (!concreteTarget && !group->templates.empty())
+			{
+				// TODO: Add generic function instantiation like SFINAE
+				concreteTarget = CallValidator::ResolveAndInstantiateGeneric(group->templates[0], explicitTypeArgs, argTypes, m_context);
+			}
 
 			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
 			{
-				id->name = funTmpl->isExternal ? funTmpl->name : concreteTarget->name;
+				if (concreteTarget)
+				{
+					id->name = concreteTarget->isExternal ? group->name : concreteTarget->name;
+				}
+			}
+			else if (const auto memAccess = dynamic_cast<ast::MemberAccessExpr*>(node->callee.get()))
+			{
+				if (concreteTarget)
+				{
+					memAccess->member = concreteTarget->isExternal ? group->name : concreteTarget->name;
+				}
 			}
 		}
 		else if (const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType))
-		{ // Non-generic function
+		{ // Non-generic function fallback (e.g. lambda variables)
 			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
 			concreteTarget = funType;
 		}
@@ -384,7 +469,7 @@ public:
 
 		if (!concreteTarget)
 		{
-			IGNI_INTERNAL_ERR("concreteTarget is null for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
+			IGNI_SEM_ERR(node, "No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
 		if (isSuperCall)
@@ -462,19 +547,10 @@ public:
 	void Visit(const ast::ConstructorDecl* node) override
 	{
 		std::shared_ptr<FunctionType> funType;
-		const Symbol* sym = m_context.env.Resolve(node->name);
 
-		const auto currentClass = m_context.location.currentClass;
-		if (sym)
+		if (m_context.instantiatedFunctions.contains(node->name))
 		{
-			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
-		}
-		else if (currentClass)
-		{
-			if (const re::String ctorName = currentClass->name; currentClass->methods.contains(ctorName))
-			{
-				funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[ctorName]);
-			}
+			funType = m_context.instantiatedFunctions.at(node->name);
 		}
 
 		if (!funType)
@@ -484,7 +560,6 @@ public:
 
 		m_context.env.PushScope();
 
-		// Parameters including 'this'
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
 			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
@@ -498,7 +573,7 @@ public:
 		const auto previousReturnType = m_context.location.currentReturnType;
 		const auto previousFunctionType = m_context.location.currentFunction;
 
-		m_context.location.currentReturnType = funType->returnType; // Unit
+		m_context.location.currentReturnType = funType->returnType;
 		m_context.location.currentFunction = funType;
 
 		if (node->body)
@@ -518,34 +593,24 @@ public:
 	void Visit(const ast::DestructorDecl* node) override
 	{
 		std::shared_ptr<FunctionType> funType;
-		const Symbol* sym = m_context.env.Resolve(node->name);
 
-		const auto currentClass = m_context.location.currentClass;
-		if (sym)
+		if (m_context.instantiatedFunctions.contains(node->name))
 		{
-			funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
-		}
-		else if (currentClass)
-		{
-			if (const re::String ctorName = currentClass->name; currentClass->methods.contains(ctorName))
-			{
-				funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[ctorName]);
-			}
+			funType = m_context.instantiatedFunctions.at(node->name);
 		}
 
 		if (!funType)
 		{
-			IGNI_SEM_ERR("Cannot resolve constructor '" + node->name + "'");
+			IGNI_SEM_ERR("Cannot resolve destructor '" + node->name + "'");
 		}
 
 		m_context.env.PushScope();
-
 		m_context.env.Define("this", funType->paramTypes[0], false);
 
 		const auto previousReturnType = m_context.location.currentReturnType;
 		const auto previousFunctionType = m_context.location.currentFunction;
 
-		m_context.location.currentReturnType = funType->returnType; // Unit
+		m_context.location.currentReturnType = funType->returnType;
 		m_context.location.currentFunction = funType;
 
 		if (node->body)
@@ -724,13 +789,8 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		if (!node->typeParams.empty())
-		{ // Ignore generic function declarations
-			return;
-		}
-
-		if (node->isExternal)
-		{ // External functions have no body to analyze
+		if (!node->typeParams.empty() || node->isExternal)
+		{ // Ignore generic and external functions
 			return;
 		}
 
@@ -754,23 +814,8 @@ public:
 		}
 		else
 		{ // Global function or Class method
-			const Symbol* sym = m_context.env.Resolve(node->name);
-			if (sym)
+			if (m_context.instantiatedFunctions.contains(node->name))
 			{
-				funType = std::dynamic_pointer_cast<FunctionType>(sym->type);
-			}
-
-			if (!funType && m_context.location.currentClass)
-			{ // Find function in Class methods
-				re::String originalName = node->name.Substring(m_context.location.currentClass->name.Length() + 1);
-				if (m_context.location.currentClass->methods.contains(originalName))
-				{
-					funType = std::dynamic_pointer_cast<FunctionType>(m_context.location.currentClass->methods[originalName]);
-				}
-			}
-
-			if (!funType && m_context.instantiatedFunctions.contains(node->name))
-			{ // Find instantiated function
 				funType = m_context.instantiatedFunctions.at(node->name);
 			}
 
@@ -1149,95 +1194,49 @@ private:
 						{
 							if (mutableFun->isOverride)
 							{
-								IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override' (restricted by monomorphization). Method: '" + originalName + "'");
+								IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override'");
 							}
 
-							const auto tmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
-							tmpl->astNode = mutableFun;
-							tmpl->typeParams = mutableFun->typeParams;
-							tmpl->moduleName = currentModule ? currentModule->name : "global";
-							tmpl->visibility = mutableFun->visibility;
-							tmpl->isExternal = fun->isExternal;
-
-							classType->methods[originalName] = tmpl;
+							auto tmpl = Declaration::GenericFunction(mutableFun, currentModule ? currentModule->name : "global");
+							Declaration::Overload::GenericMethod(classType, originalName, tmpl);
 							continue;
 						}
 
 						auto funType = Declaration::Method(mutableFun, originalName, classType, m_context);
-						if (isGlobal)
-						{
-							m_context.env.Define(funType->name, funType, true);
-						}
-						else
-						{
-							currentModule->exports[funType->name] = funType;
-						}
+						Declaration::Overload::Method(classType, originalName, funType);
 					}
 					else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 					{
 						auto funType = Declaration::Constructor(ctor, classType, classDecl->isExternal, m_context);
-						if (isGlobal)
-						{
-							m_context.env.Define(funType->name, funType, true);
-						}
-						else
-						{
-							currentModule->exports[funType->name] = funType;
-						}
+						Declaration::Overload::Method(classType, classDecl->name, funType);
 					}
 					else if (const auto dtor = dynamic_cast<ast::DestructorDecl*>(member.get()))
 					{
 						auto funType = Declaration::Destructor(dtor, classType, classDecl->isExternal, m_context);
-						if (isGlobal)
-						{
-							m_context.env.Define(funType->name, funType, true);
-						}
-						else
-						{
-							currentModule->exports[funType->name] = funType;
-						}
+						Declaration::Overload::Method(classType, "~" + classDecl->name, funType);
 					}
 				}
 			}
 
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt))
 			{
+				const re::String originalName = fun->name;
+
 				if (!fun->typeParams.empty())
 				{ // Generic non-instantiated function
-					auto tmpl = std::make_shared<GenericFunctionTemplate>(fun->name);
-					tmpl->astNode = const_cast<ast::FunDecl*>(fun);
-					tmpl->typeParams = fun->typeParams;
-					tmpl->moduleName = currentModule ? currentModule->name : "global";
-					tmpl->visibility = fun->visibility;
-					tmpl->isExternal = fun->isExternal;
-
-					if (isGlobal)
-					{
-						m_context.env.Define(fun->name, tmpl, true);
-					}
-					else
-					{
-						currentModule->exports[fun->name] = tmpl;
-					}
-
+					auto tmpl = Declaration::GenericFunction(const_cast<ast::FunDecl*>(fun), currentModule ? currentModule->name : "global");
 					if (fun->isExternal)
 					{
-						m_context.externalFunctions.insert(fun->name);
+						m_context.externalFunctions.insert(originalName);
 					}
+
+					Declaration::Overload::GenericGlobal(originalName, tmpl, m_context, currentModule);
 					continue;
 				}
 
 				// Non-generic or instantiated function
 				auto funType = Declaration::Function(const_cast<ast::FunDecl*>(fun), m_context, currentModule ? currentModule->name : "global");
-
-				if (isGlobal)
-				{
-					m_context.env.Define(funType->name, funType, true);
-				}
-				else
-				{
-					currentModule->exports[funType->name] = funType;
-				}
+				Declaration::Overload::Global(originalName, funType, m_context, currentModule);
 			}
 		}
 

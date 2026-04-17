@@ -1,5 +1,6 @@
 #pragma once
 
+#include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
 #include <stdexcept>
@@ -14,7 +15,7 @@ struct Symbol
 {
 	re::String name;
 	std::shared_ptr<SemanticType> type;
-	bool isReadOnly;
+	bool isReadOnly{};
 };
 
 class Environment
@@ -42,7 +43,7 @@ public:
 	{
 		if (m_scopes.back().contains(name))
 		{
-			throw std::runtime_error("Semantic Error: Variable '" + name + "' is already defined in this scope.");
+			IGNI_SEM_ERR(nullptr, "Variable '" + name + "' is already defined in this scope.");
 		}
 		m_scopes.back()[name] = { name, type, isReadOnly };
 	}

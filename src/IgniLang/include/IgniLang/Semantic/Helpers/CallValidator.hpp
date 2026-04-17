@@ -79,4 +79,40 @@ inline std::shared_ptr<FunctionType> ResolveAndInstantiateGeneric(
 
 	return ctx.instantiateFunctionCallback(funTmpl, concreteArgs);
 }
+
+inline bool IsApplicable(
+	const FunctionType* funType,
+	const std::vector<std::shared_ptr<SemanticType>>& argTypes,
+	const bool isMethodCall)
+{
+	const std::size_t thisOffset = isMethodCall ? 1 : 0;
+
+	if (funType->isVararg)
+	{ // Wrong vararg arguments count
+		if (const std::size_t fixedParams = funType->paramTypes.size() - 1 - thisOffset;
+			argTypes.size() < fixedParams)
+		{
+			return false;
+		}
+	}
+	else if (argTypes.size() + thisOffset != funType->paramTypes.size())
+	{ // Wrong arguments count
+		return false;
+	}
+
+	for (std::size_t i = 0; i < argTypes.size(); ++i)
+	{
+		std::shared_ptr<SemanticType> expectedType = (funType->isVararg && i + thisOffset >= funType->paramTypes.size() - 1)
+			? funType->paramTypes.back()
+			: funType->paramTypes[i + thisOffset];
+
+		if (!argTypes[i]->IsAssignableTo(expectedType.get()))
+		{ // Argument type mismatch
+			return false;
+		}
+	}
+
+	return true;
+}
+
 } // namespace igni::sem::CallValidator

@@ -3,6 +3,7 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Overload.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
@@ -27,7 +28,7 @@ inline std::shared_ptr<ClassType> Instantiate(
 			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 		}
 
-		uniqueName = uniqueName + "__" + arg->name;
+		uniqueName = uniqueName + "@" + arg->name;
 	}
 
 	if (m_context.instantiatedClasses.contains(uniqueName))
@@ -154,34 +155,37 @@ inline std::shared_ptr<ClassType> Instantiate(
 
 			classType->fields[valDecl->name] = { fieldType, false, valDecl->visibility };
 		}
-		if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+		if (const auto fun = dynamic_cast<ast::FunDecl*>(member.get()))
 		{
-			const auto mutableFun = const_cast<ast::FunDecl*>(fun);
-			const re::String originalName = Declaration::InjectThisKeyword(mutableFun, uniqueName);
+			const re::String originalName = Declaration::InjectThisKeyword(fun, classType->name);
 
-			if (!mutableFun->typeParams.empty())
+			if (!fun->typeParams.empty())
 			{
-				if (mutableFun->isOverride)
+				if (fun->isOverride)
 				{
-					IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override'");
+					IGNI_SEM_ERR(fun, "Generic methods cannot be marked 'override'");
 				}
 
-				const auto fnTmpl = std::make_shared<GenericFunctionTemplate>(mutableFun->name);
-				fnTmpl->astNode = mutableFun;
-				fnTmpl->typeParams = mutableFun->typeParams;
-				fnTmpl->moduleName = tmpl->moduleName;
-				fnTmpl->visibility = mutableFun->visibility;
-				fnTmpl->isExternal = fun->isExternal;
-
-				classType->methods[originalName] = fnTmpl;
+				auto generic = Declaration::GenericFunction(fun, classType->moduleName);
+				Declaration::Overload::GenericMethod(classType, originalName, generic);
 				continue;
 			}
+			// ==============================================================
 
-			Declaration::Method(mutableFun, originalName, classType, m_context);
+			auto funType = Declaration::Method(fun, originalName, classType, m_context);
+			Declaration::Overload::Method(classType, originalName, funType);
 		}
 		else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 		{
-			Declaration::Constructor(ctor, classType, realClassDecl->isExternal, m_context);
+			auto funType = Declaration::Constructor(ctor, classType, realClassDecl->isExternal, m_context);
+
+			Declaration::Overload::Method(classType, realClassDecl->name, funType);
+		}
+		else if (const auto dtor = dynamic_cast<ast::DestructorDecl*>(member.get()))
+		{
+			auto funType = Declaration::Destructor(dtor, classType, realClassDecl->isExternal, m_context);
+
+			Declaration::Overload::Method(classType, "~" + realClassDecl->name, funType);
 		}
 	}
 

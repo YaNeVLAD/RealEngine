@@ -26,17 +26,28 @@ re::String InjectThisKeyword(ast::FunDecl* decl, const re::String& className)
 
 std::shared_ptr<FunctionType> Function(ast::FunDecl* decl, SemanticContext& ctx, const re::String& moduleName)
 {
-	auto funType = std::make_shared<FunctionType>(decl->name);
+	re::String mangledName = decl->name;
+	std::vector<std::shared_ptr<SemanticType>> paramTypes;
+
+	for (const auto& [_, type] : decl->parameters)
+	{
+		auto pType = TypeResolver::Resolve(type.get(), ctx);
+		paramTypes.push_back(pType);
+
+		if (!decl->isExternal)
+		{
+			mangledName = mangledName + "@" + pType->name;
+		}
+	}
+
+	decl->name = mangledName;
+
+	auto funType = std::make_shared<FunctionType>(mangledName);
 	funType->moduleName = moduleName;
 	funType->visibility = decl->visibility;
 	funType->isVararg = decl->isVararg;
 	funType->isExternal = decl->isExternal;
-
-	for (const auto& param : decl->parameters)
-	{
-		funType->paramTypes.push_back(TypeResolver::Resolve(param.type.get(), ctx));
-	}
-
+	funType->paramTypes = std::move(paramTypes);
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
 	if (funType->returnType == nullptr && decl->isExprBody)
@@ -72,6 +83,8 @@ std::shared_ptr<FunctionType> Function(ast::FunDecl* decl, SemanticContext& ctx,
 	}
 	ctx.allFunctionNames.insert(funType->name);
 
+	ctx.instantiatedFunctions[funType->name] = funType;
+
 	return funType;
 }
 
@@ -89,7 +102,6 @@ std::shared_ptr<FunctionType> Method(ast::FunDecl* decl, const re::String& origi
 		IGNI_SEM_ERR(decl, "Method '" + originalName + "' hides base class method. Add the 'override' modifier.");
 	}
 
-	classType->methods[originalName] = funType;
 	return funType;
 }
 
@@ -102,22 +114,32 @@ std::shared_ptr<FunctionType> Constructor(ast::ConstructorDecl* decl, const std:
 	thisParam.type = std::move(thisTypeNode);
 	decl->parameters.insert(decl->parameters.begin(), std::move(thisParam));
 
-	decl->name = classType->name + "_" + classType->name;
-	ctx.allFunctionNames.insert(decl->name);
-
-	auto funType = std::make_shared<FunctionType>(decl->name);
-	funType->returnType = ctx.tUnit;
-	funType->isVararg = decl->isVararg;
-	funType->isExternal = isClassExternal;
-	funType->visibility = decl->visibility;
-	funType->moduleName = classType->moduleName;
+	re::String mangledName = classType->name + "_" + classType->name;
+	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 
 	for (const auto& [_, type] : decl->parameters)
 	{
-		funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), ctx));
+		auto pType = TypeResolver::Resolve(type.get(), ctx);
+		paramTypes.push_back(pType);
+
+		if (!isClassExternal && !decl->isExternal)
+		{
+			mangledName = mangledName + "@" + pType->name;
+		}
 	}
 
-	classType->methods[classType->name] = funType;
+	auto funType = std::make_shared<FunctionType>(mangledName);
+	funType->returnType = ctx.tUnit;
+	funType->isVararg = decl->isVararg;
+	funType->isExternal = isClassExternal || decl->isExternal;
+	funType->visibility = decl->visibility;
+	funType->moduleName = classType->moduleName;
+	funType->paramTypes = std::move(paramTypes);
+
+	decl->name = mangledName;
+	ctx.allFunctionNames.insert(mangledName);
+
+	ctx.instantiatedFunctions[mangledName] = funType;
 
 	return funType;
 }
@@ -129,7 +151,7 @@ std::shared_ptr<FunctionType> Destructor(ast::DestructorDecl* decl, const std::s
 
 	auto funType = std::make_shared<FunctionType>(decl->name);
 	funType->returnType = ctx.tUnit;
-	funType->isExternal = isClassExternal;
+	funType->isExternal = isClassExternal || decl->isExternal;
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
 
@@ -137,9 +159,20 @@ std::shared_ptr<FunctionType> Destructor(ast::DestructorDecl* decl, const std::s
 	thisTypeNode->name = classType->name;
 	funType->paramTypes.emplace_back(TypeResolver::Resolve(thisTypeNode.get(), ctx));
 
-	classType->methods["~" + classType->name] = funType;
+	ctx.instantiatedFunctions[decl->name] = funType;
 
 	return funType;
+}
+
+std::shared_ptr<GenericFunctionTemplate> GenericFunction(ast::FunDecl* decl, const re::String& moduleName)
+{
+	auto tmpl = std::make_shared<GenericFunctionTemplate>(decl->name);
+	tmpl->astNode = decl;
+	tmpl->typeParams = decl->typeParams;
+	tmpl->moduleName = moduleName;
+	tmpl->visibility = decl->visibility;
+	tmpl->isExternal = decl->isExternal;
+	return tmpl;
 }
 
 } // namespace igni::sem::Declaration

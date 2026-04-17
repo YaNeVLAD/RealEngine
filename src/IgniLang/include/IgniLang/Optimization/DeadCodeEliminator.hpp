@@ -163,7 +163,7 @@ private:
 			MarkReached(memAccess->member);
 		}
 
-		VISIT_NEXT(node);
+		VISIT_NEXT(node->callee);
 		for (const auto& arg : node->arguments)
 		{
 			VISIT_NEXT(arg);

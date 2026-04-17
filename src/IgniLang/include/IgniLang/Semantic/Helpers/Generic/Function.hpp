@@ -28,7 +28,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 		}
 
-		uniqueName = uniqueName + "__" + arg->name;
+		uniqueName = uniqueName + "@" + arg->name;
 	}
 
 	if (m_context.instantiatedFunctions.contains(uniqueName))

@@ -18,4 +18,6 @@ std::shared_ptr<FunctionType> Constructor(ast::ConstructorDecl* decl, const std:
 
 std::shared_ptr<FunctionType> Destructor(ast::DestructorDecl* decl, const std::shared_ptr<ClassType>& classType, bool isClassExternal, SemanticContext& ctx);
 
+std::shared_ptr<GenericFunctionTemplate> GenericFunction(ast::FunDecl* decl, const re::String& moduleName);
+
 } // namespace igni::sem::Declaration

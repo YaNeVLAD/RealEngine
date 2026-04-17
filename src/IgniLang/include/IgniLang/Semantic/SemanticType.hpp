@@ -185,4 +185,17 @@ struct GenericClassTemplate final : re::utils::Clonable<GenericClassTemplate, Se
 	explicit GenericClassTemplate(const re::String& n) { name = n; }
 };
 
+struct FunctionGroup final : re::utils::Clonable<FunctionGroup, SemanticType>
+{
+	std::vector<std::shared_ptr<FunctionType>> overloads;
+	std::vector<std::shared_ptr<GenericFunctionTemplate>> templates;
+
+	explicit FunctionGroup(const re::String& n) { name = n; }
+
+	bool IsAssignableTo(const SemanticType*) const override
+	{
+		return false;
+	}
+};
+
 } // namespace igni::sem
