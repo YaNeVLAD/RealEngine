@@ -102,10 +102,11 @@ public:
 			}
 		}
 
+		// --- PHASE 4: OPTIMIZATION ---
 		opt::DeadCodeEliminator dce;
 		dce.Eliminate(linkedProgram.get());
 
-		// --- PHASE 4: CODE GENERATION ---
+		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
 		compiler::TextCompiler textCompiler;
 		std::string assembly = textCompiler.Compile(linkedProgram.get(), globalNames, importAliases, externals, semanticAnalyzer);

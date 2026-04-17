@@ -1,4 +1,4 @@
-package main;
+package program;
 
 fun sieve(n: Int) {
     val is_prime = Array::<Bool>(n + 1);

@@ -60,11 +60,11 @@ external class <T> Array(size: Int) {
     }
 
     fun mutate(): MutableArray<T> {
-            val result = MutableArray::<T>(this.size);
-            for (i in 0..this.size - 1) {
-                result[i] = this[i];
-            }
-            return result;
+		val result = MutableArray::<T>(this.size);
+		for (i in 0..this.size - 1) {
+			result[i] = this[i];
+		}
+		return result;
     }
 
 }
@@ -72,8 +72,6 @@ external class <T> Array(size: Int) {
 external fun <T> arrayOf(elements: T...): Array<T>;
 
 external class <T> MutableArray(size: Int) : Array<T> {
-
-    external MutableArray(array: Array<T>);
 
     external fun set(index: Int, value: T): Unit;
 

@@ -94,8 +94,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	fsm::lexer<TokenType, fsm::std_regex_matcher> lexer(source);
 	lexer
-		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*:)", TokenType::Label)
-		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_]*)", TokenType::Identifier)
+		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_<>@]*:)", TokenType::Label)
+		.add_rule(R"([a-zA-Z_][a-zA-Z0-9_<>@]*)", TokenType::Identifier)
 		.add_rule(R"(\-*[0-9]+\.[0-9]+)", TokenType::Double)
 		.add_rule(R"(\-*[0-9]+)", TokenType::Integer)
 		.add_rule(R"("(?:[^"\\]|\\.)*")", TokenType::String)

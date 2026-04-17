@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <Core/String.hpp>
+#include <IgniLang/AST/AstNodes.hpp>
 
 #include <stdexcept>
 
@@ -11,12 +13,18 @@ namespace igni::sem
 {
 	if (!node)
 	{
+		std::cerr << message << std::endl;
+		RE_DEBUG_BREAK();
+
 		throw std::runtime_error("SemanticError: " + message);
 	}
 
 	const re::String location = "[Line: " + std::to_string(node->token.line) + ", Col: " + std::to_string(node->token.column) + "]";
 
 	const re::String fullMessage = location + " Semantic Error: " + message + "\n    Near: '" + std::string(node->token.lexeme) + "'";
+
+	std::cerr << fullMessage << std::endl;
+	RE_DEBUG_BREAK();
 
 	throw std::runtime_error(fullMessage.ToString());
 }
