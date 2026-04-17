@@ -214,11 +214,16 @@ void JoltPhysicsWorld::Init()
 {
 	m_state = std::make_unique<JoltState>();
 
-	constexpr auto MAX_BODIES = 1024;
-	constexpr auto MAX_CONTACTS = 1024;
+	constexpr auto MAX_BODIES = 10240;
+	constexpr auto NUM_BODY_MUTEXES = 0;
+	constexpr JPH::uint MAX_BODY_PAIRS = 65536;
+	constexpr JPH::uint MAX_CONTACT_CONSTRAINTS = 10240;
 
 	m_state->physicsSystem.Init(
-		MAX_BODIES, 0, MAX_CONTACTS, MAX_BODIES,
+		MAX_BODIES,
+		NUM_BODY_MUTEXES,
+		MAX_BODY_PAIRS,
+		MAX_CONTACT_CONSTRAINTS,
 		m_state->bpLayerInterface,
 		m_state->objVsBpFilter,
 		m_state->objPairFilter);
