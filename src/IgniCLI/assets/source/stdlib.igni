@@ -71,7 +71,10 @@ external class <T> Array(size: Int) {
 
 external fun <T> arrayOf(elements: T...): Array<T>;
 
-external class <T> MutableArray(size: Int) : Array<T> {
+external class <T> MutableArray : Array<T> {
+
+	external MutableArray(size: Int);
+	external MutableArray(arr: Array<T>);
 
     external fun set(index: Int, value: T): Unit;
 
