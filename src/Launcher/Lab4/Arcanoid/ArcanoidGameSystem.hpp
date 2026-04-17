@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BonusFactory.hpp"
+
 #include <ECS/Scene.hpp>
 #include <ECS/System/System.hpp>
 #include <Runtime/Components.hpp>
@@ -17,6 +19,8 @@ struct BottomDeathZoneTag
 class ArcanoidGameSystem final : public re::ecs::System
 {
 public:
+	ArcanoidGameSystem() = default;
+
 	void Update(re::ecs::Scene& scene, const re::core::TimeDelta dt) override
 	{
 		UpdateTimers(scene, dt);
@@ -28,6 +32,8 @@ public:
 	}
 
 private:
+	BonusFactory m_bonusFactory;
+
 	static void UpdateTimers(re::ecs::Scene& scene, const float dt)
 	{
 		const auto stateComp = scene.FindComponent<GameStateComponent>();
@@ -84,6 +90,7 @@ private:
 				continue;
 			}
 
+			// Сделать вращение шара зависимым от направления его текущего движения
 			const float spinFactor = constants::BallRotation * dt;
 
 			transform.rotation.x += rb.linearVelocity.z * spinFactor;
@@ -180,7 +187,7 @@ private:
 		}
 	}
 
-	static void HandleCollisions(re::ecs::Scene& scene)
+	void HandleCollisions(re::ecs::Scene& scene)
 	{
 		const auto eventView = scene.CreateView<re::PhysicsEventsComponent>();
 		if (eventView->begin() == eventView->end())
@@ -208,7 +215,7 @@ private:
 		}
 	}
 
-	static void CheckBallCollision(re::ecs::Scene& scene, const re::ecs::Entity ballEntity, const re::ecs::Entity otherEntity)
+	void CheckBallCollision(re::ecs::Scene& scene, const re::ecs::Entity ballEntity, const re::ecs::Entity otherEntity)
 	{
 		if (!scene.HasComponent<BallComponent>(ballEntity))
 		{
@@ -237,7 +244,7 @@ private:
 
 			if (static_cast<float>(std::rand()) / RAND_MAX < constants::BonusDropChance)
 			{
-				SpawnBonus(scene, brickTransform.position);
+				m_bonusFactory.Spawn(scene, brickTransform.position);
 			}
 		}
 		else if (scene.HasComponent<PaddleComponent>(otherEntity))
@@ -341,50 +348,6 @@ private:
 		}
 	}
 
-	static void SpawnBonus(re::ecs::Scene& scene, const re::Vector3f& pos)
-	{
-		const auto type = static_cast<BonusType>(std::rand() % 6);
-		re::Color color;
-
-		switch (type) // clang-format off
-		{
-		case BonusType::ExtraLife: color = { 255, 50, 50, 255 }; break;
-		case BonusType::Expand:    color = { 50, 255, 50, 255 }; break;
-		case BonusType::Shrink:    color = { 150, 0, 0, 255 }; break;
-		case BonusType::Slow:      color = { 50, 150, 255, 255 }; break;
-		case BonusType::Fast:      color = { 255, 255, 50, 255 }; break;
-		case BonusType::MultiBall: color = { 50, 255, 255, 255 }; break;
-		} // clang-format on
-
-		std::shared_ptr<re::StaticMesh> mesh;
-		for (auto&& [e, sm] : *scene.CreateView<re::StaticMeshComponent3D>())
-		{
-			mesh = sm.mesh;
-			break;
-		}
-
-		scene.CreateEntity()
-			.Add<BonusComponent>({ type })
-			.Add<re::RigidBodyComponent>({
-				.type = re::physics::BodyType::Kinematic,
-				.collider = { re::physics::ColliderType::Box, { 0.75f, 0.25f, 0.5f } },
-				.friction = 0.f,
-				.gravityFactor = 0.f,
-				.linearVelocity = { 0.f, 0.f, constants::BonusDropSpeed },
-				.isVelocityDirty = true,
-				.isSensor = true,
-			})
-			.Add<re::detail::OpaqueTag>()
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::TransformComponent>({
-				.position = pos,
-				.scale = { 1.5f, 0.5f, 1.0f },
-			})
-			.Add<re::MaterialComponent>(
-				re::Color{ 50, 50, 50, 255 }, color, re::Color::White, re::Color{ 0, 0, 0, 255 })
-			.Add<re::StaticMeshComponent3D>(mesh);
-	}
-
 	static void ApplyBonus(re::ecs::Scene& scene, const BonusType type)
 	{
 		const auto state = scene.FindComponent<GameStateComponent>();
@@ -435,7 +398,11 @@ private:
 			}
 			break;
 		case BonusType::MultiBall:
-			SpawnMultiBalls(scene);
+			const auto balls = scene.FindEntitiesWith<BallComponent>();
+			if (balls.size() <= 64)
+			{
+				SpawnMultiBalls(scene);
+			}
 			break;
 		}
 	}

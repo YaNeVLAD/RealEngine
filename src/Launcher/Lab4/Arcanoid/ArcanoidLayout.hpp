@@ -76,6 +76,18 @@ public:
 			}
 			LoadLevel(state.currentLevel);
 		}
+
+		m_timeAccumulator += dt;
+		if (m_timeAccumulator >= 1.0f)
+		{
+			const auto title = std::format("Arcanoid | Level: {} | Score: {} | Lives: {}",
+				state.currentLevel,
+				state.score,
+				state.lives);
+
+			m_window.SetTitle(title);
+			m_timeAccumulator = 0.0f;
+		}
 	}
 
 	void OnEvent(re::Event const& event) override
@@ -268,7 +280,7 @@ private:
 		{
 			for (int col = 0; col < MaxCols; ++col)
 			{
-				const int hp = (row > 0 && row % 3 == 0) ? 2 : 1;
+				const int hp = (row > 0 && row % 2 == 0) ? 2 : 1;
 				const auto currentTex = (hp == 2) ? tex2 : tex1;
 
 				scene.CreateEntity()
@@ -290,6 +302,8 @@ private:
 			}
 		}
 	}
+
+	float m_timeAccumulator = 0.0f;
 
 	re::render::IWindow& m_window;
 	re::AssetManager m_manager;

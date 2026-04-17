@@ -45,7 +45,7 @@ constexpr re::Vector3f LightRot = { -45.f, -45.f, 0.f };
 constexpr re::Vector3f BgPos = { 0.f, -2.f, -5.f };
 constexpr re::Vector3f BgScale = { 25.f, 0.1f, 30.f };
 
-constexpr float BonusDropChance = 0.2f;
+constexpr float BonusDropChance = 0.33f;
 constexpr float BonusDropSpeed = 10.0f;
 constexpr float PowerupDuration = 10.0f;
 

@@ -42,7 +42,7 @@ struct GameStateComponent
 
 enum class BonusType
 {
-	ExtraLife,
+	ExtraLife = 1,
 	Expand,
 	Shrink,
 	Slow,
