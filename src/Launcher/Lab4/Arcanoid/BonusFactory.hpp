@@ -17,7 +17,7 @@ namespace arcanoid
 class BonusFactory
 {
 public:
-	explicit BonusFactory() = default;
+	BonusFactory() = default;
 
 	void Spawn(re::ecs::Scene& scene, const re::Vector3f& pos)
 	{
