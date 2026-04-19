@@ -1,8 +1,7 @@
 #pragma once
 
-#include <Core/String.hpp>
+#include <RenderCore/Assets/AssetManager.hpp>
 #include <RenderCore/IWindow.hpp>
-#include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Layout.hpp>
 

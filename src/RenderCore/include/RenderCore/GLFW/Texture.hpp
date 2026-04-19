@@ -2,7 +2,7 @@
 
 #include <RenderCore/Export.hpp>
 
-#include <Core/Assets/IAsset.hpp>
+#include <RenderCore/Assets/IAsset.hpp>
 
 #include <cstdint>
 
@@ -24,7 +24,9 @@ public:
 
 	[[nodiscard]] void* GetNativeHandle();
 
-	bool LoadFromFile(String const& filePath) override;
+	bool LoadFromMemory(const std::uint8_t* data, std::size_t size);
+
+	bool LoadFromFile(String const& filePath, const AssetManager* manager) override;
 
 private:
 	std::uint32_t m_width{};

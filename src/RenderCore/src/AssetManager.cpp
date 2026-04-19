@@ -1,4 +1,4 @@
-#include <Runtime/Assets/AssetManager.hpp>
+#include <RenderCore/Assets/AssetManager.hpp>
 
 namespace re
 {

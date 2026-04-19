@@ -5,6 +5,7 @@
 #include <RenderCore/LoadTexture.hpp>
 
 #include <glad/glad.h>
+#include <stb_image.h>
 
 #include <algorithm>
 #include <fstream>
@@ -75,7 +76,45 @@ void* Texture::GetNativeHandle()
 	return &m_rendererID;
 }
 
-bool Texture::LoadFromFile(String const& filePath)
+bool Texture::LoadFromMemory(const std::uint8_t* data, std::size_t size)
+{
+	int width, height, channels;
+
+	stbi_set_flip_vertically_on_load(true);
+
+	stbi_uc* pixels = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, STBI_rgb_alpha);
+
+	if (!pixels)
+	{
+		std::cerr << "Texture::LoadFromMemory: Failed to decode image from memory!" << std::endl;
+		return false;
+	}
+
+	m_width = static_cast<std::uint32_t>(width);
+	m_height = static_cast<std::uint32_t>(height);
+
+	if (m_rendererID == 0)
+	{
+		glGenTextures(1, &m_rendererID);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_rendererID);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	stbi_image_free(pixels);
+
+	return true;
+}
+
+bool Texture::LoadFromFile(String const& filePath, const AssetManager*)
 {
 	using namespace re::render;
 

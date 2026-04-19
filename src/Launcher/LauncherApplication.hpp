@@ -1,9 +1,10 @@
 #pragma once
 
 #include <Core/Math/Vector3.hpp>
+#include <RenderCore/AnimatedModel.hpp>
+#include <RenderCore/Assets/AssetManager.hpp>
 #include <RenderCore/Model.hpp>
 #include <Runtime/Application.hpp>
-#include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
@@ -153,6 +154,46 @@ struct MenuLayout final : re::Layout
 					.Add<re::StaticMeshComponent3D>(vertices, indices);
 			}
 		}
+
+		const auto animatedModel = m_manager.Get<re::AnimatedModel>("model/Model.glb");
+		if (model)
+		{
+			for (const auto& [vertices, indices, material] : model->GetParts())
+			{
+				std::vector<re::Vector3f> positions;
+				positions.reserve(vertices.size());
+				std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
+					return vertex.position;
+				});
+
+				m_tempCollisionMeshes.push_back(std::move(positions));
+
+				const auto& safePositions = m_tempCollisionMeshes.back();
+
+				scene.CreateEntity()
+					.Add<re::RigidBodyComponent>({
+						.type = re::physics::BodyType::Static,
+						.collider = re::physics::Collider{
+							.type = re::physics::ColliderType::TriangleMesh,
+							.vertices = safePositions.data(),
+							.vertexCount = safePositions.size(),
+							.indices = indices.data(),
+							.indexCount = indices.size(),
+						},
+						.friction = 0.5f,
+						.restitution = 0.f,
+					})
+					.Add<re::Dirty<re::TransformComponent>>()
+					.Add<re::TransformComponent>({
+						.position = { -3.f, -1.f, -5.f },
+						.rotation = { 0.f, 180.f, 0.f },
+						.scale = re::Vector3f(1.f),
+					})
+					.Add<re::detail::OpaqueTag>()
+					.Add<re::MaterialComponent>(material)
+					.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
+		}
 	}
 
 	void OnAttach() override
@@ -244,13 +285,13 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		// AddLayout<MenuLayout>(Window());
+		AddLayout<MenuLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());
-		AddLayout<ArcanoidLayout>(Window());
+		// AddLayout<ArcanoidLayout>(Window());
 
-		SwitchLayout<ArcanoidLayout>();
+		SwitchLayout<MenuLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override

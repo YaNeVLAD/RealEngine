@@ -100,6 +100,39 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(FSM)
 
+# IMGUI
+FetchContent_Declare(
+        imgui_repo
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG v1.91.1
+)
+FetchContent_MakeAvailable(imgui_repo)
+set(IMGUI_SOURCES
+        "${imgui_repo_SOURCE_DIR}/imgui.cpp"
+        "${imgui_repo_SOURCE_DIR}/imgui_draw.cpp"
+        "${imgui_repo_SOURCE_DIR}/imgui_tables.cpp"
+        "${imgui_repo_SOURCE_DIR}/imgui_widgets.cpp"
+        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
+        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+)
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC
+        "${imgui_repo_SOURCE_DIR}"
+        "${imgui_repo_SOURCE_DIR}/backends"
+)
+if (RE_RENDER_BACKEND STREQUAL "GLFW")
+    target_link_libraries(imgui PRIVATE glfw)
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
+endif ()
+
+# TINYGLTF
+FetchContent_Declare(
+        tinygltf
+        GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+        GIT_TAG v3.0.0
+)
+FetchContent_MakeAvailable(tinygltf)
+
 # STB_IMAGE
 set(STB_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
 if (NOT EXISTS "${STB_IMAGE_PATH}/stb_image_impl.cpp")
@@ -126,28 +159,3 @@ if (NOT EXISTS "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 endif ()
 add_library(miniaudio STATIC "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 target_include_directories(miniaudio PUBLIC "${MINIAUDIO_PATH}")
-
-# IMGUI
-FetchContent_Declare(
-        imgui_repo
-        GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.91.1
-)
-FetchContent_MakeAvailable(imgui_repo)
-set(IMGUI_SOURCES
-        "${imgui_repo_SOURCE_DIR}/imgui.cpp"
-        "${imgui_repo_SOURCE_DIR}/imgui_draw.cpp"
-        "${imgui_repo_SOURCE_DIR}/imgui_tables.cpp"
-        "${imgui_repo_SOURCE_DIR}/imgui_widgets.cpp"
-        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
-        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
-)
-add_library(imgui STATIC ${IMGUI_SOURCES})
-target_include_directories(imgui PUBLIC
-        "${imgui_repo_SOURCE_DIR}"
-        "${imgui_repo_SOURCE_DIR}/backends"
-)
-if (RE_RENDER_BACKEND STREQUAL "GLFW")
-    target_link_libraries(imgui PRIVATE glfw)
-    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
-endif ()

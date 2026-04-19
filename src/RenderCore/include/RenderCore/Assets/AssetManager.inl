@@ -1,10 +1,10 @@
-#include <Runtime/Assets/AssetManager.hpp>
+#include <RenderCore/Assets/AssetManager.hpp>
 
 namespace re
 {
 
 template <std::derived_from<IAsset> T>
-std::shared_ptr<T> AssetManager::Get(file_system::AssetsPath const& path)
+std::shared_ptr<T> AssetManager::Get(file_system::AssetsPath const& path) const
 {
 	using namespace re::literals;
 
@@ -15,7 +15,7 @@ std::shared_ptr<T> AssetManager::Get(file_system::AssetsPath const& path)
 	}
 
 	auto newAsset = std::make_shared<T>();
-	if (newAsset->LoadFromFile(str))
+	if (newAsset->LoadFromFile(str, this))
 	{
 		m_assets[str] = newAsset;
 		return newAsset;

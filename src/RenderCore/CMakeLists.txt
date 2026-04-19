@@ -4,6 +4,8 @@ set(COMMON_SOURCES
         src/Mouse.cpp
         src/Model.cpp
         src/TextureLoader.cpp
+        src/AnimatedModel.cpp
+        src/AssetManager.cpp
 )
 
 if (RE_RENDER_BACKEND STREQUAL "GLFW")
@@ -38,6 +40,7 @@ target_link_libraries(ReRenderCore
         stb_image
         stb_image_resize
         tinyobjloader
+        tinygltf
 )
 
 target_compile_definitions(ReRenderCore PRIVATE RE_RENDER_CORE_EXPORTS ${BACKEND_DEFINES})

@@ -33,13 +33,27 @@ void VertexArray::AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuf
 	for (const auto& element : layout.GetElements())
 	{
 		glEnableVertexAttribArray(m_VertexBufferIndex);
-		glVertexAttribPointer(
-			m_VertexBufferIndex,
-			static_cast<int>(element.Count),
-			element.BaseType,
-			element.Normalized ? GL_TRUE : GL_FALSE,
-			static_cast<int>(layout.GetStride()),
-			reinterpret_cast<const void*>(static_cast<uintptr_t>(element.Offset)));
+
+		if (element.BaseType == GL_INT || element.BaseType == GL_UNSIGNED_INT)
+		{
+			glVertexAttribIPointer(
+				m_VertexBufferIndex,
+				static_cast<int>(element.Count),
+				element.BaseType,
+				static_cast<int>(layout.GetStride()),
+				reinterpret_cast<const void*>(static_cast<uintptr_t>(element.Offset)));
+		}
+		else
+		{
+			glVertexAttribPointer(
+				m_VertexBufferIndex,
+				static_cast<int>(element.Count),
+				element.BaseType,
+				element.Normalized ? GL_TRUE : GL_FALSE,
+				static_cast<int>(layout.GetStride()),
+				reinterpret_cast<const void*>(static_cast<uintptr_t>(element.Offset)));
+		}
+
 		m_VertexBufferIndex++;
 	}
 

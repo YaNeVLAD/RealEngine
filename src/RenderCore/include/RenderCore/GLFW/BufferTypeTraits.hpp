@@ -3,6 +3,7 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/Math/Vector3.hpp>
+#include <Core/Math/Vector4.hpp>
 
 #include <glm/glm.hpp>
 
@@ -43,6 +44,9 @@ DECLARE_BUFFER_TRAIT(Vector2i, 2, Type_Int);
 
 DECLARE_BUFFER_TRAIT(Vector3f, 3, Type_Float);
 DECLARE_BUFFER_TRAIT(Vector3i, 3, Type_Int);
+
+DECLARE_BUFFER_TRAIT(Vector4f, 4, Type_Float);
+DECLARE_BUFFER_TRAIT(Vector4i, 4, Type_Int);
 
 DECLARE_BUFFER_TRAIT(Color, 4, Type_UnsignedByte);
 // clang-format on

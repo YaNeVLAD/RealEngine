@@ -18,6 +18,8 @@ constexpr auto s_VertexShaderSource = UR"(
     layout(location = 2) in vec4 a_Color;
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
+	layout(location = 5) in ivec4 a_BoneIDs;
+    layout(location = 6) in vec4 a_BoneWeights;
 
     uniform mat4 u_ViewProjection;
 
@@ -64,6 +66,8 @@ constexpr auto s_VertexShader3D = UR"(
     layout(location = 2) in vec4 a_Color;
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
+	layout(location = 5) in ivec4 a_BoneIDs;
+    layout(location = 6) in vec4 a_BoneWeights;
 
 	uniform mat4 u_ModelViewProjection;
 	uniform mat4 u_ModelMatrix;
@@ -180,8 +184,11 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     layout(location = 2) in vec4 a_Color;
     layout(location = 3) in vec2 a_TexCoord;
     layout(location = 4) in float a_TexIndex;
-    layout(location = 5) in mat4 a_InstanceMatrix;
-    layout(location = 9) in mat4 a_NormalMatrix;
+	layout(location = 5) in ivec4 a_BoneIDs;
+    layout(location = 6) in vec4 a_BoneWeights;
+
+    layout(location = 7) in mat4 a_InstanceMatrix;
+    layout(location = 11) in mat4 a_NormalMatrix;
 
     uniform mat4 u_ViewProjection;
     uniform bool u_HasNonUniformScale;
@@ -433,6 +440,8 @@ void OpenGLRenderAPI::Init()
 	unifiedLayout.Push<Color>("a_Color", true);
 	unifiedLayout.Push<Vector2f>("a_TexCoord");
 	unifiedLayout.Push<float>("a_TexIndex");
+	unifiedLayout.Push<Vector4i>("a_BoneIDs");
+	unifiedLayout.Push<Vector4f>("a_BoneWeights");
 
 	m_BatchVAO = std::make_shared<VertexArray>();
 	m_BatchVBO = std::make_shared<VertexBuffer>(MaxVertices * sizeof(Vertex));
@@ -704,7 +713,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBOId);
 	glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
-	SetupMatrixAttribute(5);
+	SetupMatrixAttribute(7);
 
 	std::vector<glm::mat4> normalMatrices;
 	if (nonUniform)
@@ -717,17 +726,17 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 		glBindBuffer(GL_ARRAY_BUFFER, m_normalVBOId);
 		glBufferData(GL_ARRAY_BUFFER, normalMatrices.size() * sizeof(glm::mat4), normalMatrices.data(), GL_DYNAMIC_DRAW);
-		SetupMatrixAttribute(9);
+		SetupMatrixAttribute(11);
 	}
 
 	DrawWithWireframe(wireframe, [&] {
 		glDrawElementsInstanced(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
 	});
 
-	TeardownMatrixAttribute(5);
+	TeardownMatrixAttribute(7);
 	if (nonUniform)
 	{
-		TeardownMatrixAttribute(9);
+		TeardownMatrixAttribute(11);
 	}
 }
 
@@ -800,12 +809,12 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	mesh->GetVAO()->Bind();
 
 	glBindBuffer(GL_ARRAY_BUFFER, outputSsbo);
-	SetupMatrixAttribute(5);
+	SetupMatrixAttribute(7);
 
 	if (nonUniform)
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, normalSsbo);
-		SetupMatrixAttribute(9);
+		SetupMatrixAttribute(11);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, cmdBuffer);
@@ -827,10 +836,10 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glDepthMask(GL_TRUE);
 	});
 
-	TeardownMatrixAttribute(5);
+	TeardownMatrixAttribute(7);
 	if (nonUniform)
 	{
-		TeardownMatrixAttribute(9);
+		TeardownMatrixAttribute(11);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);

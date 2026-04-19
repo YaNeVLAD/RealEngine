@@ -133,7 +133,7 @@ bool Image::IsEmpty() const
 	return m_data.empty();
 }
 
-bool Image::LoadFromFile(String const& filePath)
+bool Image::LoadFromFile(String const& filePath, const AssetManager*)
 {
 	int w, h, channelsInFile;
 	stbi_uc* pixels = stbi_load(

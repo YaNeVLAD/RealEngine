@@ -1,8 +1,8 @@
 #pragma once
 
+#include <RenderCore/Assets/AssetManager.hpp>
 #include <ECS/Scene.hpp>
 #include <RenderCore/StaticMesh.hpp>
-#include <Runtime/Assets/AssetManager.hpp>
 
 #include "Components.hpp"
 #include "Constants.hpp"

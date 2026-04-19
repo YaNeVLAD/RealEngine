@@ -98,7 +98,7 @@ ParsingResult ParseStandard(const std::string& path)
 	TextureData result;
 
 	re::Image tempImage;
-	if (!tempImage.LoadFromFile(path))
+	if (!tempImage.LoadFromFile(path, nullptr))
 	{
 		return std::unexpected{ "[TextureParser]: Failed to load standard image: " + path };
 	}

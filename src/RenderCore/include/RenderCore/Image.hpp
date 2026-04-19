@@ -2,7 +2,7 @@
 
 #include <RenderCore/Export.hpp>
 
-#include <Core/Assets/IAsset.hpp>
+#include <RenderCore/Assets/IAsset.hpp>
 #include <Core/Math/Color.hpp>
 
 #include <cstdint>
@@ -35,7 +35,7 @@ public:
 
 	[[nodiscard]] bool IsEmpty() const;
 
-	bool LoadFromFile(String const& filePath) override;
+	bool LoadFromFile(String const& filePath, const AssetManager* manager) override;
 
 private:
 	std::uint8_t m_channels = 0;

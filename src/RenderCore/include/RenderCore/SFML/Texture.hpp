@@ -2,7 +2,7 @@
 
 #include <RenderCore/Export.hpp>
 
-#include <Core/Assets/IAsset.hpp>
+#include <RenderCore/Assets/IAsset.hpp>
 
 #include <cstdint>
 #include <memory>

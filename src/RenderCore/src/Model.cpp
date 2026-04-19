@@ -1,6 +1,8 @@
-
-#include <Core/Timer.hpp>
 #include <RenderCore/Model.hpp>
+
+#include "RenderCore/Assets/AssetManager.hpp"
+#include <RenderCore/Material.hpp>
+#include <RenderCore/Vertex.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -27,12 +29,12 @@ re::Color TinyObjColorToColor(const tinyobj::real_t* color)
 namespace re
 {
 
-const std::vector<MeshPart>& Model::GetParts() const
+const std::vector<render::MeshPart>& Model::GetParts() const
 {
 	return m_parts;
 }
 
-bool Model::LoadFromFile(String const& filePath)
+bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 {
 	m_parts.clear();
 
@@ -67,8 +69,6 @@ bool Model::LoadFromFile(String const& filePath)
 	std::vector<Material> engineMaterials;
 	engineMaterials.reserve(materials.size());
 
-	std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
-
 	for (const auto& mat : materials)
 	{
 		Material engineMat{
@@ -81,22 +81,15 @@ bool Model::LoadFromFile(String const& filePath)
 
 		if (!mat.diffuse_texname.empty())
 		{
-			if (std::string texPath = baseDir + mat.diffuse_texname; textureCache.contains(texPath))
+			std::string texPath = baseDir + mat.diffuse_texname;
+			if (auto texture = manager->Get<Texture>(String(texPath)))
 			{
-				engineMat.texture = textureCache[texPath];
+				engineMat.texture = texture;
+				std::cout << "  [Texture Loaded]: " << texPath << std::endl;
 			}
 			else
 			{
-				if (auto texture = std::make_shared<Texture>(); texture->LoadFromFile(texPath))
-				{
-					engineMat.texture = texture;
-					textureCache[texPath] = texture;
-					std::cout << "  [Texture Loaded]: " << texPath << std::endl;
-				}
-				else
-				{
-					std::cerr << "  [Texture Failed]: " << texPath << std::endl;
-				}
+				std::cerr << "  [Texture Failed]: " << texPath << std::endl;
 			}
 		}
 		engineMaterials.emplace_back(engineMat);
@@ -107,7 +100,7 @@ bool Model::LoadFromFile(String const& filePath)
 		engineMaterials.emplace_back();
 	}
 
-	std::unordered_map<int, MeshPart> partsMap;
+	std::unordered_map<int, render::MeshPart> partsMap;
 	std::unordered_map<int, std::unordered_map<Vertex, std::uint32_t>> uniqueVerticesPerPart;
 
 	for (const auto& shape : shapes)

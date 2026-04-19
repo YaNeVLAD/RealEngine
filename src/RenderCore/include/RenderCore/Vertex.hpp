@@ -3,6 +3,7 @@
 #include <Core/Math/Color.hpp>
 #include <Core/Math/Vector2.hpp>
 #include <Core/Math/Vector3.hpp>
+#include <Core/Math/Vector4.hpp>
 
 namespace re
 {
@@ -14,6 +15,9 @@ struct Vertex
 	Color color = Color::White;
 	Vector2f texCoord = { 0.f, 0.f };
 	float texIndex = -1.0f;
+
+	Vector4i boneIDs = Vector4i(-1);
+	Vector4f boneWeights = Vector4f(0.f);
 
 	bool operator==(Vertex const&) const = default;
 };

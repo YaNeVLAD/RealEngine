@@ -2,7 +2,7 @@
 
 #include <RenderCore/Export.hpp>
 
-#include <Core/Assets/IAsset.hpp>
+#include <RenderCore/Assets/IAsset.hpp>
 
 // TODO: Remove SFML dependency from RenderCore API
 #include <SFML/Graphics/Font.hpp>

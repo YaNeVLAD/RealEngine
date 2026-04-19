@@ -25,6 +25,8 @@ StaticMesh::StaticMesh(const std::vector<Vertex>& vertices, const std::vector<st
 	layout.Push<Color>("a_Color", true);
 	layout.Push<Vector2f>("a_TexCoord");
 	layout.Push<float>("a_TexIndex");
+	layout.Push<Vector4i>("a_BoneIDs");
+	layout.Push<Vector4f>("a_BoneWeights");
 
 	m_vao->AddVertexBuffer(m_vbo, layout);
 	m_vao->SetIndexBuffer(m_ebo);

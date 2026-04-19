@@ -1,7 +1,7 @@
 #pragma once
 
+#include <RenderCore/Assets/AssetManager.hpp>
 #include <Runtime/Application.hpp>
-#include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
