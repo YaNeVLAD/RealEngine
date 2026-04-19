@@ -12,6 +12,8 @@
 #include "Lab4/Maze/MazeLayout.hpp"
 #include "Lab4/Piano/PianoLayout.hpp"
 
+#include <imgui.h>
+
 #include "CameraControlSystem.hpp"
 
 struct MenuLayout final : re::Layout
@@ -107,60 +109,80 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		// const auto model = m_manager.Get<re::Model>("model/Model.obj");
-		// if (model)
-		// {
-		// 	for (const auto& [vertices, indices, material] : model->GetParts())
-		// 	{
-		// 		std::vector<re::Vector3f> positions;
-		// 		positions.reserve(vertices.size());
-		// 		std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
-		// 			return vertex.position;
-		// 		});
-		//
-		// 		m_tempCollisionMeshes.push_back(std::move(positions));
-		//
-		// 		const auto& safePositions = m_tempCollisionMeshes.back();
-		//
-		// 		scene.CreateEntity()
-		// 			.Add<re::RigidBodyComponent>({
-		// 				.type = re::physics::BodyType::Static,
-		// 				.collider = re::physics::Collider{
-		// 					.type = re::physics::ColliderType::TriangleMesh,
-		// 					.vertices = safePositions.data(),
-		// 					.vertexCount = safePositions.size(),
-		// 					.indices = indices.data(),
-		// 					.indexCount = indices.size(),
-		// 				},
-		// 				.friction = 0.5f,
-		// 				.restitution = 0.f,
-		// 			})
-		// 			.Add<re::Dirty<re::TransformComponent>>()
-		// 			.Add<re::TransformComponent>({
-		// 				.position = { 0.f, -1.f, -5.f },
-		// 				.rotation = { 0.f, 180.f, 0.f },
-		// 				.scale = { 1.f, 1.f, 1.f },
-		// 			})
-		// 			.Add<re::detail::OpaqueTag>()
-		// 			.Add<re::MaterialComponent>(material)
-		// 			.Add<re::StaticMeshComponent3D>(vertices, indices);
-		// 	}
-		// }
+		const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		if (model)
+		{
+			for (const auto& [vertices, indices, material] : model->GetParts())
+			{
+				std::vector<re::Vector3f> positions;
+				positions.reserve(vertices.size());
+				std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
+					return vertex.position;
+				});
+
+				m_tempCollisionMeshes.push_back(std::move(positions));
+
+				const auto& safePositions = m_tempCollisionMeshes.back();
+
+				scene.CreateEntity()
+					.Add<re::RigidBodyComponent>({
+						.type = re::physics::BodyType::Static,
+						.collider = re::physics::Collider{
+							.type = re::physics::ColliderType::TriangleMesh,
+							.vertices = safePositions.data(),
+							.vertexCount = safePositions.size(),
+							.indices = indices.data(),
+							.indexCount = indices.size(),
+						},
+						.friction = 0.5f,
+						.restitution = 0.f,
+					})
+					.Add<re::Dirty<re::TransformComponent>>()
+					.Add<re::TransformComponent>({
+						.position = { 0.f, -1.f, -5.f },
+						.rotation = { 0.f, 180.f, 0.f },
+						.scale = { 1.f, 1.f, 1.f },
+					})
+					.Add<re::detail::OpaqueTag>()
+					.Add<re::MaterialComponent>(material)
+					.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
+		}
 	}
 
 	void OnAttach() override
 	{
-		m_window.SetCursorLocked(true);
+		GetApplication().SetUIOverlayActive(false);
 		m_window.SetBackgroundColor(re::Color::White);
 	}
 
-	void OnDetach() override
+	void OnUIDraw() override
 	{
-		m_window.SetCursorLocked(false);
+		ImGui::Begin("Engine Debug");
+		ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+		ImGui::Text("Delta Time: %.4f sec", ImGui::GetIO().DeltaTime);
+		if (ImGui::Button("Click Me!"))
+		{
+		}
+		ImGui::End();
 	}
 
 	void OnEvent(re::Event const& event) override
 	{
+		if (const auto* keyEvent = event.GetIf<re::Event::KeyPressed>())
+		{
+			if (keyEvent->key == re::Keyboard::Key::Grave && !keyEvent->alt && !keyEvent->ctrl && !keyEvent->shift)
+			{
+				GetApplication().SetUIOverlayActive(!GetApplication().IsUIOverlayActive());
+			}
+		}
+
+		if (GetApplication().IsUIOverlayActive())
+		{
+			m_firstMouse = true;
+			return;
+		}
+
 		if (const auto* mouseMoved = event.GetIf<re::Event::MouseMoved>())
 		{
 			const auto currentX = static_cast<float>(mouseMoved->position.x);
@@ -217,7 +239,7 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		// AddLayout<MenuLayout>(Window());
+		AddLayout<MenuLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());

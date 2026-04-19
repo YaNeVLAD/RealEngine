@@ -22,6 +22,8 @@ public:
 
 	virtual void OnDetach() {}
 
+	virtual void OnUIDraw() {}
+
 	virtual void OnUpdate([[maybe_unused]] core::TimeDelta dt) {}
 
 	virtual void OnEvent([[maybe_unused]] Event const& event) {}

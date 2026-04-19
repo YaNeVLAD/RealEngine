@@ -1,8 +1,10 @@
 #include <Runtime/Application.hpp>
 
 #include <Core/Utils.hpp>
+#include <GUI/Context.hpp>
 #include <Physics/Core.hpp>
 #include <Render2D/Renderer2D.hpp>
+#include <Render3D/Renderer3D.hpp>
 #include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
@@ -18,8 +20,6 @@
 #include <RenderCore/GLFW/GLFWWindow.hpp>
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 #endif
-
-#include <Render3D/Renderer3D.hpp>
 
 #include <chrono>
 
@@ -105,6 +105,11 @@ void Application::Run()
 
 	while (m_isRunning)
 	{
+		if (m_pendingCursorLockUpdate.exchange(false))
+		{
+			m_window->SetCursorLocked(m_nextCursorLockState.load());
+		}
+
 		while (const auto event = m_window->PollEvent())
 		{
 			if (const auto* resized = event->GetIf<Event::Resized>())
@@ -145,6 +150,8 @@ void Application::GameLoop()
 {
 	m_window->SetActive(true);
 
+	gui::Context::Init(m_window->GetNativeHandle());
+
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
@@ -178,10 +185,13 @@ void Application::GameLoop()
 				auto event = m_eventQueue.front();
 				m_eventQueue.pop();
 
-				OnEvent(event);
-				if (m_currentLayout)
+				if (!gui::Context::ProcessEvent(event))
 				{
-					m_currentLayout->OnEvent(event);
+					OnEvent(event);
+					if (m_currentLayout)
+					{
+						m_currentLayout->OnEvent(event);
+					}
 				}
 			}
 		}
@@ -191,16 +201,24 @@ void Application::GameLoop()
 		OnUpdate(dt);
 		if (m_currentLayout)
 		{
+			gui::Context::BeginFrame();
+
 			auto& scene = m_currentLayout->GetScene();
 			scene.Frame(dt);
 
 			m_currentLayout->OnUpdate(dt);
+
+			m_currentLayout->OnUIDraw();
+
+			gui::Context::EndFrame();
 
 			m_window->Display();
 
 			scene.ConfirmChanges();
 		}
 	}
+
+	gui::Context::Shutdown();
 
 	m_window->SetActive(false);
 }
@@ -287,6 +305,21 @@ void Application::Shutdown()
 {
 	m_isRunning = false;
 	physics::Shutdown();
+}
+
+void Application::SetUIOverlayActive(const bool active)
+{
+	m_isUiOverlayActive = active;
+
+	m_nextCursorLockState = !active;
+	m_pendingCursorLockUpdate = true;
+
+	gui::Context::SetInteractive(active);
+}
+
+bool Application::IsUIOverlayActive() const
+{
+	return m_isUiOverlayActive;
 }
 
 ecs::Scene& Application::CurrentScene() const

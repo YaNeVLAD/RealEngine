@@ -36,6 +36,10 @@ public:
 
 	virtual void OnStop() = 0;
 
+	void SetUIOverlayActive(bool active);
+
+	bool IsUIOverlayActive() const;
+
 protected:
 	template <std::derived_from<Layout> TLayout, typename... TArgs>
 	void AddLayout(TArgs&&... args);
@@ -72,6 +76,11 @@ private:
 	std::atomic_bool m_wasResized{ false };
 	std::atomic_uint32_t m_newWidth{ 0 };
 	std::atomic_uint32_t m_newHeight{ 0 };
+
+	bool m_isUiOverlayActive = true;
+
+	std::atomic_bool m_pendingCursorLockUpdate{ false };
+	std::atomic_bool m_nextCursorLockState{ false };
 
 	std::unique_ptr<render::IWindow> m_window;
 };
