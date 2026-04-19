@@ -53,7 +53,8 @@ public:
 		const std::vector<glm::mat4>& transforms,
 		float boundingRadius,
 		const glm::vec3& cameraPos,
-		bool wireframe);
+		bool wireframe,
+		float farClip);
 
 	static void SetMaterial(const Material& material);
 

@@ -69,13 +69,25 @@ template <typename T>
 [[nodiscard]] constexpr Vector3<T> operator+(Vector3<T> const& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
+[[nodiscard]] constexpr Vector3<T> operator+(Vector3<T> const& left, T right) noexcept;
+
+template <typename T>
 constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> const& right) noexcept;
+
+template <typename T>
+constexpr Vector3<T>& operator+=(Vector3<T>& left, T right) noexcept;
 
 template <typename T>
 [[nodiscard]] constexpr Vector3<T> operator-(Vector3<T> const& left, Vector3<T> const& right) noexcept;
 
 template <typename T>
+[[nodiscard]] constexpr Vector3<T> operator-(Vector3<T> const& left, T right) noexcept;
+
+template <typename T>
 constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> const& right) noexcept;
+
+template <typename T>
+constexpr Vector3<T>& operator-=(Vector3<T>& left, T right) noexcept;
 
 template <typename T>
 [[nodiscard]] constexpr Vector3<T> operator*(Vector3<T> const& left, T right) noexcept;

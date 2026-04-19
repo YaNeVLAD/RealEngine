@@ -58,7 +58,7 @@ private:
 	void RebuildStaticOpaqueBatches(ecs::Scene& scene);
 	void CollectDynamicAndTransparent(ecs::Scene& scene, const glm::vec3& camPos);
 
-	void RenderOpaqueGeometry(const glm::vec3& camPos);
+	void RenderOpaqueGeometry(const glm::vec3& camPos, float farClip);
 	void RenderTransparentGeometry();
 
 	void DrawFlatBatch(const std::vector<StaticBatchItem>& batch);

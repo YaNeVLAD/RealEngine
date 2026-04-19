@@ -62,17 +62,22 @@ public:
 			}
 
 			constexpr float MOVE_SPEED = 10.0f;
+			float movementSpeed = MOVE_SPEED;
+			if (re::Keyboard::IsKeyPressed(re::Keyboard::Key::LShift))
+			{
+				movementSpeed *= 100.f;
+			}
 
 			if (scene.HasComponent<re::RigidBodyComponent>(entity))
 			{
 				auto& rb = scene.GetComponent<re::RigidBodyComponent>(entity);
 
-				rb.linearVelocity = { moveDir.x * MOVE_SPEED, moveDir.y * MOVE_SPEED, moveDir.z * MOVE_SPEED };
+				rb.linearVelocity = { moveDir.x * movementSpeed, moveDir.y * movementSpeed, moveDir.z * movementSpeed };
 				rb.isVelocityDirty = true;
 			}
 			else
 			{
-				const float moveStep = MOVE_SPEED * dt;
+				const float moveStep = movementSpeed * dt;
 				transform.position.x += moveDir.x * moveStep;
 				transform.position.y += moveDir.y * moveStep;
 				transform.position.z += moveDir.z * moveStep;

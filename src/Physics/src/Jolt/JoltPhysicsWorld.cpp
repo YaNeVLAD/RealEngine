@@ -12,6 +12,7 @@
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
@@ -135,37 +136,31 @@ re::Vector3f FromJPH(const JPH::Vec3& v)
 	return { v.GetX(), v.GetY(), v.GetZ() };
 }
 
-JPH::RefConst<JPH::Shape> CreateShape(const re::physics::RigidBody& desc)
+JPH::RefConst<JPH::Shape> CreateBaseShape(const re::physics::RigidBody& desc)
 {
 	using namespace re::physics;
 
 	switch (desc.collider.type)
 	{
-	case ColliderType::Box: {
-		const JPH::Vec3 scaledExtents(
-			desc.collider.halfExtends.x * std::abs(desc.scale.x),
-			desc.collider.halfExtends.y * std::abs(desc.scale.y),
-			desc.collider.halfExtends.z * std::abs(desc.scale.z));
-		return new JPH::BoxShape(scaledExtents);
-	}
-	case ColliderType::Sphere: {
-		const float maxScale = std::max({ std::abs(desc.scale.x), std::abs(desc.scale.y), std::abs(desc.scale.z) });
-		return new JPH::SphereShape(desc.collider.radius * maxScale);
-	}
-	case ColliderType::Capsule: {
-		const float radiusScale = std::max(std::abs(desc.scale.x), std::abs(desc.scale.z));
-		const float heightScale = std::abs(desc.scale.y);
-		return new JPH::CapsuleShape(desc.collider.height * 0.5f * heightScale, desc.collider.radius * radiusScale);
-	}
+	case ColliderType::Box:
+		return new JPH::BoxShape(ToJPH(desc.collider.halfExtends));
+
+	case ColliderType::Sphere:
+		return new JPH::SphereShape(desc.collider.radius);
+
+	case ColliderType::Capsule:
+		return new JPH::CapsuleShape(desc.collider.height * 0.5f, desc.collider.radius);
+
 	case ColliderType::ConvexMesh: {
 		RE_ASSERT(desc.collider.vertices && desc.collider.vertexCount > 0, "No vertices provided for ConvexMesh!");
 
 		JPH::Array<JPH::Vec3> joltVertices;
 		joltVertices.reserve(desc.collider.vertexCount);
-		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		for (std::size_t i = 0; i < desc.collider.vertexCount; ++i)
 		{
-			joltVertices.push_back(ToJPH(desc.collider.vertices[i] * desc.scale));
+			joltVertices.push_back(ToJPH(desc.collider.vertices[i]));
 		}
+
 		return JPH::ConvexHullShapeSettings(joltVertices).Create().Get();
 	}
 	case ColliderType::TriangleMesh: {
@@ -174,18 +169,17 @@ JPH::RefConst<JPH::Shape> CreateShape(const re::physics::RigidBody& desc)
 
 		JPH::VertexList joltVertices;
 		joltVertices.reserve(desc.collider.vertexCount);
-		for (size_t i = 0; i < desc.collider.vertexCount; ++i)
+		for (std::size_t i = 0; i < desc.collider.vertexCount; ++i)
 		{
-			joltVertices.push_back(JPH::Float3(
-				desc.collider.vertices[i].x * desc.scale.x,
-				desc.collider.vertices[i].y * desc.scale.y,
-				desc.collider.vertices[i].z * desc.scale.z));
+			joltVertices.push_back(JPH::Float3(desc.collider.vertices[i].x, desc.collider.vertices[i].y, desc.collider.vertices[i].z));
 		}
+
 		JPH::IndexedTriangleList joltTriangles;
-		for (size_t i = 0; i < desc.collider.indexCount; i += 3)
+		for (std::size_t i = 0; i < desc.collider.indexCount; i += 3)
 		{
 			joltTriangles.push_back({ desc.collider.indices[i], desc.collider.indices[i + 1], desc.collider.indices[i + 2] });
 		}
+
 		return JPH::MeshShapeSettings(joltVertices, joltTriangles).Create().Get();
 	}
 	default:
@@ -208,6 +202,8 @@ struct JoltPhysicsWorld::JoltState
 	ObjectVsBroadPhaseLayerFilterImpl objVsBpFilter;
 	ObjectLayerPairFilterImpl objPairFilter;
 	ECSContactListener contactListener;
+
+	std::unordered_map<BodyHandle, JPH::RefConst<JPH::Shape>> baseShapes;
 };
 
 void JoltPhysicsWorld::Init()
@@ -246,9 +242,10 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 {
 	RE_ASSERT(m_state, "JoltState is nullptr. Have you forgot to call JoltPhysicsWorld::Init()?");
 
-	const auto shape = CreateShape(desc);
-	auto motionType = JPH::EMotionType::Dynamic;
+	const JPH::RefConst<JPH::Shape> baseShape = CreateBaseShape(desc);
+	JPH::RefConst<JPH::Shape> finalShape = new JPH::ScaledShape(baseShape, ToJPH(desc.scale));
 
+	auto motionType = JPH::EMotionType::Dynamic;
 	auto layer = Layers::MOVING;
 	if (desc.type == BodyType::Static)
 	{
@@ -260,9 +257,9 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		motionType = JPH::EMotionType::Kinematic;
 	}
 
-	const JPH::Quat rotation = JPH::Quat::sEulerAngles(ToJPH(desc.rotationEuler) * (std::numbers::phi_v<float> / 180.0f));
+	const JPH::Quat rotation = JPH::Quat::sEulerAngles(ToJPH(desc.rotationEuler) * (std::numbers::pi_v<float> / 180.0f));
 
-	JPH::BodyCreationSettings settings(shape, ToJPH(desc.position), rotation, motionType, layer);
+	JPH::BodyCreationSettings settings(finalShape, ToJPH(desc.position), rotation, motionType, layer);
 
 	settings.mUserData = desc.entityId;
 	settings.mGravityFactor = desc.gravityFactor;
@@ -290,7 +287,12 @@ BodyHandle JoltPhysicsWorld::CreateBody(const RigidBody& desc)
 		settings.mMassPropertiesOverride.mMass = desc.mass;
 	}
 
-	return m_state->physicsSystem.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate).GetIndexAndSequenceNumber();
+	const JPH::BodyID id = m_state->physicsSystem.GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate);
+	const BodyHandle handle = id.GetIndexAndSequenceNumber();
+
+	m_state->baseShapes[handle] = baseShape;
+
+	return handle;
 }
 
 void JoltPhysicsWorld::DestroyBody(const BodyHandle handle)
@@ -304,6 +306,8 @@ void JoltPhysicsWorld::DestroyBody(const BodyHandle handle)
 
 	JPH::BodyInterface& bodyInterface = m_state->physicsSystem.GetBodyInterface();
 	const JPH::BodyID bodyID(handle);
+
+	m_state->baseShapes.erase(handle);
 
 	bodyInterface.RemoveBody(bodyID);
 	bodyInterface.DestroyBody(bodyID);
@@ -368,11 +372,18 @@ void JoltPhysicsWorld::UpdateScale(const BodyHandle handle, const RigidBody& des
 		return;
 	}
 
-	const auto shape = CreateShape(desc);
-	if (shape)
+	const auto it = m_state->baseShapes.find(handle);
+	if (it == m_state->baseShapes.end())
 	{
-		m_state->physicsSystem.GetBodyInterface().SetShape(JPH::BodyID(handle), shape, false, JPH::EActivation::Activate);
+		return;
 	}
+
+	const JPH::RefConst<JPH::Shape> newScaledShape = new JPH::ScaledShape(it->second, ToJPH(desc.scale));
+	m_state->physicsSystem.GetBodyInterface().SetShape(
+		JPH::BodyID(handle),
+		newScaledShape,
+		/* inUpdateMassProperties */ true,
+		JPH::EActivation::Activate);
 }
 
 std::vector<CollisionPair> JoltPhysicsWorld::GetAndClearCollisions()

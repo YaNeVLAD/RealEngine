@@ -62,9 +62,9 @@ void Renderer3D::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vector<glm
 	m_api->DrawStaticMeshInstanced(mesh, transforms, wireframe);
 }
 
-void Renderer3D::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, const float boundingRadius, const glm::vec3& cameraPos, const bool wireframe)
+void Renderer3D::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, const float boundingRadius, const glm::vec3& cameraPos, const bool wireframe, float farClip)
 {
-	m_api->DrawStaticMeshGPUCulled(batchIndex, mesh, transforms, boundingRadius, cameraPos, wireframe);
+	m_api->DrawStaticMeshGPUCulled(batchIndex, mesh, transforms, boundingRadius, cameraPos, wireframe, farClip);
 }
 
 void Renderer3D::SetMaterial(const Material& material)

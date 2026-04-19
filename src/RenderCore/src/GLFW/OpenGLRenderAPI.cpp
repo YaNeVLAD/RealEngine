@@ -246,11 +246,11 @@ constexpr auto s_ComputeCullingShader3D = UR"(
         mat4 model = inputTransforms[idx];
         vec3 pos = vec3(model[3]);
 
-        // DISTANCE CULLING
-        if (distance(u_CameraPos, pos) > u_MaxDistance) return;
-
-        float maxScale = max(max(length(vec3(model[0])), length(vec3(model[1]))), length(vec3(model[2])));
+		float maxScale = max(max(length(vec3(model[0])), length(vec3(model[1]))), length(vec3(model[2])));
         float radius = u_MeshRadius * maxScale;
+
+        // DISTANCE CULLING
+		if ((distance(u_CameraPos, pos) - radius) > u_MaxDistance) return;
 
         // FRUSTUM CULLING
         bool visible = true;
@@ -731,7 +731,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	}
 }
 
-void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, const float boundingRadius, const glm::vec3& cameraPos, const bool wireframe)
+void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, const float boundingRadius, const glm::vec3& cameraPos, const bool wireframe, float farClip)
 {
 	if (transforms.empty() || !mesh)
 	{
@@ -753,15 +753,18 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glGenBuffers(1, &outputSsbo);
 		glGenBuffers(1, &normalSsbo);
 		glGenBuffers(1, &cmdBuffer);
+	}
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, inputSsbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), transforms.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, inputSsbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizeiptr>(totalInstances * sizeof(glm::mat4)), transforms.data(), GL_DYNAMIC_DRAW);
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputSsbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputSsbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizeiptr>(totalInstances * sizeof(glm::mat4)), nullptr, GL_DYNAMIC_DRAW);
 
+	if (nonUniform)
+	{
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, normalSsbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizeiptr>(totalInstances * sizeof(glm::mat4)), nullptr, GL_DYNAMIC_DRAW);
 	}
 
 	const DrawElementsIndirectCommand cmd{ mesh->GetIndexCount(), 0, 0, 0, 0 };
@@ -778,7 +781,7 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
 	m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
 	m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
-	m_CullingComputeShader->SetFloat("u_MaxDistance", 1000.0f);
+	m_CullingComputeShader->SetFloat("u_MaxDistance", farClip);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);

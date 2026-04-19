@@ -152,11 +152,27 @@ constexpr Vector3<T> operator+(Vector3<T> const& left, Vector3<T> const& right) 
 }
 
 template <typename T>
+constexpr Vector3<T> operator+(Vector3<T> const& left, T right) noexcept
+{
+	return Vector3<T>{ left.x + right, left.y + right, left.z + right };
+}
+
+template <typename T>
 constexpr Vector3<T>& operator+=(Vector3<T>& left, Vector3<T> const& right) noexcept
 {
 	left.x += right.x;
 	left.y += right.y;
 	left.z += right.z;
+
+	return left;
+}
+
+template <typename T>
+constexpr Vector3<T>& operator+=(Vector3<T>& left, T right) noexcept
+{
+	left.x += right;
+	left.y += right;
+	left.z += right;
 
 	return left;
 }
@@ -168,11 +184,27 @@ constexpr Vector3<T> operator-(Vector3<T> const& left, Vector3<T> const& right) 
 }
 
 template <typename T>
+constexpr Vector3<T> operator-(Vector3<T> const& left, T right) noexcept
+{
+	return Vector3<T>{ left.x - right, left.y - right, left.z - right };
+}
+
+template <typename T>
 constexpr Vector3<T>& operator-=(Vector3<T>& left, Vector3<T> const& right) noexcept
 {
 	left.x -= right.x;
 	left.y -= right.y;
 	left.z -= right.z;
+
+	return left;
+}
+
+template <typename T>
+constexpr Vector3<T>& operator-=(Vector3<T>& left, T right) noexcept
+{
+	left.x -= right;
+	left.y -= right;
+	left.z -= right;
 
 	return left;
 }

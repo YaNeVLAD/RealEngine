@@ -16,6 +16,8 @@
 
 #include "CameraControlSystem.hpp"
 
+#include <deque>
+
 struct MenuLayout final : re::Layout
 {
 	MenuLayout(re::Application& app, re::render::IWindow& window)
@@ -44,18 +46,21 @@ struct MenuLayout final : re::Layout
 			});
 
 		auto camera = scene.FindFirstWith<re::CameraComponent>();
-		camera.Add<re::RigidBodyComponent>({
-			.type = re::physics::BodyType::Dynamic,
-			.collider = re::physics::Collider{
-				.type = re::physics::ColliderType::Sphere,
-				.radius = 1.f,
-			},
-			.mass = 50.0f,
-			.friction = 0.0f,
-			.gravityFactor = 0.0f,
-			.linearDamping = 10.0f,
-			.lockRotation = re::Vector3(true),
-		});
+		auto& cc = camera.Get<re::CameraComponent>();
+		cc.farClip = 1'000'000.f;
+		camera
+			.Add<re::RigidBodyComponent>({
+				.type = re::physics::BodyType::Dynamic,
+				.collider = re::physics::Collider{
+					.type = re::physics::ColliderType::Sphere,
+					.radius = 1.f,
+				},
+				.mass = 50.0f,
+				.friction = 0.0f,
+				.gravityFactor = 0.0f,
+				.linearDamping = 10.0f,
+				.lockRotation = re::Vector3(true),
+			});
 
 		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
 		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
@@ -141,7 +146,7 @@ struct MenuLayout final : re::Layout
 					.Add<re::TransformComponent>({
 						.position = { 0.f, -1.f, -5.f },
 						.rotation = { 0.f, 180.f, 0.f },
-						.scale = { 1.f, 1.f, 1.f },
+						.scale = re::Vector3f(1.f),
 					})
 					.Add<re::detail::OpaqueTag>()
 					.Add<re::MaterialComponent>(material)
@@ -224,7 +229,7 @@ private:
 	float m_lastMouseX = 0.0f;
 	float m_lastMouseY = 0.0f;
 
-	std::vector<std::vector<re::Vector3f>> m_tempCollisionMeshes;
+	std::deque<std::vector<re::Vector3f>> m_tempCollisionMeshes;
 };
 
 class LauncherApplication final : public re::Application
@@ -239,7 +244,7 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		AddLayout<MenuLayout>(Window());
+		// AddLayout<MenuLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());

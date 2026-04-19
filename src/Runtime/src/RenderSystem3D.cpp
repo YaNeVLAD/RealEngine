@@ -138,7 +138,7 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 
 	render::Renderer3D::SetLight(light);
 
-	RenderOpaqueGeometry(position);
+	RenderOpaqueGeometry(position, farClip);
 	RenderTransparentGeometry();
 
 	render::Renderer3D::EndScene();
@@ -290,7 +290,7 @@ void RenderSystem3D::CollectDynamicAndTransparent(ecs::Scene& scene, const glm::
 	}
 }
 
-void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos)
+void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos, float farClip)
 {
 	std::uint32_t batchIndex = 0;
 
@@ -298,7 +298,7 @@ void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos)
 	for (const auto& [mesh, wireframe, material, transforms] : m_cachedOpaqueBatches)
 	{
 		render::Renderer3D::SetMaterial(material.data);
-		render::Renderer3D::DrawStaticMeshGPUCulled(batchIndex++, mesh, transforms, 2.0f, camPos, wireframe);
+		render::Renderer3D::DrawStaticMeshGPUCulled(batchIndex++, mesh, transforms, 2.0f, camPos, wireframe, farClip);
 	}
 
 	for (const auto& cmd : m_opaqueQueue)
