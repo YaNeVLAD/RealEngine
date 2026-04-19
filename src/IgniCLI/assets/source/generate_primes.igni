@@ -1,7 +1,7 @@
 package program;
 
 fun sieve(n: Int) {
-    val is_prime = Array::<Bool>(n + 1);
+    val is_prime = MutableArray::<Bool>(n + 1);
 
     var i = 0;
 	for (i in 0..n) {

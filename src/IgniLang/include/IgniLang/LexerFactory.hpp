@@ -13,7 +13,7 @@ using ScriptLexer = fsm::lexer<TokenType, fsm::std_regex_matcher>;
 
 inline ScriptLexer CreateLexer(const std::string_view source = "")
 {
-	ScriptLexer lexer(source);
+	ScriptLexer lexer(source, TokenType::Error);
 
 	lexer.add_rule(R"([ \t\r\n]+)", TokenType::Error, true);
 	lexer.add_rule(R"(//[^\n]*)", TokenType::Error, true);

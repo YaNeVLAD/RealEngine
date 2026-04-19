@@ -82,7 +82,13 @@ public:
 			{
 				if (prog->statements[i])
 				{
-					prog->statements[i]->Accept(*this);
+					try
+					{
+						prog->statements[i]->Accept(*this);
+					}
+					catch (const SemanticBailoutException&)
+					{
+					}
 				}
 			}
 
@@ -766,7 +772,14 @@ public:
 		{
 			if (node->statements[i])
 			{
-				node->statements[i]->Accept(*this);
+				try
+				{
+					node->statements[i]->Accept(*this);
+				}
+				catch (const SemanticBailoutException&)
+				{
+					// Стейтмент сломался? Не беда, идем проверять следующий!
+				}
 			}
 		}
 		m_context.env.PopScope();
@@ -1017,14 +1030,24 @@ private:
 	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)
 	{
 		if (!expr)
-		{
 			return m_context.tUnit;
+
+		const std::shared_ptr<SemanticType> previousType = m_currentExprType;
+		m_currentExprType = m_context.tUnit;
+
+		try
+		{
+			expr->Accept(*this);
+		}
+		catch (const SemanticBailoutException&)
+		{
+			m_currentExprType = m_context.tUnit;
 		}
 
-		m_currentExprType = m_context.tUnit; // Reset state
-		expr->Accept(*this);
+		std::shared_ptr<SemanticType> resultType = m_currentExprType;
+		m_currentExprType = previousType;
 
-		return m_currentExprType;
+		return resultType;
 	}
 
 	std::shared_ptr<SemanticType> GetVarargArrayType(const std::shared_ptr<SemanticType>& elementType)

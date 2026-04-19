@@ -36,7 +36,7 @@ int main(const int argc, char** argv)
 
 	try
 	{
-		const igni::Compiler pipeline("assets/lang_grammar.txt");
+		const igni::Compiler pipeline("assets/igni_grammar.txt");
 		const std::string assemblyCode = pipeline.CompileFiles(sourceFiles);
 
 		std::cout << "[Info] Assembly generated successfully.\n";

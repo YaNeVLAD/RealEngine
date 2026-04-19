@@ -3,30 +3,37 @@
 #include <Core/Assert.hpp>
 #include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Diagnostic/Diagnostic.hpp>
 
 #include <stdexcept>
 
 namespace igni::sem
 {
 
+struct SemanticBailoutException final : std::exception
+{
+	const char* what() const noexcept override { return "Semantic bailout"; }
+};
+
+inline thread_local DiagnosticEngine* g_Diagnostics = nullptr;
+
 [[noreturn]] inline void SemanticError(const ast::Node* node, const re::String& message)
 {
-	if (!node)
+	if (g_Diagnostics)
 	{
-		std::cerr << message << std::endl;
-		RE_DEBUG_BREAK();
+		const std::size_t line = node ? node->token.line : 0;
+		const std::size_t col = node ? node->token.column : 0;
+		const std::size_t offset = node ? node->token.offset : 0;
+		const std::size_t length = (node && node->token.length > 0) ? node->token.length : 1;
 
-		throw std::runtime_error("SemanticError: " + message);
+		g_Diagnostics->ReportError(message.ToString(), line, col, offset, length);
+	}
+	else
+	{
+		std::cerr << "Semantic Error: " << message << std::endl;
 	}
 
-	const re::String location = "[Line: " + std::to_string(node->token.line) + ", Col: " + std::to_string(node->token.column) + "]";
-
-	const re::String fullMessage = location + " Semantic Error: " + message + "\n    Near: '" + std::string(node->token.lexeme) + "'";
-
-	std::cerr << fullMessage << std::endl;
-	RE_DEBUG_BREAK();
-
-	throw std::runtime_error(fullMessage.ToString());
+	throw SemanticBailoutException();
 }
 
 [[noreturn]] inline void InternalError(const ast::Node* node, const re::String& message)

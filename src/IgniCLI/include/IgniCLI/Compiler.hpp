@@ -1,5 +1,6 @@
 #pragma once
 
+#include "IgniLang/Diagnostic/Diagnostic.hpp"
 #include "IgniLang/Optimization/DeadCodeEliminator.hpp"
 
 #include <IgniLang/AST/AstConverter.hpp>
@@ -51,6 +52,8 @@ public:
 
 		std::vector<std::unique_ptr<ast::Program>> parsedPrograms;
 
+		DiagnosticEngine diagnostics;
+
 		// --- PHASE 1: FRONTEND ---
 		for (const auto& path : filePaths)
 		{
@@ -60,27 +63,92 @@ public:
 			const std::string& source = sourceBuffers.back();
 
 			auto tokens = CreateLexer(source).tokenize();
-			auto cstRoot = CstBuilder(parser, "<EPSILON>").Build(tokens);
+
+			std::vector<fsm::token<TokenType>> validTokens;
+			validTokens.reserve(tokens.size());
+
+			for (const auto token : tokens)
+			{
+				if (token.type == TokenType::Error)
+				{
+					diagnostics.ReportError(
+						"Unexpected character '" + std::string(token.lexeme) + "'",
+						token.line,
+						token.column,
+						token.offset,
+						token.length);
+				}
+				else
+				{
+					validTokens.emplace_back(token);
+				}
+			}
+
+			std::shared_ptr<CstNode> cstRoot = nullptr;
+			try
+			{
+				cstRoot = CstBuilder(parser, "<EPSILON>").Build(validTokens);
+			}
+			catch (const std::exception& e)
+			{
+				diagnostics.ReportError("Syntax Error in " + path + ": " + e.what(), 0, 0, 0, 0);
+				continue;
+			}
 
 			if (!cstRoot)
 			{
-				throw std::runtime_error("Syntax error in file: " + path);
+				diagnostics.ReportError("Failed to build syntax tree for file: " + path, 0, 0, 0, 0);
+				continue;
 			}
 
-			auto astRoot = astConverter.Convert(cstRoot.get());
+			std::unique_ptr<ast::Program> astRoot = nullptr;
+			try
+			{
+				astRoot = astConverter.Convert(cstRoot.get());
+			}
+			catch (const std::exception& e)
+			{
+				diagnostics.ReportError("AST Conversion Error in " + path + ": " + e.what(), 0, 0, 0, 0);
+				continue;
+			}
+
 			if (!astRoot)
 			{
-				throw std::runtime_error("AST conversion failed for file: " + path);
+				diagnostics.ReportError("AST conversion returned null for file: " + path, 0, 0, 0, 0);
+				continue;
 			}
 
 			parsedPrograms.push_back(std::move(astRoot));
 		}
 
+		if (diagnostics.HasErrors())
+		{
+			diagnostics.PrintToConsole();
+			return {};
+		}
+
+		sem::g_Diagnostics = &diagnostics;
+
 		// --- PHASE 2: SEMANTIC ANALYSIS ---
 		std::cout << "[Info] Running Semantic Analysis...\n";
 		sem::SemanticAnalyzer semanticAnalyzer;
 
-		semanticAnalyzer.Analyze(parsedPrograms);
+		try
+		{
+			semanticAnalyzer.Analyze(parsedPrograms);
+		}
+		catch (const std::exception& e)
+		{
+			diagnostics.ReportError(std::string("Fatal Semantic Error: ") + e.what(), 0, 0, 0, 0);
+		}
+
+		sem::g_Diagnostics = nullptr;
+
+		if (diagnostics.HasErrors())
+		{
+			diagnostics.PrintToConsole();
+			return {};
+		}
 
 		const auto& globalNames = semanticAnalyzer.GetGlobalNames();
 		const auto& importAliases = semanticAnalyzer.GetImportAliases();
