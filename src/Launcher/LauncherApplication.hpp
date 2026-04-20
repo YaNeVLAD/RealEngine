@@ -21,6 +21,11 @@
 
 struct MenuLayout final : re::Layout
 {
+	struct LightGizmoTag
+	{
+		bool dummy = false;
+	};
+
 	MenuLayout(re::Application& app, re::render::IWindow& window)
 		: Layout(app)
 		, m_window(window)
@@ -37,17 +42,36 @@ struct MenuLayout final : re::Layout
 			.WithWrite<re::CameraComponent>()
 			.RunOnMainThread();
 
+		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
+		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
+
+		constexpr re::Vector3f LIGHT_POS = { 4.f, 6.f, -1.f };
+		const auto lightEntity = scene.CreateEntity()
+									 .Add<re::Dirty<re::TransformComponent>>()
+									 .Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
+									 .Add<re::TransformComponent>({
+										 .position = LIGHT_POS,
+										 .rotation = { 37.f, 107.f, 3.f },
+									 });
+
 		scene.CreateEntity()
 			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
 			.Add<re::TransformComponent>({
-				.position = { 4.0f, 1.0f, 6.0f },
-				.rotation = { 37.f, 3.f, 107.f },
-			});
+				.position = LIGHT_POS,
+				.scale = re::Vector3f(0.25f),
+			})
+			.Add<re::detail::OpaqueTag>()
+			.Add<re::StaticMeshComponent3D>(sphereMesh)
+			.Add<re::MaterialComponent>()
+			.Add<LightGizmoTag>();
+
+		m_lightEntity = lightEntity.GetEntity();
 
 		if (auto camera = scene.FindFirstWith<re::CameraComponent>(); camera.IsValid())
 		{
 			camera.Get<re::CameraComponent>().farClip = 1000.f;
+			auto& transform = camera.Get<re::TransformComponent>();
+			transform.position = { 0.f, 1.5f, 3.f };
 		}
 
 		ReplaceModel("model/Model.obj");
@@ -93,11 +117,22 @@ struct MenuLayout final : re::Layout
 
 		ImGui::Separator();
 
-		for (auto&& [entity, light, transform] : *GetScene().CreateView<re::LightComponent, re::TransformComponent>())
+		const auto lightView = GetScene().CreateView<re::LightComponent, re::TransformComponent>();
+		const auto gizmoView = GetScene().CreateView<LightGizmoTag, re::TransformComponent>();
+		for (auto&& [entity, light, transform] : *lightView)
 		{
 			if (ImGui::CollapsingHeader("Light Editor"))
 			{
-				ImGui::DragFloat3("Light Pos", &transform.position.x, 0.1f);
+				if (ImGui::DragFloat3("Light Pos", &transform.position.x, 0.1f))
+				{
+					GetScene().MakeDirty<re::TransformComponent>(entity);
+
+					for (auto&& [gEntity, tag, gTransform] : *gizmoView)
+					{
+						gTransform.position = transform.position;
+						GetScene().MakeDirty<re::TransformComponent>(gEntity);
+					}
+				}
 
 				float color[3] = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
 				if (ImGui::ColorEdit3("Color", color))
@@ -230,8 +265,7 @@ private:
 	re::Vector3f m_modelRot = { 0.f, 0.f, 0.f };
 	re::Vector3f m_modelScale = { 1.f, 1.f, 1.f };
 
-	re::ecs::Entity m_solid = re::ecs::Entity::INVALID_ID;
-	re::ecs::Entity m_wireframe = re::ecs::Entity::INVALID_ID;
+	re::ecs::Entity m_lightEntity = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
 
 	re::render::IWindow& m_window;
