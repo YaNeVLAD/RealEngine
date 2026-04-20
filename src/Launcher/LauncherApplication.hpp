@@ -68,7 +68,7 @@ struct MenuLayout final : re::Layout
 
 		const auto texture = m_manager.Get<re::Texture>("0.png");
 		re::Material material;
-		material.texture = texture;
+		material.albedoMap = texture;
 		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::White);
 		scene
 			.CreateEntity()
@@ -115,7 +115,7 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		const auto model = m_manager.Get<re::Model>("model/Model.obj");
+		const auto model = m_manager.Get<re::Model>("model/Tank1.obj");
 		if (model)
 		{
 			for (const auto& [vertices, indices, material] : model->GetParts())
@@ -155,10 +155,10 @@ struct MenuLayout final : re::Layout
 			}
 		}
 
-		const auto animatedModel = m_manager.Get<re::AnimatedModel>("model/Model.glb");
-		if (model)
+		const auto animatedModel = m_manager.Get<re::AnimatedModel>("model/Tank1.glb");
+		if (animatedModel)
 		{
-			for (const auto& [vertices, indices, material] : model->GetParts())
+			for (const auto& [vertices, indices, material] : animatedModel->GetParts())
 			{
 				std::vector<re::Vector3f> positions;
 				positions.reserve(vertices.size());

@@ -36,7 +36,7 @@ struct Vector3
 	[[nodiscard]] Vector3 Normalized() const noexcept
 		requires std::floating_point<T>;
 
-	[[nodiscard]] Vector3& Normalize() noexcept
+	Vector3& Normalize() noexcept
 		requires std::floating_point<T>;
 
 	[[nodiscard]] static constexpr Vector3 Zero() noexcept;

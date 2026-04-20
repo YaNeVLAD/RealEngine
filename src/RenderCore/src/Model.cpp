@@ -69,6 +69,23 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 	std::vector<Material> engineMaterials;
 	engineMaterials.reserve(materials.size());
 
+	auto loadTex = [&](const std::string& texName) -> std::shared_ptr<Texture> {
+		if (texName.empty())
+		{
+			return nullptr;
+		}
+		const std::string texPath = baseDir + texName;
+		if (auto texture = manager->Get<Texture>(String(texPath)))
+		{
+			std::cout << "  [Texture Loaded]: " << texPath << std::endl;
+
+			return texture;
+		}
+		std::cerr << "  [Texture Failed]: " << texPath << std::endl;
+
+		return nullptr;
+	};
+
 	for (const auto& mat : materials)
 	{
 		Material engineMat{
@@ -79,19 +96,13 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 			.shininess = mat.shininess > 0.0f ? mat.shininess : 32.0f,
 		};
 
-		if (!mat.diffuse_texname.empty())
-		{
-			std::string texPath = baseDir + mat.diffuse_texname;
-			if (auto texture = manager->Get<Texture>(String(texPath)))
-			{
-				engineMat.texture = texture;
-				std::cout << "  [Texture Loaded]: " << texPath << std::endl;
-			}
-			else
-			{
-				std::cerr << "  [Texture Failed]: " << texPath << std::endl;
-			}
-		}
+		engineMat.albedoMap = loadTex(mat.diffuse_texname);
+
+		std::string normalName = !mat.normal_texname.empty() ? mat.normal_texname : mat.bump_texname;
+		engineMat.normalMap = loadTex(normalName);
+
+		engineMat.emissionMap = loadTex(mat.emissive_texname);
+
 		engineMaterials.emplace_back(engineMat);
 	}
 
@@ -153,6 +164,8 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 
 				vertex.color = Color::White;
 
+				vertex.tangent = { 0.f, 0.f, 0.f, 1.f };
+
 				if (!uniqueVertices.contains(vertex))
 				{
 					uniqueVertices[vertex] = static_cast<std::uint32_t>(vertices.size());
@@ -167,6 +180,54 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 
 	for (auto& part : partsMap | std::views::values)
 	{
+		if (part.material.normalMap && !part.indices.empty())
+		{
+			for (std::size_t i = 0; i < part.indices.size(); i += 3)
+			{
+				Vertex& v0 = part.vertices[part.indices[i]];
+				Vertex& v1 = part.vertices[part.indices[i + 1]];
+				Vertex& v2 = part.vertices[part.indices[i + 2]];
+
+				auto p0 = v0.position;
+				auto p1 = v1.position;
+				auto p2 = v2.position;
+
+				auto uv0 = v0.texCoord;
+				auto uv1 = v1.texCoord;
+				auto uv2 = v2.texCoord;
+
+				auto edge1 = p1 - p0;
+				auto edge2 = p2 - p0;
+				auto deltaUV1 = uv1 - uv0;
+				auto deltaUV2 = uv2 - uv0;
+
+				float denominator = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+				if (std::abs(denominator) > std::numeric_limits<float>::epsilon())
+				{
+					float f = 1.0f / denominator;
+					Vector3f tangent(
+						f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x),
+						f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y),
+						f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z));
+					tangent.Normalize();
+
+					v0.tangent = { v0.tangent.x + tangent.x, v0.tangent.y + tangent.y, v0.tangent.z + tangent.z, 1.0f };
+					v1.tangent = { v1.tangent.x + tangent.x, v1.tangent.y + tangent.y, v1.tangent.z + tangent.z, 1.0f };
+					v2.tangent = { v2.tangent.x + tangent.x, v2.tangent.y + tangent.y, v2.tangent.z + tangent.z, 1.0f };
+				}
+			}
+
+			for (auto& v : part.vertices)
+			{
+				Vector3f t{ v.tangent.x, v.tangent.y, v.tangent.z };
+				if (t.Length() > std::numeric_limits<float>::epsilon())
+				{
+					t.Normalize();
+					v.tangent = { t, 1.0f };
+				}
+			}
+		}
+
 		if (!part.indices.empty())
 		{
 			m_parts.emplace_back(std::move(part));

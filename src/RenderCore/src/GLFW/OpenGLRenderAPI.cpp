@@ -20,6 +20,7 @@ constexpr auto s_VertexShaderSource = UR"(
     layout(location = 4) in float a_TexIndex;
 	layout(location = 5) in ivec4 a_BoneIDs;
     layout(location = 6) in vec4 a_BoneWeights;
+	layout(location = 7) in vec4 a_Tangent;
 
     uniform mat4 u_ViewProjection;
 
@@ -68,6 +69,7 @@ constexpr auto s_VertexShader3D = UR"(
     layout(location = 4) in float a_TexIndex;
 	layout(location = 5) in ivec4 a_BoneIDs;
     layout(location = 6) in vec4 a_BoneWeights;
+	layout(location = 7) in vec4 a_Tangent;
 
 	uniform mat4 u_ModelViewProjection;
 	uniform mat4 u_ModelMatrix;
@@ -77,13 +79,30 @@ constexpr auto s_VertexShader3D = UR"(
     out vec2 v_TexCoord;
     out vec3 v_Normal;
 	out vec3 v_FragmentWorldPos;
+	out mat3 v_TBN;
 
     void main() {
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
 		v_Normal = u_NormalMatrix * a_Normal;
-		v_FragmentWorldPos = vec3(u_ModelMatrix * vec4(a_Position, 1.0));
+
+		vec4 worldPos = u_ModelMatrix * vec4(a_Position, 1.0);
+		v_FragmentWorldPos = vec3(worldPos);
 		gl_Position = u_ModelViewProjection * vec4(a_Position, 1.0);
+
+		vec3 tangent = normalize(u_NormalMatrix * a_Tangent.xyz);
+		vec3 normal = normalize(u_NormalMatrix * a_Normal);
+
+		if (length(tangent) > 0.0001) {
+			tangent = normalize(tangent - dot(tangent, normal) * normal);
+			vec3 bitangent = cross(normal, tangent) * a_Tangent.w;
+			v_TBN = mat3(tangent, bitangent, normal);
+		} else {
+			vec3 up = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+            vec3 t_fallback = normalize(cross(up, normal));
+            vec3 b_fallback = cross(normal, t_fallback);
+            v_TBN = mat3(t_fallback, b_fallback, normal);
+		}
     }
 )";
 
@@ -95,6 +114,7 @@ constexpr auto s_FragmentShader3D = UR"(
     in vec2 v_TexCoord;
     in vec3 v_Normal;
     in vec3 v_FragmentWorldPos;
+	in mat3 v_TBN;
 
     uniform vec3 u_MaterialAmbientLighting;
     uniform vec3 u_MaterialDiffuseLighting;
@@ -102,8 +122,14 @@ constexpr auto s_FragmentShader3D = UR"(
     uniform vec3 u_MaterialEmission;
     uniform float u_MaterialShininess;
 
-	uniform sampler2D u_Texture;
-    uniform int u_HasTexture;
+	uniform sampler2D u_AlbedoMap;
+    uniform int u_HasAlbedoMap;
+
+	uniform sampler2D u_NormalMap;
+	uniform int u_HasNormalMap;
+
+    uniform sampler2D u_EmissionMap;
+    uniform int u_HasEmissionMap;
 
     uniform int u_LightType;
     uniform vec3 u_LightPos;
@@ -119,6 +145,12 @@ constexpr auto s_FragmentShader3D = UR"(
     void main()
 	{
         vec3 surfaceNormal = normalize(v_Normal);
+		if (u_HasNormalMap != 0) {
+			vec3 normalColor = texture(u_NormalMap, v_TexCoord).rgb;
+			normalColor = normalColor * 2.0 - 1.0;
+			surfaceNormal = normalize(v_TBN * normalColor);
+		}
+
         vec3 viewDir = normalize(u_CameraPos - v_FragmentWorldPos);
         vec3 lightDir;
 
@@ -149,10 +181,10 @@ constexpr auto s_FragmentShader3D = UR"(
             }
         }
 
-		// TEXTURE
+		// ALBEDO_MAP
 		vec4 surfaceColor = v_Color;
-        if (u_HasTexture != 0) {
-            surfaceColor *= texture(u_Texture, v_TexCoord);
+        if (u_HasAlbedoMap != 0) {
+            surfaceColor *= texture(u_AlbedoMap, v_TexCoord);
         }
 
 		// Ambient
@@ -171,7 +203,12 @@ constexpr auto s_FragmentShader3D = UR"(
        	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect;
        	vec3 finalSpecular = specularLight * attenuation * spotEffect;
 
-		vec3 finalColor = u_MaterialEmission + finalAmbient + finalDiffuse + finalSpecular;
+		vec3 finalEmission = u_MaterialEmission;
+		if (u_HasEmissionMap != 0) {
+			finalEmission += texture(u_EmissionMap, v_TexCoord).rgb;
+		}
+
+		vec3 finalColor = finalEmission + finalAmbient + finalDiffuse + finalSpecular;
 
 		o_Color = vec4(finalColor, surfaceColor.a);
     }
@@ -186,9 +223,10 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     layout(location = 4) in float a_TexIndex;
 	layout(location = 5) in ivec4 a_BoneIDs;
     layout(location = 6) in vec4 a_BoneWeights;
+	layout(location = 7) in vec4 a_Tangent;
 
-    layout(location = 7) in mat4 a_InstanceMatrix;
-    layout(location = 11) in mat4 a_NormalMatrix;
+    layout(location = 8) in mat4 a_InstanceMatrix;
+    layout(location = 12) in mat4 a_NormalMatrix;
 
     uniform mat4 u_ViewProjection;
     uniform bool u_HasNonUniformScale;
@@ -197,24 +235,41 @@ constexpr auto s_VertexInstancedShader3D = UR"(
     out vec2 v_TexCoord;
     out vec3 v_Normal;
     out vec3 v_FragmentWorldPos;
+	out mat3 v_TBN;
 
     void main()
 	{
         v_Color = a_Color;
         v_TexCoord = a_TexCoord;
 
+		mat3 normalMatrix;
         if (u_HasNonUniformScale)
 		{
-            v_Normal = mat3(a_NormalMatrix) * a_Normal;
+            normalMatrix = mat3(a_NormalMatrix);
         }
 		else
 		{
-            v_Normal = mat3(a_InstanceMatrix) * a_Normal;
+            normalMatrix = mat3(a_InstanceMatrix);
         }
+		v_Normal = normalMatrix * a_Normal;
 
         vec4 worldPos = a_InstanceMatrix * vec4(a_Position, 1.0);
         v_FragmentWorldPos = vec3(worldPos);
         gl_Position = u_ViewProjection * worldPos;
+
+		vec3 tangent = normalMatrix * a_Tangent.xyz;
+		vec3 normal = normalize(v_Normal);
+
+		if (length(tangent) > 0.0001) {
+			tangent = normalize(tangent - dot(tangent, normal) * normal);
+			vec3 bitangent = cross(normal, tangent) * a_Tangent.w;
+			v_TBN = mat3(tangent, bitangent, normal);
+		} else {
+			vec3 up = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+            vec3 t_fallback = normalize(cross(up, normal));
+            vec3 b_fallback = cross(normal, t_fallback);
+            v_TBN = mat3(t_fallback, b_fallback, normal);
+		}
     }
 )";
 
@@ -442,6 +497,7 @@ void OpenGLRenderAPI::Init()
 	unifiedLayout.Push<float>("a_TexIndex");
 	unifiedLayout.Push<Vector4i>("a_BoneIDs");
 	unifiedLayout.Push<Vector4f>("a_BoneWeights");
+	unifiedLayout.Push<Vector4f>("a_Tangent");
 
 	m_BatchVAO = std::make_shared<VertexArray>();
 	m_BatchVBO = std::make_shared<VertexBuffer>(MaxVertices * sizeof(Vertex));
@@ -713,7 +769,7 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBOId);
 	glBufferData(GL_ARRAY_BUFFER, transforms.size() * sizeof(glm::mat4), transforms.data(), GL_DYNAMIC_DRAW);
-	SetupMatrixAttribute(7);
+	SetupMatrixAttribute(8);
 
 	std::vector<glm::mat4> normalMatrices;
 	if (nonUniform)
@@ -726,17 +782,17 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 
 		glBindBuffer(GL_ARRAY_BUFFER, m_normalVBOId);
 		glBufferData(GL_ARRAY_BUFFER, normalMatrices.size() * sizeof(glm::mat4), normalMatrices.data(), GL_DYNAMIC_DRAW);
-		SetupMatrixAttribute(11);
+		SetupMatrixAttribute(12);
 	}
 
 	DrawWithWireframe(wireframe, [&] {
 		glDrawElementsInstanced(GL_TRIANGLES, mesh->GetIndexCount(), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(transforms.size()));
 	});
 
-	TeardownMatrixAttribute(7);
+	TeardownMatrixAttribute(8);
 	if (nonUniform)
 	{
-		TeardownMatrixAttribute(11);
+		TeardownMatrixAttribute(12);
 	}
 }
 
@@ -809,12 +865,12 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	mesh->GetVAO()->Bind();
 
 	glBindBuffer(GL_ARRAY_BUFFER, outputSsbo);
-	SetupMatrixAttribute(7);
+	SetupMatrixAttribute(8);
 
 	if (nonUniform)
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, normalSsbo);
-		SetupMatrixAttribute(11);
+		SetupMatrixAttribute(12);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, cmdBuffer);
@@ -836,10 +892,10 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 		glDepthMask(GL_TRUE);
 	});
 
-	TeardownMatrixAttribute(7);
+	TeardownMatrixAttribute(8);
 	if (nonUniform)
 	{
-		TeardownMatrixAttribute(11);
+		TeardownMatrixAttribute(12);
 	}
 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
@@ -886,19 +942,46 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 		shader->SetFloat3("u_MaterialEmission", matEmis);
 		shader->SetFloat("u_MaterialShininess", material.shininess);
 
-		glActiveTexture(GL_TEXTURE0);
-		if (material.texture)
+		if (material.albedoMap)
 		{
-			shader->SetInt("u_Texture", 0);
-			shader->SetInt("u_HasTexture", 1);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.albedoMap->GetNativeHandle()));
 
-			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.texture->GetNativeHandle()));
+			shader->SetInt("u_AlbedoMap", 0);
+			shader->SetInt("u_HasAlbedoMap", 1);
 		}
 		else
 		{
-			shader->SetInt("u_HasTexture", 0);
-			glBindTexture(GL_TEXTURE_2D, 0);
+			shader->SetInt("u_HasAlbedoMap", 0);
 		}
+
+		if (material.normalMap)
+		{
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.normalMap->GetNativeHandle()));
+
+			shader->SetInt("u_NormalMap", 1);
+			shader->SetInt("u_HasNormalMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasNormalMap", 0);
+		}
+
+		if (material.emissionMap)
+		{
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.emissionMap->GetNativeHandle()));
+
+			shader->SetInt("u_EmissionMap", 2);
+			shader->SetInt("u_HasEmissionMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasEmissionMap", 0);
+		}
+
+		glActiveTexture(GL_TEXTURE0);
 	};
 
 	bindMaterialToShader(m_Shader3D);

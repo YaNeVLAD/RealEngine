@@ -155,7 +155,7 @@ private:
 				.position = PaddleSpawnPos,
 				.scale = { PaddleWidth, PaddleHeight, PaddleDepth },
 			})
-			.Add<re::MaterialComponent>(re::Material{ .texture = paddleTex })
+			.Add<re::MaterialComponent>(re::Material{ .albedoMap = paddleTex })
 			.Add<re::StaticMeshComponent3D>(m_cubeMesh);
 
 		scene.CreateEntity()
@@ -177,7 +177,7 @@ private:
 				.rotation = { 0.f, 135.f, 0.f },
 				.scale = { BallRadius * 2.f, BallRadius * 2.f, BallRadius * 2.f },
 			})
-			.Add<re::MaterialComponent>(re::Material{ .texture = ballTex })
+			.Add<re::MaterialComponent>(re::Material{ .albedoMap = ballTex })
 			.Add<re::StaticMeshComponent3D>(m_sphereMesh);
 	}
 
@@ -194,7 +194,7 @@ private:
 				.rotation = { 5.f, 180.f, 0.f },
 				.scale = arcanoid::constants::BgScale,
 			})
-			.Add<re::MaterialComponent>(re::Material{ .texture = bgTex })
+			.Add<re::MaterialComponent>(re::Material{ .albedoMap = bgTex })
 			.Add<re::StaticMeshComponent3D>(m_cubeMesh);
 
 		constexpr float WALL_THICKNESS = 5.0f;
@@ -297,7 +297,7 @@ private:
 						.position = { LevelStartX + col * SpacingX, 0.f, LevelStartZ + row * SpacingZ },
 						.scale = { BrickWidth, BrickHeight, BrickDepth },
 					})
-					.Add<re::MaterialComponent>(re::Material{ .texture = currentTex })
+					.Add<re::MaterialComponent>(re::Material{ .albedoMap = currentTex })
 					.Add<re::StaticMeshComponent3D>(m_cubeMesh);
 			}
 		}

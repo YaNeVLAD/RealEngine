@@ -21,4 +21,13 @@ constexpr Vector4<T>::Vector4(T x, T y, T z, T w) noexcept
 {
 }
 
+template <typename T>
+constexpr Vector4<T>::Vector4(const Vector3<T>& v, T w) noexcept
+	: x(v.x)
+	, y(v.y)
+	, z(v.z)
+	, w(w)
+{
+}
+
 } // namespace re

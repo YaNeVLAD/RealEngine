@@ -123,7 +123,7 @@ private:
 					const auto textureIndex = rand() % 6 + 1;
 					const auto texture = m_manager.Get<re::Texture>(re::String("maze/" + std::to_string(textureIndex) + ".png"));
 					re::Material material{
-						.texture = texture,
+						.albedoMap = texture,
 					};
 
 					scene.CreateEntity() // Wall

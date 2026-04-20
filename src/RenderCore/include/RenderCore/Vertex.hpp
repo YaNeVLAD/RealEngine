@@ -19,6 +19,8 @@ struct Vertex
 	Vector4i boneIDs = Vector4i(-1);
 	Vector4f boneWeights = Vector4f(0.f);
 
+	Vector4f tangent = { 0.f, 0.f, 0.f, 1.f };
+
 	bool operator==(Vertex const&) const = default;
 };
 

@@ -48,7 +48,7 @@ public:
 				.rotation = { 0.f, 0.f, 180.f },
 				.scale = { 0.75f, 0.75f, 0.75f },
 			})
-			.Add<re::MaterialComponent>(re::Material{ .texture = texture })
+			.Add<re::MaterialComponent>(re::Material{ .albedoMap = texture })
 			.Add<re::StaticMeshComponent3D>(mesh);
 	}
 

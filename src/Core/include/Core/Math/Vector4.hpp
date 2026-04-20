@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Core/Math/Vector3.hpp>
+
 namespace re
 {
 
@@ -10,6 +12,7 @@ struct Vector4
 
 	constexpr explicit Vector4(T value) noexcept;
 	constexpr Vector4(T x, T y, T z, T w) noexcept;
+	constexpr Vector4(const Vector3<T>& v, T w) noexcept;
 
 	constexpr bool operator==(const Vector4&) const = default;
 
