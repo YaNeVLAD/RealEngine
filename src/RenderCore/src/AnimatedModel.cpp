@@ -197,8 +197,6 @@ void ParseNodeRecursive(
 			if (primitive.material >= 0)
 			{
 				const tinygltf::Material& gltfMat = gltfModel.materials[primitive.material];
-
-				// Базовый цвет (Albedo)
 				if (gltfMat.pbrMetallicRoughness.baseColorFactor.size() == 4)
 				{
 					const auto& c = gltfMat.pbrMetallicRoughness.baseColorFactor;
@@ -209,7 +207,6 @@ void ParseNodeRecursive(
 					part.material.ambient = part.material.diffuse;
 				}
 
-				// Вспомогательная лямбда для извлечения любой текстуры
 				auto LoadTextureFromIndex = [&](const int texIndex) -> std::shared_ptr<re::Texture> {
 					if (texIndex < 0)
 					{
@@ -224,11 +221,10 @@ void ParseNodeRecursive(
 					const tinygltf::Image& gltfImg = gltfModel.images[gltfTex.source];
 
 					std::shared_ptr<re::Texture> result = nullptr;
-
 					if (!gltfImg.uri.empty())
 					{
-						std::filesystem::path modelPath(pathStr);
-						std::filesystem::path texPath = modelPath.parent_path() / gltfImg.uri;
+						const std::filesystem::path modelPath(pathStr);
+						const std::filesystem::path texPath = modelPath.parent_path() / gltfImg.uri;
 						result = manager->Get<re::Texture>(re::String(texPath));
 					}
 					else if (gltfImg.bufferView >= 0)

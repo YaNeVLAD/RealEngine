@@ -78,6 +78,12 @@ void EntityWrapper<TScene>::Destroy()
 }
 
 template <typename TScene>
+bool EntityWrapper<TScene>::IsValid() const
+{
+	return m_scene->IsValid(m_id);
+}
+
+template <typename TScene>
 auto EntityWrapper<TScene>::operator<=>(EntityWrapper const& other) const
 {
 	return m_id <=> other.m_id;

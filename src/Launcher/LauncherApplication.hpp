@@ -39,177 +39,77 @@ struct MenuLayout final : re::Layout
 
 		scene.CreateEntity()
 			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::LightComponent>(re::LightComponent::CreateDirectional(
-				re::Color{ 255, 240, 220, 255 },
-				re::Color{ 80, 80, 80, 255 }))
+			.Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
 			.Add<re::TransformComponent>({
-				.rotation = { -45.f, 45.f, 0.f },
+				.position = { 4.0f, 1.0f, 6.0f },
+				.rotation = { 37.f, 3.f, 107.f },
 			});
 
-		auto camera = scene.FindFirstWith<re::CameraComponent>();
-		auto& cc = camera.Get<re::CameraComponent>();
-		cc.farClip = 1'000'000.f;
-		camera
-			.Add<re::RigidBodyComponent>({
-				.type = re::physics::BodyType::Dynamic,
-				.collider = re::physics::Collider{
-					.type = re::physics::ColliderType::Sphere,
-					.radius = 1.f,
-				},
-				.mass = 50.0f,
-				.friction = 0.0f,
-				.gravityFactor = 0.0f,
-				.linearDamping = 10.0f,
-				.lockRotation = re::Vector3(true),
-			});
-
-		auto [solidV, solidI] = re::detail::PrimitiveBuilder::CreateOctahedron(false);
-		auto [wireV, wireI] = re::detail::PrimitiveBuilder::CreateOctahedron(true);
-
-		const auto texture = m_manager.Get<re::Texture>("0.png");
-		re::Material material;
-		material.albedoMap = texture;
-		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::White);
-		scene
-			.CreateEntity()
-			.Add<re::MaterialComponent>(material)
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::detail::OpaqueTag>()
-			.Add<re::TransformComponent>({ .position = { 3.f, 0.f, -5.f } })
-			.Add<re::StaticMeshComponent3D>(cubeV, cubeI);
-
-		constexpr std::size_t gridSize = 1;
-		constexpr float spacing = 3.0f;
-		constexpr float offset = (gridSize - 1) * spacing * 0.5f;
-
-		auto solidMesh = std::make_shared<re::StaticMesh>(solidV, solidI);
-		auto wireframeMesh = std::make_shared<re::StaticMesh>(wireV, wireI);
-		for (std::size_t x = 0; x < gridSize; ++x)
+		if (auto camera = scene.FindFirstWith<re::CameraComponent>(); camera.IsValid())
 		{
-			for (std::size_t y = 0; y < gridSize; ++y)
-			{
-				for (std::size_t z = 0; z < gridSize; ++z)
-				{
-					const float posX = x * spacing - offset;
-					const float posY = y * spacing - offset;
-					const float posZ = (z * spacing - offset) - 10.f;
-
-					scene.CreateEntity()
-						.Add<re::detail::TransparentTag>()
-						.Add<re::Dirty<re::TransformComponent>>()
-						.Add<re::TransformComponent>({
-							.position = { posX, posY, posZ },
-							.scale = { 1.0f, 1.0f, 1.0f },
-						})
-						.Add<re::StaticMeshComponent3D>(solidMesh, false);
-
-					scene.CreateEntity()
-						.Add<re::detail::TransparentTag>()
-						.Add<re::Dirty<re::TransformComponent>>()
-						.Add<re::TransformComponent>({
-							.position = { posX, posY, posZ },
-							.scale = { 1.0f, 1.0f, 1.0f },
-						})
-						.Add<re::StaticMeshComponent3D>(wireframeMesh, true);
-				}
-			}
+			camera.Get<re::CameraComponent>().farClip = 1000.f;
 		}
 
-		const auto model = m_manager.Get<re::Model>("model/Tank1.obj");
-		if (model)
-		{
-			for (const auto& [vertices, indices, material] : model->GetParts())
-			{
-				std::vector<re::Vector3f> positions;
-				positions.reserve(vertices.size());
-				std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
-					return vertex.position;
-				});
-
-				m_tempCollisionMeshes.push_back(std::move(positions));
-
-				const auto& safePositions = m_tempCollisionMeshes.back();
-
-				scene.CreateEntity()
-					.Add<re::RigidBodyComponent>({
-						.type = re::physics::BodyType::Static,
-						.collider = re::physics::Collider{
-							.type = re::physics::ColliderType::TriangleMesh,
-							.vertices = safePositions.data(),
-							.vertexCount = safePositions.size(),
-							.indices = indices.data(),
-							.indexCount = indices.size(),
-						},
-						.friction = 0.5f,
-						.restitution = 0.f,
-					})
-					.Add<re::Dirty<re::TransformComponent>>()
-					.Add<re::TransformComponent>({
-						.position = { 0.f, -1.f, -5.f },
-						.rotation = { 0.f, 180.f, 0.f },
-						.scale = re::Vector3f(1.f),
-					})
-					.Add<re::detail::OpaqueTag>()
-					.Add<re::MaterialComponent>(material)
-					.Add<re::StaticMeshComponent3D>(vertices, indices);
-			}
-		}
-
-		const auto animatedModel = m_manager.Get<re::AnimatedModel>("model/Tank1.glb");
-		if (animatedModel)
-		{
-			for (const auto& [vertices, indices, material] : animatedModel->GetParts())
-			{
-				std::vector<re::Vector3f> positions;
-				positions.reserve(vertices.size());
-				std::ranges::transform(vertices, std::back_inserter(positions), [](const auto& vertex) {
-					return vertex.position;
-				});
-
-				m_tempCollisionMeshes.push_back(std::move(positions));
-
-				const auto& safePositions = m_tempCollisionMeshes.back();
-
-				scene.CreateEntity()
-					.Add<re::RigidBodyComponent>({
-						.type = re::physics::BodyType::Static,
-						.collider = re::physics::Collider{
-							.type = re::physics::ColliderType::TriangleMesh,
-							.vertices = safePositions.data(),
-							.vertexCount = safePositions.size(),
-							.indices = indices.data(),
-							.indexCount = indices.size(),
-						},
-						.friction = 0.5f,
-						.restitution = 0.f,
-					})
-					.Add<re::Dirty<re::TransformComponent>>()
-					.Add<re::TransformComponent>({
-						.position = { -3.f, -1.f, -5.f },
-						.rotation = { 0.f, 180.f, 0.f },
-						.scale = re::Vector3f(1.f),
-					})
-					.Add<re::detail::OpaqueTag>()
-					.Add<re::MaterialComponent>(material)
-					.Add<re::StaticMeshComponent3D>(vertices, indices);
-			}
-		}
+		ReplaceModel("model/Model.obj");
 	}
 
 	void OnAttach() override
 	{
 		GetApplication().SetUIOverlayActive(false);
-		m_window.SetBackgroundColor(re::Color::White);
+		m_window.SetBackgroundColor(re::Color::Gray);
 	}
 
 	void OnUIDraw() override
 	{
-		ImGui::Begin("Engine Debug");
-		ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-		ImGui::Text("Delta Time: %.4f sec", ImGui::GetIO().DeltaTime);
-		if (ImGui::Button("Click Me!"))
+		ImGui::Begin("Scene Settings");
+
+		if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			static char pathBuffer[256] = "model/Model.obj";
+			ImGui::InputText("File Path", pathBuffer, sizeof(pathBuffer));
+
+			if (ImGui::Button("Load Model", ImVec2(-1, 0)))
+			{
+				ReplaceModel(pathBuffer);
+			}
 		}
+
+		if (!m_modelEntities.empty())
+		{
+			if (ImGui::CollapsingHeader("Model Transform", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				bool changed = false;
+
+				changed |= ImGui::DragFloat3("Position", &m_modelPos.x, 0.1f);
+				changed |= ImGui::DragFloat3("Rotation", &m_modelRot.x, 1.0f);
+				changed |= ImGui::DragFloat3("Scale", &m_modelScale.x, 0.05f);
+
+				if (changed)
+				{
+					UpdateModelTransforms();
+				}
+			}
+		}
+
+		ImGui::Separator();
+
+		for (auto&& [entity, light, transform] : *GetScene().CreateView<re::LightComponent, re::TransformComponent>())
+		{
+			if (ImGui::CollapsingHeader("Light Editor"))
+			{
+				ImGui::DragFloat3("Light Pos", &transform.position.x, 0.1f);
+
+				float color[3] = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
+				if (ImGui::ColorEdit3("Color", color))
+				{
+					light.diffuse = re::Color(color[0] * 255.f, color[1] * 255.f, color[2] * 255.f);
+				}
+
+				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
+				ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
+			}
+		}
+
 		ImGui::End();
 	}
 
@@ -260,6 +160,76 @@ struct MenuLayout final : re::Layout
 	}
 
 private:
+	void UpdateModelTransforms()
+	{
+		auto& scene = GetScene();
+		for (const auto entity : m_modelEntities)
+		{
+			if (scene.IsValid(entity))
+			{
+				auto& transform = scene.GetComponent<re::TransformComponent>(entity);
+				transform.position = m_modelPos;
+				transform.rotation = m_modelRot;
+				transform.scale = m_modelScale;
+
+				scene.MakeDirty<re::TransformComponent>(entity);
+			}
+		}
+	}
+
+	void ReplaceModel(const re::String& path)
+	{
+		auto& scene = GetScene();
+
+		for (const auto entity : m_modelEntities)
+		{
+			if (scene.IsValid(entity))
+			{
+				scene.DestroyEntity(entity);
+			}
+		}
+		m_modelEntities.clear();
+
+		std::vector<re::render::MeshPart> meshParts;
+		if (path.Find(".obj") != re::String::NPos)
+		{
+			const auto model = m_manager.Get<re::Model>(path);
+			if (model)
+			{
+				meshParts = model->GetParts();
+			}
+		}
+		else if (path.Find(".glb") != re::String::NPos || path.Find(".gltf") != re::String::NPos)
+		{
+			const auto model = m_manager.Get<re::AnimatedModel>(path);
+			if (model)
+			{
+				meshParts = model->GetParts();
+			}
+		}
+
+		for (const auto& [vertices, indices, material] : meshParts)
+		{
+			auto entity = scene.CreateEntity()
+							  .Add<re::Dirty<re::TransformComponent>>()
+							  .Add<re::TransformComponent>({
+								  .position = m_modelPos,
+								  .rotation = m_modelRot,
+								  .scale = m_modelScale,
+							  })
+							  .Add<re::detail::OpaqueTag>()
+							  .Add<re::MaterialComponent>(material)
+							  .Add<re::StaticMeshComponent3D>(vertices, indices);
+
+			m_modelEntities.push_back(entity.GetEntity());
+		}
+	}
+
+	std::vector<re::ecs::Entity> m_modelEntities;
+	re::Vector3f m_modelPos = { 0.f, 0.f, 0.f };
+	re::Vector3f m_modelRot = { 0.f, 0.f, 0.f };
+	re::Vector3f m_modelScale = { 1.f, 1.f, 1.f };
+
 	re::ecs::Entity m_solid = re::ecs::Entity::INVALID_ID;
 	re::ecs::Entity m_wireframe = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;

@@ -36,6 +36,8 @@ public:
 
 	void Destroy();
 
+	[[nodiscard]] bool IsValid() const;
+
 	auto operator<=>(EntityWrapper const& other) const;
 
 	bool operator==(EntityWrapper const& other) const;
