@@ -196,31 +196,7 @@ void ParseNodeRecursive(
 			part.material = re::Material();
 			if (primitive.material >= 0)
 			{
-				const tinygltf::Material& gltfMat = gltfModel.materials[primitive.material];
-				float roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
-				part.material.shininess = std::max((1.0f - roughness) * 128.0f, 1.0f);
-
-				if (gltfMat.emissiveFactor.size() == 3)
-				{
-					part.material.emission = re::Color{
-						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[0], 0.0, 1.0) * 255.0f),
-						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[1], 0.0, 1.0) * 255.0f),
-						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[2], 0.0, 1.0) * 255.0f),
-						255
-					};
-				}
-
-				if (gltfMat.pbrMetallicRoughness.baseColorFactor.size() == 4)
-				{
-					const auto& c = gltfMat.pbrMetallicRoughness.baseColorFactor;
-					part.material.diffuse = re::Color{
-						static_cast<uint8_t>(c[0] * 255.0f), static_cast<uint8_t>(c[1] * 255.0f),
-						static_cast<uint8_t>(c[2] * 255.0f), static_cast<uint8_t>(c[3] * 255.0f)
-					};
-					part.material.ambient = part.material.diffuse;
-				}
-
-				auto LoadTextureFromIndex = [&](const int texIndex) -> std::shared_ptr<re::Texture> {
+				auto LoadTextureFromIndex = [&](const int texIndex, const bool srgb) -> std::shared_ptr<re::Texture> {
 					if (texIndex < 0)
 					{
 						return nullptr;
@@ -233,12 +209,17 @@ void ParseNodeRecursive(
 					const tinygltf::Texture& gltfTex = gltfModel.textures[texIndex];
 					const tinygltf::Image& gltfImg = gltfModel.images[gltfTex.source];
 
-					std::shared_ptr<re::Texture> result = nullptr;
+					auto result = std::make_shared<re::Texture>();
+					bool loaded = false;
+					re::String texCacheKey;
+
 					if (!gltfImg.uri.empty())
 					{
 						const std::filesystem::path modelPath(pathStr);
 						const std::filesystem::path texPath = modelPath.parent_path() / gltfImg.uri;
-						result = manager->Get<re::Texture>(re::String(texPath));
+						texCacheKey = re::String(texPath);
+
+						loaded = result->LoadFromFileSRGB(texCacheKey, srgb);
 					}
 					else if (gltfImg.bufferView >= 0)
 					{
@@ -247,24 +228,45 @@ void ParseNodeRecursive(
 						const unsigned char* rawImageData = &buffer.data[bufferView.byteOffset];
 						const std::size_t rawImageSize = bufferView.byteLength;
 
-						result = std::make_shared<re::Texture>();
-						if (!result->LoadFromMemory(rawImageData, rawImageSize))
-						{
-							result = nullptr;
-						}
+						texCacheKey = re::String(pathStr + "_tex_" + std::to_string(texIndex));
+
+						// Используем специфичный метод загрузки из памяти
+						loaded = result->LoadFromMemorySRGB(rawImageData, rawImageSize, srgb);
 					}
 
-					if (result)
+					if (loaded)
 					{
 						textureCache[texIndex] = result;
+						const_cast<re::AssetManager*>(manager)->Add(texCacheKey, result);
+
+						return result;
 					}
 
-					return result;
+					return nullptr;
 				};
 
-				part.material.albedoMap = LoadTextureFromIndex(gltfMat.pbrMetallicRoughness.baseColorTexture.index);
-				part.material.normalMap = LoadTextureFromIndex(gltfMat.normalTexture.index);
-				part.material.emissionMap = LoadTextureFromIndex(gltfMat.emissiveTexture.index);
+				const tinygltf::Material& gltfMat = gltfModel.materials[primitive.material];
+				auto& mat = part.material;
+
+				mat.workflow = re::MaterialWorkflow::PBR;
+
+				mat.metallicFactor = static_cast<float>(gltfMat.pbrMetallicRoughness.metallicFactor);
+				mat.roughnessFactor = static_cast<float>(gltfMat.pbrMetallicRoughness.roughnessFactor);
+
+				int albedoIdx = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
+				mat.albedoMap = LoadTextureFromIndex(albedoIdx, true);
+
+				int mrIdx = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+				mat.metallicRoughnessMap = LoadTextureFromIndex(mrIdx, false);
+
+				int normIdx = gltfMat.normalTexture.index;
+				mat.normalMap = LoadTextureFromIndex(normIdx, false);
+
+				int emisIdx = gltfMat.emissiveTexture.index;
+				mat.emissionMap = LoadTextureFromIndex(emisIdx, true);
+
+				int aoIdx = gltfMat.occlusionTexture.index;
+				mat.ambientOcclusionMap = LoadTextureFromIndex(aoIdx, false);
 			}
 
 			outParts.push_back(std::move(part));

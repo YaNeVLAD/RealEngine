@@ -192,9 +192,13 @@ struct MaterialComponent
 	{
 	}
 
-	explicit MaterialComponent(const Color ambient, const Color diffuse, const Color specular, const Color emission, const float shininess = 32.f)
-		: data(ambient, diffuse, specular, emission, shininess)
+	explicit MaterialComponent([[maybe_unused]] const Color ambient, const Color diffuse, const Color specular, const Color emission, const float shininess = 32.f)
 	{
+		data.workflow = MaterialWorkflow::BlinnPhong;
+		data.albedoColor = diffuse;
+		data.specularColor = specular;
+		data.emissionColor = emission;
+		data.shininess = shininess;
 	}
 
 	bool operator==(MaterialComponent const&) const = default;

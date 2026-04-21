@@ -24,9 +24,10 @@ public:
 
 	[[nodiscard]] void* GetNativeHandle();
 
-	bool LoadFromMemory(const std::uint8_t* data, std::size_t size);
+	bool LoadFromMemorySRGB(const std::uint8_t* data, std::size_t size, bool srgb = false);
 
 	bool LoadFromFile(String const& filePath, const AssetManager* manager) override;
+	bool LoadFromFileSRGB(String const& filePath, bool srgb);
 
 private:
 	std::uint32_t m_width{};

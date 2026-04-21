@@ -17,6 +17,17 @@
 #define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
 #endif
 
+#ifndef GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT 0x8C4D
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
+#endif
+
+#ifndef GL_SRGB8
+#define GL_SRGB8 0x8C41
+#define GL_SRGB8_ALPHA8 0x8C43
+#endif
+
 namespace re
 {
 
@@ -76,7 +87,7 @@ void* Texture::GetNativeHandle()
 	return &m_rendererID;
 }
 
-bool Texture::LoadFromMemory(const std::uint8_t* data, std::size_t size)
+bool Texture::LoadFromMemorySRGB(const std::uint8_t* data, const std::size_t size, const bool srgb)
 {
 	int width, height, channels;
 
@@ -86,7 +97,7 @@ bool Texture::LoadFromMemory(const std::uint8_t* data, std::size_t size)
 
 	if (!pixels)
 	{
-		std::cerr << "Texture::LoadFromMemory: Failed to decode image from memory!" << std::endl;
+		std::cerr << "Texture::LoadFromMemorySRGB: Failed to decode image from memory!" << std::endl;
 		return false;
 	}
 
@@ -100,7 +111,8 @@ bool Texture::LoadFromMemory(const std::uint8_t* data, std::size_t size)
 
 	glBindTexture(GL_TEXTURE_2D, m_rendererID);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	const GLenum internalFormat = srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8;
+	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -115,6 +127,11 @@ bool Texture::LoadFromMemory(const std::uint8_t* data, std::size_t size)
 }
 
 bool Texture::LoadFromFile(String const& filePath, const AssetManager*)
+{
+	return LoadFromFileSRGB(filePath, false);
+}
+
+bool Texture::LoadFromFileSRGB(String const& filePath, bool srgb)
 {
 	using namespace re::render;
 
@@ -143,17 +160,17 @@ bool Texture::LoadFromFile(String const& filePath, const AssetManager*)
 
 	if (format == TextureFormat::DXT1 || format == TextureFormat::DXT3 || format == TextureFormat::DXT5)
 	{
-		GLenum glFormat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+		GLenum glFormat = srgb ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 		unsigned int blockSize = 8;
 
 		if (format == TextureFormat::DXT3)
 		{
-			glFormat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+			glFormat = srgb ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 			blockSize = 16;
 		}
 		else if (format == TextureFormat::DXT5)
 		{
-			glFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+			glFormat = srgb ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 			blockSize = 16;
 		}
 
@@ -181,19 +198,26 @@ bool Texture::LoadFromFile(String const& filePath, const AssetManager*)
 	}
 	else
 	{
-		const GLenum glFormat = (format == TextureFormat::RGB) ? GL_RGB : GL_RGBA;
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
+		const GLenum dataFormat = (format == TextureFormat::RGB) ? GL_RGB : GL_RGBA;
+		GLenum internalFormat;
+
+		if (srgb)
+		{
+			internalFormat = (format == TextureFormat::RGB) ? GL_SRGB8 : GL_SRGB8_ALPHA8;
+		}
+		else
+		{
+			internalFormat = (format == TextureFormat::RGB) ? GL_RGB8 : GL_RGBA8;
+		}
+
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat,
 			static_cast<int>(m_width), static_cast<int>(m_height),
-			0, glFormat, GL_UNSIGNED_BYTE, buffer.data());
+			0, dataFormat, GL_UNSIGNED_BYTE, buffer.data());
 
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	}
-
-	// GLfloat maxAnisotropy;
-	// glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAnisotropy);
-	// glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, maxAnisotropy);
 
 	return true;
 }

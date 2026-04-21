@@ -69,14 +69,17 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 	std::vector<Material> engineMaterials;
 	engineMaterials.reserve(materials.size());
 
-	auto loadTex = [&](const std::string& texName) -> std::shared_ptr<Texture> {
+	auto loadTex = [&](const std::string& texName, const bool srgb) -> std::shared_ptr<Texture> {
 		if (texName.empty())
 		{
 			return nullptr;
 		}
-		const std::string texPath = baseDir + texName;
-		if (auto texture = manager->Get<Texture>(String(texPath)))
+		const String texPath = baseDir + texName;
+
+		if (auto texture = std::make_shared<Texture>(); texture->LoadFromFileSRGB(texPath, srgb))
 		{
+			const_cast<AssetManager*>(manager)->Add(texPath, texture);
+
 			std::cout << "  [Texture Loaded]: " << texPath << std::endl;
 
 			return texture;
@@ -89,19 +92,18 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 	for (const auto& mat : materials)
 	{
 		Material engineMat{
-			.ambient = TinyObjColorToColor(mat.ambient),
-			.diffuse = TinyObjColorToColor(mat.diffuse),
-			.specular = TinyObjColorToColor(mat.specular),
-			.emission = TinyObjColorToColor(mat.emission),
+			.workflow = MaterialWorkflow::BlinnPhong,
+			.albedoColor = TinyObjColorToColor(mat.diffuse),
+			.emissionColor = TinyObjColorToColor(mat.emission),
+			.specularColor = TinyObjColorToColor(mat.specular),
 			.shininess = mat.shininess > 0.0f ? mat.shininess : 32.0f,
 		};
 
-		engineMat.albedoMap = loadTex(mat.diffuse_texname);
+		engineMat.albedoMap = loadTex(mat.diffuse_texname, true);
+		engineMat.emissionMap = loadTex(mat.emissive_texname, true);
 
 		std::string normalName = !mat.normal_texname.empty() ? mat.normal_texname : mat.bump_texname;
-		engineMat.normalMap = loadTex(normalName);
-
-		engineMat.emissionMap = loadTex(mat.emissive_texname);
+		engineMat.normalMap = loadTex(normalName, false);
 
 		engineMaterials.emplace_back(engineMat);
 	}

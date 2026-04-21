@@ -24,4 +24,10 @@ std::shared_ptr<T> AssetManager::Get(file_system::AssetsPath const& path) const
 	return nullptr;
 }
 
+template <std::derived_from<IAsset> T>
+void AssetManager::Add(file_system::AssetsPath const& name, std::shared_ptr<T> asset)
+{
+	m_assets[name.Str()] = asset;
+}
+
 } // namespace re
