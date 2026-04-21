@@ -195,9 +195,12 @@ constexpr auto s_FragmentShader3D = UR"(
 		vec3 diffuseLight = u_MaterialDiffuseLighting * diffuseIntensity;
 
         // Specular
-		vec3 reflectDir = reflect(lightDir, surfaceNormal);
-        float specFactor = pow(max(dot(reflectDir, viewDir), 0.0), u_MaterialShininess);
-        vec3 specularLight = u_MaterialSpecularLighting * specFactor;
+		float specFactor = 0.0;
+		if (diffuseIntensity > 0.0) {
+			vec3 reflectDir = reflect(-lightDir, surfaceNormal);
+			specFactor = pow(max(dot(viewDir, reflectDir), 0.0), max(u_MaterialShininess, 1.0));
+		}
+		vec3 specularLight = u_MaterialSpecularLighting * specFactor;
 
 		vec3 finalAmbient = ambientLight * surfaceColor.rgb;
        	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect;
@@ -205,7 +208,13 @@ constexpr auto s_FragmentShader3D = UR"(
 
 		vec3 finalEmission = u_MaterialEmission;
 		if (u_HasEmissionMap != 0) {
-			finalEmission += texture(u_EmissionMap, v_TexCoord).rgb;
+			vec3 texEmission = texture(u_EmissionMap, v_TexCoord).rgb;
+
+			if (length(u_MaterialEmission) > 0.001) {
+               finalEmission = u_MaterialEmission * texEmission;
+			} else {
+               finalEmission = texEmission;
+			}
 		}
 
 		vec3 finalColor = finalEmission + finalAmbient + finalDiffuse + finalSpecular;

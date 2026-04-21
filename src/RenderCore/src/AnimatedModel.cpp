@@ -197,6 +197,19 @@ void ParseNodeRecursive(
 			if (primitive.material >= 0)
 			{
 				const tinygltf::Material& gltfMat = gltfModel.materials[primitive.material];
+				float roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
+				part.material.shininess = std::max((1.0f - roughness) * 128.0f, 1.0f);
+
+				if (gltfMat.emissiveFactor.size() == 3)
+				{
+					part.material.emission = re::Color{
+						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[0], 0.0, 1.0) * 255.0f),
+						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[1], 0.0, 1.0) * 255.0f),
+						static_cast<uint8_t>(std::clamp(gltfMat.emissiveFactor[2], 0.0, 1.0) * 255.0f),
+						255
+					};
+				}
+
 				if (gltfMat.pbrMetallicRoughness.baseColorFactor.size() == 4)
 				{
 					const auto& c = gltfMat.pbrMetallicRoughness.baseColorFactor;

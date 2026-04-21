@@ -89,7 +89,7 @@ struct EditorLayout final : re::Layout
 	void OnAttach() override
 	{
 		GetApplication().SetUIOverlayActive(false);
-		m_window.SetBackgroundColor(re::Color::Gray);
+		m_window.SetBackgroundColor(re::Color(63, 63, 63));
 	}
 
 	void OnUIDraw() override
