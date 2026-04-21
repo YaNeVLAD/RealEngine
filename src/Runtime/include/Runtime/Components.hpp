@@ -158,7 +158,7 @@ struct LightComponent
 		return l;
 	}
 
-	static LightComponent CreatePoint(const Color diffuse = Color::White, const float linearAtt = 0.09f, const float quadAtt = 0.032f)
+	static LightComponent CreatePoint(const Color diffuse = Color::White, const float linearAtt = 0.007f, const float quadAtt = 0.0002f)
 	{
 		LightComponent l;
 		l.type = LightType::Point;

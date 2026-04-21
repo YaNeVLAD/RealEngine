@@ -106,7 +106,7 @@ constexpr auto s_VertexShader3D = UR"(
     }
 )";
 
-constexpr auto s_FragmentShader3D = UR"(
+constexpr auto s_FragmentShader3DPhong = UR"(
     #version 450 core
     layout(location = 0) out vec4 o_Color;
 
@@ -220,6 +220,146 @@ constexpr auto s_FragmentShader3D = UR"(
 		vec3 finalColor = finalEmission + finalAmbient + finalDiffuse + finalSpecular;
 
 		o_Color = vec4(finalColor, surfaceColor.a);
+    }
+)";
+
+constexpr auto s_FragmentShaderPBR = UR"(
+    #version 450 core
+    layout(location = 0) out vec4 o_Color;
+
+    in vec4 v_Color;
+    in vec2 v_TexCoord;
+    in vec3 v_Normal;
+    in vec3 v_FragmentWorldPos;
+    in mat3 v_TBN;
+
+    uniform vec3 u_AlbedoColor;
+    uniform vec3 u_EmissionColor;
+    uniform float u_MetallicFactor;
+    uniform float u_RoughnessFactor;
+
+    uniform sampler2D u_AlbedoMap;             uniform int u_HasAlbedoMap;
+    uniform sampler2D u_NormalMap;             uniform int u_HasNormalMap;
+    uniform sampler2D u_EmissionMap;           uniform int u_HasEmissionMap;
+    uniform sampler2D u_MetallicRoughnessMap;  uniform int u_HasMetallicRoughnessMap;
+    uniform sampler2D u_AOMap;                 uniform int u_HasAOMap;
+
+    uniform int u_LightType;
+    uniform vec3 u_LightPos;
+    uniform vec3 u_LightDir;
+    uniform vec3 u_LightColor;
+    uniform float u_LightConstant;
+    uniform float u_LightLinear;
+    uniform float u_LightQuadratic;
+    uniform float u_LightCutOff;   // ДОБАВЛЕНО ДЛЯ SPOTLIGHT
+    uniform float u_LightExponent; // ДОБАВЛЕНО ДЛЯ SPOTLIGHT
+
+    uniform vec3 u_CameraPos;
+
+    const float PI = 3.14159265359;
+
+    vec3 sRGBToLinear(vec3 srgbIn) { return pow(srgbIn, vec3(2.2)); }
+    vec3 linearToSRGB(vec3 linearIn) { return pow(linearIn, vec3(1.0 / 2.2)); }
+
+    float DistributionGGX(vec3 N, vec3 H, float roughness) {
+        float a = roughness * roughness;
+        float a2 = a * a;
+        float NdotH = max(dot(N, H), 0.0);
+        float NdotH2 = NdotH * NdotH;
+        float num = a2;
+        float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+        denom = PI * denom * denom;
+        return num / max(denom, 0.0000001);
+    }
+
+    float GeometrySchlickGGX(float NdotV, float roughness) {
+        float r = (roughness + 1.0);
+        float k = (r * r) / 8.0;
+        float num = NdotV;
+        float denom = NdotV * (1.0 - k) + k;
+        return num / denom;
+    }
+
+    float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+        float NdotV = max(dot(N, V), 0.0);
+        float NdotL = max(dot(N, L), 0.0);
+        return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
+    }
+
+    vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+        return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    }
+)"
+									 UR"(
+    void main() {
+        vec4 albedoTex = u_HasAlbedoMap != 0 ? texture(u_AlbedoMap, v_TexCoord) : vec4(1.0);
+        vec3 albedo = sRGBToLinear(albedoTex.rgb) * u_AlbedoColor * v_Color.rgb;
+
+        float metallic = u_MetallicFactor;
+        float roughness = u_RoughnessFactor;
+        if (u_HasMetallicRoughnessMap != 0) {
+            vec4 mrTex = texture(u_MetallicRoughnessMap, v_TexCoord);
+            roughness *= mrTex.g;
+            metallic *= mrTex.b;
+        }
+
+        float ao = u_HasAOMap != 0 ? texture(u_AOMap, v_TexCoord).r : 1.0;
+
+        vec3 N = normalize(v_Normal);
+        if (u_HasNormalMap != 0) {
+            vec3 normalColor = texture(u_NormalMap, v_TexCoord).rgb * 2.0 - 1.0;
+            N = normalize(v_TBN * normalColor);
+        }
+
+        vec3 V = normalize(u_CameraPos - v_FragmentWorldPos);
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+        vec3 L = u_LightType == 0 ? normalize(u_LightDir) : normalize(u_LightPos - v_FragmentWorldPos);
+        vec3 H = normalize(V + L);
+
+        float attenuation = 1.0;
+        float spotEffect = 1.0;
+        if (u_LightType != 0) {
+            float dist = length(u_LightPos - v_FragmentWorldPos);
+            attenuation = 1.0 / (u_LightConstant + u_LightLinear * dist + u_LightQuadratic * (dist * dist));
+
+            // ВНЕДРЕНИЕ SPOTLIGHT ДЛЯ PBR
+            if (u_LightType == 2) {
+                float cosAlpha = dot(L, normalize(u_LightDir));
+                if (cosAlpha > u_LightCutOff) spotEffect = pow(cosAlpha, u_LightExponent);
+                else spotEffect = 0.0;
+            }
+        }
+        vec3 radiance = u_LightColor * attenuation * spotEffect;
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G   = GeometrySmith(N, V, L, roughness);
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;
+
+        float NdotL = max(dot(N, L), 0.0);
+        vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
+
+        vec3 ambient = vec3(0.03) * albedo * ao;
+        vec3 emission = u_EmissionColor;
+        if (u_HasEmissionMap != 0) {
+            vec3 texEmi = sRGBToLinear(texture(u_EmissionMap, v_TexCoord).rgb);
+            emission = length(u_EmissionColor) > 0.001 ? u_EmissionColor * texEmi : texEmi;
+        }
+
+        vec3 color = ambient + Lo + emission;
+
+        color = color / (color + vec3(1.0));
+        color = linearToSRGB(color);
+
+        o_Color = vec4(color, albedoTex.a * v_Color.a);
     }
 )";
 
@@ -490,9 +630,12 @@ void OpenGLRenderAPI::Init()
 	m_batchBuffer.reserve(MaxVertices);
 
 	m_Shader2D = std::make_shared<Shader>(s_VertexShaderSource, s_FragmentShaderSource);
-	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3D);
 
-	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3D);
+	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3DPhong);
+	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3DPhong);
+
+	m_ShaderPBR = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShaderPBR);
+	m_InstancedShaderPBR = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShaderPBR);
 
 	glGenBuffers(1, &m_instanceVBOId);
 	glGenBuffers(1, &m_normalVBOId);
@@ -868,7 +1011,6 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
 	m_InstancedShader3D->Bind();
-	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
 
 	mesh->GetVAO()->Bind();
@@ -934,10 +1076,10 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
 {
-	const glm::vec3 matAmb = ColorToVec3(material.ambient);
-	const glm::vec3 matDif = ColorToVec3(material.diffuse);
-	const glm::vec3 matSpec = ColorToVec3(material.specular);
-	const glm::vec3 matEmis = ColorToVec3(material.emission);
+	const glm::vec3 matAmb = ColorToVec3(material.albedoColor);
+	const glm::vec3 matDif = ColorToVec3(material.albedoColor);
+	const glm::vec3 matSpec = ColorToVec3(material.specularColor);
+	const glm::vec3 matEmis = ColorToVec3(material.emissionColor);
 
 	const glm::vec3 finalAmbient = m_activeLight.ambient * matAmb;
 	const glm::vec3 finalDiffuse = m_activeLight.diffuse * matDif;

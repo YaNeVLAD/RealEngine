@@ -194,6 +194,7 @@ void ParseNodeRecursive(
 			}
 
 			part.material = re::Material();
+			part.material.workflow = re::MaterialWorkflow::PBR;
 			if (primitive.material >= 0)
 			{
 				auto LoadTextureFromIndex = [&](const int texIndex, const bool srgb) -> std::shared_ptr<re::Texture> {
@@ -230,7 +231,6 @@ void ParseNodeRecursive(
 
 						texCacheKey = re::String(pathStr + "_tex_" + std::to_string(texIndex));
 
-						// Используем специфичный метод загрузки из памяти
 						loaded = result->LoadFromMemorySRGB(rawImageData, rawImageSize, srgb);
 					}
 

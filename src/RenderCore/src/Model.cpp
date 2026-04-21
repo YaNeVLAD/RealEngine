@@ -20,7 +20,7 @@ re::Color TinyObjColorToColor(const tinyobj::real_t* color)
 		static_cast<std::uint8_t>(color[0] * 255),
 		static_cast<std::uint8_t>(color[1] * 255),
 		static_cast<std::uint8_t>(color[2] * 255),
-		static_cast<std::uint8_t>(color[3] * 255),
+		255,
 	};
 }
 
