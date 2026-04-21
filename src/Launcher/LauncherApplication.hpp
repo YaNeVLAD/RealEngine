@@ -8,6 +8,8 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
+#include <Core/Revertible.hpp>
+
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 #include "Lab4/Arcanoid/ArcanoidLayout.hpp"
 #include "Lab4/Maze/MazeLayout.hpp"
@@ -19,15 +21,22 @@
 
 #include <deque>
 
-struct MenuLayout final : re::Layout
+struct EditorLayout final : re::Layout
 {
 	struct LightGizmoTag
 	{
 		bool dummy = false;
 	};
 
-	MenuLayout(re::Application& app, re::render::IWindow& window)
+	static constexpr re::Vector3f DEFAULT_LIGHT_POS = { 4.f, 6.f, -1.f };
+	static constexpr re::Vector3f DEFAULT_MODEL_POS = { 0.f, 0.f, 0.f };
+
+	EditorLayout(re::Application& app, re::render::IWindow& window)
 		: Layout(app)
+		, m_modelPos(DEFAULT_MODEL_POS)
+		, m_modelRot(re::Vector3f(0.f))
+		, m_modelScale(re::Vector3f(1.f))
+		, m_lightPos(DEFAULT_LIGHT_POS)
 		, m_window(window)
 	{
 	}
@@ -45,19 +54,19 @@ struct MenuLayout final : re::Layout
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
 
-		constexpr re::Vector3f LIGHT_POS = { 4.f, 6.f, -1.f };
-		const auto lightEntity = scene.CreateEntity()
-									 .Add<re::Dirty<re::TransformComponent>>()
-									 .Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
-									 .Add<re::TransformComponent>({
-										 .position = LIGHT_POS,
-										 .rotation = { 37.f, 107.f, 3.f },
-									 });
+		const auto lightEntity
+			= scene.CreateEntity()
+				  .Add<re::Dirty<re::TransformComponent>>()
+				  .Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
+				  .Add<re::TransformComponent>({
+					  .position = DEFAULT_LIGHT_POS,
+					  .rotation = { 37.f, 107.f, 3.f },
+				  });
 
 		scene.CreateEntity()
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
-				.position = LIGHT_POS,
+				.position = DEFAULT_LIGHT_POS,
 				.scale = re::Vector3f(0.25f),
 			})
 			.Add<re::detail::OpaqueTag>()
@@ -69,7 +78,7 @@ struct MenuLayout final : re::Layout
 
 		if (auto camera = scene.FindFirstWith<re::CameraComponent>(); camera.IsValid())
 		{
-			camera.Get<re::CameraComponent>().farClip = 1000.f;
+			camera.Get<re::CameraComponent>().farClip = 100'000.f;
 			auto& transform = camera.Get<re::TransformComponent>();
 			transform.position = { 0.f, 1.5f, 3.f };
 		}
@@ -104,14 +113,24 @@ struct MenuLayout final : re::Layout
 			{
 				bool changed = false;
 
-				changed |= ImGui::DragFloat3("Position", &m_modelPos.x, 0.1f);
-				changed |= ImGui::DragFloat3("Rotation", &m_modelRot.x, 1.0f);
-				changed |= ImGui::DragFloat3("Scale", &m_modelScale.x, 0.05f);
+				changed |= ImGui::DragFloat3("Position", &m_modelPos.RawRef().x, 0.1f);
+				changed |= ImGui::DragFloat3("Rotation", &m_modelRot.RawRef().x, 1.0f);
+				changed |= ImGui::DragFloat3("Scale", &m_modelScale.RawRef().x, 0.05f);
 
 				if (changed)
 				{
 					UpdateModelTransforms();
 				}
+
+				ImGui::BeginDisabled(!m_modelPos.Modified() && !m_modelRot.Modified() && !m_modelScale.Modified());
+				if (ImGui::Button("Reset Transform", ImVec2(-1, 0)))
+				{
+					m_modelPos.Reset();
+					m_modelRot.Reset();
+					m_modelScale.Reset();
+					UpdateModelTransforms();
+				}
+				ImGui::EndDisabled();
 			}
 		}
 
@@ -123,16 +142,21 @@ struct MenuLayout final : re::Layout
 		{
 			if (ImGui::CollapsingHeader("Light Editor"))
 			{
-				if (ImGui::DragFloat3("Light Pos", &transform.position.x, 0.1f))
-				{
-					GetScene().MakeDirty<re::TransformComponent>(entity);
+				bool changed = false;
+				changed |= ImGui::DragFloat3("Light Pos", &m_lightPos.RawRef().x, 0.1f);
 
-					for (auto&& [gEntity, tag, gTransform] : *gizmoView)
-					{
-						gTransform.position = transform.position;
-						GetScene().MakeDirty<re::TransformComponent>(gEntity);
-					}
+				if (changed)
+				{
+					UpdateLightTransforms(transform, gizmoView);
 				}
+
+				ImGui::BeginDisabled(!m_lightPos.Modified());
+				if (ImGui::Button("Reset Light Position", ImVec2(-1, 0)))
+				{
+					m_lightPos.Reset();
+					UpdateLightTransforms(transform, gizmoView);
+				}
+				ImGui::EndDisabled();
 
 				float color[3] = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
 				if (ImGui::ColorEdit3("Color", color))
@@ -195,6 +219,18 @@ struct MenuLayout final : re::Layout
 	}
 
 private:
+	void UpdateLightTransforms(re::TransformComponent& lightTransform, auto& gizmoView)
+	{
+		lightTransform.position = *m_lightPos;
+		GetScene().MakeDirty<re::TransformComponent>(m_lightEntity);
+
+		for (auto&& [gEntity, tag, gTransform] : *gizmoView)
+		{
+			gTransform.position = *m_lightPos;
+			GetScene().MakeDirty<re::TransformComponent>(gEntity);
+		}
+	}
+
 	void UpdateModelTransforms()
 	{
 		auto& scene = GetScene();
@@ -203,9 +239,9 @@ private:
 			if (scene.IsValid(entity))
 			{
 				auto& transform = scene.GetComponent<re::TransformComponent>(entity);
-				transform.position = m_modelPos;
-				transform.rotation = m_modelRot;
-				transform.scale = m_modelScale;
+				transform.position = *m_modelPos;
+				transform.rotation = *m_modelRot;
+				transform.scale = *m_modelScale;
 
 				scene.MakeDirty<re::TransformComponent>(entity);
 			}
@@ -248,9 +284,9 @@ private:
 			auto entity = scene.CreateEntity()
 							  .Add<re::Dirty<re::TransformComponent>>()
 							  .Add<re::TransformComponent>({
-								  .position = m_modelPos,
-								  .rotation = m_modelRot,
-								  .scale = m_modelScale,
+								  .position = *m_modelPos,
+								  .rotation = *m_modelRot,
+								  .scale = *m_modelScale,
 							  })
 							  .Add<re::detail::OpaqueTag>()
 							  .Add<re::MaterialComponent>(material)
@@ -261,9 +297,11 @@ private:
 	}
 
 	std::vector<re::ecs::Entity> m_modelEntities;
-	re::Vector3f m_modelPos = { 0.f, 0.f, 0.f };
-	re::Vector3f m_modelRot = { 0.f, 0.f, 0.f };
-	re::Vector3f m_modelScale = { 1.f, 1.f, 1.f };
+	re::Revertible<re::Vector3f> m_modelPos;
+	re::Revertible<re::Vector3f> m_modelRot;
+	re::Revertible<re::Vector3f> m_modelScale;
+
+	re::Revertible<re::Vector3f> m_lightPos;
 
 	re::ecs::Entity m_lightEntity = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
@@ -289,13 +327,13 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		AddLayout<MenuLayout>(Window());
+		AddLayout<EditorLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());
 		// AddLayout<ArcanoidLayout>(Window());
 
-		SwitchLayout<MenuLayout>();
+		SwitchLayout<EditorLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
@@ -325,7 +363,7 @@ public:
 		{
 			if (e->key == re::Keyboard::Key::F1)
 			{
-				SwitchLayout<MenuLayout>();
+				SwitchLayout<EditorLayout>();
 			}
 			if (e->key == re::Keyboard::Key::F2)
 			{
