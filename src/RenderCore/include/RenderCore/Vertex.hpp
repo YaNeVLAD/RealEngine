@@ -8,6 +8,7 @@
 namespace re
 {
 
+#pragma pack(push, 1)
 struct Vertex
 {
 	Vector3f position;
@@ -23,6 +24,7 @@ struct Vertex
 
 	bool operator==(Vertex const&) const = default;
 };
+#pragma pack(pop)
 
 } // namespace re
 

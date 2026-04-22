@@ -91,13 +91,21 @@ void ParseNodeRecursive(
 				continue;
 			}
 
+			bool isSkinned = (gltfNode.skin >= 0);
+
 			part.vertices.resize(vertexCount);
 			for (std::size_t i = 0; i < vertexCount; ++i)
 			{
 				auto pos = reinterpret_cast<const float*>(posData + i * stride);
-
-				glm::vec4 worldPos = globalTransform * glm::vec4(pos[0], pos[1], pos[2], 1.0f);
-				part.vertices[i].position = { worldPos.x, worldPos.y, worldPos.z };
+				if (isSkinned)
+				{
+					part.vertices[i].position = { pos[0], pos[1], pos[2] };
+				}
+				else
+				{
+					glm::vec4 worldPos = globalTransform * glm::vec4(pos[0], pos[1], pos[2], 1.0f);
+					part.vertices[i].position = { worldPos.x, worldPos.y, worldPos.z };
+				}
 			}
 
 			std::size_t count, normStride;
@@ -106,8 +114,15 @@ void ParseNodeRecursive(
 				for (std::size_t i = 0; i < count; ++i)
 				{
 					auto norm = reinterpret_cast<const float*>(normData + i * normStride);
-					glm::vec3 worldNormal = glm::normalize(normalTransform * glm::vec3(norm[0], norm[1], norm[2]));
-					part.vertices[i].normal = { worldNormal.x, worldNormal.y, worldNormal.z };
+					if (isSkinned)
+					{
+						part.vertices[i].normal = { norm[0], norm[1], norm[2] };
+					}
+					else
+					{
+						glm::vec3 worldNormal = glm::normalize(normalTransform * glm::vec3(norm[0], norm[1], norm[2]));
+						part.vertices[i].normal = { worldNormal.x, worldNormal.y, worldNormal.z };
+					}
 				}
 			}
 
@@ -117,8 +132,15 @@ void ParseNodeRecursive(
 				for (size_t i = 0; i < count; ++i)
 				{
 					auto tang = reinterpret_cast<const float*>(tangData + i * tangStride);
-					glm::vec3 worldTang = glm::normalize(normalTransform * glm::vec3(tang[0], tang[1], tang[2]));
-					part.vertices[i].tangent = { worldTang.x, worldTang.y, worldTang.z, tang[3] };
+					if (isSkinned)
+					{
+						part.vertices[i].tangent = { tang[0], tang[1], tang[2], tang[3] };
+					}
+					else
+					{
+						glm::vec3 worldTang = glm::normalize(normalTransform * glm::vec3(tang[0], tang[1], tang[2]));
+						part.vertices[i].tangent = { worldTang.x, worldTang.y, worldTang.z, tang[3] };
+					}
 				}
 			}
 
@@ -476,9 +498,10 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			glm::quat rotation(1.0f, 0.0f, 0.0f, 0.0f);
 			glm::vec3 scale(1.0f);
 
+			// Явный каст из double[] во float, чтобы спать спокойно
 			if (node.translation.size() == 3)
 			{
-				translation = glm::make_vec3(node.translation.data());
+				translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
 			}
 			if (node.rotation.size() == 4)
 			{
@@ -486,11 +509,16 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			}
 			if (node.scale.size() == 3)
 			{
-				scale = glm::make_vec3(node.scale.data());
+				scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
 			}
 
+			// --- СОХРАНЯЕМ В КОСТЬ ---
+			m_skeleton[i].translation = translation;
+			m_skeleton[i].rotation = rotation;
+			m_skeleton[i].scale = scale;
+
 			m_skeleton[i].localTransform = glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0f), scale);
-			m_skeleton[i].globalTransform = m_skeleton[i].localTransform; // Пока глобальный равен локальному
+			m_skeleton[i].globalTransform = m_skeleton[i].localTransform;
 
 			// Ищем детей этой кости и устанавливаем им parentIndex
 			for (int childNodeIndex : node.children)

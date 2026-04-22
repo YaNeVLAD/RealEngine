@@ -29,6 +29,10 @@ struct Bone
 
 	glm::mat4 localTransform{ 1.0f };
 	glm::mat4 globalTransform{ 1.0f };
+
+	glm::vec3 translation{ 0.0f };
+	glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+	glm::vec3 scale{ 1.0f };
 };
 
 struct PositionKeyframe
@@ -71,7 +75,6 @@ public:
 	[[nodiscard]] const std::vector<render::MeshPart>& Parts() const;
 	[[nodiscard]] const std::vector<render::Bone>& Skeleton() const;
 	[[nodiscard]] const std::vector<render::Animation>& Animations() const;
-
 
 	bool LoadFromFile(const String& filePath, const AssetManager* manager) override;
 

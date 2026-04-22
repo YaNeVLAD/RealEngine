@@ -29,24 +29,27 @@ void main() {
     v_Color = a_Color;
     v_TexCoord = a_TexCoord;
 
-    // Вычисляем итоговую матрицу трансформации на основе весов
-    mat4 boneTransform = u_Bones[a_BoneIDs[0]] * a_BoneWeights[0];
-    boneTransform += u_Bones[a_BoneIDs[1]] * a_BoneWeights[1];
-    boneTransform += u_Bones[a_BoneIDs[2]] * a_BoneWeights[2];
-    boneTransform += u_Bones[a_BoneIDs[3]] * a_BoneWeights[3];
+    mat4 boneTransform = mat4(0.0);
+    float totalWeight = a_BoneWeights[0] + a_BoneWeights[1] + a_BoneWeights[2] + a_BoneWeights[3];
 
-    // Защита: если весов нет (например, часть меша не анимирована), используем единичную матрицу
-    if (a_BoneWeights[0] + a_BoneWeights[1] + a_BoneWeights[2] + a_BoneWeights[3] < 0.01) {
+    if (totalWeight > 0.01) {
+        vec4 w = a_BoneWeights / totalWeight;
+
+        boneTransform += u_Bones[a_BoneIDs[0]] * w[0];
+        boneTransform += u_Bones[a_BoneIDs[1]] * w[1];
+        boneTransform += u_Bones[a_BoneIDs[2]] * w[2];
+        boneTransform += u_Bones[a_BoneIDs[3]] * w[3];
+    } else {
         boneTransform = mat4(1.0);
     }
 
-    // Применяем анимацию к позиции
     vec4 localPos = boneTransform * vec4(a_Position, 1.0);
+    localPos.w = 1.0;
+
     vec4 worldPos = u_ModelMatrix * localPos;
     v_FragmentWorldPos = vec3(worldPos);
     gl_Position = u_ModelViewProjection * localPos;
 
-    // Применяем анимацию к нормалям и тангентам
     mat3 boneNormalMatrix = mat3(boneTransform);
     vec3 localNormal = boneNormalMatrix * a_Normal;
     v_Normal = u_NormalMatrix * localNormal;

@@ -313,6 +313,11 @@ void Shader::SetMat4(const std::string_view name, const glm::mat4& value)
 	glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void Shader::SetMat3(const std::string_view name, const glm::mat3& value)
+{
+	glUniformMatrix3fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
 void Shader::SetUInt(const std::string_view name, const std::uint32_t value)
 {
 	glUniform1ui(GetUniformLocation(name), value);

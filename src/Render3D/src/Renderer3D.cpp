@@ -72,6 +72,11 @@ void Renderer3D::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4& view
 	m_api->DrawSkybox(cubemapID, viewMatrix, projectionMatrix);
 }
 
+void Renderer3D::DrawAnimatedModel(AnimatedModel* model, Animator* animator, const glm::mat4& transform, const bool wireframe)
+{
+	m_api->DrawAnimatedModel(model, animator, transform, wireframe);
+}
+
 std::uint32_t Renderer3D::CreateCubemapFromHDR(Texture* hdrTexture)
 {
 	return m_api->CreateCubemapFromHDR(hdrTexture);

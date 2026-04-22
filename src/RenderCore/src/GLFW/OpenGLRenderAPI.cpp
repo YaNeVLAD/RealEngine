@@ -286,10 +286,10 @@ void OpenGLRenderAPI::Init()
 	m_DynamicVAO->AddVertexBuffer(m_DynamicVBO, unifiedLayout);
 
 	m_DynamicVAO3D = std::make_shared<VertexArray>();
-	m_DynamicVBO3D = std::make_shared<VertexBuffer>(10000 * sizeof(Vertex));
+	m_DynamicVBO3D = std::make_shared<VertexBuffer>(100000 * sizeof(Vertex));
 	m_DynamicVAO3D->AddVertexBuffer(m_DynamicVBO3D, unifiedLayout);
 
-	m_DynamicEBO3D = std::make_shared<IndexBuffer>(30000);
+	m_DynamicEBO3D = std::make_shared<IndexBuffer>(300000);
 	m_DynamicVAO3D->SetIndexBuffer(m_DynamicEBO3D);
 
 	constexpr float skyboxVertices[] = { // clang-format off
@@ -506,6 +506,13 @@ void OpenGLRenderAPI::SetCameraPerspective(const float fov, const float aspectRa
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
 	m_InstancedShader3D->SetFloat3("u_CameraPos", cameraPos);
+
+	m_InstancedShader3DPBR->Bind();
+	m_InstancedShader3DPBR->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3DPBR->SetFloat3("u_CameraPos", cameraPos);
+
+	m_AnimatedShader3DPBR->Bind();
+	m_AnimatedShader3DPBR->SetFloat3("u_CameraPos", cameraPos);
 }
 
 void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const glm::mat4& transform, const bool wireframe)
@@ -724,6 +731,86 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glBindVertexArray(0);
 }
 
+void OpenGLRenderAPI::DrawAnimatedModel(AnimatedModel* model, Animator* animator, const glm::mat4& transform, const bool wireframe)
+{
+	if (!model || !animator)
+	{
+		return;
+	}
+
+	// 1. Применяем наш RAII паттерн для защиты текущих шейдеров
+	ScopedShaderRestorer restorer;
+
+	// Вычисляем базовые матрицы
+	const glm::mat4 mvp = m_viewProj3D * transform;
+	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+
+	if (!m_AnimatedShader3DPBR)
+	{
+		return;
+	}
+
+	m_AnimatedShader3DPBR->Bind();
+	m_AnimatedShader3DPBR->SetMat4("u_ModelMatrix", transform);
+	m_AnimatedShader3DPBR->SetMat4("u_ModelViewProjection", mvp);
+	m_AnimatedShader3DPBR->SetMat3("u_NormalMatrix", normalMatrix); // Передаем как mat4, шейдер сам скастит в mat3
+
+	// 3. Заливаем матрицы костей в SSBO
+	const auto& boneMatrices = animator->FinalBoneMatrices();
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_boneSSBO);
+
+	if (!boneMatrices.empty())
+	{
+		glBufferData(GL_SHADER_STORAGE_BUFFER, boneMatrices.size() * sizeof(glm::mat4), boneMatrices.data(), GL_DYNAMIC_DRAW);
+	}
+	else
+	{
+		// Защита от мусора: отправляем одну единичную матрицу для Т-позы
+		constexpr glm::mat4 identity(1.0f);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::mat4), &identity, GL_DYNAMIC_DRAW);
+	}
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, m_boneSSBO);
+
+	// 4. Отрисовываем все части (MeshParts) модели
+	// Для оптимизации в будущем эти данные VBO/EBO нужно загрузить в GPU один раз при инициализации AnimatedModel!
+	// Сейчас мы загружаем их "на лету" через динамический буфер для простоты.
+	const auto& parts = model->Parts();
+	for (const auto& part : parts)
+	{
+		if (part.vertices.empty() || part.indices.empty())
+		{
+			continue;
+		}
+
+		// Применяем материал конкретной части модели
+		SetMaterial(part.material);
+
+		// Используем твой механизм динамических буферов
+		const std::size_t vboBytesNeeded = part.vertices.size() * sizeof(Vertex);
+		const std::size_t eboCountNeeded = part.indices.size();
+
+		if (m_dynamicOffsetVbo3D + vboBytesNeeded > m_DynamicVBO3D->GetSize() || m_dynamicOffsetEbo3D + eboCountNeeded > m_DynamicEBO3D->GetCapacity())
+		{
+			m_dynamicOffsetVbo3D = 0;
+			m_dynamicOffsetEbo3D = 0;
+		}
+
+		m_DynamicVAO3D->Bind();
+		m_DynamicVBO3D->SetData(part.vertices.data(), vboBytesNeeded, m_dynamicOffsetVbo3D);
+		m_DynamicEBO3D->SetData(part.indices.data(), eboCountNeeded, m_dynamicOffsetEbo3D);
+
+		DrawWithWireframe(wireframe, [&] {
+			const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
+			const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(std::uint32_t));
+			glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(part.indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
+		});
+
+		m_dynamicOffsetVbo3D += vboBytesNeeded;
+		m_dynamicOffsetEbo3D += eboCountNeeded;
+	}
+}
+
 void OpenGLRenderAPI::SetLight(const LightData& light)
 {
 	m_activeLight = light;
@@ -764,6 +851,7 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 	bindPBRLight(m_Shader3DPBR);
 	bindPBRLight(m_InstancedShader3DPBR);
+	bindPBRLight(m_AnimatedShader3DPBR);
 }
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
@@ -908,6 +996,7 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 	{
 		bindPBRMaterial(m_Shader3DPBR);
 		bindPBRMaterial(m_InstancedShader3DPBR);
+		bindPBRMaterial(m_AnimatedShader3DPBR);
 	}
 	else
 	{
@@ -1104,6 +1193,7 @@ void OpenGLRenderAPI::SetEnvironment(const std::uint32_t irradianceMap)
 
 	bindEnv(m_Shader3DPBR);
 	bindEnv(m_InstancedShader3DPBR);
+	bindEnv(m_AnimatedShader3DPBR);
 }
 
 void OpenGLRenderAPI::BindStandard3DUniforms(const glm::mat4& transform) const
@@ -1116,12 +1206,12 @@ void OpenGLRenderAPI::BindStandard3DUniforms(const glm::mat4& transform) const
 	m_Shader3D->Bind();
 	m_Shader3D->SetMat4("u_ModelMatrix", transform);
 	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
-	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
+	m_Shader3D->SetMat3("u_NormalMatrix", normalMatrix);
 
 	m_Shader3DPBR->Bind();
 	m_Shader3DPBR->SetMat4("u_ModelMatrix", transform);
 	m_Shader3DPBR->SetMat4("u_ModelViewProjection", mvp);
-	m_Shader3DPBR->SetMat4("u_NormalMatrix", normalMatrix);
+	m_Shader3DPBR->SetMat3("u_NormalMatrix", normalMatrix);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

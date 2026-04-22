@@ -89,7 +89,7 @@ struct EditorLayout final : re::Layout
 			transform.position = { 0.f, 1.5f, 3.f };
 		}
 
-		ReplaceModel("model/Model.obj");
+		ReplaceModel("model/Fox.glb");
 	}
 
 	void OnAttach() override
@@ -104,7 +104,7 @@ struct EditorLayout final : re::Layout
 
 		if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			static char modelPathBuffer[256] = "model/Model.obj";
+			static char modelPathBuffer[256] = "model/Fox.glb";
 			ImGui::InputText("File Path##Model", modelPathBuffer, sizeof(modelPathBuffer));
 
 			if (ImGui::Button("Load Model", ImVec2(-1, 0)))
@@ -321,8 +321,20 @@ private:
 								  .scale = *m_modelScale,
 							  })
 							  .Add<re::detail::OpaqueTag>()
-							  .Add<re::MaterialComponent>(material)
-							  .Add<re::StaticMeshComponent3D>(vertices, indices);
+							  .Add<re::MaterialComponent>(material);
+
+			if (path.Find(".glb") != re::String::NPos)
+			{
+				const auto animModel = m_manager.Get<re::AnimatedModel>(path);
+				const auto animator = std::make_shared<re::Animator>(animModel.get());
+				animator->PlayAnimation(2);
+
+				entity.Add<re::AnimatedMeshComponent3D>(animModel, animator);
+			}
+			else
+			{
+				entity.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
 
 			m_modelEntities.push_back(entity.GetEntity());
 		}

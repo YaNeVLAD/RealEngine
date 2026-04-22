@@ -43,6 +43,9 @@ struct RenderCommand3D
 	float distanceToCamera = 0.0f;
 	bool wireframe = false;
 
+	std::shared_ptr<AnimatedModel> animatedModel = nullptr;
+	std::shared_ptr<Animator> animator = nullptr;
+
 	MaterialComponent material;
 };
 

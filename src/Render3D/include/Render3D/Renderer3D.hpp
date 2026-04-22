@@ -3,6 +3,8 @@
 #include <Render3D/Export.hpp>
 
 #include <Core/Math/Vector3.hpp>
+#include <RenderCore/AnimatedModel.hpp>
+#include <RenderCore/Animator.hpp>
 #include <RenderCore/IRenderAPI.hpp>
 #include <RenderCore/Light.hpp>
 #include <RenderCore/Material.hpp>
@@ -60,6 +62,12 @@ public:
 		std::uint32_t cubemapID,
 		const glm::mat4& viewMatrix,
 		const glm::mat4& projectionMatrix);
+
+	static void DrawAnimatedModel(
+		AnimatedModel* model,
+		Animator* animator,
+		const glm::mat4& transform,
+		bool wireframe);
 
 	static std::uint32_t CreateCubemapFromHDR(Texture* hdrTexture);
 

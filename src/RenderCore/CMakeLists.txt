@@ -6,6 +6,7 @@ set(COMMON_SOURCES
         src/TextureLoader.cpp
         src/AnimatedModel.cpp
         src/AssetManager.cpp
+        src/Animator.cpp
 )
 
 if (RE_RENDER_BACKEND STREQUAL "GLFW")

@@ -4,6 +4,7 @@
 
 #include <RenderCore/AnimatedModel.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 
 #include <vector>
@@ -16,14 +17,11 @@ class RE_RENDER_CORE_API Animator
 public:
 	explicit Animator(const AnimatedModel* model);
 
-	// Установить индекс анимации (из массива m_animations модели)
 	void PlayAnimation(int animationIndex);
 
-	// Продвинуть время анимации на delta time
 	void Update(float dt);
 
-	// Получить готовые матрицы для отправки в шейдер
-	const std::vector<glm::mat4>& GetFinalBoneMatrices() const { return m_finalBoneMatrices; }
+	const std::vector<glm::mat4>& FinalBoneMatrices() const { return m_finalBoneMatrices; }
 
 private:
 	void CalculateBoneTransform(int boneIndex, const glm::mat4& parentTransform);

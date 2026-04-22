@@ -6,6 +6,8 @@
 #include <Core/String.hpp>
 #include <ECS/Scene.hpp>
 #include <Physics/Types.hpp>
+#include <RenderCore/AnimatedModel.hpp>
+#include <RenderCore/Animator.hpp>
 #include <RenderCore/Font.hpp>
 #include <RenderCore/Image.hpp>
 #include <RenderCore/Material.hpp>
@@ -258,6 +260,13 @@ private:
 	std::uint32_t irradianceID = 0;
 
 	friend class detail::RenderSystem3D;
+};
+
+struct AnimatedMeshComponent3D
+{
+	std::shared_ptr<AnimatedModel> model = nullptr;
+	std::shared_ptr<Animator> animator = nullptr;
+	bool wireframe = false;
 };
 
 struct PhysicsEventsComponent

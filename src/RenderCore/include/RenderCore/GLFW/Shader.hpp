@@ -35,6 +35,7 @@ public:
 	void SetFloat3(std::string_view name, const glm::vec3& value);
 	void SetFloat4(std::string_view name, const glm::vec4& value);
 	void SetMat4(std::string_view name, const glm::mat4& value);
+	void SetMat3(std::string_view name, const glm::mat3& value);
 	void SetUInt(std::string_view name, std::uint32_t value);
 	void SetBool(std::string_view name, bool value);
 	void SetFloat4Array(std::string_view name, const glm::vec4* values, std::uint32_t count);

@@ -50,7 +50,7 @@ void Animator::Update(const float dt)
 	}
 }
 
-void Animator::CalculateBoneTransform(const int boneIndex, const glm::mat4& parentTransform)
+void Animator::CalculateBoneTransform(int boneIndex, const glm::mat4& parentTransform)
 {
 	using namespace re::render;
 
@@ -58,24 +58,37 @@ void Animator::CalculateBoneTransform(const int boneIndex, const glm::mat4& pare
 	const Bone& bone = skeleton[boneIndex];
 	const Animation& animation = m_model->Animations()[m_currentAnimationIndex];
 
-	glm::mat4 localTransform = bone.localTransform; // Берем базовый трансформ из T-позы
+	// 1. По умолчанию берем базовые сдвиги кости (Т-поза)
+	glm::vec3 position = bone.translation;
+	glm::quat rotation = bone.rotation;
+	glm::vec3 scale = bone.scale;
 
-	// Если для этой кости есть анимация - переопределяем локальный трансформ
+	// 2. Если есть ключи анимации — перезаписываем базовые значения
 	if (animation.boneAnimations.contains(boneIndex))
 	{
 		const BoneAnimation& boneAnim = animation.boneAnimations.at(boneIndex);
 
-		const glm::vec3 position = InterpolatePosition(m_currentTime, boneAnim);
-		const glm::quat rotation = InterpolateRotation(m_currentTime, boneAnim);
-		const glm::vec3 scale = InterpolateScale(m_currentTime, boneAnim);
-
-		localTransform = glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0f), scale);
+		if (!boneAnim.positions.empty())
+		{
+			position = InterpolatePosition(m_currentTime, boneAnim);
+		}
+		if (!boneAnim.rotations.empty())
+		{
+			rotation = InterpolateRotation(m_currentTime, boneAnim);
+		}
+		if (!boneAnim.scales.empty())
+		{
+			scale = InterpolateScale(m_currentTime, boneAnim);
+		}
 	}
 
-	// Глобальная матрица = глобальная матрица родителя * наша локальная
-	const glm::mat4 globalTransform = parentTransform * localTransform;
+	// 3. Собираем итоговую локальную матрицу
+	glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0f), scale);
 
-	// Итоговая матрица для шейдера: Глобальная * Inverse Bind Matrix
+	// 4. Умножаем на матрицу родителя
+	glm::mat4 globalTransform = parentTransform * localTransform;
+
+	// 5. Итоговая матрица для шейдера: Глобальная * Inverse Bind Matrix
 	m_finalBoneMatrices[boneIndex] = globalTransform * bone.inverseBindMatrix;
 
 	// Рекурсивно вызываем для всех детей

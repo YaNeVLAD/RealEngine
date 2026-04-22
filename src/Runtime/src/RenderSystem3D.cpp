@@ -121,13 +121,21 @@ RenderSystem3D::RenderSystem3D(render::IWindow& window)
 {
 }
 
-void RenderSystem3D::Update(ecs::Scene& scene, float)
+void RenderSystem3D::Update(ecs::Scene& scene, const core::TimeDelta dt)
 {
 	auto [width, height] = m_window.Size();
 	const float aspect = static_cast<float>(width) / static_cast<float>(height);
 	if (width == 0 || height == 0)
 	{
 		return;
+	}
+
+	for (auto&& [entity, animComp] : *scene.CreateView<AnimatedMeshComponent3D>())
+	{
+		if (animComp.animator)
+		{
+			animComp.animator->Update(dt);
+		}
 	}
 
 	ProcessTransforms(scene);
@@ -304,6 +312,27 @@ void RenderSystem3D::CollectDynamicAndTransparent(ecs::Scene& scene, const glm::
 			m_opaqueQueue.push_back(cmd);
 		}
 	}
+
+	for (auto&& [entity, transform, animComp] : *scene.CreateView<TransformComponent, AnimatedMeshComponent3D>())
+	{
+		if (!animComp.model || !animComp.animator)
+			continue;
+
+		MaterialComponent material;
+		if (scene.HasComponent<MaterialComponent>(entity))
+		{
+			material = scene.GetComponent<MaterialComponent>(entity);
+		}
+
+		RenderCommand3D cmd;
+		cmd.transform = transform.modelMatrix;
+		cmd.animatedModel = animComp.model;
+		cmd.animator = animComp.animator;
+		cmd.wireframe = animComp.wireframe;
+		cmd.material = material;
+
+		m_opaqueQueue.push_back(cmd);
+	}
 }
 
 void RenderSystem3D::RenderOpaqueGeometry(const glm::vec3& camPos, float farClip)
@@ -401,7 +430,11 @@ void RenderSystem3D::ExecuteRenderCommand(const RenderCommand3D& cmd)
 {
 	render::Renderer3D::SetMaterial(cmd.material.data);
 
-	if (cmd.staticMesh)
+	if (cmd.animatedModel)
+	{
+		render::Renderer3D::DrawAnimatedModel(cmd.animatedModel.get(), cmd.animator.get(), cmd.transform, cmd.wireframe);
+	}
+	else if (cmd.staticMesh)
 	{
 		render::Renderer3D::DrawStaticMesh(cmd.staticMesh, cmd.transform, cmd.wireframe);
 	}
