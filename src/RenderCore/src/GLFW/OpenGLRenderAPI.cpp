@@ -134,6 +134,7 @@ constexpr auto s_FragmentShader3DPhong = UR"(
     uniform int u_LightType;
     uniform vec3 u_LightPos;
     uniform vec3 u_LightDir;
+    uniform vec3 u_LightColor;
     uniform float u_LightConstant;
     uniform float u_LightLinear;
     uniform float u_LightQuadratic;
@@ -203,8 +204,8 @@ constexpr auto s_FragmentShader3DPhong = UR"(
 		vec3 specularLight = u_MaterialSpecularLighting * specFactor;
 
 		vec3 finalAmbient = ambientLight * surfaceColor.rgb;
-       	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect;
-       	vec3 finalSpecular = specularLight * attenuation * spotEffect;
+       	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect * u_LightColor;
+       	vec3 finalSpecular = specularLight * attenuation * spotEffect * u_LightColor;
 
 		vec3 finalEmission = u_MaterialEmission;
 		if (u_HasEmissionMap != 0) {
@@ -634,8 +635,8 @@ void OpenGLRenderAPI::Init()
 	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3DPhong);
 	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3DPhong);
 
-	m_ShaderPBR = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShaderPBR);
-	m_InstancedShaderPBR = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShaderPBR);
+	m_Shader3DPBR = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShaderPBR);
+	m_InstancedShader3DPBR = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShaderPBR);
 
 	glGenBuffers(1, &m_instanceVBOId);
 	glGenBuffers(1, &m_normalVBOId);
@@ -1063,6 +1064,7 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 		shader->SetInt("u_LightType", light.type);
 		shader->SetFloat3("u_LightPos", light.position);
 		shader->SetFloat3("u_LightDir", -light.direction);
+		shader->SetFloat3("u_LightColor", light.ambient);
 		shader->SetFloat("u_LightConstant", light.constant);
 		shader->SetFloat("u_LightLinear", light.linear);
 		shader->SetFloat("u_LightQuadratic", light.quadratic);
@@ -1076,17 +1078,18 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
 {
-	const glm::vec3 matAmb = ColorToVec3(material.albedoColor);
-	const glm::vec3 matDif = ColorToVec3(material.albedoColor);
-	const glm::vec3 matSpec = ColorToVec3(material.specularColor);
-	const glm::vec3 matEmis = ColorToVec3(material.emissionColor);
-
-	const glm::vec3 finalAmbient = m_activeLight.ambient * matAmb;
-	const glm::vec3 finalDiffuse = m_activeLight.diffuse * matDif;
-	const glm::vec3 finalSpecular = m_activeLight.specular * matSpec;
-
-	auto bindMaterialToShader = [&](const std::shared_ptr<Shader>& shader) {
+	auto bindPhongMaterial = [&](const std::shared_ptr<Shader>& shader) {
 		shader->Bind();
+
+		const glm::vec3 matAmb = ColorToVec3(material.albedoColor);
+		const glm::vec3 matDif = ColorToVec3(material.albedoColor);
+		const glm::vec3 matSpec = ColorToVec3(material.specularColor);
+		const glm::vec3 matEmis = ColorToVec3(material.emissionColor);
+
+		const glm::vec3 finalAmbient = m_activeLight.ambient * matAmb;
+		const glm::vec3 finalDiffuse = m_activeLight.diffuse * matDif;
+		const glm::vec3 finalSpecular = m_activeLight.specular * matSpec;
+
 		shader->SetFloat3("u_MaterialAmbientLighting", finalAmbient);
 		shader->SetFloat3("u_MaterialDiffuseLighting", finalDiffuse);
 		shader->SetFloat3("u_MaterialSpecularLighting", finalSpecular);
@@ -1135,8 +1138,92 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 		glActiveTexture(GL_TEXTURE0);
 	};
 
-	bindMaterialToShader(m_Shader3D);
-	bindMaterialToShader(m_InstancedShader3D);
+	auto bindPBRMaterial = [&](const std::shared_ptr<Shader>& shader) {
+		shader->Bind();
+
+		shader->SetFloat3("u_AlbedoColor", ColorToVec3(material.albedoColor));
+		shader->SetFloat3("u_EmissionColor", ColorToVec3(material.emissionColor));
+		shader->SetFloat("u_MetallicFactor", material.metallicFactor);
+		shader->SetFloat("u_RoughnessFactor", material.roughnessFactor);
+
+		if (material.albedoMap)
+		{
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.albedoMap->GetNativeHandle()));
+
+			shader->SetInt("u_AlbedoMap", 0);
+			shader->SetInt("u_HasAlbedoMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasAlbedoMap", 0);
+		}
+
+		if (material.normalMap)
+		{
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.normalMap->GetNativeHandle()));
+
+			shader->SetInt("u_NormalMap", 1);
+			shader->SetInt("u_HasNormalMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasNormalMap", 0);
+		}
+
+		if (material.emissionMap)
+		{
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.emissionMap->GetNativeHandle()));
+
+			shader->SetInt("u_EmissionMap", 2);
+			shader->SetInt("u_HasEmissionMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasEmissionMap", 0);
+		}
+
+		if (material.metallicRoughnessMap)
+		{
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.metallicRoughnessMap->GetNativeHandle()));
+
+			shader->SetInt("u_MetallicRoughnessMap", 3);
+			shader->SetInt("u_HasMetallicRoughnessMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasMetallicRoughnessMap", 0);
+		}
+
+		if (material.ambientOcclusionMap)
+		{
+			glActiveTexture(GL_TEXTURE4);
+			glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(material.ambientOcclusionMap->GetNativeHandle()));
+
+			shader->SetInt("u_AOMap", 4);
+			shader->SetInt("u_HasAOMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasAOMap", 0);
+		}
+
+		glActiveTexture(GL_TEXTURE0);
+	};
+
+	if (material.workflow == MaterialWorkflow::PBR)
+	{
+		bindPBRMaterial(m_Shader3DPBR);
+		bindPBRMaterial(m_InstancedShader3DPBR);
+	}
+	else
+	{
+		bindPhongMaterial(m_Shader3D);
+		bindPhongMaterial(m_InstancedShader3D);
+	}
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

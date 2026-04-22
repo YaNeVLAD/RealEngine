@@ -79,8 +79,8 @@ private:
 
 	std::vector<CullingData> m_cullingBatches;
 
-	std::shared_ptr<Shader> m_ShaderPBR;
-	std::shared_ptr<Shader> m_InstancedShaderPBR;
+	std::shared_ptr<Shader> m_Shader3DPBR;
+	std::shared_ptr<Shader> m_InstancedShader3DPBR;
 
 	LightData m_activeLight;
 
