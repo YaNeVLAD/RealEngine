@@ -517,10 +517,9 @@ constexpr auto s_VertexSkybox = UR"(
 
     void main()
     {
-        v_TexCoord = a_Position; // Для кубмапы координаты вектора совпадают с позицией вершин куба
+        v_TexCoord = a_Position;
         vec4 pos = u_ViewProjection * vec4(a_Position, 1.0);
 
-        // Хитрость xyww: после деления перспективы (pos.z / pos.w), Z всегда будет равен 1.0 (максимальная глубина)
         gl_Position = pos.xyww;
     }
 )";
@@ -537,10 +536,9 @@ constexpr auto s_FragmentSkybox = UR"(
 
     void main()
     {
-        // Кубмапы HDR загружаются в линейном пространстве
         vec3 envColor = texture(u_EnvironmentMap, v_TexCoord).rgb;
 
-        // Tone mapping (защита от пересвета HDR)
+        // Tone mapping
         envColor = envColor / (envColor + vec3(1.0));
         // Gamma
         envColor = linearToSRGB(envColor);
@@ -583,7 +581,6 @@ constexpr auto s_FragmentEquirectToCube = UR"(
 
     void main()
     {
-        // Переводим 3D направление в 2D UV координаты
         vec2 uv = SampleSphericalMap(normalize(v_WorldPos));
         vec3 color = texture(u_EquirectangularMap, uv).rgb;
         o_Color = vec4(color, 1.0);
@@ -602,26 +599,21 @@ constexpr auto s_FragmentIrradianceConvolution = UR"(
 
     void main()
     {
-        // Нормаль совпадает с направлением вершины куба
         vec3 N = normalize(v_WorldPos);
         vec3 irradiance = vec3(0.0);
 
-        // Базисные векторы касательного пространства
-        vec3 up    = vec3(0.0, 1.0, 0.0);
+        vec3 up = vec3(0.0, 1.0, 0.0);
         vec3 right = normalize(cross(up, N));
-        up         = normalize(cross(N, right));
+        up = normalize(cross(N, right));
 
         float sampleDelta = 0.025;
         float nrSamples = 0.0;
 
-        // Интегрируем свет со всей полусферы
         for(float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
         {
             for(float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta)
             {
-                // Сферические координаты в декартовы (касательное пространство)
                 vec3 tangentSample = vec3(sin(theta) * cos(phi),  sin(theta) * sin(phi), cos(theta));
-                // Перевод из касательного в мировое
                 vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N;
 
                 irradiance += texture(u_EnvironmentMap, sampleVec).rgb * cos(theta) * sin(theta);
@@ -1435,14 +1427,11 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 
 void OpenGLRenderAPI::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
-	// Меняем функцию глубины с LESS на LEQUAL, так как z скайбокса всегда равна 1.0
 	glDepthFunc(GL_LEQUAL);
 
 	m_Skybox3D->Bind();
 
-	// Убираем позицию из матрицы вида (обнуляем 3й столбец)
-	// Это "привяжет" скайбокс к камере, не давая нам подойти к его краям
-	glm::mat4 view = glm::mat4(glm::mat3(viewMatrix));
+	const auto view = glm::mat4(glm::mat3(viewMatrix));
 	m_Skybox3D->SetMat4("u_ViewProjection", projectionMatrix * view);
 
 	glActiveTexture(GL_TEXTURE0);
@@ -1453,14 +1442,17 @@ void OpenGLRenderAPI::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4&
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glBindVertexArray(0);
 
-	// Возвращаем стандартную функцию глубины
 	glDepthFunc(GL_LESS);
 }
 
 std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 {
 	if (!hdrTexture)
+	{
 		return 0;
+	}
+
+	constexpr int TEXTURE_SIZE = 1024;
 
 	std::uint32_t captureFBO, captureRBO;
 	glGenFramebuffers(1, &captureFBO);
@@ -1468,8 +1460,7 @@ std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-	// Разрешение 1024x1024 на каждую грань куба — оптимально для скайбокса
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1024, 1024);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, TEXTURE_SIZE, TEXTURE_SIZE);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
 	std::uint32_t envCubemap;
@@ -1477,17 +1468,14 @@ std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 	for (unsigned int i = 0; i < 6; ++i)
 	{
-		// ВНИМАНИЕ: Используем 16-битный float для сохранения HDR-яркости
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 1024, 1024, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, TEXTURE_SIZE, TEXTURE_SIZE, 0, GL_RGB, GL_FLOAT, nullptr);
 	}
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	// Включаем MipMaps (они понадобятся нам на шаге 3 для шероховатости металлов)
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	// Матрицы "камеры", смотрящей в 6 сторон из центра куба
 	const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 	const glm::mat4 captureViews[] = {
 		glm::lookAt(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
@@ -1500,13 +1488,13 @@ std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 
 	m_EquirectToCubeShader->Bind();
 	m_EquirectToCubeShader->SetInt("u_EquirectangularMap", 0);
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(hdrTexture->GetNativeHandle()));
 
-	glViewport(0, 0, 1024, 1024);
+	glViewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 
-	// Отрисовываем куб 6 раз
 	for (unsigned int i = 0; i < 6; ++i)
 	{
 		m_EquirectToCubeShader->SetMat4("u_ViewProjection", captureProjection * captureViews[i]);
@@ -1519,15 +1507,12 @@ std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// Генерируем мипмапы для готовой кубмапы (нужно для Pre-filter map)
 	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
-	// Очищаем мусор
 	glDeleteFramebuffers(1, &captureFBO);
 	glDeleteRenderbuffers(1, &captureRBO);
 
-	// Восстанавливаем оригинальный Viewport движка!
 	glViewport(
 		static_cast<GLint>(m_viewport.x),
 		static_cast<GLint>(m_viewport.y),
@@ -1537,10 +1522,14 @@ std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
 	return envCubemap;
 }
 
-std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
+std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(const std::uint32_t envCubemap)
 {
 	if (envCubemap == 0)
+	{
 		return 0;
+	}
+
+	constexpr int TEXTURE_SIZE = 32;
 
 	std::uint32_t captureFBO, captureRBO;
 	glGenFramebuffers(1, &captureFBO);
@@ -1548,7 +1537,7 @@ std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, TEXTURE_SIZE, TEXTURE_SIZE);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
 	std::uint32_t irradianceMap;
@@ -1556,7 +1545,7 @@ std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
 	glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
 	for (unsigned int i = 0; i < 6; ++i)
 	{
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, TEXTURE_SIZE, TEXTURE_SIZE, 0, GL_RGB, GL_FLOAT, nullptr);
 	}
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1576,10 +1565,11 @@ std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
 
 	m_IrradianceShader->Bind();
 	m_IrradianceShader->SetInt("u_EnvironmentMap", 0);
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 
-	glViewport(0, 0, 32, 32);
+	glViewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 
 	for (unsigned int i = 0; i < 6; ++i)
@@ -1596,12 +1586,16 @@ std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
 	glDeleteFramebuffers(1, &captureFBO);
 	glDeleteRenderbuffers(1, &captureRBO);
 
-	glViewport(static_cast<GLint>(m_viewport.x), static_cast<GLint>(m_viewport.y), static_cast<GLsizei>(m_viewport.z), static_cast<GLsizei>(m_viewport.w));
+	glViewport(
+		static_cast<GLint>(m_viewport.x),
+		static_cast<GLint>(m_viewport.y),
+		static_cast<GLsizei>(m_viewport.z),
+		static_cast<GLsizei>(m_viewport.w));
 
 	return irradianceMap;
 }
 
-void OpenGLRenderAPI::SetEnvironment(std::uint32_t irradianceMap)
+void OpenGLRenderAPI::SetEnvironment(const std::uint32_t irradianceMap)
 {
 	auto bindEnv = [irradianceMap](const std::shared_ptr<Shader>& shader) {
 		if (irradianceMap != 0)

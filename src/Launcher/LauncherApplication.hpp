@@ -76,7 +76,7 @@ struct EditorLayout final : re::Layout
 			})
 			.Add<re::detail::OpaqueTag>()
 			.Add<re::StaticMeshComponent3D>(sphereMesh)
-			.Add<re::MaterialComponent>()
+			.Add<re::MaterialComponent>(re::Material{ .emissionColor = re::Color::White })
 			.Add<LightGizmoTag>();
 
 		m_lightEntity = lightEntity.GetEntity();
