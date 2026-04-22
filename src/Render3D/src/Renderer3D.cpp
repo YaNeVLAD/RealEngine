@@ -67,6 +67,26 @@ void Renderer3D::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, StaticM
 	m_api->DrawStaticMeshGPUCulled(batchIndex, mesh, transforms, boundingRadius, cameraPos, wireframe, farClip);
 }
 
+void Renderer3D::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+{
+	m_api->DrawSkybox(cubemapID, viewMatrix, projectionMatrix);
+}
+
+std::uint32_t Renderer3D::CreateCubemapFromHDR(Texture* hdrTexture)
+{
+	return m_api->CreateCubemapFromHDR(hdrTexture);
+}
+
+std::uint32_t Renderer3D::CreateIrradianceMap(const std::uint32_t cubemapID)
+{
+	return m_api->CreateIrradianceMap(cubemapID);
+}
+
+void Renderer3D::SetEnvironment(const std::uint32_t irradianceID)
+{
+	return m_api->SetEnvironment(irradianceID);
+}
+
 void Renderer3D::SetMaterial(const Material& material)
 {
 	m_api->SetMaterial(material);

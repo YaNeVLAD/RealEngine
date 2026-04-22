@@ -26,6 +26,8 @@ public:
 
 	bool LoadFromMemorySRGB(const std::uint8_t* data, std::size_t size, bool srgb = false);
 
+	bool LoadHDR(String const& filePath);
+
 	bool LoadFromFile(String const& filePath, const AssetManager* manager) override;
 	bool LoadFromFileSRGB(String const& filePath, bool srgb);
 

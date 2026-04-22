@@ -126,12 +126,54 @@ bool Texture::LoadFromMemorySRGB(const std::uint8_t* data, const std::size_t siz
 	return true;
 }
 
+bool Texture::LoadHDR(String const& filePath)
+{
+	stbi_set_flip_vertically_on_load(true);
+
+	int width, height, channels;
+	float* data = stbi_loadf(filePath.ToString().c_str(), &width, &height, &channels, 0);
+
+	if (!data)
+	{
+		std::cerr << "Texture::LoadHDR: Failed to load HDR image: " << filePath.ToString() << std::endl;
+		return false;
+	}
+
+	m_width = static_cast<std::uint32_t>(width);
+	m_height = static_cast<std::uint32_t>(height);
+
+	if (m_rendererID == 0)
+	{
+		glGenTextures(1, &m_rendererID);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_rendererID);
+
+	const GLenum format = channels == 3 ? GL_RGB : GL_RGBA;
+	const GLenum internalFormat = channels == 3 ? GL_RGB16F : GL_RGBA16F;
+	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_FLOAT, data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	stbi_image_free(data);
+
+	return true;
+}
+
 bool Texture::LoadFromFile(String const& filePath, const AssetManager*)
 {
+	if (filePath.Find(".hdr") != String::NPos)
+	{
+		return LoadHDR(filePath);
+	}
+
 	return LoadFromFileSRGB(filePath, false);
 }
 
-bool Texture::LoadFromFileSRGB(String const& filePath, bool srgb)
+bool Texture::LoadFromFileSRGB(String const& filePath, const bool srgb)
 {
 	using namespace re::render;
 

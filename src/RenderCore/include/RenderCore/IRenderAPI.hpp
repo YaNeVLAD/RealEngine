@@ -56,6 +56,11 @@ public:
 	virtual void DrawStaticMeshGPUCulled(std::uint32_t batchIndex, StaticMesh* mesh, const std::vector<glm::mat4>& transforms, float boundingRadius, const glm::vec3& cameraPos, bool wireframe, float farClip) = 0;
 	virtual void SetLight(const LightData& light) = 0;
 	virtual void SetMaterial(const Material& material) = 0;
+
+	virtual void DrawSkybox(std::uint32_t cubemapID, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) = 0;
+	virtual std::uint32_t CreateCubemapFromHDR(Texture* hdrTexture) = 0;
+	virtual std::uint32_t CreateIrradianceMap(std::uint32_t envCubemap) = 0;
+	virtual void SetEnvironment(std::uint32_t irradianceMap) = 0;
 };
 
 } // namespace re::render

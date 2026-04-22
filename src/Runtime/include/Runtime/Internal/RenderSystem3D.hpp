@@ -64,6 +64,8 @@ private:
 	void DrawFlatBatch(const std::vector<StaticBatchItem>& batch);
 	static void ExecuteRenderCommand(const RenderCommand3D& cmd);
 
+	static SkyboxComponent ExtractSkybox(ecs::Scene& scene);
+
 private:
 	render::IWindow& m_window;
 

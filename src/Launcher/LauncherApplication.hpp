@@ -28,7 +28,7 @@ struct EditorLayout final : re::Layout
 		bool dummy = false;
 	};
 
-	static constexpr re::Vector3f DEFAULT_LIGHT_POS = { 4.f, 6.f, -1.f };
+	static constexpr re::Vector3f DEFAULT_LIGHT_POS = { 0.f, 2.f, 1.f };
 	static constexpr re::Vector3f DEFAULT_MODEL_POS = { 0.f, 0.f, 0.f };
 
 	EditorLayout(re::Application& app, re::render::IWindow& window)
@@ -62,6 +62,11 @@ struct EditorLayout final : re::Layout
 					  .position = DEFAULT_LIGHT_POS,
 					  .rotation = { 37.f, 107.f, 3.f },
 				  });
+
+		// auto skyboxTexture = m_manager.Get<re::Texture>("model/citrus_orchard_road_puresky_4k.hdr");
+		auto skyboxTexture = m_manager.Get<re::Texture>("model/grasslands_sunset_4k.hdr");
+		scene.CreateEntity()
+			.Add<re::SkyboxComponent>(skyboxTexture);
 
 		scene.CreateEntity()
 			.Add<re::Dirty<re::TransformComponent>>()
@@ -279,8 +284,9 @@ private:
 			}
 		}
 
-		for (const auto& [vertices, indices, material] : meshParts)
+		for (auto&& [vertices, indices, material] : meshParts)
 		{
+			material.metallicFactor = 0.f;
 			auto entity = scene.CreateEntity()
 							  .Add<re::Dirty<re::TransformComponent>>()
 							  .Add<re::TransformComponent>({

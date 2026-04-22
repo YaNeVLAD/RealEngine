@@ -131,15 +131,23 @@ void RenderSystem3D::Update(ecs::Scene& scene, float)
 
 	const auto light = ExtractLight(scene);
 	const auto [position, viewMatrix, fov, nearClip, farClip] = ExtractCamera(scene);
+	const auto skybox = ExtractSkybox(scene);
 
 	CollectDynamicAndTransparent(scene, position);
 
 	render::Renderer3D::BeginScene(fov, aspect, nearClip, farClip, viewMatrix);
 
 	render::Renderer3D::SetLight(light);
+	render::Renderer3D::SetEnvironment(skybox.irradianceID);
 
 	RenderOpaqueGeometry(position, farClip);
 	RenderTransparentGeometry();
+
+	if (skybox.m_cubemapID != 0)
+	{
+		glm::mat4 projection = glm::perspective(glm::radians(fov), aspect, nearClip, farClip);
+		render::Renderer3D::DrawSkybox(skybox.m_cubemapID, viewMatrix, projection);
+	}
 
 	render::Renderer3D::EndScene();
 }
@@ -393,6 +401,24 @@ void RenderSystem3D::ExecuteRenderCommand(const RenderCommand3D& cmd)
 	{
 		render::Renderer3D::DrawMesh(*cmd.vertices, *cmd.indices, cmd.transform, cmd.wireframe);
 	}
+}
+
+SkyboxComponent RenderSystem3D::ExtractSkybox(ecs::Scene& scene)
+{
+	SkyboxComponent defaultSkybox;
+
+	for (auto&& [entity, skybox] : *scene.CreateView<SkyboxComponent>())
+	{
+		if (skybox.hdrTexture && skybox.m_cubemapID == 0)
+		{
+			skybox.m_cubemapID = render::Renderer3D::CreateCubemapFromHDR(skybox.hdrTexture.get());
+			skybox.irradianceID = render::Renderer3D::CreateIrradianceMap(skybox.m_cubemapID);
+		}
+
+		return skybox;
+	}
+
+	return defaultSkybox;
 }
 
 } // namespace re::detail

@@ -56,6 +56,17 @@ public:
 		bool wireframe,
 		float farClip);
 
+	static void DrawSkybox(
+		std::uint32_t cubemapID,
+		const glm::mat4& viewMatrix,
+		const glm::mat4& projectionMatrix);
+
+	static std::uint32_t CreateCubemapFromHDR(Texture* hdrTexture);
+
+	static std::uint32_t CreateIrradianceMap(std::uint32_t cubemapID);
+
+	static void SetEnvironment(std::uint32_t irradianceID);
+
 	static void SetMaterial(const Material& material);
 
 	static void SetLight(const LightData& light);

@@ -245,6 +245,9 @@ constexpr auto s_FragmentShaderPBR = UR"(
     uniform sampler2D u_MetallicRoughnessMap;  uniform int u_HasMetallicRoughnessMap;
     uniform sampler2D u_AOMap;                 uniform int u_HasAOMap;
 
+	uniform samplerCube u_IrradianceMap;
+	uniform int u_HasIrradianceMap;
+
     uniform int u_LightType;
     uniform vec3 u_LightPos;
     uniform vec3 u_LightDir;
@@ -295,7 +298,7 @@ constexpr auto s_FragmentShaderPBR = UR"(
 									 UR"(
     void main() {
 		vec4 albedoTex = u_HasAlbedoMap != 0 ? texture(u_AlbedoMap, v_TexCoord) : vec4(1.0);
-		vec3 albedo = albedoTex.rgb * sRGBToLinear(u_AlbedoColor) * v_Color.rgb;
+		vec3 albedo = albedoTex.rgb * sRGBToLinear(u_AlbedoColor); //* v_Color.rgb;
 
         float metallic = u_MetallicFactor;
         float roughness = u_RoughnessFactor;
@@ -312,6 +315,10 @@ constexpr auto s_FragmentShaderPBR = UR"(
             vec3 normalColor = texture(u_NormalMap, v_TexCoord).rgb * 2.0 - 1.0;
             N = normalize(v_TBN * normalColor);
         }
+
+		// === NORMALS DEBUG ===
+		//o_Color = vec4(N * 0.5 + 0.5, 1.0);
+        //return;
 
         vec3 V = normalize(u_CameraPos - v_FragmentWorldPos);
         vec3 F0 = mix(vec3(0.04), albedo, metallic);
@@ -345,10 +352,23 @@ constexpr auto s_FragmentShaderPBR = UR"(
         vec3 kD = vec3(1.0) - kS;
         kD *= 1.0 - metallic;
 
-        float NdotL = max(dot(N, L), 0.0);
-        vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
+		// === HALF-LAMBERT ===
+        float wrap = dot(N, L) * 0.5 + 0.5;
+        float NdotL = wrap * wrap;
 
-        vec3 ambient = u_LightAmbient * albedo * ao;
+        // float NdotL = max(dot(N, L), 0.0);
+		vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
+
+		// === SMART_AMBIENT - FAKE-IBL ===
+		// vec3 ambientDiffuse = u_LightAmbient * albedo * kD * ao;
+
+		// === IBL ===
+		vec3 irradiance = u_HasIrradianceMap != 0 ? texture(u_IrradianceMap, N).rgb : u_LightAmbient;
+		vec3 ambientDiffuse = irradiance * albedo * kD * ao;
+
+		vec3 ambientSpecular = u_LightAmbient * F0 * ao;
+        vec3 ambient = ambientDiffuse + ambientSpecular;
+
         vec3 emission = u_EmissionColor;
         if (u_HasEmissionMap != 0) {
             vec3 texEmi = sRGBToLinear(texture(u_EmissionMap, v_TexCoord).rgb);
@@ -484,6 +504,133 @@ constexpr auto s_ComputeCullingShader3D = UR"(
                 outputNormalMatrices[outIdx] = mat4(transpose(inverse(mat3(model))));
             }
         }
+    }
+)";
+
+constexpr auto s_VertexSkybox = UR"(
+    #version 450 core
+    layout (location = 0) in vec3 a_Position;
+
+    out vec3 v_TexCoord;
+
+    uniform mat4 u_ViewProjection;
+
+    void main()
+    {
+        v_TexCoord = a_Position; // Для кубмапы координаты вектора совпадают с позицией вершин куба
+        vec4 pos = u_ViewProjection * vec4(a_Position, 1.0);
+
+        // Хитрость xyww: после деления перспективы (pos.z / pos.w), Z всегда будет равен 1.0 (максимальная глубина)
+        gl_Position = pos.xyww;
+    }
+)";
+
+constexpr auto s_FragmentSkybox = UR"(
+    #version 450 core
+    layout(location = 0) out vec4 o_Color;
+
+    in vec3 v_TexCoord;
+
+    uniform samplerCube u_EnvironmentMap;
+
+    vec3 linearToSRGB(vec3 linearIn) { return pow(linearIn, vec3(1.0 / 2.2)); }
+
+    void main()
+    {
+        // Кубмапы HDR загружаются в линейном пространстве
+        vec3 envColor = texture(u_EnvironmentMap, v_TexCoord).rgb;
+
+        // Tone mapping (защита от пересвета HDR)
+        envColor = envColor / (envColor + vec3(1.0));
+        // Gamma
+        envColor = linearToSRGB(envColor);
+
+        o_Color = vec4(envColor, 1.0);
+    }
+)";
+
+constexpr auto s_VertexEquirectToCube = UR"(
+    #version 450 core
+    layout (location = 0) in vec3 a_Position;
+
+    out vec3 v_WorldPos;
+
+    uniform mat4 u_ViewProjection;
+
+    void main()
+    {
+        v_WorldPos = a_Position;
+        gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
+    }
+)";
+
+constexpr auto s_FragmentEquirectToCube = UR"(
+    #version 450 core
+    layout(location = 0) out vec4 o_Color;
+
+    in vec3 v_WorldPos;
+
+    uniform sampler2D u_EquirectangularMap;
+
+    const vec2 invAtan = vec2(0.1591, 0.3183);
+    vec2 SampleSphericalMap(vec3 v)
+    {
+        vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+        uv *= invAtan;
+        uv += 0.5;
+        return uv;
+    }
+
+    void main()
+    {
+        // Переводим 3D направление в 2D UV координаты
+        vec2 uv = SampleSphericalMap(normalize(v_WorldPos));
+        vec3 color = texture(u_EquirectangularMap, uv).rgb;
+        o_Color = vec4(color, 1.0);
+    }
+)";
+
+constexpr auto s_FragmentIrradianceConvolution = UR"(
+    #version 450 core
+    layout(location = 0) out vec4 o_Color;
+
+    in vec3 v_WorldPos;
+
+    uniform samplerCube u_EnvironmentMap;
+
+    const float PI = 3.14159265359;
+
+    void main()
+    {
+        // Нормаль совпадает с направлением вершины куба
+        vec3 N = normalize(v_WorldPos);
+        vec3 irradiance = vec3(0.0);
+
+        // Базисные векторы касательного пространства
+        vec3 up    = vec3(0.0, 1.0, 0.0);
+        vec3 right = normalize(cross(up, N));
+        up         = normalize(cross(N, right));
+
+        float sampleDelta = 0.025;
+        float nrSamples = 0.0;
+
+        // Интегрируем свет со всей полусферы
+        for(float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
+        {
+            for(float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta)
+            {
+                // Сферические координаты в декартовы (касательное пространство)
+                vec3 tangentSample = vec3(sin(theta) * cos(phi),  sin(theta) * sin(phi), cos(theta));
+                // Перевод из касательного в мировое
+                vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N;
+
+                irradiance += texture(u_EnvironmentMap, sampleVec).rgb * cos(theta) * sin(theta);
+                nrSamples++;
+            }
+        }
+        irradiance = PI * irradiance * (1.0 / float(nrSamples));
+
+        o_Color = vec4(irradiance, 1.0);
     }
 )";
 
@@ -638,6 +785,8 @@ void OpenGLRenderAPI::Init()
 	m_Shader3DPBR = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShaderPBR);
 	m_InstancedShader3DPBR = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShaderPBR);
 
+	m_Skybox3D = std::make_shared<Shader>(s_VertexSkybox, s_FragmentSkybox);
+
 	glGenBuffers(1, &m_instanceVBOId);
 	glGenBuffers(1, &m_normalVBOId);
 	m_CullingComputeShader = std::make_shared<Shader>(s_ComputeCullingShader3D);
@@ -682,6 +831,33 @@ void OpenGLRenderAPI::Init()
 
 	m_DynamicEBO3D = std::make_shared<IndexBuffer>(30000);
 	m_DynamicVAO3D->SetIndexBuffer(m_DynamicEBO3D);
+
+	constexpr float skyboxVertices[] = { // clang-format off
+		-1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f
+	}; // clang-format on
+
+	BufferLayout skyboxLayout;
+	skyboxLayout.Push<Vector3f>("a_Position");
+
+	m_CubeVAO3D = std::make_shared<VertexArray>();
+	m_CubeVBO3D = std::make_shared<VertexBuffer>(sizeof(skyboxVertices));
+	m_CubeVBO3D->SetData(skyboxVertices, sizeof(skyboxVertices));
+
+	m_CubeVAO3D->AddVertexBuffer(m_CubeVBO3D, skyboxLayout);
+
+	m_EquirectToCubeShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentEquirectToCube);
+	m_IrradianceShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentIrradianceConvolution);
 }
 
 void OpenGLRenderAPI::Clear()
@@ -1255,6 +1431,194 @@ void OpenGLRenderAPI::SetMaterial(const Material& material)
 		bindPhongMaterial(m_Shader3D);
 		bindPhongMaterial(m_InstancedShader3D);
 	}
+}
+
+void OpenGLRenderAPI::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+{
+	// Меняем функцию глубины с LESS на LEQUAL, так как z скайбокса всегда равна 1.0
+	glDepthFunc(GL_LEQUAL);
+
+	m_Skybox3D->Bind();
+
+	// Убираем позицию из матрицы вида (обнуляем 3й столбец)
+	// Это "привяжет" скайбокс к камере, не давая нам подойти к его краям
+	glm::mat4 view = glm::mat4(glm::mat3(viewMatrix));
+	m_Skybox3D->SetMat4("u_ViewProjection", projectionMatrix * view);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapID);
+	m_Skybox3D->SetInt("u_EnvironmentMap", 0);
+
+	m_CubeVAO3D->Bind();
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+	// Возвращаем стандартную функцию глубины
+	glDepthFunc(GL_LESS);
+}
+
+std::uint32_t OpenGLRenderAPI::CreateCubemapFromHDR(Texture* hdrTexture)
+{
+	if (!hdrTexture)
+		return 0;
+
+	std::uint32_t captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	// Разрешение 1024x1024 на каждую грань куба — оптимально для скайбокса
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1024, 1024);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	std::uint32_t envCubemap;
+	glGenTextures(1, &envCubemap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		// ВНИМАНИЕ: Используем 16-битный float для сохранения HDR-яркости
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 1024, 1024, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	// Включаем MipMaps (они понадобятся нам на шаге 3 для шероховатости металлов)
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// Матрицы "камеры", смотрящей в 6 сторон из центра куба
+	const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	const glm::mat4 captureViews[] = {
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))
+	};
+
+	m_EquirectToCubeShader->Bind();
+	m_EquirectToCubeShader->SetInt("u_EquirectangularMap", 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, *static_cast<std::uint32_t*>(hdrTexture->GetNativeHandle()));
+
+	glViewport(0, 0, 1024, 1024);
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+	// Отрисовываем куб 6 раз
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		m_EquirectToCubeShader->SetMat4("u_ViewProjection", captureProjection * captureViews[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		m_CubeVAO3D->Bind();
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Генерируем мипмапы для готовой кубмапы (нужно для Pre-filter map)
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+	// Очищаем мусор
+	glDeleteFramebuffers(1, &captureFBO);
+	glDeleteRenderbuffers(1, &captureRBO);
+
+	// Восстанавливаем оригинальный Viewport движка!
+	glViewport(
+		static_cast<GLint>(m_viewport.x),
+		static_cast<GLint>(m_viewport.y),
+		static_cast<GLsizei>(m_viewport.z),
+		static_cast<GLsizei>(m_viewport.w));
+
+	return envCubemap;
+}
+
+std::uint32_t OpenGLRenderAPI::CreateIrradianceMap(std::uint32_t envCubemap)
+{
+	if (envCubemap == 0)
+		return 0;
+
+	std::uint32_t captureFBO, captureRBO;
+	glGenFramebuffers(1, &captureFBO);
+	glGenRenderbuffers(1, &captureRBO);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	std::uint32_t irradianceMap;
+	glGenTextures(1, &irradianceMap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	const glm::mat4 captureViews[] = {
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+		glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))
+	};
+
+	m_IrradianceShader->Bind();
+	m_IrradianceShader->SetInt("u_EnvironmentMap", 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+	glViewport(0, 0, 32, 32);
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		m_IrradianceShader->SetMat4("u_ViewProjection", captureProjection * captureViews[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		m_CubeVAO3D->Bind();
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &captureFBO);
+	glDeleteRenderbuffers(1, &captureRBO);
+
+	glViewport(static_cast<GLint>(m_viewport.x), static_cast<GLint>(m_viewport.y), static_cast<GLsizei>(m_viewport.z), static_cast<GLsizei>(m_viewport.w));
+
+	return irradianceMap;
+}
+
+void OpenGLRenderAPI::SetEnvironment(std::uint32_t irradianceMap)
+{
+	auto bindEnv = [irradianceMap](const std::shared_ptr<Shader>& shader) {
+		if (irradianceMap != 0)
+		{
+			glActiveTexture(GL_TEXTURE5);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+			shader->SetInt("u_IrradianceMap", 5);
+			shader->SetInt("u_HasIrradianceMap", 1);
+		}
+		else
+		{
+			shader->SetInt("u_HasIrradianceMap", 0);
+		}
+	};
+
+	bindEnv(m_Shader3DPBR);
+	bindEnv(m_InstancedShader3DPBR);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

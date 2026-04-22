@@ -232,6 +232,28 @@ private:
 	friend class MouseLookSystem;
 };
 
+namespace detail
+{
+class RenderSystem3D;
+}
+struct SkyboxComponent
+{
+	SkyboxComponent() = default;
+
+	explicit SkyboxComponent(const std::shared_ptr<Texture>& texture)
+		: hdrTexture(texture)
+	{
+	}
+
+	std::shared_ptr<Texture> hdrTexture = nullptr;
+
+private:
+	std::uint32_t m_cubemapID = 0;
+	std::uint32_t irradianceID = 0;
+
+	friend class detail::RenderSystem3D;
+};
+
 struct PhysicsEventsComponent
 {
 	std::vector<physics::CollisionPair> collisions;

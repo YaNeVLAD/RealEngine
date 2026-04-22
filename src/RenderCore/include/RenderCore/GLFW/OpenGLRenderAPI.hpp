@@ -46,6 +46,11 @@ public:
 	void SetLight(const LightData& light) override;
 	void SetMaterial(const Material& material) override;
 
+	void DrawSkybox(std::uint32_t cubemapID, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) override;
+	std::uint32_t CreateCubemapFromHDR(Texture* hdrTexture) override;
+	std::uint32_t CreateIrradianceMap(std::uint32_t envCubemap) override;
+	void SetEnvironment(std::uint32_t irradianceMap) override;
+
 private:
 	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
 
@@ -81,6 +86,13 @@ private:
 
 	std::shared_ptr<Shader> m_Shader3DPBR;
 	std::shared_ptr<Shader> m_InstancedShader3DPBR;
+
+	std::shared_ptr<VertexArray> m_CubeVAO3D;
+	std::shared_ptr<VertexBuffer> m_CubeVBO3D;
+	std::shared_ptr<Shader> m_Skybox3D;
+
+	std::shared_ptr<Shader> m_EquirectToCubeShader;
+	std::shared_ptr<Shader> m_IrradianceShader;
 
 	LightData m_activeLight;
 
