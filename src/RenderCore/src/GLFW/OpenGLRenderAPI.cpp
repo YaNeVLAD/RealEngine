@@ -993,6 +993,9 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glm::vec4 planes[6];
 	ExtractFrustumPlanes(m_viewProj3D, planes);
 
+	GLint activeGraphicsShader;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &activeGraphicsShader);
+
 	m_CullingComputeShader->Bind();
 	m_CullingComputeShader->SetBool("u_ComputeNormals", nonUniform);
 	m_CullingComputeShader->SetFloat4Array("u_FrustumPlanes", planes, 6);
@@ -1013,6 +1016,13 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 
 	m_InstancedShader3D->Bind();
 	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
+
+	m_InstancedShader3DPBR->Bind();
+	m_InstancedShader3DPBR->SetMat4("u_ViewProjection", m_viewProj3D);
+	m_InstancedShader3DPBR->SetBool("u_HasNonUniformScale", nonUniform);
+
+	glUseProgram(activeGraphicsShader);
 
 	mesh->GetVAO()->Bind();
 
@@ -1064,7 +1074,7 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 		shader->SetInt("u_LightType", light.type);
 		shader->SetFloat3("u_LightPos", light.position);
 		shader->SetFloat3("u_LightDir", -light.direction);
-		shader->SetFloat3("u_LightColor", light.ambient);
+		shader->SetFloat3("u_LightColor", light.diffuse);
 		shader->SetFloat("u_LightConstant", light.constant);
 		shader->SetFloat("u_LightLinear", light.linear);
 		shader->SetFloat("u_LightQuadratic", light.quadratic);
@@ -1074,6 +1084,9 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 
 	bindLightToShader(m_Shader3D);
 	bindLightToShader(m_InstancedShader3D);
+
+	bindLightToShader(m_Shader3DPBR);
+	bindLightToShader(m_InstancedShader3DPBR);
 }
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
