@@ -738,10 +738,8 @@ void OpenGLRenderAPI::DrawAnimatedModel(AnimatedModel* model, Animator* animator
 		return;
 	}
 
-	// 1. Применяем наш RAII паттерн для защиты текущих шейдеров
 	ScopedShaderRestorer restorer;
 
-	// Вычисляем базовые матрицы
 	const glm::mat4 mvp = m_viewProj3D * transform;
 	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
 
@@ -753,9 +751,8 @@ void OpenGLRenderAPI::DrawAnimatedModel(AnimatedModel* model, Animator* animator
 	m_AnimatedShader3DPBR->Bind();
 	m_AnimatedShader3DPBR->SetMat4("u_ModelMatrix", transform);
 	m_AnimatedShader3DPBR->SetMat4("u_ModelViewProjection", mvp);
-	m_AnimatedShader3DPBR->SetMat3("u_NormalMatrix", normalMatrix); // Передаем как mat4, шейдер сам скастит в mat3
+	m_AnimatedShader3DPBR->SetMat3("u_NormalMatrix", normalMatrix);
 
-	// 3. Заливаем матрицы костей в SSBO
 	const auto& boneMatrices = animator->FinalBoneMatrices();
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_boneSSBO);
 
@@ -765,49 +762,28 @@ void OpenGLRenderAPI::DrawAnimatedModel(AnimatedModel* model, Animator* animator
 	}
 	else
 	{
-		// Защита от мусора: отправляем одну единичную матрицу для Т-позы
 		constexpr glm::mat4 identity(1.0f);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::mat4), &identity, GL_DYNAMIC_DRAW);
 	}
-
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, m_boneSSBO);
 
-	// 4. Отрисовываем все части (MeshParts) модели
-	// Для оптимизации в будущем эти данные VBO/EBO нужно загрузить в GPU один раз при инициализации AnimatedModel!
-	// Сейчас мы загружаем их "на лету" через динамический буфер для простоты.
-	const auto& parts = model->Parts();
-	for (const auto& part : parts)
+	// 4. Отрисовка запеченных статических буферов
+	for (const auto& part : model->Parts())
 	{
-		if (part.vertices.empty() || part.indices.empty())
+		// Если VAO не был создан, пропускаем
+		if (!part.vao)
 		{
 			continue;
 		}
 
-		// Применяем материал конкретной части модели
 		SetMaterial(part.material);
 
-		// Используем твой механизм динамических буферов
-		const std::size_t vboBytesNeeded = part.vertices.size() * sizeof(Vertex);
-		const std::size_t eboCountNeeded = part.indices.size();
-
-		if (m_dynamicOffsetVbo3D + vboBytesNeeded > m_DynamicVBO3D->GetSize() || m_dynamicOffsetEbo3D + eboCountNeeded > m_DynamicEBO3D->GetCapacity())
-		{
-			m_dynamicOffsetVbo3D = 0;
-			m_dynamicOffsetEbo3D = 0;
-		}
-
-		m_DynamicVAO3D->Bind();
-		m_DynamicVBO3D->SetData(part.vertices.data(), vboBytesNeeded, m_dynamicOffsetVbo3D);
-		m_DynamicEBO3D->SetData(part.indices.data(), eboCountNeeded, m_dynamicOffsetEbo3D);
+		// Просто биндим готовый VAO
+		part.vao->Bind();
 
 		DrawWithWireframe(wireframe, [&] {
-			const auto baseVertex = static_cast<GLint>(m_dynamicOffsetVbo3D / sizeof(Vertex));
-			const auto indexByteOffset = reinterpret_cast<const void*>(m_dynamicOffsetEbo3D * sizeof(std::uint32_t));
-			glDrawElementsBaseVertex(GL_TRIANGLES, static_cast<GLsizei>(part.indices.size()), GL_UNSIGNED_INT, indexByteOffset, baseVertex);
+			glDrawElements(GL_TRIANGLES, part.ebo->GetCount(), GL_UNSIGNED_INT, nullptr);
 		});
-
-		m_dynamicOffsetVbo3D += vboBytesNeeded;
-		m_dynamicOffsetEbo3D += eboCountNeeded;
 	}
 }
 

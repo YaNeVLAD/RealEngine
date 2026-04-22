@@ -128,7 +128,7 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 				matId = 0;
 			}
 
-			auto& [vertices, indices, material] = partsMap[matId];
+			auto& [vertices, indices, material, _, _1, _2] = partsMap[matId];
 			auto& uniqueVertices = uniqueVerticesPerPart[matId];
 
 			material = engineMaterials[matId];

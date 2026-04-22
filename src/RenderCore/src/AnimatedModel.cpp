@@ -183,7 +183,6 @@ void ParseNodeRecursive(
 				{
 					const std::uint8_t* raw = jointsData + i * jointsStride;
 
-					// В glTF индексы костей обычно хранятся как UNSIGNED_SHORT или UNSIGNED_BYTE
 					if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
 					{
 						auto j = reinterpret_cast<const std::uint16_t*>(raw);
@@ -453,7 +452,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 		ParseNodeRecursive(gltfModel, nodeIndex, glm::mat4(1.0f), m_parts, localTextureCache, manager, pathStr);
 	}
 
-	// Хэш-таблица для быстрого поиска: индекс узла glTF -> индекс кости в нашем массиве
 	std::unordered_map<int, int> nodeToBoneMap;
 	if (!gltfModel.skins.empty())
 	{
@@ -469,7 +467,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			nodeToBoneMap[skin.joints[i]] = static_cast<int>(i);
 		}
 
-		// Читаем Inverse Bind Matrices
 		const float* ibmData = nullptr;
 		if (skin.inverseBindMatrices >= 0)
 		{
@@ -479,7 +476,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			ibmData = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
 		}
 
-		// Заполняем кости
 		for (std::size_t i = 0; i < skin.joints.size(); ++i)
 		{
 			int nodeIndex = skin.joints[i];
@@ -487,18 +483,15 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 
 			m_skeleton[i].name = node.name;
 
-			// Записываем Inverse Bind Matrix (если есть, иначе оставляем единичную)
 			if (ibmData)
 			{
 				m_skeleton[i].inverseBindMatrix = glm::make_mat4(ibmData + i * 16);
 			}
 
-			// Вычисляем базовый локальный трансформ кости (T * R * S)
 			glm::vec3 translation(0.0f);
 			glm::quat rotation(1.0f, 0.0f, 0.0f, 0.0f);
 			glm::vec3 scale(1.0f);
 
-			// Явный каст из double[] во float, чтобы спать спокойно
 			if (node.translation.size() == 3)
 			{
 				translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
@@ -512,7 +505,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 				scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
 			}
 
-			// --- СОХРАНЯЕМ В КОСТЬ ---
 			m_skeleton[i].translation = translation;
 			m_skeleton[i].rotation = rotation;
 			m_skeleton[i].scale = scale;
@@ -520,7 +512,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			m_skeleton[i].localTransform = glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0f), scale);
 			m_skeleton[i].globalTransform = m_skeleton[i].localTransform;
 
-			// Ищем детей этой кости и устанавливаем им parentIndex
 			for (int childNodeIndex : node.children)
 			{
 				if (nodeToBoneMap.contains(childNodeIndex))
@@ -542,7 +533,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 		{
 			int nodeIndex = channel.target_node;
 
-			// Если анимация направлена не на кость из нашего скелета - пропускаем
 			if (!nodeToBoneMap.contains(nodeIndex))
 			{
 				continue;
@@ -551,7 +541,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 
 			const tinygltf::AnimationSampler& sampler = gltfAnim.samplers[channel.sampler];
 
-			// --- Читаем ВРЕМЯ (Inputs) ---
 			const tinygltf::Accessor& inputAccessor = gltfModel.accessors[sampler.input];
 			const tinygltf::BufferView& inputView = gltfModel.bufferViews[inputAccessor.bufferView];
 			const tinygltf::Buffer& inputBuffer = gltfModel.buffers[inputView.buffer];
@@ -569,7 +558,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 				}
 			}
 
-			// --- Читаем ЗНАЧЕНИЯ (Outputs) ---
 			const tinygltf::Accessor& outputAccessor = gltfModel.accessors[sampler.output];
 			const tinygltf::BufferView& outputView = gltfModel.bufferViews[outputAccessor.bufferView];
 			const tinygltf::Buffer& outputBuffer = gltfModel.buffers[outputView.buffer];
@@ -595,8 +583,7 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			{
 				for (std::size_t i = 0; i < inputAccessor.count; ++i)
 				{
-					const float* val = reinterpret_cast<const float*>(outputData + i * outputStride);
-					// ВНИМАНИЕ: glTF хранит кватернионы как [X, Y, Z, W], а конструктор glm::quat ожидает (W, X, Y, Z)
+					auto val = reinterpret_cast<const float*>(outputData + i * outputStride);
 					boneAnim.rotations.push_back({ times[i], glm::quat(val[3], val[0], val[1], val[2]) });
 				}
 			}
@@ -604,7 +591,7 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 			{
 				for (std::size_t i = 0; i < inputAccessor.count; ++i)
 				{
-					const float* val = reinterpret_cast<const float*>(outputData + i * outputStride);
+					auto val = reinterpret_cast<const float*>(outputData + i * outputStride);
 					boneAnim.scales.push_back({ times[i], glm::vec3(val[0], val[1], val[2]) });
 				}
 			}
@@ -615,6 +602,40 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 	}
 
 	PrintSkeleton(m_skeleton);
+
+	BufferLayout layout;
+	layout.Push<Vector3f>("a_Position");
+	layout.Push<Vector3f>("a_Normal");
+	layout.Push<Color>("a_Color", true);
+	layout.Push<Vector2f>("a_TexCoord");
+	layout.Push<float>("a_TexIndex");
+	layout.Push<Vector4i>("a_BoneIDs");
+	layout.Push<Vector4f>("a_BoneWeights");
+	layout.Push<Vector4f>("a_Tangent");
+
+	for (auto& part : m_parts)
+	{
+		if (part.vertices.empty() || part.indices.empty())
+		{
+			continue;
+		}
+
+		// Создаем VAO
+		part.vao = std::make_shared<VertexArray>();
+
+		// Создаем и заливаем VBO
+		part.vbo = std::make_shared<VertexBuffer>(part.vertices.size() * sizeof(Vertex));
+		part.vbo->SetData(part.vertices.data(), part.vertices.size() * sizeof(Vertex));
+		part.vao->AddVertexBuffer(part.vbo, layout);
+
+		// Создаем и заливаем EBO
+		part.ebo = std::make_shared<IndexBuffer>(part.indices.data(), part.indices.size());
+		part.vao->SetIndexBuffer(part.ebo);
+
+		// Опционально: можно очистить part.vertices и part.indices из оперативки
+		part.vertices.clear();
+		part.indices.clear();
+	}
 
 	return true;
 }

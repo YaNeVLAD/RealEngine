@@ -9,7 +9,6 @@ layout (location = 5) in ivec4 a_BoneIDs;
 layout (location = 6) in vec4 a_BoneWeights;
 layout (location = 7) in vec4 a_Tangent;
 
-// === БЕЗЛИМИТНЫЙ БУФЕР КОСТЕЙ ===
 layout (std430, binding = 4) readonly buffer BoneBuffer
 {
     mat4 u_Bones[];
