@@ -153,6 +153,54 @@ void ParseNodeRecursive(
 				}
 			}
 
+			std::size_t jointsCount, jointsStride;
+			if (const std::uint8_t* jointsData = GetAttributeData<float>(gltfModel, primitive, "JOINTS_0", jointsCount, jointsStride))
+			{
+				const int componentType = gltfModel.accessors[primitive.attributes.at("JOINTS_0")].componentType;
+				for (std::size_t i = 0; i < jointsCount; ++i)
+				{
+					const std::uint8_t* raw = jointsData + i * jointsStride;
+
+					// В glTF индексы костей обычно хранятся как UNSIGNED_SHORT или UNSIGNED_BYTE
+					if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+					{
+						auto j = reinterpret_cast<const std::uint16_t*>(raw);
+						part.vertices[i].boneIDs = { j[0], j[1], j[2], j[3] };
+					}
+					else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+					{
+						auto j = raw;
+						part.vertices[i].boneIDs = { j[0], j[1], j[2], j[3] };
+					}
+				}
+			}
+
+			std::size_t weightsCount, weightsStride;
+			if (const std::uint8_t* weightsData = GetAttributeData<float>(gltfModel, primitive, "WEIGHTS_0", weightsCount, weightsStride))
+			{
+				const int componentType = gltfModel.accessors[primitive.attributes.at("WEIGHTS_0")].componentType;
+				for (std::size_t i = 0; i < weightsCount; ++i)
+				{
+					const std::uint8_t* raw = weightsData + i * weightsStride;
+
+					if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
+					{
+						auto w = reinterpret_cast<const float*>(raw);
+						part.vertices[i].boneWeights = { w[0], w[1], w[2], w[3] };
+					}
+					else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+					{
+						auto w = reinterpret_cast<const std::uint16_t*>(raw);
+						part.vertices[i].boneWeights = { w[0] / 65535.0f, w[1] / 65535.0f, w[2] / 65535.0f, w[3] / 65535.0f };
+					}
+					else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+					{
+						auto w = raw;
+						part.vertices[i].boneWeights = { w[0] / 255.0f, w[1] / 255.0f, w[2] / 255.0f, w[3] / 255.0f };
+					}
+				}
+			}
+
 			if (primitive.indices >= 0)
 			{
 				const tinygltf::Accessor& indexAccessor = gltfModel.accessors[primitive.indices];
@@ -279,18 +327,70 @@ void ParseNodeRecursive(
 	}
 }
 
+void PrintBoneRecursive(const std::vector<re::render::Bone>& skeleton, int boneIndex, int depth);
+
+void PrintSkeleton(const std::vector<re::render::Bone>& skeleton)
+{
+	if (skeleton.empty())
+	{
+		std::cout << "Model has no skeleton.\n";
+		return;
+	}
+
+	std::cout << "--- Skeleton Hierarchy ---\n";
+
+	for (std::size_t i = 0; i < skeleton.size(); ++i)
+	{
+		if (skeleton[i].parentIndex == re::render::Bone::ROOT_BONE_IDX)
+		{
+			PrintBoneRecursive(skeleton, static_cast<int>(i), 0);
+		}
+	}
+	std::cout << "--------------------------\n";
+}
+
+void PrintBoneRecursive(const std::vector<re::render::Bone>& skeleton, const int boneIndex, const int depth)
+{
+	for (int i = 0; i < depth; ++i)
+	{
+		std::cout << "  ";
+	}
+
+	std::cout << "|- [" << boneIndex << "] " << skeleton[boneIndex].name << "\n";
+
+	for (std::size_t i = 0; i < skeleton.size(); ++i)
+	{
+		if (skeleton[i].parentIndex == boneIndex)
+		{
+			PrintBoneRecursive(skeleton, static_cast<int>(i), depth + 1);
+		}
+	}
+}
+
 } // namespace
 
 namespace re
 {
 
-const std::vector<render::MeshPart>& AnimatedModel::GetParts() const
+const std::vector<render::MeshPart>& AnimatedModel::Parts() const
 {
 	return m_parts;
 }
 
+const std::vector<render::Bone>& AnimatedModel::Skeleton() const
+{
+	return m_skeleton;
+}
+
+const std::vector<render::Animation>& AnimatedModel::Animations() const
+{
+	return m_animations;
+}
+
 bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* manager)
 {
+	using namespace re::render;
+
 	tinygltf::Model gltfModel;
 	tinygltf::TinyGLTF loader;
 	std::string err, warn;
@@ -325,12 +425,168 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 	std::unordered_map<int, std::shared_ptr<Texture>> localTextureCache;
 
 	const int sceneIndex = gltfModel.defaultScene > -1 ? gltfModel.defaultScene : 0;
-	const tinygltf::Scene& scene = gltfModel.scenes[sceneIndex];
 
-	for (const int nodeIndex : scene.nodes)
+	for (const tinygltf::Scene& scene = gltfModel.scenes[sceneIndex]; const int nodeIndex : scene.nodes)
 	{
 		ParseNodeRecursive(gltfModel, nodeIndex, glm::mat4(1.0f), m_parts, localTextureCache, manager, pathStr);
 	}
+
+	// Хэш-таблица для быстрого поиска: индекс узла glTF -> индекс кости в нашем массиве
+	std::unordered_map<int, int> nodeToBoneMap;
+	if (!gltfModel.skins.empty())
+	{
+		if (gltfModel.skins.size() > 1)
+		{
+			RE_LOG_WARN("Multiple skins detected in {}. All shins except for the first one will be ignored", filePath.ToString());
+		}
+		const tinygltf::Skin& skin = gltfModel.skins[0];
+		m_skeleton.resize(skin.joints.size());
+
+		for (std::size_t i = 0; i < skin.joints.size(); ++i)
+		{
+			nodeToBoneMap[skin.joints[i]] = static_cast<int>(i);
+		}
+
+		// Читаем Inverse Bind Matrices
+		const float* ibmData = nullptr;
+		if (skin.inverseBindMatrices >= 0)
+		{
+			const tinygltf::Accessor& accessor = gltfModel.accessors[skin.inverseBindMatrices];
+			const tinygltf::BufferView& bufferView = gltfModel.bufferViews[accessor.bufferView];
+			const tinygltf::Buffer& buffer = gltfModel.buffers[bufferView.buffer];
+			ibmData = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+		}
+
+		// Заполняем кости
+		for (std::size_t i = 0; i < skin.joints.size(); ++i)
+		{
+			int nodeIndex = skin.joints[i];
+			const tinygltf::Node& node = gltfModel.nodes[nodeIndex];
+
+			m_skeleton[i].name = node.name;
+
+			// Записываем Inverse Bind Matrix (если есть, иначе оставляем единичную)
+			if (ibmData)
+			{
+				m_skeleton[i].inverseBindMatrix = glm::make_mat4(ibmData + i * 16);
+			}
+
+			// Вычисляем базовый локальный трансформ кости (T * R * S)
+			glm::vec3 translation(0.0f);
+			glm::quat rotation(1.0f, 0.0f, 0.0f, 0.0f);
+			glm::vec3 scale(1.0f);
+
+			if (node.translation.size() == 3)
+			{
+				translation = glm::make_vec3(node.translation.data());
+			}
+			if (node.rotation.size() == 4)
+			{
+				rotation = glm::quat(static_cast<float>(node.rotation[3]), static_cast<float>(node.rotation[0]), static_cast<float>(node.rotation[1]), static_cast<float>(node.rotation[2]));
+			}
+			if (node.scale.size() == 3)
+			{
+				scale = glm::make_vec3(node.scale.data());
+			}
+
+			m_skeleton[i].localTransform = glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0f), scale);
+			m_skeleton[i].globalTransform = m_skeleton[i].localTransform; // Пока глобальный равен локальному
+
+			// Ищем детей этой кости и устанавливаем им parentIndex
+			for (int childNodeIndex : node.children)
+			{
+				if (nodeToBoneMap.contains(childNodeIndex))
+				{
+					int childBoneIndex = nodeToBoneMap[childNodeIndex];
+					m_skeleton[childBoneIndex].parentIndex = static_cast<int>(i);
+				}
+			}
+		}
+	}
+
+	for (const tinygltf::Animation& gltfAnim : gltfModel.animations)
+	{
+		Animation anim;
+		anim.name = gltfAnim.name;
+		float maxTime = 0.0f;
+
+		for (const tinygltf::AnimationChannel& channel : gltfAnim.channels)
+		{
+			int nodeIndex = channel.target_node;
+
+			// Если анимация направлена не на кость из нашего скелета - пропускаем
+			if (!nodeToBoneMap.contains(nodeIndex))
+			{
+				continue;
+			}
+			int boneIndex = nodeToBoneMap[nodeIndex];
+
+			const tinygltf::AnimationSampler& sampler = gltfAnim.samplers[channel.sampler];
+
+			// --- Читаем ВРЕМЯ (Inputs) ---
+			const tinygltf::Accessor& inputAccessor = gltfModel.accessors[sampler.input];
+			const tinygltf::BufferView& inputView = gltfModel.bufferViews[inputAccessor.bufferView];
+			const tinygltf::Buffer& inputBuffer = gltfModel.buffers[inputView.buffer];
+
+			const unsigned char* inputData = &inputBuffer.data[inputView.byteOffset + inputAccessor.byteOffset];
+			std::size_t inputStride = inputAccessor.ByteStride(inputView) ? inputAccessor.ByteStride(inputView) : sizeof(float);
+
+			std::vector<float> times(inputAccessor.count);
+			for (std::size_t i = 0; i < inputAccessor.count; ++i)
+			{
+				times[i] = *reinterpret_cast<const float*>(inputData + i * inputStride);
+				if (times[i] > maxTime)
+				{
+					maxTime = times[i];
+				}
+			}
+
+			// --- Читаем ЗНАЧЕНИЯ (Outputs) ---
+			const tinygltf::Accessor& outputAccessor = gltfModel.accessors[sampler.output];
+			const tinygltf::BufferView& outputView = gltfModel.bufferViews[outputAccessor.bufferView];
+			const tinygltf::Buffer& outputBuffer = gltfModel.buffers[outputView.buffer];
+
+			const unsigned char* outputData = &outputBuffer.data[outputView.byteOffset + outputAccessor.byteOffset];
+			std::size_t outputStride = outputAccessor.ByteStride(outputView);
+			if (outputStride == 0)
+			{
+				outputStride = (channel.target_path == "rotation") ? sizeof(float) * 4 : sizeof(float) * 3;
+			}
+
+			BoneAnimation& boneAnim = anim.boneAnimations[boneIndex];
+
+			if (channel.target_path == "translation")
+			{
+				for (std::size_t i = 0; i < inputAccessor.count; ++i)
+				{
+					const float* val = reinterpret_cast<const float*>(outputData + i * outputStride);
+					boneAnim.positions.push_back({ times[i], glm::vec3(val[0], val[1], val[2]) });
+				}
+			}
+			else if (channel.target_path == "rotation")
+			{
+				for (std::size_t i = 0; i < inputAccessor.count; ++i)
+				{
+					const float* val = reinterpret_cast<const float*>(outputData + i * outputStride);
+					// ВНИМАНИЕ: glTF хранит кватернионы как [X, Y, Z, W], а конструктор glm::quat ожидает (W, X, Y, Z)
+					boneAnim.rotations.push_back({ times[i], glm::quat(val[3], val[0], val[1], val[2]) });
+				}
+			}
+			else if (channel.target_path == "scale")
+			{
+				for (std::size_t i = 0; i < inputAccessor.count; ++i)
+				{
+					const float* val = reinterpret_cast<const float*>(outputData + i * outputStride);
+					boneAnim.scales.push_back({ times[i], glm::vec3(val[0], val[1], val[2]) });
+				}
+			}
+		}
+
+		anim.duration = maxTime;
+		m_animations.push_back(anim);
+	}
+
+	PrintSkeleton(m_skeleton);
 
 	return true;
 }

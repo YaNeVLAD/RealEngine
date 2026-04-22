@@ -306,7 +306,7 @@ private:
 			const auto model = m_manager.Get<re::AnimatedModel>(path);
 			if (model)
 			{
-				meshParts = model->GetParts();
+				meshParts = model->Parts();
 			}
 		}
 

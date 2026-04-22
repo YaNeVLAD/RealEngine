@@ -318,6 +318,9 @@ void OpenGLRenderAPI::Init()
 
 	m_EquirectToCubeShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentEquirectToCube);
 	m_IrradianceShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentIrradianceConvolution);
+
+	m_AnimatedShader3DPBR = std::make_shared<Shader>("animation3d.vert.glsl"_shader, "pbr.frag.glsl"_shader);
+	glGenBuffers(1, &m_boneSSBO);
 }
 
 void OpenGLRenderAPI::ReloadShaders()
@@ -329,6 +332,7 @@ void OpenGLRenderAPI::ReloadShaders()
 	m_InstancedShader3DPBR->Reload();
 	m_SkyboxShader3D->Reload();
 	m_CullingComputeShader->Reload();
+	m_AnimatedShader3DPBR->Reload();
 }
 
 void OpenGLRenderAPI::Clear()

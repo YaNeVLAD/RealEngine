@@ -97,6 +97,10 @@ private:
 	std::shared_ptr<Shader> m_EquirectToCubeShader;
 	std::shared_ptr<Shader> m_IrradianceShader;
 
+	std::shared_ptr<Shader> m_AnimatedShader3DPBR;
+
+	std::uint32_t m_boneSSBO = 0;
+
 	LightData m_activeLight;
 
 	std::vector<Vertex> m_batchBuffer{};
