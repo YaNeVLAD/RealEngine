@@ -249,11 +249,12 @@ constexpr auto s_FragmentShaderPBR = UR"(
     uniform vec3 u_LightPos;
     uniform vec3 u_LightDir;
     uniform vec3 u_LightColor;
+	uniform vec3 u_LightAmbient;
     uniform float u_LightConstant;
     uniform float u_LightLinear;
     uniform float u_LightQuadratic;
-    uniform float u_LightCutOff;   // ДОБАВЛЕНО ДЛЯ SPOTLIGHT
-    uniform float u_LightExponent; // ДОБАВЛЕНО ДЛЯ SPOTLIGHT
+    uniform float u_LightCutOff;
+    uniform float u_LightExponent;
 
     uniform vec3 u_CameraPos;
 
@@ -293,8 +294,8 @@ constexpr auto s_FragmentShaderPBR = UR"(
 )"
 									 UR"(
     void main() {
-        vec4 albedoTex = u_HasAlbedoMap != 0 ? texture(u_AlbedoMap, v_TexCoord) : vec4(1.0);
-        vec3 albedo = sRGBToLinear(albedoTex.rgb) * u_AlbedoColor * v_Color.rgb;
+		vec4 albedoTex = u_HasAlbedoMap != 0 ? texture(u_AlbedoMap, v_TexCoord) : vec4(1.0);
+		vec3 albedo = albedoTex.rgb * sRGBToLinear(u_AlbedoColor) * v_Color.rgb;
 
         float metallic = u_MetallicFactor;
         float roughness = u_RoughnessFactor;
@@ -324,7 +325,6 @@ constexpr auto s_FragmentShaderPBR = UR"(
             float dist = length(u_LightPos - v_FragmentWorldPos);
             attenuation = 1.0 / (u_LightConstant + u_LightLinear * dist + u_LightQuadratic * (dist * dist));
 
-            // ВНЕДРЕНИЕ SPOTLIGHT ДЛЯ PBR
             if (u_LightType == 2) {
                 float cosAlpha = dot(L, normalize(u_LightDir));
                 if (cosAlpha > u_LightCutOff) spotEffect = pow(cosAlpha, u_LightExponent);
@@ -348,7 +348,7 @@ constexpr auto s_FragmentShaderPBR = UR"(
         float NdotL = max(dot(N, L), 0.0);
         vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
 
-        vec3 ambient = vec3(0.03) * albedo * ao;
+        vec3 ambient = u_LightAmbient * albedo * ao;
         vec3 emission = u_EmissionColor;
         if (u_HasEmissionMap != 0) {
             vec3 texEmi = sRGBToLinear(texture(u_EmissionMap, v_TexCoord).rgb);
@@ -1068,13 +1068,14 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 void OpenGLRenderAPI::SetLight(const LightData& light)
 {
 	m_activeLight = light;
+	const auto baseLightColor = light.diffuse;
 
-	auto bindLightToShader = [&](const std::shared_ptr<Shader>& shader) {
+	auto bindPhongLight = [&](const std::shared_ptr<Shader>& shader) {
 		shader->Bind();
 		shader->SetInt("u_LightType", light.type);
 		shader->SetFloat3("u_LightPos", light.position);
 		shader->SetFloat3("u_LightDir", -light.direction);
-		shader->SetFloat3("u_LightColor", light.diffuse);
+		shader->SetFloat3("u_LightColor", baseLightColor);
 		shader->SetFloat("u_LightConstant", light.constant);
 		shader->SetFloat("u_LightLinear", light.linear);
 		shader->SetFloat("u_LightQuadratic", light.quadratic);
@@ -1082,11 +1083,28 @@ void OpenGLRenderAPI::SetLight(const LightData& light)
 		shader->SetFloat("u_LightExponent", light.exponent);
 	};
 
-	bindLightToShader(m_Shader3D);
-	bindLightToShader(m_InstancedShader3D);
+	auto bindPBRLight = [&](const std::shared_ptr<Shader>& shader) {
+		shader->Bind();
+		shader->SetInt("u_LightType", light.type);
+		shader->SetFloat3("u_LightPos", light.position);
+		shader->SetFloat3("u_LightDir", -light.direction);
 
-	bindLightToShader(m_Shader3DPBR);
-	bindLightToShader(m_InstancedShader3DPBR);
+		constexpr float LIGHT_AMPLIFICATION = 2.5f;
+		constexpr float PBR_INTENSITY = std::numbers::pi_v<float> * LIGHT_AMPLIFICATION;
+		shader->SetFloat3("u_LightColor", baseLightColor * PBR_INTENSITY);
+		shader->SetFloat3("u_LightAmbient", light.ambient);
+		shader->SetFloat("u_LightConstant", light.constant);
+		shader->SetFloat("u_LightLinear", light.linear);
+		shader->SetFloat("u_LightQuadratic", light.quadratic);
+		shader->SetFloat("u_LightCutOff", light.cutOff);
+		shader->SetFloat("u_LightExponent", light.exponent);
+	};
+
+	bindPhongLight(m_Shader3D);
+	bindPhongLight(m_InstancedShader3D);
+
+	bindPBRLight(m_Shader3DPBR);
+	bindPBRLight(m_InstancedShader3DPBR);
 }
 
 void OpenGLRenderAPI::SetMaterial(const Material& material)
