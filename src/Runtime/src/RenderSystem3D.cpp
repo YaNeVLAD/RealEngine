@@ -17,6 +17,7 @@
 
 namespace
 {
+
 using namespace re;
 
 struct CameraData
@@ -27,6 +28,13 @@ struct CameraData
 	float nearClip = 0.1f;
 	float farClip = 1000.0f;
 };
+
+glm::vec3 ColorToVec3(const Color color)
+{
+	const auto c = color.ToFloat();
+
+	return glm::vec3{ c.r, c.g, c.b };
+}
 
 glm::mat4 CalculateModelMatrix(TransformComponent const& transform)
 {
@@ -58,9 +66,9 @@ LightData ExtractLight(ecs::Scene& scene)
 		data.direction.z = std::sin(yawRad) * std::cos(pitchRad);
 		data.direction = glm::normalize(data.direction);
 
-		data.ambient = { light.ambient.r / 255.f, light.ambient.g / 255.f, light.ambient.b / 255.f };
-		data.diffuse = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
-		data.specular = { light.specular.r / 255.f, light.specular.g / 255.f, light.specular.b / 255.f };
+		data.ambient = ColorToVec3(light.ambient);
+		data.diffuse = ColorToVec3(light.diffuse);
+		data.specular = ColorToVec3(light.specular);
 
 		data.constant = light.constant;
 		data.linear = light.linear;
