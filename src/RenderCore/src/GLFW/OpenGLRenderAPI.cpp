@@ -1,3 +1,8 @@
+#include
+#include
+#include
+#include
+
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 
 #include <glad/glad.h>
@@ -189,14 +194,6 @@ void TeardownMatrixAttribute(const GLuint location)
 	}
 }
 
-void BindStandard3DUniforms(const std::shared_ptr<re::render::Shader>& shader, const glm::mat4& transform, const glm::mat4& viewProj)
-{
-	shader->Bind();
-	shader->SetMat4("u_ModelViewProjection", viewProj * transform);
-	shader->SetMat4("u_ModelMatrix", transform);
-	shader->SetMat4("u_NormalMatrix", glm::transpose(glm::inverse(glm::mat3(transform))));
-}
-
 glm::vec3 ColorToVec3(const re::Color c)
 {
 	return {
@@ -205,6 +202,26 @@ glm::vec3 ColorToVec3(const re::Color c)
 		static_cast<float>(c.b) / 255.f,
 	};
 }
+
+class ScopedShaderRestorer
+{
+public:
+	ScopedShaderRestorer()
+	{
+		glGetIntegerv(GL_CURRENT_PROGRAM, &m_previousProgram);
+	}
+
+	~ScopedShaderRestorer()
+	{
+		glUseProgram(m_previousProgram);
+	}
+
+	ScopedShaderRestorer(const ScopedShaderRestorer&) = delete;
+	ScopedShaderRestorer& operator=(const ScopedShaderRestorer&) = delete;
+
+private:
+	GLint m_previousProgram = 0;
+};
 
 } // namespace
 
@@ -499,7 +516,7 @@ void OpenGLRenderAPI::DrawMesh3D(const std::vector<Vertex>& vertices, const std:
 		return;
 	}
 
-	BindStandard3DUniforms(m_Shader3D, transform, m_viewProj3D);
+	BindStandard3DUniforms(transform);
 
 	const std::size_t vboBytesNeeded = vertices.size() * sizeof(Vertex);
 	const std::size_t eboCountNeeded = indices.size();
@@ -533,7 +550,8 @@ void OpenGLRenderAPI::DrawStaticMesh3D(StaticMesh* mesh, const glm::mat4& transf
 		return;
 	}
 
-	BindStandard3DUniforms(m_Shader3D, transform, m_viewProj3D);
+	BindStandard3DUniforms(transform);
+
 	mesh->GetVAO()->Bind();
 
 	DrawWithWireframe(wireframe, [&] {
@@ -549,9 +567,17 @@ void OpenGLRenderAPI::DrawStaticMeshInstanced(StaticMesh* mesh, const std::vecto
 	}
 	const bool nonUniform = HasNonUniformScale(transforms);
 
-	m_InstancedShader3D->Bind();
-	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
+	{
+		ScopedShaderRestorer restorer;
+
+		m_InstancedShader3D->Bind();
+		m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+		m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
+
+		m_InstancedShader3DPBR->Bind();
+		m_InstancedShader3DPBR->SetMat4("u_ViewProjection", m_viewProj3D);
+		m_InstancedShader3DPBR->SetBool("u_HasNonUniformScale", nonUniform);
+	}
 
 	mesh->GetVAO()->Bind();
 
@@ -628,36 +654,35 @@ void OpenGLRenderAPI::DrawStaticMeshGPUCulled(const std::uint32_t batchIndex, St
 	glm::vec4 planes[6];
 	ExtractFrustumPlanes(m_viewProj3D, planes);
 
-	GLint activeGraphicsShader;
-	glGetIntegerv(GL_CURRENT_PROGRAM, &activeGraphicsShader);
+	{ // SHADER_RESTORER_SCOPE_BEGIN
+		ScopedShaderRestorer restorer;
 
-	m_CullingComputeShader->Bind();
-	m_CullingComputeShader->SetBool("u_ComputeNormals", nonUniform);
-	m_CullingComputeShader->SetFloat4Array("u_FrustumPlanes", planes, 6);
-	m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
-	m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
-	m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
-	m_CullingComputeShader->SetFloat("u_MaxDistance", farClip);
+		m_CullingComputeShader->Bind();
+		m_CullingComputeShader->SetBool("u_ComputeNormals", nonUniform);
+		m_CullingComputeShader->SetFloat4Array("u_FrustumPlanes", planes, 6);
+		m_CullingComputeShader->SetUInt("u_TotalInstances", totalInstances);
+		m_CullingComputeShader->SetFloat("u_MeshRadius", boundingRadius);
+		m_CullingComputeShader->SetFloat3("u_CameraPos", cameraPos);
+		m_CullingComputeShader->SetFloat("u_MaxDistance", farClip);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cmdBuffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, normalSsbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, inputSsbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputSsbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, cmdBuffer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, normalSsbo);
 
-	const GLuint numGroups = (totalInstances + 63) / 64;
-	glDispatchCompute(numGroups, 1, 1);
+		const GLuint numGroups = (totalInstances + 63) / 64;
+		glDispatchCompute(numGroups, 1, 1);
 
-	glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+		glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
-	m_InstancedShader3D->Bind();
-	m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
+		m_InstancedShader3D->Bind();
+		m_InstancedShader3D->SetMat4("u_ViewProjection", m_viewProj3D);
+		m_InstancedShader3D->SetBool("u_HasNonUniformScale", nonUniform);
 
-	m_InstancedShader3DPBR->Bind();
-	m_InstancedShader3DPBR->SetMat4("u_ViewProjection", m_viewProj3D);
-	m_InstancedShader3DPBR->SetBool("u_HasNonUniformScale", nonUniform);
-
-	glUseProgram(activeGraphicsShader);
+		m_InstancedShader3DPBR->Bind();
+		m_InstancedShader3DPBR->SetMat4("u_ViewProjection", m_viewProj3D);
+		m_InstancedShader3DPBR->SetBool("u_HasNonUniformScale", nonUniform);
+	} // SHADER_RESTORER_SCOPE_END
 
 	mesh->GetVAO()->Bind();
 
@@ -1080,6 +1105,24 @@ void OpenGLRenderAPI::SetEnvironment(const std::uint32_t irradianceMap)
 
 	bindEnv(m_Shader3DPBR);
 	bindEnv(m_InstancedShader3DPBR);
+}
+
+void OpenGLRenderAPI::BindStandard3DUniforms(const glm::mat4& transform) const
+{
+	ScopedShaderRestorer shaderRestorer;
+
+	const glm::mat4 mvp = m_viewProj3D * transform;
+	const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+
+	m_Shader3D->Bind();
+	m_Shader3D->SetMat4("u_ModelMatrix", transform);
+	m_Shader3D->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3D->SetMat4("u_NormalMatrix", normalMatrix);
+
+	m_Shader3DPBR->Bind();
+	m_Shader3DPBR->SetMat4("u_ModelMatrix", transform);
+	m_Shader3DPBR->SetMat4("u_ModelViewProjection", mvp);
+	m_Shader3DPBR->SetMat4("u_NormalMatrix", normalMatrix);
 }
 
 void OpenGLRenderAPI::DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color)

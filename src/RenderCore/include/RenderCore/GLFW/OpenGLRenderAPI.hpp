@@ -54,6 +54,7 @@ public:
 	void SetEnvironment(std::uint32_t irradianceMap) override;
 
 private:
+	void BindStandard3DUniforms(const glm::mat4& transform) const;
 	void DrawTexturedQuadImpl(const Vector3f& pos, const Vector2f& size, float rotation, Texture* texture, const Color& color);
 
 private:
