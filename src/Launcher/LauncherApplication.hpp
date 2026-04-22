@@ -327,7 +327,7 @@ private:
 			{
 				const auto animModel = m_manager.Get<re::AnimatedModel>(path);
 				const auto animator = std::make_shared<re::Animator>(animModel.get());
-				animator->PlayAnimation(2);
+				animator->PlayAnimation(0);
 
 				entity.Add<re::AnimatedMeshComponent3D>(animModel, animator);
 			}
