@@ -164,10 +164,9 @@ struct EditorLayout final : re::Layout
 				}
 				ImGui::EndDisabled();
 
-				float color[3] = { light.diffuse.r / 255.f, light.diffuse.g / 255.f, light.diffuse.b / 255.f };
-				if (ImGui::ColorEdit3("Color", color))
+				if (auto color = light.diffuse.ToFloat(); ImGui::ColorEdit3("Color", color.Data()))
 				{
-					light.diffuse = re::Color(color[0] * 255.f, color[1] * 255.f, color[2] * 255.f);
+					light.diffuse = re::Color::FromFloat(color);
 				}
 
 				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);

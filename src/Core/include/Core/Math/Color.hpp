@@ -7,21 +7,25 @@
 namespace re
 {
 
+struct ColorF;
+
 class Color
 {
 public:
 	constexpr Color() = default;
 
-	constexpr Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+	constexpr Color(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a = 255);
 
-	constexpr explicit Color(uint32_t color);
+	constexpr explicit Color(std::uint32_t color);
 
-	[[nodiscard]] constexpr Color WithR(uint8_t val) const;
-	[[nodiscard]] constexpr Color WithG(uint8_t val) const;
-	[[nodiscard]] constexpr Color WithB(uint8_t val) const;
-	[[nodiscard]] constexpr Color WithA(uint8_t val) const;
+	[[nodiscard]] constexpr Color WithR(std::uint8_t val) const;
+	[[nodiscard]] constexpr Color WithG(std::uint8_t val) const;
+	[[nodiscard]] constexpr Color WithB(std::uint8_t val) const;
+	[[nodiscard]] constexpr Color WithA(std::uint8_t val) const;
 
-	[[nodiscard]] constexpr uint32_t ToInt() const;
+	[[nodiscard]] constexpr std::uint32_t ToInt() const;
+	[[nodiscard]] constexpr ColorF ToFloat() const;
+	[[nodiscard]] static constexpr Color FromFloat(const ColorF& fColor);
 
 	static const Color Black;
 	static const Color White;
@@ -49,10 +53,26 @@ public:
 	constexpr bool operator!=(const Color&) const = default;
 	constexpr auto operator<=>(const Color&) const = default;
 
-	uint8_t r{};
-	uint8_t g{};
-	uint8_t b{};
-	uint8_t a{ 255 };
+	std::uint8_t r{};
+	std::uint8_t g{};
+	std::uint8_t b{};
+	std::uint8_t a{ 255 };
+};
+
+struct ColorF
+{
+	constexpr ColorF();
+
+	constexpr ColorF(float r, float g, float b, float a = 1.0f);
+
+	[[nodiscard]] float* Data();
+
+	[[nodiscard]] const float* Data() const;
+
+	float r{};
+	float g{};
+	float b{};
+	float a{ 1.f };
 };
 
 } // namespace re
