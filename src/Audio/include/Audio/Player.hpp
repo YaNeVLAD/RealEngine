@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Audio/Export.hpp>
+
 #include <Audio/Device.hpp>
 
 #include <miniaudio.h>
@@ -10,7 +12,7 @@
 namespace re::audio
 {
 
-class Player
+class RE_AUDIO_API Player
 {
 public:
 	using DataCallback = std::function<void(void* output, ma_uint32 frameCount)>;

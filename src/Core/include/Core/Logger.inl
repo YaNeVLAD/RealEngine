@@ -43,7 +43,7 @@ void Logger::Fatal(std::format_string<Args...> fmt, Args&&... args)
 	Log(LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 
-constexpr const char* Logger::LevelToString(const LogLevel level)
+inline const char* Logger::LevelToString(const LogLevel level)
 {
 	switch (level)
 	{

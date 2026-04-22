@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Audio/Export.hpp>
+
 #include <miniaudio.h>
 
 #include <functional>
@@ -7,7 +9,7 @@
 namespace re::audio
 {
 
-class Device
+class RE_AUDIO_API Device
 {
 public:
 	using DataCallback = std::function<void(void*, const void*, ma_uint32)>;

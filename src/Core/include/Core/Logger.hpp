@@ -38,7 +38,7 @@ public:
 	static void Fatal(std::format_string<Args...> fmt, Args&&... args);
 
 private:
-	static constexpr const char* LevelToString(LogLevel level);
+	static inline const char* LevelToString(LogLevel level);
 };
 
 #define RE_LOG_INFO(...) ::re::Logger::Info(__VA_ARGS__)

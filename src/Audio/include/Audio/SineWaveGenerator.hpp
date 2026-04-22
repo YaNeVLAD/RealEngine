@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Audio/Export.hpp>
+
 #include <miniaudio.h>
 
 #include <numbers>
@@ -7,7 +9,7 @@
 namespace re::audio
 {
 
-class SineWaveGenerator
+class RE_AUDIO_API SineWaveGenerator
 {
 public:
 	SineWaveGenerator(ma_uint32 sampleRate, ma_float frequency, ma_float amplitude = 1.f, ma_float startPhase = 0.f);
@@ -19,7 +21,6 @@ private:
 	ma_float m_frequency;
 	ma_float m_amplitude;
 	ma_float m_phase;
-	// На сколько смещается фаза синусоидальных колебаний при переходе к следующему отсчёту
 	ma_float m_phaseShift = static_cast<ma_float>(2.f * std::numbers::pi * m_frequency / m_sampleRate);
 };
 
