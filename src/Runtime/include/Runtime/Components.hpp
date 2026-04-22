@@ -241,13 +241,19 @@ struct SkyboxComponent
 	SkyboxComponent() = default;
 
 	explicit SkyboxComponent(const std::shared_ptr<Texture>& texture)
-		: hdrTexture(texture)
+		: m_hdrTexture(texture)
 	{
 	}
 
-	std::shared_ptr<Texture> hdrTexture = nullptr;
+	void ChangeTexture(const std::shared_ptr<Texture>& texture)
+	{
+		m_hdrTexture = texture;
+		m_cubemapID = 0;
+		irradianceID = 0;
+	}
 
 private:
+	std::shared_ptr<Texture> m_hdrTexture = nullptr;
 	std::uint32_t m_cubemapID = 0;
 	std::uint32_t irradianceID = 0;
 

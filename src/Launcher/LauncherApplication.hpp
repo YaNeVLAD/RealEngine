@@ -104,12 +104,12 @@ struct EditorLayout final : re::Layout
 
 		if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			static char pathBuffer[256] = "model/Model.obj";
-			ImGui::InputText("File Path", pathBuffer, sizeof(pathBuffer));
+			static char modelPathBuffer[256] = "model/Model.obj";
+			ImGui::InputText("File Path##Model", modelPathBuffer, sizeof(modelPathBuffer));
 
 			if (ImGui::Button("Load Model", ImVec2(-1, 0)))
 			{
-				ReplaceModel(pathBuffer);
+				ReplaceModel(modelPathBuffer);
 			}
 		}
 
@@ -181,6 +181,14 @@ struct EditorLayout final : re::Layout
 			{
 				re::render::Renderer3D::ReloadShaders();
 			}
+
+			static char skyboxPathBuffer[256] = "model/grasslands_sunset_4k.hdr";
+			ImGui::InputText("File Path##Skybox", skyboxPathBuffer, sizeof(skyboxPathBuffer));
+
+			if (ImGui::Button("Load Skybox", ImVec2(-1, 0)))
+			{
+				UpdateSkybox(skyboxPathBuffer);
+			}
 		}
 
 		ImGui::End();
@@ -233,6 +241,16 @@ struct EditorLayout final : re::Layout
 	}
 
 private:
+	void UpdateSkybox(const re::String& texturePath)
+	{
+		const auto skyboxTexture = m_manager.Get<re::Texture>(texturePath);
+		if (auto entity = GetScene().FindFirstWith<re::SkyboxComponent>(); entity.IsValid())
+		{
+			auto& component = entity.Get<re::SkyboxComponent>();
+			component.ChangeTexture(skyboxTexture);
+		}
+	}
+
 	void UpdateLightTransforms(re::TransformComponent& lightTransform, auto& gizmoView)
 	{
 		lightTransform.position = *m_lightPos;

@@ -409,9 +409,9 @@ SkyboxComponent RenderSystem3D::ExtractSkybox(ecs::Scene& scene)
 
 	for (auto&& [entity, skybox] : *scene.CreateView<SkyboxComponent>())
 	{
-		if (skybox.hdrTexture && skybox.m_cubemapID == 0)
+		if (skybox.m_hdrTexture && skybox.m_cubemapID == 0)
 		{
-			skybox.m_cubemapID = render::Renderer3D::CreateCubemapFromHDR(skybox.hdrTexture.get());
+			skybox.m_cubemapID = render::Renderer3D::CreateCubemapFromHDR(skybox.m_hdrTexture.get());
 			skybox.irradianceID = render::Renderer3D::CreateIrradianceMap(skybox.m_cubemapID);
 		}
 
