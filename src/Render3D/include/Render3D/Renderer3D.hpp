@@ -79,6 +79,8 @@ public:
 
 	static void SetCullMode(CullMode mode);
 
+	static void ReloadShaders();
+
 private:
 	static std::unique_ptr<IRenderAPI> m_api;
 };

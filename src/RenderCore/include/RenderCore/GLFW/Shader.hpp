@@ -1,7 +1,9 @@
 #pragma once
 
-#include <Core/String.hpp>
 #include <RenderCore/Export.hpp>
+
+#include <Core/FileSystem.hpp>
+#include <Core/String.hpp>
 
 #include <glm/glm.hpp>
 
@@ -16,13 +18,17 @@ class RE_RENDER_CORE_API Shader
 
 public:
 	explicit Shader(String const& computeSrc);
+	explicit Shader(file_system::ShadersPath const& computePath);
 	Shader(String const& vertexSrc, String const& fragmentSrc);
+	Shader(file_system::ShadersPath&& vertexPath, file_system::ShadersPath&& fragmentPath);
 	~Shader();
 
 	void Bind() const;
 	void Unbind() const;
 
 	void* GetNativeHandle() const;
+
+	bool Reload();
 
 	void SetInt(std::string_view name, int value);
 	void SetFloat(std::string_view name, float value);
@@ -38,6 +44,11 @@ private:
 	int GetUniformLocation(std::string_view name);
 
 private:
+	String m_vertexPath;
+	String m_fragmentPath;
+	String m_computePath;
+	bool m_isCompute = false;
+
 	std::uint32_t m_rendererId;
 	std::unordered_map<std::string, int, std::hash<std::string_view>, std::equal_to<>> m_uniformLocationCache;
 };

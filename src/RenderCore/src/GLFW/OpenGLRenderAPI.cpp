@@ -10,542 +10,6 @@
 
 namespace
 {
-// 0: Position, 1: Normal, 2: Color, 3: TexCoord, 4: TexIndex
-constexpr auto s_VertexShaderSource = UR"(
-    #version 450 core
-    layout(location = 0) in vec3 a_Position;
-    layout(location = 1) in vec3 a_Normal;
-    layout(location = 2) in vec4 a_Color;
-    layout(location = 3) in vec2 a_TexCoord;
-    layout(location = 4) in float a_TexIndex;
-	layout(location = 5) in ivec4 a_BoneIDs;
-    layout(location = 6) in vec4 a_BoneWeights;
-	layout(location = 7) in vec4 a_Tangent;
-
-    uniform mat4 u_ViewProjection;
-
-    out vec4 v_Color;
-    out vec2 v_TexCoord;
-    out float v_TexIndex;
-
-    void main()
-	{
-        v_Color = a_Color;
-        v_TexCoord = a_TexCoord;
-        v_TexIndex = a_TexIndex;
-        gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
-    }
-)";
-
-constexpr auto s_FragmentShaderSource = UR"(
-    #version 450 core
-    layout(location = 0) out vec4 color;
-
-    in vec4 v_Color;
-    in vec2 v_TexCoord;
-    in float v_TexIndex;
-
-    uniform sampler2D u_Texture;
-
-    void main()
-	{
-        if (v_TexIndex < 0.0)
-		{
-            color = v_Color;
-        }
-		else
-		{
-            color = texture(u_Texture, v_TexCoord) * v_Color;
-        }
-    }
-)";
-
-constexpr auto s_VertexShader3D = UR"(
-    #version 450 core
-    layout(location = 0) in vec3 a_Position;
-    layout(location = 1) in vec3 a_Normal;
-    layout(location = 2) in vec4 a_Color;
-    layout(location = 3) in vec2 a_TexCoord;
-    layout(location = 4) in float a_TexIndex;
-	layout(location = 5) in ivec4 a_BoneIDs;
-    layout(location = 6) in vec4 a_BoneWeights;
-	layout(location = 7) in vec4 a_Tangent;
-
-	uniform mat4 u_ModelViewProjection;
-	uniform mat4 u_ModelMatrix;
-	uniform mat3 u_NormalMatrix;
-
-    out vec4 v_Color;
-    out vec2 v_TexCoord;
-    out vec3 v_Normal;
-	out vec3 v_FragmentWorldPos;
-	out mat3 v_TBN;
-
-    void main() {
-        v_Color = a_Color;
-        v_TexCoord = a_TexCoord;
-		v_Normal = u_NormalMatrix * a_Normal;
-
-		vec4 worldPos = u_ModelMatrix * vec4(a_Position, 1.0);
-		v_FragmentWorldPos = vec3(worldPos);
-		gl_Position = u_ModelViewProjection * vec4(a_Position, 1.0);
-
-		vec3 tangent = normalize(u_NormalMatrix * a_Tangent.xyz);
-		vec3 normal = normalize(u_NormalMatrix * a_Normal);
-
-		if (length(tangent) > 0.0001) {
-			tangent = normalize(tangent - dot(tangent, normal) * normal);
-			vec3 bitangent = cross(normal, tangent) * a_Tangent.w;
-			v_TBN = mat3(tangent, bitangent, normal);
-		} else {
-			vec3 up = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-            vec3 t_fallback = normalize(cross(up, normal));
-            vec3 b_fallback = cross(normal, t_fallback);
-            v_TBN = mat3(t_fallback, b_fallback, normal);
-		}
-    }
-)";
-
-constexpr auto s_FragmentShader3DPhong = UR"(
-    #version 450 core
-    layout(location = 0) out vec4 o_Color;
-
-    in vec4 v_Color;
-    in vec2 v_TexCoord;
-    in vec3 v_Normal;
-    in vec3 v_FragmentWorldPos;
-	in mat3 v_TBN;
-
-    uniform vec3 u_MaterialAmbientLighting;
-    uniform vec3 u_MaterialDiffuseLighting;
-    uniform vec3 u_MaterialSpecularLighting;
-    uniform vec3 u_MaterialEmission;
-    uniform float u_MaterialShininess;
-
-	uniform sampler2D u_AlbedoMap;
-    uniform int u_HasAlbedoMap;
-
-	uniform sampler2D u_NormalMap;
-	uniform int u_HasNormalMap;
-
-    uniform sampler2D u_EmissionMap;
-    uniform int u_HasEmissionMap;
-
-    uniform int u_LightType;
-    uniform vec3 u_LightPos;
-    uniform vec3 u_LightDir;
-    uniform vec3 u_LightColor;
-    uniform float u_LightConstant;
-    uniform float u_LightLinear;
-    uniform float u_LightQuadratic;
-    uniform float u_LightCutOff;
-    uniform float u_LightExponent;
-
-    uniform vec3 u_CameraPos;
-
-    void main()
-	{
-        vec3 surfaceNormal = normalize(v_Normal);
-		if (u_HasNormalMap != 0) {
-			vec3 normalColor = texture(u_NormalMap, v_TexCoord).rgb;
-			normalColor = normalColor * 2.0 - 1.0;
-			surfaceNormal = normalize(v_TBN * normalColor);
-		}
-
-        vec3 viewDir = normalize(u_CameraPos - v_FragmentWorldPos);
-        vec3 lightDir;
-
-        float attenuation = 1.0;
-        float spotEffect = 1.0;
-
-        if (u_LightType == 0)
-		{ // Directional
-            lightDir = normalize(u_LightDir);
-        }
-		else
-		{ // Point or Spotlight
-            lightDir = normalize(u_LightPos - v_FragmentWorldPos);
-            float dist = length(u_LightPos - v_FragmentWorldPos);
-            attenuation = 1.0 / (u_LightConstant + u_LightLinear * dist + u_LightQuadratic * (dist * dist));
-
-            if (u_LightType == 2)
-			{ // Spotlight
-                float cosAlpha = dot(lightDir, normalize(u_LightDir));
-                if (cosAlpha > u_LightCutOff)
-				{
-					spotEffect = pow(cosAlpha, u_LightExponent);
-                }
-				else
-				{
-                    spotEffect = 0.0;
-                }
-            }
-        }
-
-		// ALBEDO_MAP
-		vec4 surfaceColor = v_Color;
-        if (u_HasAlbedoMap != 0) {
-            surfaceColor *= texture(u_AlbedoMap, v_TexCoord);
-        }
-
-		// Ambient
-        vec3 ambientLight = u_MaterialAmbientLighting;
-
-        // Diffuse
-		float diffuseIntensity = max(dot(surfaceNormal, lightDir), 0.0);
-		vec3 diffuseLight = u_MaterialDiffuseLighting * diffuseIntensity;
-
-        // Specular
-		float specFactor = 0.0;
-		if (diffuseIntensity > 0.0) {
-			vec3 reflectDir = reflect(-lightDir, surfaceNormal);
-			specFactor = pow(max(dot(viewDir, reflectDir), 0.0), max(u_MaterialShininess, 1.0));
-		}
-		vec3 specularLight = u_MaterialSpecularLighting * specFactor;
-
-		vec3 finalAmbient = ambientLight * surfaceColor.rgb;
-       	vec3 finalDiffuse = diffuseLight * surfaceColor.rgb * attenuation * spotEffect * u_LightColor;
-       	vec3 finalSpecular = specularLight * attenuation * spotEffect * u_LightColor;
-
-		vec3 finalEmission = u_MaterialEmission;
-		if (u_HasEmissionMap != 0) {
-			vec3 texEmission = texture(u_EmissionMap, v_TexCoord).rgb;
-
-			if (length(u_MaterialEmission) > 0.001) {
-               finalEmission = u_MaterialEmission * texEmission;
-			} else {
-               finalEmission = texEmission;
-			}
-		}
-
-		vec3 finalColor = finalEmission + finalAmbient + finalDiffuse + finalSpecular;
-
-		o_Color = vec4(finalColor, surfaceColor.a);
-    }
-)";
-
-constexpr auto s_FragmentShaderPBR = UR"(
-    #version 450 core
-    layout(location = 0) out vec4 o_Color;
-
-    in vec4 v_Color;
-    in vec2 v_TexCoord;
-    in vec3 v_Normal;
-    in vec3 v_FragmentWorldPos;
-    in mat3 v_TBN;
-
-    uniform vec3 u_AlbedoColor;
-    uniform vec3 u_EmissionColor;
-    uniform float u_MetallicFactor;
-    uniform float u_RoughnessFactor;
-
-    uniform sampler2D u_AlbedoMap;             uniform int u_HasAlbedoMap;
-    uniform sampler2D u_NormalMap;             uniform int u_HasNormalMap;
-    uniform sampler2D u_EmissionMap;           uniform int u_HasEmissionMap;
-    uniform sampler2D u_MetallicRoughnessMap;  uniform int u_HasMetallicRoughnessMap;
-    uniform sampler2D u_AOMap;                 uniform int u_HasAOMap;
-
-	uniform samplerCube u_IrradianceMap;
-	uniform int u_HasIrradianceMap;
-
-    uniform int u_LightType;
-    uniform vec3 u_LightPos;
-    uniform vec3 u_LightDir;
-    uniform vec3 u_LightColor;
-	uniform vec3 u_LightAmbient;
-    uniform float u_LightConstant;
-    uniform float u_LightLinear;
-    uniform float u_LightQuadratic;
-    uniform float u_LightCutOff;
-    uniform float u_LightExponent;
-
-    uniform vec3 u_CameraPos;
-
-    const float PI = 3.14159265359;
-
-    vec3 sRGBToLinear(vec3 srgbIn) { return pow(srgbIn, vec3(2.2)); }
-    vec3 linearToSRGB(vec3 linearIn) { return pow(linearIn, vec3(1.0 / 2.2)); }
-
-    float DistributionGGX(vec3 N, vec3 H, float roughness) {
-        float a = roughness * roughness;
-        float a2 = a * a;
-        float NdotH = max(dot(N, H), 0.0);
-        float NdotH2 = NdotH * NdotH;
-        float num = a2;
-        float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-        denom = PI * denom * denom;
-        return num / max(denom, 0.0000001);
-    }
-
-    float GeometrySchlickGGX(float NdotV, float roughness) {
-        float r = (roughness + 1.0);
-        float k = (r * r) / 8.0;
-        float num = NdotV;
-        float denom = NdotV * (1.0 - k) + k;
-        return num / denom;
-    }
-
-    float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
-        float NdotV = max(dot(N, V), 0.0);
-        float NdotL = max(dot(N, L), 0.0);
-        return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
-    }
-
-    vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-        return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-    }
-)"
-									 UR"(
-    void main() {
-		vec4 albedoTex = u_HasAlbedoMap != 0 ? texture(u_AlbedoMap, v_TexCoord) : vec4(1.0);
-		vec3 albedo = albedoTex.rgb * sRGBToLinear(u_AlbedoColor); //* v_Color.rgb;
-
-        float metallic = u_MetallicFactor;
-        float roughness = u_RoughnessFactor;
-        if (u_HasMetallicRoughnessMap != 0) {
-            vec4 mrTex = texture(u_MetallicRoughnessMap, v_TexCoord);
-            roughness *= mrTex.g;
-            metallic *= mrTex.b;
-        }
-
-        float ao = u_HasAOMap != 0 ? texture(u_AOMap, v_TexCoord).r : 1.0;
-
-        vec3 N = normalize(v_Normal);
-        if (u_HasNormalMap != 0) {
-            vec3 normalColor = texture(u_NormalMap, v_TexCoord).rgb * 2.0 - 1.0;
-            N = normalize(v_TBN * normalColor);
-        }
-
-		// === NORMALS DEBUG ===
-		//o_Color = vec4(N * 0.5 + 0.5, 1.0);
-        //return;
-
-        vec3 V = normalize(u_CameraPos - v_FragmentWorldPos);
-        vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-        vec3 L = u_LightType == 0 ? normalize(u_LightDir) : normalize(u_LightPos - v_FragmentWorldPos);
-        vec3 H = normalize(V + L);
-
-        float attenuation = 1.0;
-        float spotEffect = 1.0;
-        if (u_LightType != 0) {
-            float dist = length(u_LightPos - v_FragmentWorldPos);
-            attenuation = 1.0 / (u_LightConstant + u_LightLinear * dist + u_LightQuadratic * (dist * dist));
-
-            if (u_LightType == 2) {
-                float cosAlpha = dot(L, normalize(u_LightDir));
-                if (cosAlpha > u_LightCutOff) spotEffect = pow(cosAlpha, u_LightExponent);
-                else spotEffect = 0.0;
-            }
-        }
-        vec3 radiance = u_LightColor * attenuation * spotEffect;
-
-        float NDF = DistributionGGX(N, H, roughness);
-        float G   = GeometrySmith(N, V, L, roughness);
-        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
-
-        vec3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-        vec3 specular = numerator / denominator;
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - metallic;
-
-		// === HALF-LAMBERT ===
-        float wrap = dot(N, L) * 0.5 + 0.5;
-        float NdotL = wrap * wrap;
-
-        // float NdotL = max(dot(N, L), 0.0);
-		vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
-
-		// === SMART_AMBIENT - FAKE-IBL ===
-		// vec3 ambientDiffuse = u_LightAmbient * albedo * kD * ao;
-
-		// === IBL ===
-		vec3 irradiance = u_HasIrradianceMap != 0 ? texture(u_IrradianceMap, N).rgb : u_LightAmbient;
-		vec3 ambientDiffuse = irradiance * albedo * kD * ao;
-
-		vec3 ambientSpecular = u_LightAmbient * F0 * ao;
-        vec3 ambient = ambientDiffuse + ambientSpecular;
-
-        vec3 emission = u_EmissionColor;
-        if (u_HasEmissionMap != 0) {
-            vec3 texEmi = sRGBToLinear(texture(u_EmissionMap, v_TexCoord).rgb);
-            emission = length(u_EmissionColor) > 0.001 ? u_EmissionColor * texEmi : texEmi;
-        }
-
-        vec3 color = ambient + Lo + emission;
-
-        color = color / (color + vec3(1.0));
-        color = linearToSRGB(color);
-
-        o_Color = vec4(color, albedoTex.a * v_Color.a);
-    }
-)";
-
-constexpr auto s_VertexInstancedShader3D = UR"(
-    #version 450 core
-    layout(location = 0) in vec3 a_Position;
-    layout(location = 1) in vec3 a_Normal;
-    layout(location = 2) in vec4 a_Color;
-    layout(location = 3) in vec2 a_TexCoord;
-    layout(location = 4) in float a_TexIndex;
-	layout(location = 5) in ivec4 a_BoneIDs;
-    layout(location = 6) in vec4 a_BoneWeights;
-	layout(location = 7) in vec4 a_Tangent;
-
-    layout(location = 8) in mat4 a_InstanceMatrix;
-    layout(location = 12) in mat4 a_NormalMatrix;
-
-    uniform mat4 u_ViewProjection;
-    uniform bool u_HasNonUniformScale;
-
-    out vec4 v_Color;
-    out vec2 v_TexCoord;
-    out vec3 v_Normal;
-    out vec3 v_FragmentWorldPos;
-	out mat3 v_TBN;
-
-    void main()
-	{
-        v_Color = a_Color;
-        v_TexCoord = a_TexCoord;
-
-		mat3 normalMatrix;
-        if (u_HasNonUniformScale)
-		{
-            normalMatrix = mat3(a_NormalMatrix);
-        }
-		else
-		{
-            normalMatrix = mat3(a_InstanceMatrix);
-        }
-		v_Normal = normalMatrix * a_Normal;
-
-        vec4 worldPos = a_InstanceMatrix * vec4(a_Position, 1.0);
-        v_FragmentWorldPos = vec3(worldPos);
-        gl_Position = u_ViewProjection * worldPos;
-
-		vec3 tangent = normalMatrix * a_Tangent.xyz;
-		vec3 normal = normalize(v_Normal);
-
-		if (length(tangent) > 0.0001) {
-			tangent = normalize(tangent - dot(tangent, normal) * normal);
-			vec3 bitangent = cross(normal, tangent) * a_Tangent.w;
-			v_TBN = mat3(tangent, bitangent, normal);
-		} else {
-			vec3 up = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-            vec3 t_fallback = normalize(cross(up, normal));
-            vec3 b_fallback = cross(normal, t_fallback);
-            v_TBN = mat3(t_fallback, b_fallback, normal);
-		}
-    }
-)";
-
-constexpr auto s_ComputeCullingShader3D = UR"(
-    #version 430 core
-    layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
-
-    layout(std430, binding = 0) readonly buffer InputInstances { mat4 inputTransforms[]; };
-    layout(std430, binding = 1) writeonly buffer OutputInstances { mat4 outputTransforms[]; };
-	layout(std430, binding = 3) writeonly buffer OutputNormals { mat4 outputNormalMatrices[]; };
-
-    struct DrawCommand
-	{
-        uint count;
-		uint instanceCount;
-		uint firstIndex;
-		uint baseVertex;
-		uint baseInstance;
-    };
-    layout(std430, binding = 2) buffer CommandBuffer { DrawCommand cmd; };
-
-    uniform vec4 u_FrustumPlanes[6];
-    uniform uint u_TotalInstances;
-    uniform float u_MeshRadius;
-
-    uniform vec3 u_CameraPos;
-    uniform float u_MaxDistance;
-
-	uniform bool u_ComputeNormals;
-
-    void main()
-    {
-        uint idx = gl_GlobalInvocationID.x;
-        if (idx >= u_TotalInstances) return;
-
-        mat4 model = inputTransforms[idx];
-        vec3 pos = vec3(model[3]);
-
-		float maxScale = max(max(length(vec3(model[0])), length(vec3(model[1]))), length(vec3(model[2])));
-        float radius = u_MeshRadius * maxScale;
-
-        // DISTANCE CULLING
-		if ((distance(u_CameraPos, pos) - radius) > u_MaxDistance) return;
-
-        // FRUSTUM CULLING
-        bool visible = true;
-        for(int i = 0; i < 6; i++)
-        {
-            if (dot(u_FrustumPlanes[i].xyz, pos) + u_FrustumPlanes[i].w < -radius)
-            {
-                visible = false;
-                break;
-            }
-        }
-
-        if (visible)
-        {
-            uint outIdx = atomicAdd(cmd.instanceCount, 1);
-            outputTransforms[outIdx] = model;
-			if (u_ComputeNormals)
-			{
-                outputNormalMatrices[outIdx] = mat4(transpose(inverse(mat3(model))));
-            }
-        }
-    }
-)";
-
-constexpr auto s_VertexSkybox = UR"(
-    #version 450 core
-    layout (location = 0) in vec3 a_Position;
-
-    out vec3 v_TexCoord;
-
-    uniform mat4 u_ViewProjection;
-
-    void main()
-    {
-        v_TexCoord = a_Position;
-        vec4 pos = u_ViewProjection * vec4(a_Position, 1.0);
-
-        gl_Position = pos.xyww;
-    }
-)";
-
-constexpr auto s_FragmentSkybox = UR"(
-    #version 450 core
-    layout(location = 0) out vec4 o_Color;
-
-    in vec3 v_TexCoord;
-
-    uniform samplerCube u_EnvironmentMap;
-
-    vec3 linearToSRGB(vec3 linearIn) { return pow(linearIn, vec3(1.0 / 2.2)); }
-
-    void main()
-    {
-        vec3 envColor = texture(u_EnvironmentMap, v_TexCoord).rgb;
-
-        // Tone mapping
-        envColor = envColor / (envColor + vec3(1.0));
-        // Gamma
-        envColor = linearToSRGB(envColor);
-
-        o_Color = vec4(envColor, 1.0);
-    }
-)";
 
 constexpr auto s_VertexEquirectToCube = UR"(
     #version 450 core
@@ -733,16 +197,6 @@ void BindStandard3DUniforms(const std::shared_ptr<re::render::Shader>& shader, c
 	shader->SetMat4("u_NormalMatrix", glm::transpose(glm::inverse(glm::mat3(transform))));
 }
 
-glm::vec4 ColorToVec4(const re::Color c)
-{
-	return {
-		static_cast<float>(c.r) / 255.f,
-		static_cast<float>(c.g) / 255.f,
-		static_cast<float>(c.b) / 255.f,
-		static_cast<float>(c.a) / 255.f,
-	};
-}
-
 glm::vec3 ColorToVec3(const re::Color c)
 {
 	return {
@@ -759,6 +213,8 @@ namespace re::render
 
 void OpenGLRenderAPI::Init()
 {
+	using namespace file_system::literals;
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_DEPTH_TEST);
@@ -769,19 +225,19 @@ void OpenGLRenderAPI::Init()
 
 	m_batchBuffer.reserve(MaxVertices);
 
-	m_Shader2D = std::make_shared<Shader>(s_VertexShaderSource, s_FragmentShaderSource);
+	m_Shader2D = std::make_shared<Shader>("dynamic2d.vert.glsl"_shader, "dynamic2d.frag.glsl");
 
-	m_Shader3D = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShader3DPhong);
-	m_InstancedShader3D = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShader3DPhong);
+	m_Shader3D = std::make_shared<Shader>("dynamic3d.vert.glsl"_shader, "phong.frag.glsl"_shader);
+	m_InstancedShader3D = std::make_shared<Shader>("instantiated3d.vert.glsl"_shader, "phong.frag.glsl"_shader);
 
-	m_Shader3DPBR = std::make_shared<Shader>(s_VertexShader3D, s_FragmentShaderPBR);
-	m_InstancedShader3DPBR = std::make_shared<Shader>(s_VertexInstancedShader3D, s_FragmentShaderPBR);
+	m_Shader3DPBR = std::make_shared<Shader>("dynamic3d.vert.glsl"_shader, "pbr.frag.glsl"_shader);
+	m_InstancedShader3DPBR = std::make_shared<Shader>("instantiated3d.vert.glsl"_shader, "pbr.frag.glsl"_shader);
 
-	m_Skybox3D = std::make_shared<Shader>(s_VertexSkybox, s_FragmentSkybox);
+	m_SkyboxShader3D = std::make_shared<Shader>("skybox.vert.glsl"_shader, "skybox.frag.glsl"_shader);
 
 	glGenBuffers(1, &m_instanceVBOId);
 	glGenBuffers(1, &m_normalVBOId);
-	m_CullingComputeShader = std::make_shared<Shader>(s_ComputeCullingShader3D);
+	m_CullingComputeShader = std::make_shared<Shader>("compute/culling3d.comp.glsl"_shader);
 
 	BufferLayout unifiedLayout;
 	unifiedLayout.Push<Vector3f>("a_Position");
@@ -850,6 +306,17 @@ void OpenGLRenderAPI::Init()
 
 	m_EquirectToCubeShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentEquirectToCube);
 	m_IrradianceShader = std::make_shared<Shader>(s_VertexEquirectToCube, s_FragmentIrradianceConvolution);
+}
+
+void OpenGLRenderAPI::ReloadShaders()
+{
+	m_Shader2D->Reload();
+	m_Shader3D->Reload();
+	m_InstancedShader3D->Reload();
+	m_Shader3DPBR->Reload();
+	m_InstancedShader3DPBR->Reload();
+	m_SkyboxShader3D->Reload();
+	m_CullingComputeShader->Reload();
 }
 
 void OpenGLRenderAPI::Clear()
@@ -1429,14 +896,14 @@ void OpenGLRenderAPI::DrawSkybox(const std::uint32_t cubemapID, const glm::mat4&
 {
 	glDepthFunc(GL_LEQUAL);
 
-	m_Skybox3D->Bind();
+	m_SkyboxShader3D->Bind();
 
 	const auto view = glm::mat4(glm::mat3(viewMatrix));
-	m_Skybox3D->SetMat4("u_ViewProjection", projectionMatrix * view);
+	m_SkyboxShader3D->SetMat4("u_ViewProjection", projectionMatrix * view);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapID);
-	m_Skybox3D->SetInt("u_EnvironmentMap", 0);
+	m_SkyboxShader3D->SetInt("u_EnvironmentMap", 0);
 
 	m_CubeVAO3D->Bind();
 	glDrawArrays(GL_TRIANGLES, 0, 36);

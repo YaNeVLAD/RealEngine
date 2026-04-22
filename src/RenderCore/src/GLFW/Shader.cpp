@@ -3,7 +3,27 @@
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <fstream>
 #include <iostream>
+
+namespace
+{
+
+std::string ReadFile(re::String const& filepath)
+{
+	const std::ifstream file(filepath.ToString());
+	if (!file.is_open())
+	{
+		std::cerr << "Shader::ReadFile: Failed to open file: " << filepath << std::endl;
+		return "";
+	}
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+
+	return buffer.str();
+}
+
+} // namespace
 
 namespace re::render
 {
@@ -37,7 +57,15 @@ Shader::Shader(String const& computeSrc)
 	glDeleteShader(computeShader);
 }
 
+Shader::Shader(file_system::ShadersPath const& computePath)
+	: m_computePath(computePath.Str())
+	, m_isCompute(true)
+{
+	Reload();
+}
+
 Shader::Shader(String const& vertexSrc, String const& fragmentSrc)
+	: m_isCompute(false)
 {
 	const std::uint32_t vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSrc);
 	const std::uint32_t fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSrc);
@@ -71,9 +99,20 @@ Shader::Shader(String const& vertexSrc, String const& fragmentSrc)
 	glDeleteShader(fragmentShader);
 }
 
+Shader::Shader(file_system::ShadersPath&& vertexPath, file_system::ShadersPath&& fragmentPath)
+	: m_vertexPath(vertexPath.Str())
+	, m_fragmentPath(fragmentPath.Str())
+	, m_isCompute(false)
+{
+	Reload();
+}
+
 Shader::~Shader()
 {
-	glDeleteProgram(m_rendererId);
+	if (m_rendererId != 0)
+	{
+		glDeleteProgram(m_rendererId);
+	}
 }
 
 std::uint32_t Shader::CompileShader(const std::uint32_t type, String const& source)
@@ -116,6 +155,118 @@ void Shader::Unbind() const
 void* Shader::GetNativeHandle() const
 {
 	return (void*)&m_rendererId;
+}
+
+bool Shader::Reload()
+{
+	const std::uint32_t newProgramId = glCreateProgram();
+
+	if (m_isCompute)
+	{
+		const std::string computeSrc = ReadFile(m_computePath);
+		if (computeSrc.empty())
+		{
+			glDeleteProgram(newProgramId);
+			return false;
+		}
+
+		const std::uint32_t computeShader = CompileShader(GL_COMPUTE_SHADER, computeSrc);
+		if (computeShader == 0)
+		{
+			glDeleteProgram(newProgramId);
+			return false;
+		}
+
+		glAttachShader(newProgramId, computeShader);
+		glLinkProgram(newProgramId);
+
+		int isLinked = 0;
+		glGetProgramiv(newProgramId, GL_LINK_STATUS, &isLinked);
+		if (isLinked == GL_FALSE)
+		{
+			int maxLength = 0;
+			glGetProgramiv(newProgramId, GL_INFO_LOG_LENGTH, &maxLength);
+			std::vector<char> infoLog(maxLength);
+			glGetProgramInfoLog(newProgramId, maxLength, &maxLength, &infoLog[0]);
+
+			std::cerr << "Compute Shader linking failed (" << m_computePath << "):\n"
+					  << infoLog.data() << std::endl;
+			glDeleteProgram(newProgramId);
+			glDeleteShader(computeShader);
+			return false;
+		}
+
+		glDetachShader(newProgramId, computeShader);
+		glDeleteShader(computeShader);
+	}
+	else
+	{
+		const std::string vertexSrc = ReadFile(m_vertexPath);
+		const std::string fragmentSrc = ReadFile(m_fragmentPath);
+
+		if (vertexSrc.empty() || fragmentSrc.empty())
+		{
+			glDeleteProgram(newProgramId);
+
+			return false;
+		}
+
+		const std::uint32_t vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSrc);
+		const std::uint32_t fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSrc);
+
+		if (vertexShader == 0 || fragmentShader == 0)
+		{
+			if (vertexShader != 0)
+			{
+				glDeleteShader(vertexShader);
+			}
+			if (fragmentShader != 0)
+			{
+				glDeleteShader(fragmentShader);
+			}
+			glDeleteProgram(newProgramId);
+
+			return false;
+		}
+
+		glAttachShader(newProgramId, vertexShader);
+		glAttachShader(newProgramId, fragmentShader);
+		glLinkProgram(newProgramId);
+
+		int isLinked = 0;
+		glGetProgramiv(newProgramId, GL_LINK_STATUS, &isLinked);
+		if (isLinked == GL_FALSE)
+		{
+			int maxLength = 0;
+			glGetProgramiv(newProgramId, GL_INFO_LOG_LENGTH, &maxLength);
+			std::vector<char> infoLog(maxLength);
+			glGetProgramInfoLog(newProgramId, maxLength, &maxLength, &infoLog[0]);
+
+			std::cerr << "Shader linking failed ("
+					  << m_vertexPath << ", " << m_fragmentPath << "):\n"
+					  << infoLog.data() << std::endl;
+			glDeleteProgram(newProgramId);
+			glDeleteShader(vertexShader);
+			glDeleteShader(fragmentShader);
+			return false;
+		}
+
+		glDetachShader(newProgramId, vertexShader);
+		glDetachShader(newProgramId, fragmentShader);
+		glDeleteShader(vertexShader);
+		glDeleteShader(fragmentShader);
+	}
+
+	if (m_rendererId != 0)
+	{
+		glDeleteProgram(m_rendererId);
+	}
+
+	m_rendererId = newProgramId;
+	m_uniformLocationCache.clear();
+
+	std::cout << "Shader reloaded successfully!" << std::endl;
+	return true;
 }
 
 int Shader::GetUniformLocation(const std::string_view name)

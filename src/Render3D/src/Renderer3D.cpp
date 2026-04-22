@@ -104,8 +104,7 @@ void Renderer3D::ResetCullingCache()
 
 void Renderer3D::SetViewport(const Vector2u size)
 {
-	m_api->SetViewport({ 0, 0 },
-		{ static_cast<float>(size.x), static_cast<float>(size.y) });
+	m_api->SetViewport({ 0, 0 }, { static_cast<float>(size.x), static_cast<float>(size.y) });
 }
 
 void Renderer3D::SetDepthMask(const bool enable)
@@ -116,6 +115,11 @@ void Renderer3D::SetDepthMask(const bool enable)
 void Renderer3D::SetCullMode(const CullMode mode)
 {
 	m_api->SetCullMode(mode);
+}
+
+void Renderer3D::ReloadShaders()
+{
+	m_api->ReloadShaders();
 }
 
 } // namespace re::render

@@ -7,6 +7,9 @@
 #include <filesystem>
 
 #ifdef RE_SYSTEM_WINDOWS
+#define NOUSER
+#define NODRAWTEXT
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #endif
@@ -18,6 +21,7 @@ namespace raw
 {
 
 inline constexpr char ASSETS_DIR[] = "assets";
+inline constexpr char SHADERS_DIR[] = "shaders";
 inline constexpr char BIN_DIR[] = "bin";
 
 template <const char* PARENT_DIR>
@@ -47,6 +51,27 @@ private:
 
 using AssetsPath = raw::ResourcePath<raw::ASSETS_DIR>;
 using BinaryPath = raw::ResourcePath<raw::BIN_DIR>;
+using ShadersPath = raw::ResourcePath<raw::SHADERS_DIR>;
+
+namespace literals
+{
+
+inline AssetsPath operator""_asset(const char* str, std::size_t /*len*/)
+{
+	return AssetsPath(String(str));
+}
+
+inline BinaryPath operator""_binary(const char* str, std::size_t /*len*/)
+{
+	return BinaryPath(String(str));
+}
+
+inline ShadersPath operator""_shader(const char* str, std::size_t /*len*/)
+{
+	return ShadersPath(String(str));
+}
+
+} // namespace literals
 
 } // namespace re::file_system
 

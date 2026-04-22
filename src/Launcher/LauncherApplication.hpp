@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Math/Vector3.hpp>
+#include <Render3D/Renderer3D.hpp>
 #include <RenderCore/AnimatedModel.hpp>
 #include <RenderCore/Assets/AssetManager.hpp>
 #include <RenderCore/Model.hpp>
@@ -171,6 +172,14 @@ struct EditorLayout final : re::Layout
 
 				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
 				ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Renderer Settings", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Reload Shaders", ImVec2(-1, 0)))
+			{
+				re::render::Renderer3D::ReloadShaders();
 			}
 		}
 

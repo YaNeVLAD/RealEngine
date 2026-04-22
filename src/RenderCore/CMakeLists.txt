@@ -44,3 +44,11 @@ target_link_libraries(ReRenderCore
 )
 
 target_compile_definitions(ReRenderCore PRIVATE RE_RENDER_CORE_EXPORTS ${BACKEND_DEFINES})
+
+add_custom_command(
+        TARGET ReRenderCore POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+        "$<TARGET_FILE_DIR:ReRenderCore>/../bin/shaders"
+        COMMENT "Copying shaders to bin/shaders directory..."
+)

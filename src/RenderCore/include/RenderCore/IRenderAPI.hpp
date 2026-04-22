@@ -32,6 +32,8 @@ public:
 
 	virtual void Init() = 0;
 
+	virtual void ReloadShaders() = 0;
+
 	// 2D
 	virtual void SetViewport(Vector2f topLeft, Vector2f size) = 0;
 	virtual void SetCamera(Vector2f center, Vector2f size) = 0;

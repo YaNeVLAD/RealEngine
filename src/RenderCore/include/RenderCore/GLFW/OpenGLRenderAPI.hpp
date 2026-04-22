@@ -20,6 +20,8 @@ class RE_RENDER_CORE_API OpenGLRenderAPI final : public IRenderAPI
 public:
 	void Init() override;
 
+	void ReloadShaders() override;
+
 	void Clear() override;
 	void Flush() override;
 	void SetViewport(Vector2f topLeft, Vector2f size) override;
@@ -89,7 +91,7 @@ private:
 
 	std::shared_ptr<VertexArray> m_CubeVAO3D;
 	std::shared_ptr<VertexBuffer> m_CubeVBO3D;
-	std::shared_ptr<Shader> m_Skybox3D;
+	std::shared_ptr<Shader> m_SkyboxShader3D;
 
 	std::shared_ptr<Shader> m_EquirectToCubeShader;
 	std::shared_ptr<Shader> m_IrradianceShader;
