@@ -1,8 +1,3 @@
-#include
-#include
-#include
-#include
-
 #include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
 
 #include <glad/glad.h>
