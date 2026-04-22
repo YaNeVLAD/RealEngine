@@ -191,7 +191,6 @@ private:
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
 				.position = arcanoid::constants::BgPos,
-				.rotation = { 5.f, 180.f, 0.f },
 				.scale = arcanoid::constants::BgScale,
 			})
 			.Add<re::MaterialComponent>(re::Material{ .albedoMap = bgTex })

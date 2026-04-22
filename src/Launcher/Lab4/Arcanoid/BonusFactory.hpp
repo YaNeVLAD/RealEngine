@@ -45,7 +45,6 @@ public:
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({
 				.position = pos,
-				.rotation = { 0.f, 0.f, 180.f },
 				.scale = { 0.75f, 0.75f, 0.75f },
 			})
 			.Add<re::MaterialComponent>(re::Material{ .albedoMap = texture })
