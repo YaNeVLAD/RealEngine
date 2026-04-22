@@ -191,6 +191,18 @@ struct EditorLayout final : re::Layout
 		}
 
 		ImGui::End();
+
+		ImGui::SetNextWindowPos(ImVec2(10, 10));
+		ImGui::Begin("FPS Overlay", nullptr,
+			ImGuiWindowFlags_NoDecoration
+				| ImGuiWindowFlags_AlwaysAutoResize
+				| ImGuiWindowFlags_NoSavedSettings
+				| ImGuiWindowFlags_NoFocusOnAppearing
+				| ImGuiWindowFlags_NoNav
+				| ImGuiWindowFlags_NoMove);
+
+		ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+		ImGui::End();
 	}
 
 	void OnEvent(re::Event const& event) override
