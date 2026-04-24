@@ -129,7 +129,7 @@ private:
 					scene.CreateEntity() // Wall
 						.Add<re::RigidBodyComponent>({
 							.type = re::physics::BodyType::Static,
-							.collider = { re::physics::ColliderType::Box, { HALF_BLOCK, HALF_BLOCK, HALF_BLOCK } },
+							.collider = { re::physics::ColliderType::Box },
 						})
 						.Add<re::detail::OpaqueTag>()
 						.Add<re::Dirty<re::TransformComponent>>()
@@ -164,7 +164,7 @@ private:
 				scene.CreateEntity() // Floor
 					.Add<re::RigidBodyComponent>({
 						.type = re::physics::BodyType::Static,
-						.collider = { re::physics::ColliderType::Box, { HALF_BLOCK, HALF_BLOCK, HALF_BLOCK } },
+						.collider = { re::physics::ColliderType::Box },
 					})
 					.Add<re::detail::OpaqueTag>()
 					.Add<re::Dirty<re::TransformComponent>>()
