@@ -1,6 +1,4 @@
 add_executable(ReLauncher main.cpp
-        Components.hpp
-        HierarchySystem.hpp
         CameraControlSystem.hpp
 
         Lab3/Asteroids/AsteroidsLayout.hpp
@@ -13,6 +11,11 @@ add_executable(ReLauncher main.cpp
 
         Lab4/Maze/MazeGame.hpp
         Lab4/Maze/MazeLayout.hpp
+
+        Lab6/BattleCityComponents.hpp
+        Lab6/BattleCitySystem.hpp
+        Lab6/BattleCityLayout.hpp
+        Lab6/EntityFactory.hpp
 
         LauncherApplication.hpp
 )

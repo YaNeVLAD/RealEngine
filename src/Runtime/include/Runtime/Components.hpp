@@ -211,29 +211,6 @@ struct MaterialComponent
 	}
 };
 
-class MouseLookSystem;
-struct MouseLookComponent
-{
-	explicit MouseLookComponent(const float sensitivity = 0.1f)
-		: sensitivity(sensitivity)
-	{
-	}
-
-	float sensitivity = 0.1f;
-
-private:
-	static constexpr float MIN_PITCH = -89.0f;
-	static constexpr float MAX_PITCH = 89.0f;
-
-	bool firstMouse = true;
-	float lastX = 0.0f;
-	float lastY = 0.0f;
-	float deltaX = 0.0f;
-	float deltaY = 0.0f;
-
-	friend class MouseLookSystem;
-};
-
 namespace detail
 {
 class RenderSystem3D;

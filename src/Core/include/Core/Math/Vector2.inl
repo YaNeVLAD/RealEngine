@@ -48,6 +48,14 @@ constexpr Vector2<T>::Vector2(T x, T y) noexcept
 }
 
 template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+template <typename U>
+constexpr Vector2<T>::operator Vector2<U>() const noexcept
+{
+	return Vector2<U>{ static_cast<U>(x), static_cast<U>(y) };
+}
+
+template <typename T>
 constexpr Vector2<T> operator+(Vector2<T> left, Vector2<T> right) noexcept
 {
 	return Vector2<T>(left.x + right.x, left.y + right.y);

@@ -1,6 +1,7 @@
 #include "AsteroidsLayout.hpp"
 
 #include <Runtime/Application.hpp>
+#include <Runtime/System/HierarchySystem.hpp>
 
 #include <ctime>
 
@@ -8,9 +9,6 @@
 #include "LifetimeSystem.hpp"
 #include "MovementSystem.hpp"
 #include "ShipSystem.hpp"
-
-#include "../../Components.hpp"
-#include "../../HierarchySystem.hpp"
 
 namespace
 {
@@ -58,11 +56,6 @@ void AsteroidsLayout::OnCreate()
 		.AddSystem<LifetimeSystem>()
 		.WithRead<BulletComponent, ParticleComponent>()
 		.RunOnMainThread();
-
-	GetScene()
-		.AddSystem<HierarchySystem>()
-		.WithRead<ChildComponent>()
-		.WithWrite<re::TransformComponent>();
 
 	GetScene().BuildSystemGraph();
 	StartGame();
@@ -129,7 +122,7 @@ void AsteroidsLayout::CreateShip()
 	auto flame = GetScene().CreateEntity();
 
 	flame.Add<re::TransformComponent>(re::Vector3f{ 0.f, 0.f, Z_ShipFlame })
-		.Add<ChildComponent>(shipRoot.GetEntity(), re::Vector2f{ 0.f, 0.f }, 0.f);
+		.Add<re::HierarchyComponent>(shipRoot.GetEntity(), re::Vector3f{ 0.f, 0.f, 0.f });
 
 	ShipComponent shipComp;
 	shipComp.flameEntity = flame.GetEntity();

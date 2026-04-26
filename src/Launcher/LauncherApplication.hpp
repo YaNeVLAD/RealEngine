@@ -19,6 +19,7 @@
 #include <imgui.h>
 
 #include "CameraControlSystem.hpp"
+#include "Lab6/BattleCityLayout.hpp"
 
 #include <deque>
 
@@ -383,13 +384,14 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		AddLayout<EditorLayout>(Window());
+		// AddLayout<EditorLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());
 		// AddLayout<ArcanoidLayout>(Window());
+		AddLayout<battle_city::BattleCityLayout>(Window());
 
-		SwitchLayout<EditorLayout>();
+		SwitchLayout<battle_city::BattleCityLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override

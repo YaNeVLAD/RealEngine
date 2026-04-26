@@ -9,6 +9,7 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
 #include <Runtime/Internal/RenderSystem3D.hpp>
+#include <Runtime/System/HierarchySystem.hpp>
 #include <Runtime/System/PhysicsSystem.hpp>
 
 #if defined(RE_USE_SFML_RENDER)
@@ -229,6 +230,11 @@ void Application::SetupScene(Layout& layout) const
 	scene
 		.AddSystem<PhysicsSystem>(scene)
 		.WithRead<TransformComponent, physics::RigidBody>()
+		.WithWrite<TransformComponent>()
+		.RunOnMainThread();
+
+	scene.AddSystem<HierarchySystem>()
+		.WithRead<HierarchyComponent, TransformComponent>()
 		.WithWrite<TransformComponent>()
 		.RunOnMainThread();
 

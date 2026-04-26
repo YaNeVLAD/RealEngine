@@ -30,6 +30,9 @@ struct Vector2
 
 	T Length() noexcept;
 
+	template <typename U>
+	constexpr explicit operator Vector2<U>() const noexcept;
+
 	constexpr auto operator<=>(const Vector2&) const noexcept = default;
 
 	T x{};
@@ -45,7 +48,7 @@ template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator+(Vector2<T> left, Vector2<T> right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector2<T>& operator+=(Vector2<T>& left, Vector2<T> right) noexcept;
+constexpr Vector2<T>& operator+=(Vector2<T>& left, Vector2<T> right) noexcept;
 
 template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator-(Vector2<T> left, Vector2<T> right) noexcept;
@@ -60,13 +63,13 @@ template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator*(T left, Vector2<T> right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector2<T>& operator*=(Vector2<T>& left, T right) noexcept;
+constexpr Vector2<T>& operator*=(Vector2<T>& left, T right) noexcept;
 
 template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator/(Vector2<T> left, T right) noexcept;
 
 template <typename T>
-[[nodiscard]] constexpr Vector2<T>& operator/=(Vector2<T>& left, T right) noexcept;
+constexpr Vector2<T>& operator/=(Vector2<T>& left, T right) noexcept;
 
 } // namespace re
 

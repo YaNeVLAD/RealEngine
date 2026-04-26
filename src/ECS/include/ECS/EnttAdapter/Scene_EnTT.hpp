@@ -121,7 +121,10 @@ public:
 	{
 		for (Entity const& entity : m_entitiesToDestroy)
 		{
-			m_registry.destroy(static_cast<entt::entity>(entity.Id()));
+			if (const auto enttId = static_cast<entt::entity>(entity.Id()); m_registry.valid(enttId))
+			{
+				m_registry.destroy(enttId);
+			}
 		}
 
 		m_entitiesToDestroy.clear();

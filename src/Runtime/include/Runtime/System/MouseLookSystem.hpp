@@ -12,6 +12,30 @@
 namespace re
 {
 
+class MouseLookSystem;
+
+struct MouseLookComponent
+{
+	explicit MouseLookComponent(const float sensitivity = 0.1f)
+		: sensitivity(sensitivity)
+	{
+	}
+
+	float sensitivity = 0.1f;
+
+private:
+	static constexpr float MIN_PITCH = -89.0f;
+	static constexpr float MAX_PITCH = 89.0f;
+
+	bool firstMouse = true;
+	float lastX = 0.0f;
+	float lastY = 0.0f;
+	float deltaX = 0.0f;
+	float deltaY = 0.0f;
+
+	friend class MouseLookSystem;
+};
+
 class RE_RUNTIME_API MouseLookSystem final : public ecs::System
 {
 public:
@@ -43,8 +67,8 @@ public:
 	{
 		if (const auto* mouseMoved = event.GetIf<Event::MouseMoved>())
 		{
-			const float currentX = static_cast<float>(mouseMoved->position.x);
-			const float currentY = static_cast<float>(mouseMoved->position.y);
+			const auto currentX = static_cast<float>(mouseMoved->position.x);
+			const auto currentY = static_cast<float>(mouseMoved->position.y);
 
 			for (auto&& [entity, mouseLook] : *scene.CreateView<MouseLookComponent>())
 			{
