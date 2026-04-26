@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <vector>
 
 namespace re::rvm
@@ -15,25 +16,20 @@ namespace re::rvm
 enum class InterpreterResult : std::uint8_t
 {
 	Success = 0,
-	CompileError,
 	RuntimeError,
-};
-
-struct CallFrame
-{
-	const std::uint8_t* returnAddress;
-	std::size_t stackBase;
-	std::size_t localsBase;
-
-	ClosurePtr closure;
+	Suspended,
 };
 
 class RE_RVM_API VirtualMachine
 {
 public:
+	using DelayHandler = std::function<void(CoroutinePtr, std::uint64_t)>;
+
 	VirtualMachine();
 
 	InterpreterResult Interpret(Chunk const& chunk);
+
+	InterpreterResult Resume();
 
 	void RegisterNative(String const& name, NativeFn fn);
 
@@ -41,9 +37,19 @@ public:
 
 	void RegisterGlobal(const String& name, Value value);
 
+	InterpreterResult ResumeCoroutine(CoroutinePtr const& coro, Value const& arg);
+
 	[[nodiscard]] TypeInfoPtr GetType(Value const& value) const;
 
 	[[nodiscard]] TypeInfoPtr GetTypeByName(String const& name) const;
+
+	[[nodiscard]] CoroutinePtr GetActiveCoroutine() const;
+
+	void EnqueueMacrotask(CoroutinePtr const& coro, Value const& arg = Null);
+
+	void SetDelayHandler(DelayHandler handler);
+
+	void RequestDelay(std::uint64_t ms) const;
 
 private:
 	InterpreterResult Run();
@@ -57,6 +63,18 @@ private:
 	using HashMap = std::unordered_map<String, T>;
 
 	void InitBuiltinTypes();
+
+	void SaveContext();
+	void LoadContext();
+
+	bool SwitchToNextMicrotask();
+
+private:
+	CoroutinePtr m_activeCoro;
+
+	std::queue<CoroutinePtr> m_microtasks;
+
+	DelayHandler m_delayHandler;
 
 	TypeInfoPtr m_typeInt;
 	TypeInfoPtr m_typeDouble;

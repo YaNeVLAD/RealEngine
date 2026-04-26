@@ -673,6 +673,12 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		  case "PACK_ARRAY"_hs:      if (!parsePackArray()) return false; break;
 
+		  case "CO_MAKE"_hs:         outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineMake)); break;
+		  case "CO_RESUME"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineResume)); break;
+		  case "CO_YIELD"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineYield)); break;
+		  case "CO_AWAIT"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineAwait)); break;
+		  case "CO_LAUNCH"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineLaunch)); break;
+
 		  case "CALL_METHOD"_hs:     if (!parseCallMethod()) return false; break;
 		  case "CALL"_hs:   	     if (!parseCall())   return false; break;
           case "NATIVE"_hs: 	     if (!parseNative()) return false; break;

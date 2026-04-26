@@ -3,7 +3,6 @@
 #include <Core/String.hpp>
 #include <RVM/VirtualMachine.hpp>
 
-#include <cmath>
 #include <iostream>
 
 namespace
@@ -227,5 +226,18 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		returnArr->typeInfo = vm->GetTypeByName("MutableArray");
 
 		return returnArr;
+	});
+
+	vm->RegisterNative("delay", [vm](const std::vector<Value>& args) -> Value {
+		if (args.empty() || !std::holds_alternative<Int>(args[0]))
+		{
+			return Null;
+		}
+
+		const std::uint64_t ms = std::get<Int>(args[0]);
+
+		vm->RequestDelay(ms);
+
+		return Null;
 	});
 }

@@ -26,6 +26,9 @@ struct Upvalue;
 struct Closure;
 struct NativeObject;
 
+struct CallFrame;
+struct Coroutine;
+
 using Null_t = std::monostate;
 using Int = std::int64_t;
 using Double = std::double_t;
@@ -38,6 +41,8 @@ using UpvaluePtr = Ptr<Upvalue>;
 using ClosurePtr = Ptr<Closure>;
 using NativeObjectPtr = Ptr<NativeObject>;
 
+using CoroutinePtr = Ptr<Coroutine>;
+
 using Value = std::variant<
 	Null_t,
 	Int,
@@ -48,7 +53,8 @@ using Value = std::variant<
 	ArrayInstancePtr,
 	UpvaluePtr,
 	ClosurePtr,
-	NativeObjectPtr>;
+	NativeObjectPtr,
+	CoroutinePtr>;
 
 constexpr auto Null = Value{ Null_t{} };
 
@@ -84,6 +90,37 @@ struct NativeObject
 	String name;
 	std::int8_t argCount;
 	NativeFn function;
+};
+
+enum class CoroutineState : std::uint8_t
+{
+	Suspended,
+	Running,
+	Dead,
+};
+
+struct CallFrame
+{
+	const std::uint8_t* returnAddress;
+	std::size_t stackBase;
+	std::size_t localsBase;
+
+	ClosurePtr closure;
+};
+
+struct Coroutine
+{
+	CoroutineState state = CoroutineState::Suspended;
+	const std::uint8_t* ip = nullptr;
+	std::size_t currentLocalsBase = 0;
+
+	std::vector<Value> stack;
+	std::vector<Value> variables;
+	std::vector<CallFrame> callFrames;
+
+	Value transferValue = Null;
+
+	CoroutinePtr caller = nullptr;
 };
 
 using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;
@@ -392,6 +429,43 @@ enum class OpCode : std::uint8_t
 	// Description: Reads 1 byte (count). Pops N elements from the stack,
 	// packs them into a new Array object, and pushes the array back.
 	PackArray,
+
+	// ---------------------------------------------------------
+	// COROUTINES & ASYNC
+	// ---------------------------------------------------------
+
+	// Bytecode: [CoroutineMake]
+	// Stack: ..., [ClosurePtr] -> ..., [CoroutinePtr]
+	// Description: Pops a closure, allocates a new Coroutine in the heap,
+	// initializes its first CallFrame with the closure, and pushes the CoroutinePtr.
+	CoroutineMake,
+
+	// Bytecode: [CoroutineResume]
+	// Stack: ..., [CoroutinePtr], [arg] -> ..., [yielded_value]
+	// Description: Resumes a suspended coroutine, passing 'arg' to it.
+	// The VM suspends the current frame, switches to the coroutine's context,
+	// and continues execution until it yields or returns.
+	CoroutineResume,
+
+	// Bytecode: [CoroutineYield]
+	// Stack: ..., [value] -> ...
+	// Description: Pauses the current coroutine, saving its IP. Passes 'value'
+	// back to the caller's CoroutineResume instruction.
+	CoroutineYield,
+
+	// Bytecode: [CoroutineAwait]
+	// Stack: ..., [Future/Task] -> ..., [result]
+	// Description: Pauses the coroutine, yielding control back to the Event Loop
+	// until the awaited Task is resolved.
+	CoroutineAwait,
+
+	// Bytecode: [CoroutineLaunch]
+	// Stack: ..., [ClosurePtr] -> ...
+	// Description: Pops a closure, allocates a new Coroutine in the heap,
+	// initializes its first CallFrame, and immediately schedules it into the
+	// VM's internal microtask queue. The coroutine will be executed asynchronously.
+	// Unlike CoroutineMake, it does not push the CoroutinePtr back onto the stack.
+	CoroutineLaunch,
 
 	// ---------------------------------------------------------
 	// TERMINATION

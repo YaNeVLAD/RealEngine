@@ -1,11 +1,11 @@
 #pragma once
 
+#include <Core/Math/Vector3.hpp>
+#include <RVM/EventLoop.hpp>
+#include <RVM/VirtualMachine.hpp>
 #include <Runtime/Application.hpp>
 #include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
-
-#include <Core/Math/Vector3.hpp>
-#include <RVM/VirtualMachine.hpp>
 
 #include "Lab1/Circle/CircleLayout.hpp"
 #include "Lab1/Hangman/HangmanLayout.hpp"
@@ -35,6 +35,52 @@ struct MenuLayout final : re::Layout
 							  .Add<re::CubeComponent>(re::Color::Red);
 
 		m_cube = cube.GetEntity();
+
+		using namespace re::rvm;
+		EventLoop eventLoop;
+
+		vm.RegisterNative("println", [](const std::vector<Value>& args) -> Value {
+			if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
+			{
+				for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
+				{
+					std::cout << arg;
+				}
+			}
+			else
+			{
+				for (const auto& arg : args)
+				{
+					std::cout << arg;
+				}
+			}
+			std::cout << std::endl;
+
+			return Null;
+		});
+
+		vm.RegisterNative("delay", [&](const std::vector<Value>& args) -> Value {
+			if (args.empty() || !std::holds_alternative<Int>(args[0]))
+			{
+				return Null;
+			}
+
+			const std::uint64_t ms = std::get<Int>(args[0]);
+
+			vm.RequestDelay(ms);
+
+			return Null;
+		});
+
+		vm.SetDelayHandler([&eventLoop](const CoroutinePtr& coro, const std::uint64_t ms) {
+			eventLoop.Delay(coro, ms);
+		});
+
+		if (const auto script = m_manager.Get<Chunk>("scripts/coroutine_async_tests.rbc"))
+		{
+			vm.Interpret(*script);
+			eventLoop.Run(vm);
+		}
 	}
 
 	void OnUpdate(const re::core::TimeDelta dt) override

@@ -56,8 +56,25 @@ InterpreterResult VirtualMachine::Interpret(Chunk const& chunk)
 	m_ip = m_chunk->GetCode().data();
 	m_stack.clear();
 	m_variables.clear();
+	m_callStack.clear();
+	m_currentLocalsBase = 0;
+
+	m_activeCoro = std::make_shared<Coroutine>();
+	m_activeCoro->state = CoroutineState::Running;
 
 	return Run();
+}
+
+InterpreterResult VirtualMachine::Resume()
+{
+	if (SwitchToNextMicrotask())
+	{
+		LoadContext();
+
+		return Run();
+	}
+
+	return InterpreterResult::Suspended;
 }
 
 void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
@@ -73,6 +90,26 @@ void VirtualMachine::RegisterType(TypeInfoPtr typeInfo)
 void VirtualMachine::RegisterGlobal(const String& name, Value value)
 {
 	m_globals[name] = std::move(value);
+}
+
+InterpreterResult VirtualMachine::ResumeCoroutine(CoroutinePtr const& coro, Value const& arg)
+{
+	if (coro->state == CoroutineState::Dead)
+	{
+		return InterpreterResult::RuntimeError;
+	}
+
+	SaveContext();
+
+	coro->caller = nullptr;
+	coro->state = CoroutineState::Running;
+	m_activeCoro = coro;
+
+	LoadContext();
+
+	Push(arg);
+
+	return Run();
 }
 
 InterpreterResult VirtualMachine::Run()
@@ -633,6 +670,104 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::JmpIfGreaterLocal:      JUMP_IF_LOCAL(>); break;
 			// clang-format on
 
+		case OpCode::CoroutineMake: {
+			Value closureVal = Pop();
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: CoroutineMake expects a Closure");
+			}
+
+			auto closure = std::get<ClosurePtr>(closureVal);
+			auto coro = std::make_shared<Coroutine>();
+			coro->state = CoroutineState::Suspended;
+			coro->ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+			CallFrame initialFrame;
+			initialFrame.returnAddress = nullptr;
+			initialFrame.stackBase = 0;
+			initialFrame.localsBase = 0;
+			initialFrame.closure = closure;
+
+			coro->callFrames.push_back(initialFrame);
+
+			Push(coro);
+			break;
+		}
+
+		case OpCode::CoroutineResume: {
+			Value arg = Pop();
+			Value coroVal = Pop();
+			auto coro = std::get<CoroutinePtr>(coroVal);
+
+			if (coro->state == CoroutineState::Dead)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Cannot resume a dead coroutine");
+			}
+
+			SaveContext();
+
+			coro->caller = m_activeCoro;
+			coro->state = CoroutineState::Running;
+			m_activeCoro = coro;
+
+			LoadContext();
+
+			Push(arg);
+			break;
+		}
+
+		case OpCode::CoroutineYield:
+		case OpCode::CoroutineAwait: {
+			Value yieldedVal = Pop();
+
+			SaveContext();
+			m_activeCoro->state = CoroutineState::Suspended;
+
+			auto caller = m_activeCoro->caller;
+
+			if (caller == nullptr)
+			{
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
+
+				return InterpreterResult::Suspended;
+			}
+
+			m_activeCoro->caller = nullptr;
+			m_activeCoro = caller;
+
+			LoadContext();
+
+			Push(yieldedVal);
+			break;
+		}
+
+		case OpCode::CoroutineLaunch: {
+			Value closureVal = Pop();
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: SPAWN expects a Closure");
+			}
+
+			auto closure = std::get<ClosurePtr>(closureVal);
+			auto coro = std::make_shared<Coroutine>();
+			coro->state = CoroutineState::Suspended;
+			coro->ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+			CallFrame initialFrame;
+			initialFrame.returnAddress = nullptr;
+			initialFrame.stackBase = 0;
+			initialFrame.localsBase = 0;
+			initialFrame.closure = closure;
+			coro->callFrames.push_back(initialFrame);
+
+			m_microtasks.push(coro);
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())
@@ -642,17 +777,39 @@ InterpreterResult VirtualMachine::Run()
 
 			if (!m_callStack.empty())
 			{
-				const auto& [returnAddress, stackBase, localsBase, _] = m_callStack.back();
-				m_ip = returnAddress;
+				if (const auto& frame = m_callStack.back(); frame.returnAddress == nullptr)
+				{
+					SaveContext();
+					m_activeCoro->state = CoroutineState::Dead;
 
-				m_stack.resize(stackBase);
+					auto caller = m_activeCoro->caller;
 
-				m_variables.resize(m_currentLocalsBase);
-				m_currentLocalsBase = localsBase;
+					if (caller == nullptr)
+					{
+						if (SwitchToNextMicrotask())
+						{
+							LoadContext();
+							break;
+						}
 
-				m_callStack.pop_back();
+						return InterpreterResult::Success;
+					}
 
-				Push(retVal);
+					m_activeCoro->caller = nullptr;
+					m_activeCoro = caller;
+					LoadContext();
+					Push(retVal);
+				}
+				else
+				{
+					m_ip = frame.returnAddress;
+					m_stack.resize(frame.stackBase);
+					m_variables.resize(m_currentLocalsBase);
+					m_currentLocalsBase = frame.localsBase;
+					m_callStack.pop_back();
+
+					Push(retVal);
+				}
 			}
 			else
 			{
@@ -710,6 +867,30 @@ TypeInfoPtr VirtualMachine::GetTypeByName(String const& name) const
 	return nullptr;
 }
 
+CoroutinePtr VirtualMachine::GetActiveCoroutine() const
+{
+	return m_activeCoro;
+}
+
+void VirtualMachine::EnqueueMacrotask(CoroutinePtr const& coro, Value const& arg)
+{
+	coro->stack.push_back(arg);
+	m_microtasks.push(coro);
+}
+
+void VirtualMachine::SetDelayHandler(DelayHandler handler)
+{
+	m_delayHandler = std::move(handler);
+}
+
+void VirtualMachine::RequestDelay(const std::uint64_t ms) const
+{
+	if (m_delayHandler)
+	{
+		m_delayHandler(m_activeCoro, ms);
+	}
+}
+
 void VirtualMachine::InitBuiltinTypes()
 {
 	m_typeInt = std::make_shared<TypeInfo>(String("Int"));
@@ -722,6 +903,41 @@ void VirtualMachine::InitBuiltinTypes()
 	m_types[m_typeDouble->name] = m_typeDouble;
 	m_types[m_typeString->name] = m_typeString;
 	m_types[m_typeArray->name] = m_typeArray;
+}
+
+void VirtualMachine::SaveContext()
+{
+	m_activeCoro->ip = m_ip;
+	m_activeCoro->currentLocalsBase = m_currentLocalsBase;
+	std::swap(m_activeCoro->stack, m_stack);
+	std::swap(m_activeCoro->variables, m_variables);
+	std::swap(m_activeCoro->callFrames, m_callStack);
+}
+
+void VirtualMachine::LoadContext()
+{
+	m_ip = m_activeCoro->ip;
+	m_currentLocalsBase = m_activeCoro->currentLocalsBase;
+	std::swap(m_stack, m_activeCoro->stack);
+	std::swap(m_variables, m_activeCoro->variables);
+	std::swap(m_callStack, m_activeCoro->callFrames);
+}
+
+bool VirtualMachine::SwitchToNextMicrotask()
+{
+	if (m_microtasks.empty())
+	{
+		return false;
+	}
+
+	const auto nextCoro = m_microtasks.front();
+	m_microtasks.pop();
+
+	nextCoro->caller = nullptr;
+	nextCoro->state = CoroutineState::Running;
+	m_activeCoro = nextCoro;
+
+	return true;
 }
 
 } // namespace re::rvm

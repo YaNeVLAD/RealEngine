@@ -1,0 +1,30 @@
+FUN main
+    // Создаем быструю задачу и отправляем её в фон (spawn)
+    LOAD_FUN taskFast
+    CO_LAUNCH
+
+    // А теперь сама main засыпает на 1000мс
+    CONST 1000
+    NATIVE "delay" 1
+    CO_AWAIT          // Возвращает управление EventLoop
+    POP
+
+    CONST "Main task done! (1000ms)"
+    NATIVE "println" 1
+    POP
+
+    CONST null
+    RETURN
+
+FUN taskFast
+    CONST 500
+    NATIVE "delay" 1
+    CO_AWAIT          // Возвращает управление EventLoop
+    POP
+
+    CONST "Fast task done! (500ms)"
+    NATIVE "println" 1
+    POP
+
+    CONST null
+    RETURN
