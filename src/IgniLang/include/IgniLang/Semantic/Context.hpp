@@ -15,6 +15,7 @@ struct TraversalContext
 	std::shared_ptr<SemanticType> expectedReturnType = nullptr;
 	std::shared_ptr<SemanticType> currentReturnType = nullptr;
 	std::shared_ptr<ModuleType> currentPackage = nullptr;
+	bool isInsideLaunch = false;
 };
 
 struct SemanticContext

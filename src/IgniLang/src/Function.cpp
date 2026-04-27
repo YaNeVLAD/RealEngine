@@ -47,6 +47,7 @@ std::shared_ptr<FunctionType> Function(ast::FunDecl* decl, SemanticContext& ctx,
 	funType->visibility = decl->visibility;
 	funType->isVararg = decl->isVararg;
 	funType->isExternal = decl->isExternal;
+	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
@@ -131,6 +132,7 @@ std::shared_ptr<FunctionType> Constructor(ast::ConstructorDecl* decl, const std:
 	auto funType = std::make_shared<FunctionType>(mangledName);
 	funType->returnType = ctx.tUnit;
 	funType->isVararg = decl->isVararg;
+	funType->isSuspend = false; // TODO: Suspended constructors
 	funType->isExternal = isClassExternal || decl->isExternal;
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
@@ -151,6 +153,7 @@ std::shared_ptr<FunctionType> Destructor(ast::DestructorDecl* decl, const std::s
 
 	auto funType = std::make_shared<FunctionType>(decl->name);
 	funType->returnType = ctx.tUnit;
+	funType->isSuspend = false; // TODO: Suspended destructors
 	funType->isExternal = isClassExternal || decl->isExternal;
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;

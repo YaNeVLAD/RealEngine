@@ -746,25 +746,38 @@ InterpreterResult VirtualMachine::Run()
 		}
 
 		case OpCode::CoroutineLaunch: {
-			Value closureVal = Pop();
+			std::uint8_t argCount = READ_BYTE();
+
+			Value closureVal = m_stack[m_stack.size() - 1 - argCount];
+
 			if (!std::holds_alternative<ClosurePtr>(closureVal))
 			{
-				EXIT_WITH_ERROR("Runtime Error: SPAWN expects a Closure");
+				EXIT_WITH_ERROR("Runtime Error: CO_LAUNCH expects a Closure");
 			}
 
 			auto closure = std::get<ClosurePtr>(closureVal);
-			auto coro = std::make_shared<Coroutine>();
-			coro->state = CoroutineState::Suspended;
-			coro->ip = m_chunk->GetCode().data() + closure->ipOffset;
+			auto coroutine = std::make_shared<Coroutine>();
+			coroutine->state = CoroutineState::Suspended;
+			coroutine->ip = m_chunk->GetCode().data() + closure->ipOffset;
 
 			CallFrame initialFrame;
 			initialFrame.returnAddress = nullptr;
 			initialFrame.stackBase = 0;
 			initialFrame.localsBase = 0;
 			initialFrame.closure = closure;
-			coro->callFrames.push_back(initialFrame);
+			coroutine->callFrames.push_back(initialFrame);
 
-			m_microtasks.push(coro);
+			coroutine->stack.resize(argCount);
+			for (int i = argCount - 1; i >= 0; --i)
+			{
+				coroutine->stack[i] = Pop();
+			}
+			Pop();
+
+			m_microtasks.push(coroutine);
+
+			Push(coroutine);
+
 			break;
 		}
 

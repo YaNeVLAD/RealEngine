@@ -599,6 +599,18 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseLaunch = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt || argOpt->type != TokenType::Integer)
+		{
+			std::cerr << "Expected integer argument count after CO_LAUNCH\n";
+			return false;
+		}
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineLaunch));
+		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -677,10 +689,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "CO_RESUME"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineResume)); break;
 		  case "CO_YIELD"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineYield)); break;
 		  case "CO_AWAIT"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineAwait)); break;
-		  case "CO_LAUNCH"_hs:       outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineLaunch)); break;
+		  case "CO_LAUNCH"_hs:       if (!parseLaunch()) return false; break;
 
 		  case "CALL_METHOD"_hs:     if (!parseCallMethod()) return false; break;
-		  case "CALL"_hs:   	     if (!parseCall())   return false; break;
+		  case "CALL"_hs:   	     if (!parseCall()) return false; break;
           case "NATIVE"_hs: 	     if (!parseNative()) return false; break;
 		  case "LOAD_FUN"_hs:        if (!parseLoadFun()) return false; break;
 		  case "CALL_INDIRECT"_hs:   if (!parseCallIndirect()) return false; break;

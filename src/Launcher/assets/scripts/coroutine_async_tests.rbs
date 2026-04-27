@@ -1,7 +1,7 @@
 FUN main
     // Создаем быструю задачу и отправляем её в фон (spawn)
     LOAD_FUN taskFast
-    CO_LAUNCH
+    CO_LAUNCH 0
 
     // А теперь сама main засыпает на 1000мс
     CONST 1000

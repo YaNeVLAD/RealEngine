@@ -478,6 +478,14 @@ public:
 			IGNI_SEM_ERR(node, "No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
+		if (concreteTarget->isSuspend && !m_context.location.isInsideLaunch)
+		{
+			if (!m_context.location.currentFunction || !m_context.location.currentFunction->isSuspend)
+			{
+				IGNI_SEM_ERR(node, "Suspend function '" + concreteTarget->name + "' can only be called from a coroutine or another suspend function. Use 'launch'.");
+			}
+		}
+
 		if (isSuperCall)
 		{ // super(Args...) constructor call
 			auto thisExpr = std::make_unique<ast::IdentifierExpr>();
@@ -812,6 +820,7 @@ public:
 		if (m_context.location.currentFunction != nullptr)
 		{ // Local function
 			funType = std::make_shared<FunctionType>(node->name);
+			funType->isSuspend = node->isSuspend;
 			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
 			if (funType->returnType == nullptr && !node->isExprBody)
 			{
@@ -1003,6 +1012,35 @@ public:
 	void Visit(const ast::ImportDecl* node) override
 	{
 		Import::Process(node, m_context);
+	}
+
+	void Visit(const ast::AwaitExpr* node) override
+	{
+		if (!m_context.location.currentFunction || !m_context.location.currentFunction->isSuspend)
+		{
+			IGNI_SEM_ERR(node, "The 'await' operator can only be used inside a 'suspend' function.");
+		}
+
+		// TODO: Add Task<T> end extract generic argument
+		m_currentExprType = Evaluate(node->expression.get());
+	}
+
+	void Visit(const ast::LaunchExpr* node) override
+	{
+		if (!dynamic_cast<const ast::CallExpr*>(node->callable.get()) && !dynamic_cast<const ast::IdentifierExpr*>(node->callable.get()))
+		{
+			IGNI_SEM_ERR(node, "The 'launch' operator expects a function call.");
+		}
+
+		const bool prevContext = m_context.location.isInsideLaunch;
+		m_context.location.isInsideLaunch = true;
+
+		Evaluate(node->callable.get()); // Здесь CallExpr сам проверит типы аргументов!
+
+		m_context.location.isInsideLaunch = prevContext;
+
+		// TODO: Return Job type
+		m_currentExprType = m_context.tUnit;
 	}
 
 private:

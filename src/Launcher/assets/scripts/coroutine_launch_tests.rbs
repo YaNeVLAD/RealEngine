@@ -1,0 +1,41 @@
+JMP main
+
+// ==========================================
+// suspend fun load() = "Data";
+// ==========================================
+FUN load
+    CONST "Data"
+    RETURN
+
+// ==========================================
+// suspend fun loadAsyncWithPrefix(prefix: String): String
+// ==========================================
+FUN loadAsyncWithPrefix
+    // val data = await load()
+    LOAD_FUN load
+    CALL_INDIRECT 0
+    SET data
+    POP
+
+    // return prefix + data
+    CONST "prefix: "
+    GET data
+    ADD
+    RETURN
+
+// ==========================================
+// fun main()
+// ==========================================
+FUN main
+    // launch loadAsyncWithPrefix("Data: ")
+    LOAD_FUN loadAsyncWithPrefix
+    CONST "Data: "
+    CO_LAUNCH 1
+    SET result
+
+    GET result
+    NATIVE "println" 1
+    POP
+
+    CONST null
+    RETURN

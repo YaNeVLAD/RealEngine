@@ -41,6 +41,14 @@ std::basic_ostream<TChar>& operator<<(std::basic_ostream<TChar>& os, Value const
 			}
 			os << "]";
 		},
+		[&os](CoroutinePtr const& ptr) {
+			if (!ptr)
+			{
+				os << "null_coroutine";
+				return;
+			}
+			os << "Coroutine(State: " << static_cast<int>(ptr->state) << ")";
+		},
 		[&os](const auto&) { os << "unknown_type"; }
 	}, val);
 	// clang-format on

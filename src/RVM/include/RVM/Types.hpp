@@ -460,11 +460,10 @@ enum class OpCode : std::uint8_t
 	CoroutineAwait,
 
 	// Bytecode: [CoroutineLaunch]
-	// Stack: ..., [ClosurePtr] -> ...
-	// Description: Pops a closure, allocates a new Coroutine in the heap,
+	// Stack: ..., [ClosurePtr], [args...] -> ..., [CoroutinePtr]
+	// Description: Pops arguments and a closure, allocates a new Coroutine,
 	// initializes its first CallFrame, and immediately schedules it into the
-	// VM's internal microtask queue. The coroutine will be executed asynchronously.
-	// Unlike CoroutineMake, it does not push the CoroutinePtr back onto the stack.
+	// VM's internal microtask queue. Pushes the CoroutinePtr back onto the stack.
 	CoroutineLaunch,
 
 	// ---------------------------------------------------------

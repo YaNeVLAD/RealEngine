@@ -65,6 +65,7 @@ struct FunctionType final : re::utils::Clonable<FunctionType, SemanticType>
 
 	bool isVararg = false;
 	bool isExternal = false;
+	bool isSuspend = false;
 
 	ast::Visibility visibility = ast::Visibility::Public;
 	re::String moduleName;
