@@ -22,6 +22,8 @@ namespace igni::ast
 	V(IndexExpr)        \
 	V(AssignExpr)       \
 	V(UnaryExpr)        \
+	V(AwaitExpr)        \
+	V(LaunchExpr)       \
 	V(ExprStmt)         \
 	V(ReturnStmt)       \
 	V(Block)            \
@@ -175,6 +177,8 @@ struct SimpleTypeNode final : Visitable<SimpleTypeNode, TypeNode>
 
 struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
 {
+	bool isSuspend = false;
+
 	std::vector<std::unique_ptr<TypeNode>> paramTypes;
 	std::unique_ptr<TypeNode> returnType;
 
@@ -205,6 +209,7 @@ struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
 	{
 		auto clone = std::make_unique<FunctionTypeNode>();
 		clone->isNullable = isNullable;
+		clone->isSuspend = isSuspend;
 
 		for (const auto& p : paramTypes)
 		{
@@ -474,6 +479,40 @@ struct MemberAccessExpr final : Visitable<MemberAccessExpr, Expr>
 		{
 			clone->typeArgs.push_back(t ? t->Clone(env) : nullptr);
 		}
+
+		return clone;
+	}
+};
+
+struct AwaitExpr final : Visitable<AwaitExpr, Expr>
+{
+	std::unique_ptr<Expr> expression;
+
+	void Print(int) const override
+	{
+	}
+
+	std::unique_ptr<Expr> CloneExpr(const TypeEnv* env) const override
+	{
+		auto clone = std::make_unique<AwaitExpr>();
+		clone->expression = expression->CloneExpr(env);
+
+		return clone;
+	}
+};
+
+struct LaunchExpr final : Visitable<LaunchExpr, Expr>
+{
+	std::unique_ptr<Expr> callable;
+
+	void Print(int) const override
+	{
+	}
+
+	std::unique_ptr<Expr> CloneExpr(const TypeEnv* env) const override
+	{
+		auto clone = std::make_unique<LaunchExpr>();
+		clone->callable = callable->CloneExpr(env);
 
 		return clone;
 	}
@@ -839,6 +878,7 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 	bool isExternal = false;
 	bool isExprBody = false;
 	bool isOverride = false;
+	bool isSuspend = false;
 
 	std::unique_ptr<Block> body;
 	std::unique_ptr<TypeNode> returnType;
@@ -891,6 +931,7 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 		clone->isExternal = isExternal;
 		clone->isExprBody = isExprBody;
 		clone->isOverride = isOverride;
+		clone->isSuspend = isSuspend;
 
 		if (body)
 		{

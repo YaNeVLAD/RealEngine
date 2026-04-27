@@ -19,14 +19,17 @@ OptParenExpr -> ( Expr ) | \e
 
 OptVisibility -> public | private | internal | \e
 
+OptModifierList -> OptModifierList Modifier | \e
+Modifier -> external | compile_time | override | suspend
+
 OptMod -> external | \e
 OptInit -> = Expr | \e
 
-VarDecl -> OptMod var ident OptColonType OptInit ;
-ValDecl -> OptMod val ident OptColonType OptInit ;
+VarDecl -> OptModifierList var ident OptColonType OptInit ;
+ValDecl -> OptModifierList val ident OptColonType OptInit ;
 OptColonType -> : Type | \e
 
-ClassDecl -> OptClassMod class OptTypeParams ident OptPrimaryCtor OptBaseClass { ClassMemberList }
+ClassDecl -> OptModifierList class OptTypeParams ident OptPrimaryCtor OptBaseClass { ClassMemberList }
 OptBaseClass -> : Type ( OptActPars ) | : Type | \e
 OptClassMod -> external | \e
 
@@ -43,12 +46,13 @@ ClassMemberList -> ClassMemberList ClassMember | \e
 ClassMember -> AnnotationList OptVisibility ClassMemberDecl
 ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
 
-ConstructorDecl -> OptFunMod ident ( OptFormPars ) FunBody
-DestructorDecl -> OptFunMod ~ ident ( ) FunBody
+ConstructorDecl -> OptModifierList ident ( OptFormPars ) FunBody
+DestructorDecl -> OptModifierList ~ ident ( ) FunBody
 
-FunDecl -> OptFunMod fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
+FunDecl -> OptModifierList fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
+OptFunModList -> OptFunModList FunMod | \e
+FunMod -> external | compile_time | override | suspend
 FunName -> ident | ident . ident
-OptFunMod -> external | compile_time | override | \e
 OptFormPars -> FormPars | \e
 FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
 NormalPars -> NormalPars , FormPar | FormPar
@@ -56,7 +60,8 @@ FormPar -> ident : Type
 VarargPar -> ident : Type ...
 FunBody -> Block | = Expr ; | ;
 
-Type -> ident OptTypeArgs OptQuestion | ( OptTypeList ) -> Type OptQuestion
+Type -> ident OptTypeArgs OptQuestion | OptSuspend ( OptTypeList ) -> Type OptQuestion
+OptSuspend -> suspend | \e
 OptTypeList -> TypeList | \e
 TypeList -> TypeList , Type | Type
 
@@ -95,6 +100,7 @@ AddExpr -> AddExpr + MulExpr | AddExpr - MulExpr | MulExpr
 MulExpr -> MulExpr * UnaryExpr | MulExpr / UnaryExpr | MulExpr % UnaryExpr | UnaryExpr
 
 UnaryExpr -> + UnaryExpr | - UnaryExpr | ! UnaryExpr | ~ UnaryExpr
+           | await UnaryExpr | launch UnaryExpr
            | ++ Designator | -- Designator
            | PostfixExpr
 

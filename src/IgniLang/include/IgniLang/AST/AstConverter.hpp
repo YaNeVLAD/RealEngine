@@ -43,6 +43,48 @@ public:
 	}
 
 private:
+	struct Modifiers
+	{
+		bool isExternal = false;
+		bool isOverride = false;
+		bool isSuspend = false;
+		bool isCompileTime = false;
+	};
+
+	static Modifiers ExtractModifiers(const CstNode* modListNode)
+	{
+		Modifiers mods;
+		if (!modListNode || modListNode->symbol.Hashed() == "<EPSILON>"_hs || modListNode->children.empty())
+		{
+			return mods;
+		}
+
+		// OptModifierList -> OptModifierList [0] Modifier [1]
+		if (modListNode->children.size() == 2)
+		{
+			mods = ExtractModifiers(modListNode->children[0].get());
+
+			if (const auto modHash = modListNode->children[1]->children[0]->symbol.Hashed(); modHash == "external"_hs)
+			{
+				mods.isExternal = true;
+			}
+			else if (modHash == "override"_hs)
+			{
+				mods.isOverride = true;
+			}
+			else if (modHash == "suspend"_hs)
+			{
+				mods.isSuspend = true;
+			}
+			else if (modHash == "compile_time"_hs)
+			{
+				mods.isCompileTime = true;
+			}
+		}
+
+		return mods;
+	}
+
 	static ast::Visibility ParseVisibility(const CstNode* optVisNode)
 	{
 		if (optVisNode->children.empty() || optVisNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
@@ -152,12 +194,7 @@ private:
 		case "ValDecl"_hs:
 		case "VarDecl"_hs: {
 			// VarDecl/ValDecl -> OptMod [0] var/val [1] ident [2] OptColonType [3] OptInit [4] ; [5]
-			bool isExternal = false;
-			if (const auto& optMod = actualDecl->children[0];
-				!optMod->children.empty() && optMod->children[0]->symbol.Hashed() == "external"_hs)
-			{
-				isExternal = true;
-			}
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
 
 			const re::String name = actualDecl->children[2]->token->lexeme;
 
@@ -181,7 +218,7 @@ private:
 				val->name = name;
 				val->type = std::move(explicitType);
 				val->initializer = std::move(initializerExpr);
-				val->isExternal = isExternal;
+				val->isExternal = mods.isExternal;
 
 				return val;
 			}
@@ -191,7 +228,7 @@ private:
 			var->name = name;
 			var->type = std::move(explicitType);
 			var->initializer = std::move(initializerExpr);
-			var->isExternal = isExternal;
+			var->isExternal = mods.isExternal;
 
 			return var;
 		}
@@ -199,17 +236,10 @@ private:
 			auto funDecl = std::make_unique<ast::FunDecl>();
 			funDecl->token = *actualDecl->children[1]->token;
 
-			if (const auto& optFunMod = actualDecl->children[0]; !optFunMod->children.empty())
-			{ // External modifier [0]
-				if (optFunMod->children[0]->symbol.Hashed() == "external"_hs)
-				{
-					funDecl->isExternal = true;
-				}
-				if (optFunMod->children[0]->symbol.Hashed() == "override"_hs)
-				{
-					funDecl->isOverride = true;
-				}
-			}
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
+			funDecl->isExternal = mods.isExternal;
+			funDecl->isOverride = mods.isOverride;
+			funDecl->isSuspend = mods.isSuspend;
 
 			if (const auto& funNameNode = actualDecl->children[3]; funNameNode->children.size() == 1)
 			{ // FunName [3]
@@ -257,11 +287,8 @@ private:
 			auto classDecl = std::make_unique<ast::ClassDecl>();
 			classDecl->token = *actualDecl->children[1]->token;
 
-			if (const auto& optClassMod = actualDecl->children[0];
-				!optClassMod->children.empty() && optClassMod->children[0]->symbol.Hashed() == "external"_hs)
-			{
-				classDecl->isExternal = true;
-			}
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
+			classDecl->isExternal = mods.isExternal;
 
 			classDecl->name = actualDecl->children[3]->token->lexeme;
 
@@ -341,13 +368,8 @@ private:
 			ctorDecl->token = *actualDecl->children[1]->token;
 			ctorDecl->name = actualDecl->children[1]->token->lexeme;
 
-			for (const auto& mod : actualDecl->children[0]->children)
-			{
-				if (mod->symbol.Hashed() == "external"_hs)
-				{
-					ctorDecl->isExternal = true;
-				}
-			}
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
+			ctorDecl->isExternal = mods.isExternal;
 
 			// Reuse FunDecl for temporary storage
 			ast::FunDecl tempFun;
@@ -370,13 +392,8 @@ private:
 			dtorDecl->token = *actualDecl->children[2]->token;
 			dtorDecl->name = actualDecl->children[2]->token->lexeme;
 
-			for (const auto& mod : actualDecl->children[0]->children)
-			{
-				if (mod->symbol.Hashed() == "external"_hs)
-				{
-					dtorDecl->isExternal = true;
-				}
-			}
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
+			dtorDecl->isExternal = mods.isExternal;
 
 			if (!dtorDecl->isExternal)
 			{
@@ -562,6 +579,23 @@ private:
 		case "UnaryExpr"_hs: {
 			if (exprNode->children.size() == 2)
 			{
+				const auto opHash = exprNode->children[0]->symbol.Hashed();
+
+				if (opHash == "await"_hs)
+				{
+					auto awaitExpr = std::make_unique<ast::AwaitExpr>();
+					awaitExpr->token = *exprNode->children[0]->token;
+					awaitExpr->expression = ConvertExpr(exprNode->children[1].get());
+					return awaitExpr;
+				}
+				if (opHash == "launch"_hs)
+				{
+					auto launchExpr = std::make_unique<ast::LaunchExpr>();
+					launchExpr->token = *exprNode->children[0]->token;
+					launchExpr->callable = ConvertExpr(exprNode->children[1].get());
+					return launchExpr;
+				}
+
 				auto unExpr = std::make_unique<ast::UnaryExpr>();
 				unExpr->token = *exprNode->children[0]->token;
 				unExpr->op = exprNode->children[0]->symbol;
@@ -694,19 +728,26 @@ private:
 
 			return simpleType;
 		}
-		case "("_hs: { // Type -> ( [0] OptTypeList [1] ) [2] -> [3] Type [4] OptQuestion [5]
+		case "OptSuspend"_hs:
+		case "("_hs: { // Type -> OptSuspend [0] ( [1] OptTypeList [2] ) [3] -> [4] Type [5] OptQuestion [6]
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
-			funType->token = *typeNode->children[0]->token;
 
-			if (const auto& optTypeList = typeNode->children[1]; optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+			const bool isSuspend = !typeNode->children[0]->children.empty()
+				&& typeNode->children[0]->children[0]->symbol.Hashed() == "suspend"_hs;
+
+			funType->isSuspend = isSuspend;
+			funType->token = *typeNode->children[1]->token;
+
+			if (const auto& optTypeList = typeNode->children[2];
+				optTypeList->children.size() == 1 && optTypeList->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 			{
 				ExtractTypeList(optTypeList->children[0].get(), funType->paramTypes);
 			}
 
-			funType->returnType = ConvertType(typeNode->children[4].get());
+			funType->returnType = ConvertType(typeNode->children[5].get());
 
-			const auto& optQuestion = typeNode->children[5];
-			funType->isNullable = (!optQuestion->children.empty() && optQuestion->children[0]->symbol.Hashed() != "<EPSILON>"_hs);
+			const auto& optQuestion = typeNode->children[6];
+			funType->isNullable = !optQuestion->children.empty() && optQuestion->children[0]->symbol.Hashed() != "<EPSILON>"_hs;
 
 			return funType;
 		}
