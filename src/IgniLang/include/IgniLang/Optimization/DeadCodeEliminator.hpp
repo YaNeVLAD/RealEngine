@@ -252,6 +252,16 @@ private:
 		VISIT_NEXT(node->initializer);
 	}
 
+	void Visit(const ast::AwaitExpr* node) override
+	{
+		VISIT_NEXT(node->expression);
+	}
+
+	void Visit(const ast::LaunchExpr* node) override
+	{
+		VISIT_NEXT(node->callable);
+	}
+
 #undef VISIT_NEXT
 };
 

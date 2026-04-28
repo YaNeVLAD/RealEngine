@@ -121,6 +121,8 @@ struct Coroutine
 	Value transferValue = Null;
 
 	CoroutinePtr caller = nullptr;
+
+	bool isAwaitedByHost = false;
 };
 
 using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;

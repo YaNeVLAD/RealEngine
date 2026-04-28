@@ -723,10 +723,18 @@ InterpreterResult VirtualMachine::Run()
 			SaveContext();
 			m_activeCoro->state = CoroutineState::Suspended;
 
-			auto caller = m_activeCoro->caller;
-
-			if (caller == nullptr)
+			if (static_cast<OpCode>(instruction) != OpCode::CoroutineAwait)
 			{
+				if (auto caller = m_activeCoro->caller; caller != nullptr)
+				{
+					m_activeCoro->caller = nullptr;
+					m_activeCoro = caller;
+					LoadContext();
+
+					Push(yieldedVal);
+					break;
+				}
+
 				if (SwitchToNextMicrotask())
 				{
 					LoadContext();
@@ -736,13 +744,30 @@ InterpreterResult VirtualMachine::Run()
 				return InterpreterResult::Suspended;
 			}
 
-			m_activeCoro->caller = nullptr;
-			m_activeCoro = caller;
+			if (!m_activeCoro->isAwaitedByHost)
+			{
+				m_activeCoro->stack.push_back(yieldedVal);
+				m_microtasks.push(m_activeCoro);
+			}
+			m_activeCoro->isAwaitedByHost = false;
 
-			LoadContext();
+			if (auto caller = m_activeCoro->caller; caller == nullptr)
+			{
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
 
-			Push(yieldedVal);
-			break;
+				return InterpreterResult::Suspended;
+			}
+			else
+			{
+				m_activeCoro->caller = nullptr;
+				m_activeCoro = caller;
+				LoadContext();
+				break;
+			}
 		}
 
 		case OpCode::CoroutineLaunch: {
@@ -826,6 +851,15 @@ InterpreterResult VirtualMachine::Run()
 			}
 			else
 			{
+				SaveContext();
+				m_activeCoro->state = CoroutineState::Dead;
+
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
+
 				return InterpreterResult::Success;
 			}
 			break;
@@ -900,6 +934,7 @@ void VirtualMachine::RequestDelay(const std::uint64_t ms) const
 {
 	if (m_delayHandler)
 	{
+		m_activeCoro->isAwaitedByHost = true;
 		m_delayHandler(m_activeCoro, ms);
 	}
 }

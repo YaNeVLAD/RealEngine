@@ -1,6 +1,7 @@
 #include <Core/LibraryLoader.hpp>
 #include <IgniCLI/Compiler.hpp>
 #include <RVM/Assembler.hpp>
+#include <RVM/EventLoop.hpp>
 #include <RVM/VirtualMachine.hpp>
 
 #include <filesystem>
@@ -45,7 +46,13 @@ int main(const int argc, char** argv)
 				  << "\n-------------------\n";
 
 		std::unique_ptr<re::LibraryLoader> stdlibPlugin = nullptr;
+
+		re::rvm::EventLoop eventLoop;
 		re::rvm::VirtualMachine vm;
+		vm.SetDelayHandler([&eventLoop](const re::rvm::CoroutinePtr& coro, const std::uint64_t ms) {
+			eventLoop.Delay(coro, ms);
+		});
+
 		try
 		{
 			constexpr auto STD_LIB_NAME = "IgniStdLib.dll";
@@ -71,7 +78,11 @@ int main(const int argc, char** argv)
 		std::cout << "[Info] Running Virtual Machine...\n";
 		std::cout << "=================================\n";
 
-		const auto result = vm.Interpret(chunk);
+		auto result = vm.Interpret(chunk);
+		if (result == re::rvm::InterpreterResult::Suspended)
+		{
+			result = eventLoop.Run(vm);
+		}
 
 		std::cout << "=================================\n";
 		if (result != re::rvm::InterpreterResult::Success)

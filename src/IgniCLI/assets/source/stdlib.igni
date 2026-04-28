@@ -12,6 +12,8 @@ fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 //fun max(a: Double, b: Double): Double = if (a > b) a else b;
 //fun abs(value: Double): Double = if (value < 0.0) -value else value;
 
+external suspend fun delay(milliseconds: Int): Unit;
+
 external fun print(args: Any...): Unit;
 external fun println(args: Any...): Unit;
 

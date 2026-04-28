@@ -242,9 +242,10 @@ public:
 		}
 		else
 		{
-			const bool isGlobal = std::ranges::any_of(m_flatFunctions, [this, name](const ast::FunDecl* fun) {
-				return fun->name == name && m_funcAsmNames.at(fun) == name;
+			const bool isGlobal = std::ranges::any_of(m_funcAsmNames | std::views::values, [name, this](auto const& asmName) {
+				return asmName == name && m_semanticAnalyzer.GetGlobalNames().contains(name);
 			});
+
 			isGlobal
 				? m_out << "LOAD_FUN " << name << "\n"
 				: m_out << "GET_GLOBAL \"" << name << "\"\n";
@@ -935,6 +936,80 @@ public:
 
 		m_out << "MAKE_CLOSURE " << m_funcAsmNames.at(node) << " " << upvalues.size() << "\n";
 		m_out << "SET " << DeclareLocal(node->name) << "\n";
+	}
+
+	void Visit(const ast::AwaitExpr* node) override
+	{
+		if (node->expression)
+		{
+			node->expression->Accept(*this);
+		}
+		else
+		{
+			m_out << "CONST null\n";
+		}
+
+		m_out << "CO_AWAIT\n";
+	}
+
+	void Visit(const ast::LaunchExpr* node) override
+	{
+		if (const auto callNode = dynamic_cast<const ast::CallExpr*>(node->callable.get()))
+		{
+			re::String targetName = callNode->staticMethodTarget;
+
+			if (targetName.Empty())
+			{
+				if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(callNode->callee.get()))
+				{
+					targetName = id->name;
+				}
+			}
+
+			if (!targetName.Empty() && m_externals.contains(targetName))
+			{
+				m_out << "LOAD_NATIVE \"" << targetName << "\" " << callNode->arguments.size() << "\n";
+			}
+			else if (!targetName.Empty())
+			{
+				m_out << "LOAD_FUN " << targetName << "\n";
+			}
+			else
+			{
+				if (callNode->callee)
+				{
+					callNode->callee->Accept(*this);
+				}
+			}
+
+			for (const auto& arg : callNode->arguments)
+			{
+				if (arg)
+				{
+					arg->Accept(*this);
+				}
+			}
+
+			if (callNode->isVarargCall)
+			{
+				m_out << "PACK_ARRAY " << callNode->varargCount << "\n";
+			}
+
+			const std::size_t actualArgs = callNode->isVarargCall
+				? callNode->arguments.size() - callNode->varargCount + 1
+				: callNode->arguments.size();
+
+			m_out << "CO_LAUNCH " << actualArgs << "\n";
+		}
+		else if (const auto idNode = dynamic_cast<const ast::IdentifierExpr*>(node->callable.get()))
+		{
+			idNode->Accept(*this);
+			m_out << "CO_LAUNCH 0\n";
+		}
+		else
+		{
+			m_out << "CONST null\n";
+		}
 	}
 
 private:

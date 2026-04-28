@@ -15,9 +15,9 @@ class RE_RVM_API EventLoop
 	using TimePoint = std::chrono::steady_clock::time_point;
 
 public:
-	void Delay(CoroutinePtr coroutine, std::uint64_t milliseconds);
+	void Delay(CoroutinePtr const& coroutine, std::uint64_t milliseconds);
 
-	void Run(VirtualMachine& vm);
+	InterpreterResult Run(VirtualMachine& vm);
 
 private:
 	struct TimerTask
