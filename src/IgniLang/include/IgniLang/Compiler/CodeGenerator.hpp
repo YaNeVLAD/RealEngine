@@ -172,6 +172,31 @@ public:
 				}
 			}
 		}
+
+		if (!m_nativeWrappers.empty())
+		{
+			m_out << "// --- Native Wrappers (Auto-generated for launch) ---\n";
+			for (const auto& [nativeName, argCount] : m_nativeWrappers)
+			{
+				m_out << "FUN __native_wrapper_" << nativeName << "\n";
+
+				for (int i = static_cast<int>(argCount) - 1; i >= 0; --i)
+				{
+					m_out << "SET wrapper_arg_" << i << "\n";
+				}
+
+				for (int i = 0; i < argCount; ++i)
+				{
+					m_out << "GET wrapper_arg_" << i << "\n";
+				}
+
+				m_out << "NATIVE \"" << nativeName << "\" " << argCount << "\n";
+
+				m_out << "CO_AWAIT\n";
+
+				m_out << "RETURN\n\n";
+			}
+		}
 	}
 
 	void Visit(const ast::MemberAccessExpr* node) override
@@ -966,9 +991,15 @@ public:
 				}
 			}
 
+			const std::size_t actualArgs = callNode->isVarargCall
+				? callNode->arguments.size() - callNode->varargCount + 1
+				: callNode->arguments.size();
+
 			if (!targetName.Empty() && m_externals.contains(targetName))
 			{
-				m_out << "LOAD_NATIVE \"" << targetName << "\" " << callNode->arguments.size() << "\n";
+				const re::String wrapperName = "__native_wrapper_" + targetName;
+				m_nativeWrappers[targetName] = actualArgs;
+				m_out << "LOAD_FUN " << wrapperName << "\n";
 			}
 			else if (!targetName.Empty())
 			{
@@ -994,10 +1025,6 @@ public:
 			{
 				m_out << "PACK_ARRAY " << callNode->varargCount << "\n";
 			}
-
-			const std::size_t actualArgs = callNode->isVarargCall
-				? callNode->arguments.size() - callNode->varargCount + 1
-				: callNode->arguments.size();
 
 			m_out << "CO_LAUNCH " << actualArgs << "\n";
 		}
@@ -1030,6 +1057,8 @@ private:
 	const std::unordered_set<re::String>& m_externals;
 
 	const sem::SemanticAnalyzer& m_semanticAnalyzer;
+
+	std::unordered_map<re::String, std::size_t> m_nativeWrappers;
 
 	void GenerateConstructor(const ast::ConstructorDecl* ctor, const ast::ClassDecl* classDecl)
 	{
