@@ -696,8 +696,8 @@ public:
 		case ">="_hs: m_out << "GREATER_EQUAL\n"; break;
 		case "=="_hs: m_out << "EQUAL\n"; break;
 		case "!="_hs: m_out << "NOT_EQUAL\n"; break;
-		case "&&"_hs: m_out << "AND\n"; break;
-		case "||"_hs: m_out << "OR\n"; break;
+		case "and"_hs: m_out << "AND\n"; break;
+		case "or"_hs: m_out << "OR\n"; break;
 		default: throw std::runtime_error("TextCompiler: Unsupported binary operator '" + node->op.ToString() + "'");
 		}
 		// clang-format on

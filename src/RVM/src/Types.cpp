@@ -191,4 +191,24 @@ bool IsTruthy(Value const& val)
 		val);
 }
 
+Value OpAnd(Value const& lhs, Value const& rhs)
+{
+	if (!IsTruthy(lhs))
+	{
+		return lhs;
+	}
+
+	return rhs;
+}
+
+Value OpOr(Value const& lhs, Value const& rhs)
+{
+	if (IsTruthy(lhs))
+	{
+		return lhs;
+	}
+
+	return rhs;
+}
+
 } // namespace re::rvm

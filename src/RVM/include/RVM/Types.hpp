@@ -298,6 +298,18 @@ enum class OpCode : std::uint8_t
 	// Description: Pops B and A. Pushes 1 (true) if A != B, else 0 (false).
 	NotEqual,
 
+	// Bytecode: [And]
+	// Stack: ..., [a], [b] -> ..., [result]
+	// Description: Performs logical AND. If A is falsy, pushes A.
+	// Otherwise, pushes B. Supports short-circuiting logic.
+	And,
+
+	// Bytecode: [Or]
+	// Stack: ..., [a], [b] -> ..., [result]
+	// Description: Performs logical OR. If A is truthy, pushes A.
+	// Otherwise, pushes B. Supports short-circuiting logic.
+	Or,
+
 	// ---------------------------------------------------------
 	// CLOSURE AND UPVALUE
 	// ---------------------------------------------------------
@@ -489,6 +501,9 @@ RE_RVM_API Value OpLess(Value const& lhs, Value const& rhs);
 RE_RVM_API Value OpEqual(Value const& lhs, Value const& rhs);
 
 RE_RVM_API bool IsTruthy(Value const& val);
+
+RE_RVM_API Value OpAnd(Value const& lhs, Value const& rhs);
+RE_RVM_API Value OpOr(Value const& lhs, Value const& rhs);
 
 template <typename TChar>
 std::basic_ostream<TChar>& operator<<(std::basic_ostream<TChar>& os, Value const& val);

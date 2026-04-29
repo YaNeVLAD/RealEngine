@@ -142,6 +142,8 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::NotEqual:     BINARY_OP([](const Value& a, const Value& b) { return IsTruthy(OpEqual(a, b)) ? Value(static_cast<Int>(0)) : Value(static_cast<Int>(1)); }, NOT_EQUAL); break;
 		case OpCode::LessEqual:    BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(a, b); }, LESS_EQUAL); break;
 		case OpCode::GreaterEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(b, a); }, GREATER_EQUAL); break;
+		case OpCode::And:          BINARY_OP([](const Value& a, const Value& b) { return OpAnd(a, b); }, AND); break;
+		case OpCode::Or:           BINARY_OP([](const Value& a, const Value& b) { return OpOr(a, b);  }, OR);  break;
 			// clang-format on
 
 		case OpCode::Inc: {
