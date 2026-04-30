@@ -206,7 +206,14 @@ public:
 			node->object->Accept(*this);
 		}
 
-		m_out << "GET_PROPERTY \"" << node->member << "\"\n";
+		re::String memberName = node->member;
+
+		if (m_semanticAnalyzer.GetBindings().resolvedMembers.contains(node))
+		{
+			memberName = m_semanticAnalyzer.GetBindings().resolvedMembers.at(node);
+		}
+
+		m_out << "GET_PROPERTY \"" << memberName << "\"\n";
 	}
 
 	void Visit(const ast::IndexExpr* node) override
@@ -241,6 +248,11 @@ public:
 	void Visit(const ast::IdentifierExpr* node) override
 	{
 		auto name = node->name;
+		if (m_semanticAnalyzer.GetBindings().resolvedNames.contains(node))
+		{
+			name = m_semanticAnalyzer.GetBindings().resolvedNames.at(node);
+		}
+
 		if (name.Hashed() == "super"_hs)
 		{ // Aliasing super keyword
 			name = "this";
@@ -354,8 +366,14 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		if (node->isSuperCall)
-		{ // Requires 'this' as the first argument
+		const auto& callInfo = m_semanticAnalyzer.GetBindings().callInfo.at(node);
+		const std::size_t passedArgs = callInfo.isVarargCall
+			? node->arguments.size() - callInfo.varargCount + 1
+			: node->arguments.size();
+
+		if (callInfo.isSuperCall)
+		{
+			m_out << "GET " << GetAsmName("this") << "\n";
 			for (const auto& arg : node->arguments)
 			{
 				if (arg)
@@ -363,35 +381,18 @@ public:
 					arg->Accept(*this);
 				}
 			}
-
-			if (node->isVarargCall)
+			if (callInfo.isVarargCall)
 			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 			}
 
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
-
-			m_out << "CALL " << node->staticMethodTarget << " " << actualArgs << "\n";
+			m_out << "CALL " << callInfo.mangledTargetName << " " << (passedArgs + 1) << "\n";
 			return;
 		}
 
-		if (node->isConstructorCall)
+		if (callInfo.isConstructorCall)
 		{
-			re::String className;
-
-			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-			{
-				className = id->name;
-			}
-			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-			{
-				className = memAccess->member;
-			}
-
-			m_out << "NEW \"" << className << "\"\n";
-
+			m_out << "NEW \"" << callInfo.mangledClassName << "\"\n"; // Берем имя из таблицы!
 			m_out << "DUP\n";
 
 			for (const auto& arg : node->arguments)
@@ -401,30 +402,32 @@ public:
 					arg->Accept(*this);
 				}
 			}
-
-			if (node->isVarargCall)
+			if (callInfo.isVarargCall)
 			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 			}
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
 
-			if (!node->staticMethodTarget.Empty())
+			if (!callInfo.mangledTargetName.Empty())
 			{
-				m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+				if (m_externals.contains(callInfo.mangledTargetName))
+				{
+					m_out << "NATIVE \"" << callInfo.mangledTargetName << "\" " << (passedArgs + 1) << "\n";
+				}
+				else
+				{
+					m_out << "CALL " << callInfo.mangledTargetName << " " << (passedArgs + 1) << "\n";
+				}
 			}
-			else if (actualArgs > 0)
+			else if (passedArgs > 0)
 			{
-				m_out << "CALL_METHOD \"init\" " << actualArgs << "\n";
+				m_out << "CALL_METHOD \"init\" " << passedArgs << "\n";
 			}
 
 			m_out << "POP\n";
-
 			return;
 		}
 
-		if (!node->staticMethodTarget.Empty())
+		if (!callInfo.mangledTargetName.Empty())
 		{
 			if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()); memberAccess)
 			{
@@ -434,7 +437,6 @@ public:
 				}
 			}
 
-			// 2. Кладем остальные аргументы
 			for (const auto& arg : node->arguments)
 			{
 				if (arg)
@@ -442,18 +444,23 @@ public:
 					arg->Accept(*this);
 				}
 			}
-
-			if (node->isVarargCall)
+			if (callInfo.isVarargCall)
 			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 			}
 
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
+			const bool isMethod = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
+			const std::size_t totalArgs = isMethod ? (passedArgs + 1) : passedArgs;
 
-			// Call function with one extra argument (this)
-			m_out << "CALL " << node->staticMethodTarget << " " << (actualArgs + 1) << "\n";
+			if (m_externals.contains(callInfo.mangledTargetName))
+			{
+				m_out << "NATIVE \"" << callInfo.mangledTargetName << "\" " << totalArgs << "\n";
+			}
+			else
+			{
+				m_out << "CALL " << callInfo.mangledTargetName << " " << totalArgs << "\n";
+			}
+
 			return;
 		}
 
@@ -472,112 +479,34 @@ public:
 				}
 			}
 
-			if (node->isVarargCall)
+			if (callInfo.isVarargCall)
 			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
+				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 			}
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
 
-			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << actualArgs << "\n";
+			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << passedArgs << "\n";
 			return;
 		}
 
-		bool isDirectCall = false;
-		re::String directFuncName;
-		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+		if (node->callee)
 		{
-			directFuncName = id->name;
-			if (m_importAliases.contains(directFuncName))
+			node->callee->Accept(*this);
+		}
+
+		for (const auto& arg : node->arguments)
+		{
+			if (arg)
 			{
-				const auto& moduleName = m_importAliases.at(directFuncName);
-				m_out << "GET_GLOBAL \"" << moduleName << "\"\n";
-
-				for (const auto& arg : node->arguments)
-				{
-					if (arg)
-					{
-						arg->Accept(*this);
-					}
-				}
-
-				if (node->isVarargCall)
-				{
-					m_out << "PACK_ARRAY " << node->varargCount << "\n";
-				}
-				const std::size_t actualArgs = node->isVarargCall
-					? (node->arguments.size() - node->varargCount + 1)
-					: node->arguments.size();
-
-				m_out << "CALL_METHOD \"" << directFuncName << "\" " << actualArgs << "\n";
-				return;
-			}
-
-			if (m_externals.contains(directFuncName))
-			{
-				isDirectCall = true;
-			}
-			else if (!IsLocal(directFuncName)
-				&& std::ranges::find(m_currentUpvalues, directFuncName) == m_currentUpvalues.end())
-			{
-				isDirectCall = true;
+				arg->Accept(*this);
 			}
 		}
 
-		if (isDirectCall)
+		if (callInfo.isVarargCall)
 		{
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-
-			if (node->isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
-			}
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
-
-			if (m_externals.contains(directFuncName))
-			{
-				m_out << "NATIVE \"" << directFuncName << "\" " << actualArgs << "\n";
-			}
-			else
-			{
-				m_out << "CALL " << directFuncName << " " << actualArgs << "\n";
-			}
+			m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 		}
-		else
-		{
-			if (node->callee)
-			{
-				node->callee->Accept(*this);
-			}
 
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-
-			if (node->isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << node->varargCount << "\n";
-			}
-
-			const std::size_t actualArgs = node->isVarargCall
-				? (node->arguments.size() - node->varargCount + 1)
-				: node->arguments.size();
-
-			m_out << "CALL_INDIRECT " << actualArgs << "\n";
-		}
+		m_out << "CALL_INDIRECT " << passedArgs << "\n";
 	}
 
 	void Visit(const ast::UnaryExpr* node) override
@@ -981,7 +910,9 @@ public:
 	{
 		if (const auto callNode = dynamic_cast<const ast::CallExpr*>(node->callable.get()))
 		{
-			re::String targetName = callNode->staticMethodTarget;
+			const auto& callInfo = m_semanticAnalyzer.GetBindings().callInfo.at(callNode);
+
+			re::String targetName = callInfo.mangledTargetName;
 
 			if (targetName.Empty())
 			{
@@ -991,8 +922,8 @@ public:
 				}
 			}
 
-			const std::size_t actualArgs = callNode->isVarargCall
-				? callNode->arguments.size() - callNode->varargCount + 1
+			const std::size_t actualArgs = callInfo.isVarargCall
+				? callNode->arguments.size() - callInfo.varargCount + 1
 				: callNode->arguments.size();
 
 			if (!targetName.Empty() && m_externals.contains(targetName))
@@ -1021,9 +952,9 @@ public:
 				}
 			}
 
-			if (callNode->isVarargCall)
+			if (callInfo.isVarargCall)
 			{
-				m_out << "PACK_ARRAY " << callNode->varargCount << "\n";
+				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 			}
 
 			m_out << "CO_LAUNCH " << actualArgs << "\n";

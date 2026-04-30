@@ -308,14 +308,6 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 	std::unique_ptr<Expr> callee;
 	std::vector<std::unique_ptr<Expr>> arguments;
 
-	bool isVarargCall = false;
-	std::size_t varargCount = 0;
-
-	bool isConstructorCall = false;
-	bool isSuperCall = false;
-
-	re::String staticMethodTarget;
-
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
@@ -351,11 +343,6 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 		{
 			clone->arguments.push_back(arg ? arg->CloneExpr(env) : nullptr);
 		}
-		clone->isVarargCall = isVarargCall;
-		clone->varargCount = varargCount;
-		clone->isConstructorCall = isConstructorCall;
-		clone->isSuperCall = isSuperCall;
-		clone->staticMethodTarget = staticMethodTarget;
 
 		return clone;
 	}

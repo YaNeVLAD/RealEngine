@@ -1,12 +1,10 @@
 #pragma once
 
-#include "IgniLang/Diagnostic/Diagnostic.hpp"
-#include "IgniLang/Optimization/DeadCodeEliminator.hpp"
-
 #include <IgniLang/AST/AstConverter.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
 #include <IgniLang/Compiler/TextCompiler.hpp>
+#include <IgniLang/Diagnostic/Diagnostic.hpp>
 #include <IgniLang/LexerFactory.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
@@ -171,8 +169,8 @@ public:
 		}
 
 		// --- PHASE 4: OPTIMIZATION ---
-		opt::DeadCodeEliminator dce;
-		dce.Eliminate(linkedProgram.get());
+		// opt::DeadCodeEliminator dce;
+		// dce.Eliminate(linkedProgram.get());
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";

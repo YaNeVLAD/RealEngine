@@ -13,7 +13,8 @@ inline void ValidateArguments(
 	const ast::CallExpr* node,
 	const FunctionType* funType,
 	const std::vector<std::shared_ptr<SemanticType>>& argTypes,
-	const bool isMethodCall)
+	const bool isMethodCall,
+	CallInfo& callInfo)
 {
 	const std::size_t thisOffset = isMethodCall ? 1 : 0;
 
@@ -25,9 +26,8 @@ inline void ValidateArguments(
 			IGNI_SEM_ERR("Not enough arguments for vararg function '" + funType->name + "'");
 		}
 
-		const auto mutableNode = const_cast<ast::CallExpr*>(node);
-		mutableNode->isVarargCall = true;
-		mutableNode->varargCount = argTypes.size() - fixedParams;
+		callInfo.isVarargCall = true;
+		callInfo.varargCount = argTypes.size() - fixedParams;
 	}
 	else if (argTypes.size() + thisOffset != funType->paramTypes.size())
 	{

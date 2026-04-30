@@ -142,6 +142,11 @@ public:
 		return m_context.externalFunctions;
 	}
 
+	[[nodiscard]] const BindingContext& GetBindings() const
+	{
+		return m_context.bindings;
+	}
+
 	// ==========================================
 	// EXPRESSIONS
 	// ==========================================
@@ -186,7 +191,7 @@ public:
 			{
 				m_currentExprType = group->overloads.front();
 
-				const_cast<ast::IdentifierExpr*>(node)->name = group->overloads.front()->isExternal
+				m_context.bindings.resolvedNames[node] = group->overloads.front()->isExternal
 					? group->name
 					: group->overloads.front()->name;
 
@@ -220,7 +225,7 @@ public:
 				{
 					m_currentExprType = group->overloads.front();
 
-					const_cast<ast::MemberAccessExpr*>(node)->member = group->overloads.front()->isExternal
+					m_context.bindings.resolvedMembers[node] = group->overloads.front()->isExternal
 						? group->name
 						: group->overloads.front()->name;
 				}
@@ -310,7 +315,8 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		bool isSuperCall = false;
+		CallInfo callInfo;
+		callInfo.isSuperCall = false;
 
 		const auto calleeType = Evaluate(node->callee.get());
 
@@ -323,7 +329,7 @@ public:
 		std::vector<std::shared_ptr<SemanticType>> explicitTypeArgs;
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
 		{ // Explicit type arguments ident::<T>
-			isSuperCall = id->name.Hashed() == "super"_hs;
+			callInfo.isSuperCall = id->name.Hashed() == "super"_hs;
 			for (const auto& t : id->typeArgs)
 			{
 				explicitTypeArgs.push_back(TypeResolver::Resolve(t.get(), m_context));
@@ -339,6 +345,7 @@ public:
 
 		std::shared_ptr<FunctionType> concreteTarget = nullptr;
 		bool isMethodCall = false;
+		bool isIndirectCall = false;
 
 		auto resolveOverload = [&](const std::shared_ptr<FunctionGroup>& group, bool isMethod) -> std::shared_ptr<FunctionType> {
 			std::shared_ptr<FunctionType> bestMatch = nullptr;
@@ -410,7 +417,8 @@ public:
 				concreteTarget = resolveOverload(group, true);
 			}
 
-			const_cast<ast::CallExpr*>(node)->isConstructorCall = true;
+			callInfo.isConstructorCall = true;
+			callInfo.mangledClassName = classTmpl->astNode->isExternal ? classTmpl->name : concreteClass->name;
 			isMethodCall = true;
 
 			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
@@ -431,7 +439,8 @@ public:
 				concreteTarget = resolveOverload(group, true);
 			}
 
-			const_cast<ast::CallExpr*>(node)->isConstructorCall = true;
+			callInfo.isConstructorCall = true;
+			callInfo.mangledClassName = classType->name;
 			isMethodCall = true;
 		}
 		else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
@@ -444,39 +453,39 @@ public:
 				// TODO: Add generic function instantiation like SFINAE
 				concreteTarget = CallValidator::ResolveAndInstantiateGeneric(group->templates[0], explicitTypeArgs, argTypes, m_context);
 			}
-
-			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
-			{
-				if (concreteTarget)
-				{
-					id->name = concreteTarget->isExternal ? group->name : concreteTarget->name;
-				}
-			}
-			else if (const auto memAccess = dynamic_cast<ast::MemberAccessExpr*>(node->callee.get()))
-			{
-				if (concreteTarget)
-				{
-					memAccess->member = concreteTarget->isExternal ? group->name : concreteTarget->name;
-				}
-			}
 		}
 		else if (const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType))
 		{ // Non-generic function fallback (e.g. lambda variables)
 			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
 			concreteTarget = funType;
+
+			isIndirectCall = true;
+			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+			{
+				if (m_context.bindings.resolvedNames.contains(id))
+				{
+					isIndirectCall = false;
+				}
+			}
+			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+			{
+				if (m_context.bindings.resolvedMembers.contains(memAccess))
+				{
+					isIndirectCall = false;
+				}
+			}
 		}
 		else
 		{
 			IGNI_SEM_ERR("Attempt to call a non-callable type");
 		}
 
-		const auto mutableNode = const_cast<ast::CallExpr*>(node);
-		mutableNode->isSuperCall = isSuperCall;
-
 		if (!concreteTarget)
 		{
 			IGNI_SEM_ERR(node, "No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
+
+		callInfo.target = concreteTarget;
 
 		if (concreteTarget->isSuspend && !m_context.location.isInsideLaunch)
 		{
@@ -486,7 +495,7 @@ public:
 			}
 		}
 
-		if (isSuperCall)
+		if (callInfo.isSuperCall)
 		{ // super(Args...) constructor call
 			auto thisExpr = std::make_unique<ast::IdentifierExpr>();
 			thisExpr->name = "this";
@@ -494,35 +503,50 @@ public:
 
 			const auto thisType = Evaluate(thisExpr.get());
 
-			mutableNode->arguments.insert(mutableNode->arguments.begin(), std::move(thisExpr));
 			argTypes.insert(argTypes.begin(), thisType);
 
-			mutableNode->isConstructorCall = false;
+			callInfo.isConstructorCall = false;
 			isMethodCall = false;
-			mutableNode->staticMethodTarget = concreteTarget->name;
+			callInfo.mangledTargetName = concreteTarget->name;
+		}
 
-			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
+		if (isIndirectCall)
+		{
+			callInfo.mangledTargetName = "";
+		}
+		else if (concreteTarget->isExternal)
+		{
+			if (!isMethodCall && !callInfo.isConstructorCall)
 			{
-				id->name = concreteTarget->name;
+				if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+				{
+					callInfo.mangledTargetName = id->name;
+				}
+				else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+				{
+					callInfo.mangledTargetName = memAccess->member;
+				}
+			}
+			else
+			{
+				callInfo.mangledTargetName = "";
 			}
 		}
-
-		if (concreteTarget->isExternal)
-		{ // Keep external function original name for code generator
-		}
-		else if (isMethodCall || node->isConstructorCall)
+		else
 		{
-			mutableNode->staticMethodTarget = concreteTarget->name;
+			callInfo.mangledTargetName = concreteTarget->name;
 		}
 
-		CallValidator::ValidateArguments(node, concreteTarget.get(), argTypes, isMethodCall);
+		CallValidator::ValidateArguments(node, concreteTarget.get(), argTypes, isMethodCall, callInfo);
 
 		if (concreteTarget->returnType == nullptr)
 		{
 			IGNI_SEM_ERR("Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
 		}
 
-		if (node->isConstructorCall)
+		m_context.bindings.callInfo[node] = callInfo;
+
+		if (callInfo.isConstructorCall)
 		{
 			if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
 			{
@@ -1035,7 +1059,7 @@ public:
 		const bool prevContext = m_context.location.isInsideLaunch;
 		m_context.location.isInsideLaunch = true;
 
-		Evaluate(node->callable.get()); // Здесь CallExpr сам проверит типы аргументов!
+		Evaluate(node->callable.get());
 
 		m_context.location.isInsideLaunch = prevContext;
 

@@ -143,6 +143,11 @@ std::shared_ptr<FunctionType> Constructor(ast::ConstructorDecl* decl, const std:
 
 	ctx.instantiatedFunctions[mangledName] = funType;
 
+	if (funType->isExternal)
+	{
+		ctx.externalFunctions.insert(mangledName);
+	}
+
 	return funType;
 }
 
@@ -163,6 +168,11 @@ std::shared_ptr<FunctionType> Destructor(ast::DestructorDecl* decl, const std::s
 	funType->paramTypes.emplace_back(TypeResolver::Resolve(thisTypeNode.get(), ctx));
 
 	ctx.instantiatedFunctions[decl->name] = funType;
+
+	if (funType->isExternal)
+	{
+		ctx.externalFunctions.insert(decl->name);
+	}
 
 	return funType;
 }

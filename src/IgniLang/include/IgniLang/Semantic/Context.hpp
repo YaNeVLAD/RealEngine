@@ -1,5 +1,6 @@
 #pragma once
 
+#include <IgniLang/BindingContext.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
@@ -22,6 +23,7 @@ struct SemanticContext
 {
 	Environment env;
 	TraversalContext location;
+	BindingContext bindings;
 
 	std::unordered_map<re::String, re::String> importAliases;
 
