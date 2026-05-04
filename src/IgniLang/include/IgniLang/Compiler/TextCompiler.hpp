@@ -28,11 +28,9 @@ public:
 		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;
 		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>> functionBoxedVars;
 
-		// Pass 1
-		ScopeAnalyzer analyzer(flatFunctions, functionUpvalues, functionBoxedVars, globalNames);
+		ScopeAnalyzer analyzer(flatFunctions, functionUpvalues, functionBoxedVars, globalNames, semanticAnalyzer);
 		analyzer.Analyze(program);
 
-		// Pass 2
 		std::stringstream out;
 		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals, semanticAnalyzer);
 		generator.Generate(program);

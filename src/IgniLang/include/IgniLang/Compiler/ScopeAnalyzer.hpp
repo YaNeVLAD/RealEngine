@@ -1,6 +1,7 @@
 #pragma once
 
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -18,10 +19,12 @@ public:
 		std::vector<const ast::FunDecl*>& flatFuncs,
 		std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvalues,
 		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
-		const std::unordered_set<re::String>& globalNames)
+		const std::unordered_set<re::String>& globalNames,
+		const sem::SemanticAnalyzer& semantics)
 		: m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvalues)
 		, m_functionBoxedVars(funcBoxedVars)
+		, m_semantics(semantics)
 	{
 		m_scopeStack.emplace_back(globalNames); // Global scope
 	}
@@ -45,9 +48,15 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
-		if (!m_scopeStack.back().contains(node->name))
+		re::String name = node->name;
+		if (name.Hashed() == "super"_hs)
 		{
-			m_freeVars.insert(node->name);
+			name = "this";
+		}
+
+		if (!m_scopeStack.back().contains(name))
+		{
+			m_freeVars.insert(name);
 		}
 	}
 
@@ -179,6 +188,9 @@ public:
 
 	void Visit(const ast::ClassDecl* node) override
 	{
+		const bool prevInsideClass = m_isInsideClass;
+		m_isInsideClass = true;
+
 		for (const auto& member : node->members)
 		{
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
@@ -186,6 +198,8 @@ public:
 				fun->Accept(*this);
 			}
 		}
+
+		m_isInsideClass = prevInsideClass;
 	}
 
 	void Visit(const ast::VarDecl* node) override
@@ -208,10 +222,43 @@ public:
 
 	void Visit(const ast::ConstructorDecl* node) override
 	{
+		if (node->isExternal)
+		{
+			return;
+		}
+
+		m_scopeStack.emplace_back(m_scopeStack.back());
+		m_scopeStack.back().insert("this");
+
+		for (const auto& [name, _] : node->parameters)
+		{
+			m_scopeStack.back().insert(name);
+		}
+
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		m_scopeStack.pop_back();
 	}
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
+		if (node->isExternal)
+		{
+			return;
+		}
+
+		m_scopeStack.emplace_back(m_scopeStack.back());
+		m_scopeStack.back().insert("this");
+
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		m_scopeStack.pop_back();
 	}
 
 	void Visit(const ast::FunDecl* node) override
@@ -224,7 +271,7 @@ public:
 
 		m_functionBoxedVars[node];
 
-		ScopeAnalyzer childAnalyzer(m_flatFunctions, m_functionUpvalues, m_functionBoxedVars, m_scopeStack.front());
+		ScopeAnalyzer childAnalyzer(m_flatFunctions, m_functionUpvalues, m_functionBoxedVars, m_scopeStack.front(), m_semantics);
 		childAnalyzer.m_currentFunContext = node;
 
 		std::unordered_set<re::String> funLocals;
@@ -233,6 +280,18 @@ public:
 		{
 			funLocals.insert(name);
 		}
+
+		bool isMethod = m_isInsideClass;
+		if (m_semantics.GetBindings().funMeta.contains(node))
+		{
+			isMethod = m_semantics.GetBindings().funMeta.at(node).isMethod;
+		}
+
+		if (isMethod)
+		{
+			funLocals.insert("this");
+		}
+
 		childAnalyzer.m_scopeStack.emplace_back(funLocals);
 
 		if (node->body)
@@ -276,6 +335,9 @@ private:
 	std::vector<std::unordered_set<re::String>> m_scopeStack;
 	std::unordered_set<re::String> m_freeVars;
 	const ast::FunDecl* m_currentFunContext = nullptr;
+
+	bool m_isInsideClass = false;
+	const sem::SemanticAnalyzer& m_semantics;
 
 	std::vector<const ast::FunDecl*>& m_flatFunctions;
 	std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& m_functionUpvalues;

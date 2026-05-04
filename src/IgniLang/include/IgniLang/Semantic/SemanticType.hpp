@@ -174,6 +174,9 @@ struct GenericFunctionTemplate final : re::utils::Clonable<GenericFunctionTempla
 	ast::Visibility visibility = ast::Visibility::Public;
 	bool isExternal = false;
 
+	bool isMethod = false;
+	std::shared_ptr<ClassType> parentClass = nullptr;
+
 	explicit GenericFunctionTemplate(const re::String& n) { name = n; }
 };
 

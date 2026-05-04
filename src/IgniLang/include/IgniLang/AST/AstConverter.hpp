@@ -356,6 +356,25 @@ private:
 
 			ExtractClassMembers(classMemberList.get(), classDecl->members);
 
+			bool hasAnyCtor = false;
+			for (const auto& member : classDecl->members)
+			{
+				if (dynamic_cast<ast::ConstructorDecl*>(member.get()))
+				{
+					hasAnyCtor = true;
+					break;
+				}
+			}
+			if (!primaryCtor && !hasAnyCtor)
+			{
+				auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
+				defaultCtor->token = classDecl->token;
+				defaultCtor->name = classDecl->name;
+				defaultCtor->body = std::make_unique<ast::Block>();
+				defaultCtor->body->token = classDecl->token;
+				classDecl->members.push_back(std::move(defaultCtor));
+			}
+
 			if (primaryCtor)
 			{
 				classDecl->members.push_back(std::move(primaryCtor));

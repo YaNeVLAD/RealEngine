@@ -60,11 +60,9 @@ inline std::shared_ptr<FunctionType> ResolveAndInstantiateGeneric(
 	{ // ident(T)
 		concreteArgs.resize(funTmpl->typeParams.size(), nullptr);
 
-		// Reserve place for 'this' argument for member functions
-		const std::size_t paramOffset = (!funTmpl->astNode->parameters.empty() && funTmpl->astNode->parameters[0].name == "this") ? 1 : 0;
-		for (std::size_t i = 0; i < argTypes.size() && (i + paramOffset) < funTmpl->astNode->parameters.size(); ++i)
+		for (std::size_t i = 0; i < argTypes.size() && i < funTmpl->astNode->parameters.size(); ++i)
 		{
-			const auto paramTypeAst = funTmpl->astNode->parameters[i + paramOffset].type.get();
+			const auto paramTypeAst = funTmpl->astNode->parameters[i].type.get();
 			TypeResolver::InferTypeArguments(argTypes[i], paramTypeAst, funTmpl->typeParams, concreteArgs);
 		}
 

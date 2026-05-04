@@ -1,12 +1,11 @@
 #pragma once
 
-#include "Helpers/Declaration/Overload.hpp"
-
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
 #include <IgniLang/Semantic/Helpers/CallValidator.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
+#include <IgniLang/Semantic/Helpers/Declaration/Overload.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Variable.hpp>
 #include <IgniLang/Semantic/Helpers/Export.hpp>
 #include <IgniLang/Semantic/Helpers/Generic/Class.hpp>
@@ -497,13 +496,13 @@ public:
 
 		if (callInfo.isSuperCall)
 		{ // super(Args...) constructor call
-			auto thisExpr = std::make_unique<ast::IdentifierExpr>();
-			thisExpr->name = "this";
-			thisExpr->token = node->token;
+			const Symbol* sym = m_context.env.Resolve("this");
+			if (!sym)
+			{
+				IGNI_SEM_ERR(node, "Undefined variable 'this'");
+			}
 
-			const auto thisType = Evaluate(thisExpr.get());
-
-			argTypes.insert(argTypes.begin(), thisType);
+			argTypes.insert(argTypes.begin(), sym->type);
 
 			callInfo.isConstructorCall = false;
 			isMethodCall = false;
@@ -586,9 +585,15 @@ public:
 	{
 		std::shared_ptr<FunctionType> funType;
 
-		if (m_context.instantiatedFunctions.contains(node->name))
+		re::String lookupName = node->name;
+		if (m_context.bindings.funMeta.contains(node))
 		{
-			funType = m_context.instantiatedFunctions.at(node->name);
+			lookupName = m_context.bindings.funMeta.at(node).mangledName;
+		}
+
+		if (m_context.instantiatedFunctions.contains(lookupName))
+		{
+			funType = m_context.instantiatedFunctions.at(lookupName);
 		}
 
 		if (!funType)
@@ -597,10 +602,11 @@ public:
 		}
 
 		m_context.env.PushScope();
+		m_context.env.Define("this", funType->paramTypes[0], false);
 
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
-			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
+			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i + 1];
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
 				paramType = GetVarargArrayType(paramType);
@@ -632,9 +638,15 @@ public:
 	{
 		std::shared_ptr<FunctionType> funType;
 
-		if (m_context.instantiatedFunctions.contains(node->name))
+		re::String lookupName = node->name;
+		if (m_context.bindings.funMeta.contains(node))
 		{
-			funType = m_context.instantiatedFunctions.at(node->name);
+			lookupName = m_context.bindings.funMeta.at(node).mangledName;
+		}
+
+		if (m_context.instantiatedFunctions.contains(lookupName))
+		{
+			funType = m_context.instantiatedFunctions.at(lookupName);
 		}
 
 		if (!funType)
@@ -860,9 +872,15 @@ public:
 		}
 		else
 		{ // Global function or Class method
-			if (m_context.instantiatedFunctions.contains(node->name))
+			re::String lookupName = node->name;
+			if (m_context.bindings.funMeta.contains(node))
 			{
-				funType = m_context.instantiatedFunctions.at(node->name);
+				lookupName = m_context.bindings.funMeta.at(node).mangledName;
+			}
+
+			if (m_context.instantiatedFunctions.contains(lookupName))
+			{
+				funType = m_context.instantiatedFunctions.at(lookupName);
 			}
 
 			if (!funType)
@@ -872,9 +890,23 @@ public:
 		}
 
 		m_context.env.PushScope();
+
+		bool isMethod = false;
+		if (m_context.bindings.funMeta.contains(node))
+		{
+			const auto& meta = m_context.bindings.funMeta.at(node);
+			isMethod = meta.isMethod;
+			if (isMethod)
+			{
+				m_context.env.Define("this", GetClassType(meta.parentClass), false);
+			}
+		}
+
 		for (std::size_t i = 0; i < node->parameters.size(); ++i)
 		{
-			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i];
+			const std::size_t typeIdx = isMethod ? i + 1 : i;
+
+			std::shared_ptr<SemanticType> paramType = funType->paramTypes[typeIdx];
 			if (node->isVararg && i == node->parameters.size() - 1)
 			{
 				paramType = GetVarargArrayType(paramType);
@@ -949,7 +981,7 @@ public:
 					if (!classType->methods.contains(methodName))
 					{
 						classType->methods[methodName] = methodType;
-					} // --------------------------------------------------------
+					}
 				}
 			}
 		}
@@ -1006,7 +1038,7 @@ public:
 		{ // Register member functions
 			if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
 			{
-				re::String originalName = funDecl->name.Substring(node->name.Length() + 1);
+				re::String originalName = funDecl->name;
 
 				const bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(originalName);
 				if (funDecl->isOverride && !existsInBase)
@@ -1238,25 +1270,6 @@ private:
 
 				m_context.allClassTypes[classDecl->name] = classType;
 
-				bool hasConstructor = false;
-				for (const auto& member : classDecl->members)
-				{
-					if (dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-					{
-						hasConstructor = true;
-						break;
-					}
-				}
-
-				if (!hasConstructor)
-				{
-					auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
-					defaultCtor->name = classDecl->name;
-					defaultCtor->body = std::make_unique<ast::Block>();
-
-					const_cast<ast::ClassDecl*>(classDecl)->members.push_back(std::move(defaultCtor));
-				}
-
 				classType->moduleName = currentModule ? currentModule->name : "global";
 
 				if (isGlobal && isNewClass)
@@ -1272,23 +1285,20 @@ private:
 				{
 					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
-						const auto mutableFun = const_cast<ast::FunDecl*>(fun);
-						const re::String originalName = Declaration::InjectThisKeyword(mutableFun, classDecl->name);
-
-						if (!mutableFun->typeParams.empty())
+						if (!fun->typeParams.empty())
 						{
-							if (mutableFun->isOverride)
+							if (fun->isOverride)
 							{
-								IGNI_SEM_ERR(mutableFun, "Generic methods cannot be marked 'override'");
+								IGNI_SEM_ERR(fun, "Generic methods cannot be marked 'override'");
 							}
 
-							auto tmpl = Declaration::GenericFunction(mutableFun, currentModule ? currentModule->name : "global");
-							Declaration::Overload::GenericMethod(classType, originalName, tmpl);
+							auto tmpl = Declaration::GenericFunction(fun, currentModule ? currentModule->name : "global");
+							Declaration::Overload::GenericMethod(classType, fun->name, tmpl);
 							continue;
 						}
 
-						auto funType = Declaration::Method(mutableFun, originalName, classType, m_context);
-						Declaration::Overload::Method(classType, originalName, funType);
+						auto funType = Declaration::Method(fun, classType, m_context);
+						Declaration::Overload::Method(classType, fun->name, funType);
 					}
 					else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 					{

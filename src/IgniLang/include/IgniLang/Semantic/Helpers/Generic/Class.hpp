@@ -57,23 +57,6 @@ inline std::shared_ptr<ClassType> Instantiate(
 	realClassDecl->name = uniqueName;
 	realClassDecl->typeParams.clear();
 
-	bool hasConstructor = false;
-	for (const auto& member : realClassDecl->members)
-	{
-		if (dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-		{
-			hasConstructor = true;
-			break;
-		}
-	}
-	if (!hasConstructor)
-	{
-		auto defaultCtor = std::make_unique<ast::ConstructorDecl>();
-		defaultCtor->name = uniqueName;
-		defaultCtor->body = std::make_unique<ast::Block>();
-		realClassDecl->members.push_back(std::move(defaultCtor));
-	}
-
 	auto classType = std::make_shared<ClassType>(uniqueName, tmpl->astNode);
 	classType->classDecl = realClassDecl;
 	classType->moduleName = tmpl->moduleName;
@@ -157,8 +140,6 @@ inline std::shared_ptr<ClassType> Instantiate(
 		}
 		if (const auto fun = dynamic_cast<ast::FunDecl*>(member.get()))
 		{
-			const re::String originalName = Declaration::InjectThisKeyword(fun, classType->name);
-
 			if (!fun->typeParams.empty())
 			{
 				if (fun->isOverride)
@@ -166,14 +147,13 @@ inline std::shared_ptr<ClassType> Instantiate(
 					IGNI_SEM_ERR(fun, "Generic methods cannot be marked 'override'");
 				}
 
-				auto generic = Declaration::GenericFunction(fun, classType->moduleName);
-				Declaration::Overload::GenericMethod(classType, originalName, generic);
+				auto generic = Declaration::GenericFunction(fun, classType->moduleName, classType);
+				Declaration::Overload::GenericMethod(classType, fun->name, generic);
 				continue;
 			}
-			// ==============================================================
 
-			auto funType = Declaration::Method(fun, originalName, classType, m_context);
-			Declaration::Overload::Method(classType, originalName, funType);
+			auto funType = Declaration::Method(fun, classType, m_context);
+			Declaration::Overload::Method(classType, fun->name, funType);
 		}
 		else if (const auto ctor = dynamic_cast<ast::ConstructorDecl*>(member.get()))
 		{

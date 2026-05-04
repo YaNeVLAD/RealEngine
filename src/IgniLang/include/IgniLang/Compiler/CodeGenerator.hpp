@@ -91,9 +91,9 @@ public:
 				continue;
 			}
 
-			if (globalFuncs.contains(fun))
+			if (m_semanticAnalyzer.GetBindings().funMeta.contains(fun))
 			{
-				m_funcAsmNames[fun] = fun->name;
+				m_funcAsmNames[fun] = m_semanticAnalyzer.GetBindings().funMeta.at(fun).mangledName;
 			}
 			else
 			{
@@ -993,7 +993,12 @@ private:
 
 	void GenerateConstructor(const ast::ConstructorDecl* ctor, const ast::ClassDecl* classDecl)
 	{
-		m_out << "FUN " << ctor->name << "\n";
+		re::String asmName = ctor->name;
+		if (m_semanticAnalyzer.GetBindings().funMeta.contains(ctor))
+		{
+			asmName = m_semanticAnalyzer.GetBindings().funMeta.at(ctor).mangledName;
+		}
+		m_out << "FUN " << asmName << "\n";
 		m_currentLocals.clear();
 		m_varCounter = 0;
 
@@ -1002,6 +1007,11 @@ private:
 		for (auto it = ctor->parameters.rbegin(); it != ctor->parameters.rend(); ++it)
 		{
 			m_out << "SET " << DeclareLocal(it->name) << "\n";
+		}
+
+		if (m_semanticAnalyzer.GetBindings().funMeta.contains(ctor) && m_semanticAnalyzer.GetBindings().funMeta.at(ctor).isMethod)
+		{
+			m_out << "SET " << DeclareLocal("this") << "\n";
 		}
 
 		// Injecting member initializers
@@ -1044,7 +1054,12 @@ private:
 
 	void GenerateDestructor(const ast::DestructorDecl* dtor, const ast::ClassDecl* classDecl)
 	{
-		m_out << "FUN " << dtor->name << "\n";
+		re::String asmName = dtor->name;
+		if (m_semanticAnalyzer.GetBindings().funMeta.contains(dtor))
+		{
+			asmName = m_semanticAnalyzer.GetBindings().funMeta.at(dtor).mangledName;
+		}
+		m_out << "FUN " << asmName << "\n";
 		m_currentLocals.clear();
 		m_varCounter = 0;
 		m_currentUpvalues.clear();
@@ -1116,6 +1131,11 @@ private:
 			}
 
 			m_out << "SET " << DeclareLocal(paramName) << "\n";
+		}
+
+		if (m_semanticAnalyzer.GetBindings().funMeta.contains(fun) && m_semanticAnalyzer.GetBindings().funMeta.at(fun).isMethod)
+		{
+			m_out << "SET " << DeclareLocal("this") << "\n";
 		}
 
 		if (fun->body)

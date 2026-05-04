@@ -57,7 +57,15 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	realFunDecl->name = uniqueName;
 	realFunDecl->typeParams.clear();
 
-	auto funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
+	std::shared_ptr<FunctionType> funType;
+	if (tmpl->isMethod)
+	{
+		funType = Declaration::Method(realFunDecl, tmpl->parentClass, m_context);
+	}
+	else
+	{
+		funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
+	}
 
 	m_context.instantiatedFunctions[uniqueName] = funType;
 	m_context.env.Define(uniqueName, funType, true);

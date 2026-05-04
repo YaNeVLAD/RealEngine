@@ -25,6 +25,13 @@ struct CallInfo
 	std::size_t varargCount = 0;
 };
 
+struct FunMeta
+{
+	re::String mangledName;
+	bool isMethod = false;
+	re::String parentClass;
+};
+
 class IGNI_API BindingContext
 {
 public:
@@ -39,6 +46,8 @@ public:
 	std::unordered_map<const ast::FunDecl*, std::shared_ptr<sem::FunctionType>> funTypes;
 
 	std::unordered_map<const ast::FunDecl*, re::String> mangledFunNames;
+
+	std::unordered_map<const ast::Node*, FunMeta> funMeta;
 
 	void SetExpressionType(const ast::Expr* expr, std::shared_ptr<sem::SemanticType> type)
 	{
