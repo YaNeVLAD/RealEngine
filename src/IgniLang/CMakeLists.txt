@@ -21,6 +21,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(IgniTests
         tests/IgniLangTests.cpp
+        tests/FrontendTests.cpp
 )
 
 target_link_libraries(IgniTests
