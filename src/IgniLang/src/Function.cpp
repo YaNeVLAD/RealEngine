@@ -134,16 +134,6 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 	ctx.allFunctionNames.insert(funType->name);
 	ctx.instantiatedFunctions[funType->name] = funType;
 
-	const bool existsInBase = classType->baseClass && classType->baseClass->methods.contains(decl->name);
-	if (decl->isOverride && !existsInBase)
-	{
-		IGNI_SEM_ERR(decl, "Method '" + decl->name + "' is marked 'override' but no matching method found in base class");
-	}
-	if (!decl->isOverride && existsInBase)
-	{
-		IGNI_SEM_ERR(decl, "Method '" + decl->name + "' hides base class method. Add the 'override' modifier.");
-	}
-
 	ctx.bindings.funMeta[decl] = FunMeta{ mangledName, true, classType->name };
 
 	return funType;

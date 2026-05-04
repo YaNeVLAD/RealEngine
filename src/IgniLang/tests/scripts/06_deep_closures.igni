@@ -1,0 +1,39 @@
+// EXPECT_OUTPUT:
+// 15
+// 30
+// 42
+// 100
+// END_EXPECT
+
+package program;
+
+fun main() {
+    var a = 5;
+
+    fun outer() {
+        var b = 10;
+
+        fun inner() {
+            a = a + b;
+            b = b + 5;
+        }
+
+        inner();
+        println(a); // 5 + 10 = 15
+
+        inner();
+        println(a); // 15 + 15 = 30
+    }
+
+    outer();
+
+    var secret = 0;
+    fun setSecret(v: Int) { secret = v; }
+    fun getSecret(): Int = secret;
+
+    setSecret(42);
+    println(getSecret()); // 42
+
+    setSecret(100);
+    println(getSecret()); // 100
+}

@@ -20,16 +20,18 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		IGNI_SEM_ERR(tmpl->astNode, "Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
-	re::String uniqueName = tmpl->name;
+	re::String genericSuffix;
 	for (const auto& arg : typeArgs)
 	{
 		if (!arg)
 		{
-			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
+			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument");
 		}
-
-		uniqueName = uniqueName + "@" + arg->name;
+		genericSuffix = genericSuffix + "@" + arg->name;
 	}
+
+	const re::String baseName = tmpl->name + genericSuffix;
+	const re::String uniqueName = tmpl->isMethod ? tmpl->parentClass->name + "_" + baseName : baseName;
 
 	if (m_context.instantiatedFunctions.contains(uniqueName))
 	{

@@ -1,0 +1,32 @@
+// EXPECT_OUTPUT:
+// Animal
+// Dog barks
+// Legs: 4
+// END_EXPECT
+
+package program;
+
+class Animal(val name: String) {
+    fun speak() {
+        println(this.name);
+    }
+}
+
+class Dog(name: String, val legs: Int) : Animal(name) {
+    override fun speak() {
+        println("Dog barks");
+    }
+
+    fun walk() {
+        println("Legs: ", this.legs);
+    }
+}
+
+fun main() {
+    val a = Animal("Animal");
+    a.speak();
+
+    val d = Dog("Rex", 4);
+    d.speak();
+    d.walk();
+}

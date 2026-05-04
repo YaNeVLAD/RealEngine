@@ -1,0 +1,34 @@
+// EXPECT_OUTPUT:
+// Base
+// Derived A
+// Derived B
+// END_EXPECT
+
+package program;
+
+class Base() {
+    fun printName() {
+        println("Base");
+    }
+}
+
+class DerivedA() : Base() {
+    override fun printName() {
+        println("Derived A");
+    }
+}
+
+class DerivedB() : Base() {
+    override fun printName() {
+        println("Derived B");
+    }
+}
+
+fun main() {
+    // T -> Base
+    val arr = arrayOf(Base(), DerivedA(), DerivedB());
+
+    for (obj in arr) { // Dynamic dispatch inside VM
+        obj.printName();
+    }
+}

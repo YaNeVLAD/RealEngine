@@ -10,6 +10,8 @@
 #include <fsm/slr/parser.hpp>
 #include <fsm/slr/table_builder.hpp>
 
+#include <filesystem>
+
 inline std::vector<fsm::token<igni::TokenType>> Tokenize(const std::string& source)
 {
 	using namespace igni;
@@ -30,6 +32,58 @@ inline std::vector<fsm::token<igni::TokenType>> Tokenize(const std::string& sour
 		}
 	}
 	return tokens;
+}
+
+inline std::string ExtractExpectedOutput(const std::filesystem::path& filePath)
+{
+	std::ifstream file(filePath);
+	std::string line;
+	std::stringstream expected;
+	bool inExpectBlock = false;
+
+	while (std::getline(file, line))
+	{
+		if (line.find("// EXPECT_OUTPUT:") != std::string::npos)
+		{
+			inExpectBlock = true;
+			continue;
+		}
+		if (line.find("// END_EXPECT") != std::string::npos)
+		{
+			inExpectBlock = false;
+			break;
+		}
+		if (inExpectBlock)
+		{
+			if (line.size() >= 3 && line.substr(0, 3) == "// ")
+			{
+				expected << line.substr(3) << "\n";
+			}
+			else if (line.size() >= 2 && line.substr(0, 2) == "//")
+			{
+				expected << line.substr(2) << "\n";
+			}
+		}
+	}
+	return expected.str();
+}
+
+inline std::vector<std::filesystem::path> GetTestScripts()
+{
+	namespace fs = std::filesystem;
+
+	std::vector<fs::path> scripts;
+	if (fs::exists("tests/scripts"))
+	{
+		for (const auto& entry : fs::directory_iterator("tests/scripts"))
+		{
+			if (entry.path().extension() == ".igni")
+			{
+				scripts.emplace_back(entry.path());
+			}
+		}
+	}
+	return scripts;
 }
 
 class FrontendTestFixture : public ::testing::Test

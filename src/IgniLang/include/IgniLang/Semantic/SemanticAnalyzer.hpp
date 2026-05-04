@@ -345,6 +345,7 @@ public:
 		std::shared_ptr<FunctionType> concreteTarget = nullptr;
 		bool isMethodCall = false;
 		bool isIndirectCall = false;
+		bool isGenericInstantiation = false;
 
 		auto resolveOverload = [&](const std::shared_ptr<FunctionGroup>& group, bool isMethod) -> std::shared_ptr<FunctionType> {
 			std::shared_ptr<FunctionType> bestMatch = nullptr;
@@ -451,6 +452,7 @@ public:
 			{
 				// TODO: Add generic function instantiation like SFINAE
 				concreteTarget = CallValidator::ResolveAndInstantiateGeneric(group->templates[0], explicitTypeArgs, argTypes, m_context);
+				isGenericInstantiation = true;
 			}
 		}
 		else if (const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType))
@@ -533,7 +535,14 @@ public:
 		}
 		else
 		{
-			callInfo.mangledTargetName = concreteTarget->name;
+			if (isMethodCall && !callInfo.isConstructorCall && !callInfo.isSuperCall && !isGenericInstantiation)
+			{ // Non-generic or external methods are marked as dynamic
+				callInfo.mangledTargetName = "";
+			}
+			else
+			{
+				callInfo.mangledTargetName = concreteTarget->name;
+			}
 		}
 
 		CallValidator::ValidateArguments(node, concreteTarget.get(), argTypes, isMethodCall, callInfo);
@@ -698,8 +707,8 @@ public:
 						bool isInsideCtor = false;
 						if (m_context.location.currentFunction)
 						{ // allow val mutations in constructor
-							const re::String expectedCtorName = classType->name + "_" + classType->name;
-							if (m_context.location.currentFunction->name == expectedCtorName)
+							if (const re::String expectedCtorName = classType->name + "_" + classType->name;
+								m_context.location.currentFunction->name.Find(expectedCtorName) != re::String::NPos)
 							{
 								isInsideCtor = true;
 							}
@@ -822,7 +831,6 @@ public:
 				}
 				catch (const SemanticBailoutException&)
 				{
-					// Стейтмент сломался? Не беда, идем проверять следующий!
 				}
 			}
 		}

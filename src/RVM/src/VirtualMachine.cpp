@@ -562,7 +562,7 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::GetUpvalue: {
 			std::uint8_t index = READ_BYTE();
 			const auto& closure = m_callStack.back().closure;
-			Push(closure->captured[index]->value);
+			Push(closure->captured[index]);
 			break;
 		}
 

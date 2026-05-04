@@ -943,7 +943,11 @@ private:
 
 	static void ExtractPrimaryCtorParams(const CstNode* listNode, ast::ClassDecl* classDecl, ast::ConstructorDecl* ctorDecl)
 	{
-		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
+		if (!listNode || listNode->children.empty() || listNode->symbol.Hashed() == "<EPSILON>"_hs)
+		{
+			return;
+		}
+		if (listNode->children.size() == 1 && listNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
 			return;
 		}
@@ -953,7 +957,7 @@ private:
 			ExtractPrimaryCtorParams(listNode->children[0].get(), classDecl, ctorDecl);
 			ProcessPrimaryCtorPar(listNode->children[2].get(), classDecl, ctorDecl);
 		}
-		else
+		else if (listNode->children.size() == 1)
 		{
 			ProcessPrimaryCtorPar(listNode->children[0].get(), classDecl, ctorDecl);
 		}

@@ -135,6 +135,32 @@ public:
 			}
 		}
 
+		m_out << "// --- VTable Binding ---\n";
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
+			{
+				if (classDecl->isExternal || !classDecl->typeParams.empty())
+				{
+					continue;
+				}
+
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+					{
+						if (!fun->typeParams.empty())
+						{
+							continue;
+						}
+
+						m_out << "MAKE_CLOSURE " << m_funcAsmNames.at(fun) << " 0\n";
+						m_out << "BIND_METHOD \"" << classDecl->name << "\" \"" << fun->name << "\"\n";
+					}
+				}
+			}
+		}
+
 		m_out << "// --- Entry Point ---\n";
 		m_out << "CALL main 0\nRETURN\n\n";
 
@@ -268,6 +294,7 @@ public:
 		if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 		{
 			m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+			m_out << "UNBOX\n";
 		}
 		else if (IsLocal(name))
 		{
@@ -296,11 +323,12 @@ public:
 			const auto& name = id->name;
 			if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 			{
+				m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 				if (node->value)
 				{
 					node->value->Accept(*this);
 				}
-				m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+				m_out << "STORE_BOX\n";
 			}
 			else if (IsLocal(name))
 			{
@@ -556,9 +584,12 @@ public:
 
 				if (upIt != m_currentUpvalues.end())
 				{
-					m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+					const auto idx = std::distance(m_currentUpvalues.begin(), upIt);
+					m_out << "GET_UPVALUE " << idx << "\n";
+					m_out << "GET_UPVALUE " << idx << "\n";
+					m_out << "UNBOX\n";
 					m_out << vmOp << "\n";
-					m_out << "SET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+					m_out << "STORE_BOX\n";
 				}
 				else
 				{
@@ -579,6 +610,7 @@ public:
 				if (upIt != m_currentUpvalues.end())
 				{
 					m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+					m_out << "UNBOX\n";
 				}
 				else
 				{
@@ -1135,6 +1167,10 @@ private:
 
 		if (m_semanticAnalyzer.GetBindings().funMeta.contains(fun) && m_semanticAnalyzer.GetBindings().funMeta.at(fun).isMethod)
 		{
+			if (boxedVars.contains("this"))
+			{
+				m_out << "BOX\n";
+			}
 			m_out << "SET " << DeclareLocal("this") << "\n";
 		}
 
