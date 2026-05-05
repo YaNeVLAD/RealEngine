@@ -2,8 +2,8 @@
 
 #include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
-#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -14,50 +14,52 @@ namespace igni::opt
 class DeadCodeEliminator final : public ast::BaseAstVisitor
 {
 public:
-	// Принимает только корень программы и мутирует его in-place
-	void Eliminate(ast::Program* program)
+	void Eliminate(ast::Program* program, const BindingContext& bindings)
 	{
+		m_bindings = &bindings;
 		m_reachableNames.clear();
 		m_worklist.clear();
 		m_allBodies.clear();
+		m_dynamicMethods.clear();
 
-		// 1. Построение карты тел функций напрямую из AST
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
-				if (fun->typeParams.empty())
+				if (fun->typeParams.empty() && !fun->isExternal)
 				{
-					m_allBodies[fun->name] = fun->body.get();
+					re::String mangledName = GetMangledName(fun);
+					m_allBodies[mangledName] = fun->body.get();
 				}
 			}
 			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				if (classDecl->typeParams.empty())
+				if (classDecl->typeParams.empty() && !classDecl->isExternal)
 				{
 					for (const auto& member : classDecl->members)
 					{
 						if (const auto mFun = dynamic_cast<const ast::FunDecl*>(member.get()))
 						{
-							m_allBodies[mFun->name] = mFun->body.get();
+							re::String mangledName = GetMangledName(mFun);
+							m_allBodies[mangledName] = mFun->body.get();
+
+							m_dynamicMethods[mFun->name].push_back(mangledName);
 						}
 						else if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 						{
-							m_allBodies[mCtor->name] = mCtor->body.get();
+							m_allBodies[GetMangledName(mCtor)] = mCtor->body.get();
 						}
 						else if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 						{
-							m_allBodies[mDtor->name] = mDtor->body.get();
+							m_allBodies[GetMangledName(mDtor)] = mDtor->body.get();
 						}
 					}
 				}
 			}
 		}
 
-		// 2. Mark: Инициируем поиск с корней (main)
 		MarkReached("main");
 
-		// Анализируем глобальные инициализации (val, var, expr)
 		for (const auto& stmt : program->statements)
 		{
 			if (!dynamic_cast<const ast::FunDecl*>(stmt.get()) && !dynamic_cast<const ast::ClassDecl*>(stmt.get()))
@@ -66,7 +68,6 @@ public:
 			}
 		}
 
-		// Волновой обход графа вызовов
 		while (!m_worklist.empty())
 		{
 			const re::String current = m_worklist.back();
@@ -78,57 +79,78 @@ public:
 			}
 		}
 
-		// 3. Sweep: ФИЗИЧЕСКОЕ УДАЛЕНИЕ МЕРТВОГО КОДА ИЗ AST
-
-		// Очищаем глобальные функции
 		std::erase_if(program->statements, [&](const std::unique_ptr<ast::Statement>& stmt) {
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
-				// Удаляем инстанцированную функцию, если ее нет в списке достижимых
-				return fun->typeParams.empty() && !m_reachableNames.contains(fun->name);
+				return fun->typeParams.empty() && !fun->isExternal && !m_reachableNames.contains(GetMangledName(fun));
 			}
 
-			return false; // Классы, переменные и выражения оставляем
+			return false;
 		});
 
-		// Очищаем методы классов прямо в AST
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto classDecl = dynamic_cast<ast::ClassDecl*>(stmt.get()))
 			{
-				if (!classDecl->typeParams.empty())
+				if (!classDecl->typeParams.empty() || classDecl->isExternal)
 				{
-					continue; // Сырые шаблоны не трогаем
+					continue;
 				}
 
 				std::erase_if(classDecl->members, [&](const std::unique_ptr<ast::Decl>& member) {
 					if (const auto mFun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(mFun->name);
+						return !mFun->isExternal && !m_reachableNames.contains(GetMangledName(mFun));
 					}
 					if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(mCtor->name);
+						return !mCtor->isExternal && !m_reachableNames.contains(GetMangledName(mCtor));
 					}
 					if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(mDtor->name);
+						return !mDtor->isExternal && !m_reachableNames.contains(GetMangledName(mDtor));
 					}
 
-					return false; // VarDecl и ValDecl остаются!
+					return false;
 				});
 			}
 		}
 	}
 
 private:
+	const BindingContext* m_bindings = nullptr;
 	std::unordered_set<re::String> m_reachableNames;
 	std::vector<re::String> m_worklist;
 	std::unordered_map<re::String, const ast::Block*> m_allBodies;
 
+	std::unordered_map<re::String, std::vector<re::String>> m_dynamicMethods;
+
+	re::String GetMangledName(const ast::Decl* decl) const
+	{
+		if (m_bindings && m_bindings->funMeta.contains(decl))
+		{
+			return m_bindings->funMeta.at(decl).mangledName;
+		}
+
+		if (const auto f = dynamic_cast<const ast::FunDecl*>(decl))
+		{
+			return f->name;
+		}
+		if (const auto c = dynamic_cast<const ast::ConstructorDecl*>(decl))
+		{
+			return c->name;
+		}
+		if (const auto d = dynamic_cast<const ast::DestructorDecl*>(decl))
+		{
+			return d->name;
+		}
+
+		return {};
+	}
+
 	void MarkReached(const re::String& name)
 	{
-		if (!m_reachableNames.contains(name))
+		if (!name.Empty() && !m_reachableNames.contains(name))
 		{
 			m_reachableNames.insert(name);
 			m_worklist.push_back(name);
@@ -141,26 +163,29 @@ private:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		if (!node->staticMethodTarget.Empty())
+		if (m_bindings && m_bindings->callInfo.contains(node))
 		{
-			MarkReached(node->staticMethodTarget);
+			const auto& callInfo = m_bindings->callInfo.at(node);
 
-			// Если вызываем конструктор, помечаем деструктор как живой
-			if (node->isConstructorCall)
+			if (!callInfo.mangledTargetName.Empty())
 			{
-				if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+				MarkReached(callInfo.mangledTargetName);
+			}
+			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+			{
+				if (m_dynamicMethods.contains(memAccess->member))
 				{
-					MarkReached(id->name + "_destructor");
+					for (const auto& mangled : m_dynamicMethods.at(memAccess->member))
+					{
+						MarkReached(mangled);
+					}
 				}
 			}
-		}
-		else if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-		{
-			MarkReached(id->name);
-		}
-		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-		{
-			MarkReached(memAccess->member);
+
+			if (callInfo.isConstructorCall)
+			{
+				MarkReached(callInfo.mangledClassName + "_destructor");
+			}
 		}
 
 		VISIT_NEXT(node->callee);
@@ -172,12 +197,18 @@ private:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
-		MarkReached(node->name);
+		if (m_bindings && m_bindings->resolvedNames.contains(node))
+		{
+			MarkReached(m_bindings->resolvedNames.at(node)); // Захват замыканий
+		}
 	}
 
 	void Visit(const ast::MemberAccessExpr* node) override
 	{
-		MarkReached(node->member);
+		if (m_bindings && m_bindings->resolvedMembers.contains(node))
+		{
+			MarkReached(m_bindings->resolvedMembers.at(node)); // Референсы на методы
+		}
 		VISIT_NEXT(node->object);
 	}
 

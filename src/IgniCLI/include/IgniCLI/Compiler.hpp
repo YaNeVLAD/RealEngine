@@ -6,6 +6,7 @@
 #include <IgniLang/Compiler/TextCompiler.hpp>
 #include <IgniLang/Diagnostic/Diagnostic.hpp>
 #include <IgniLang/LexerFactory.hpp>
+#include <IgniLang/Optimization/DeadCodeEliminator.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <fsm/cfg.hpp>
@@ -169,8 +170,8 @@ public:
 		}
 
 		// --- PHASE 4: OPTIMIZATION ---
-		// opt::DeadCodeEliminator dce;
-		// dce.Eliminate(linkedProgram.get());
+		opt::DeadCodeEliminator dce;
+		dce.Eliminate(linkedProgram.get(), semanticAnalyzer.GetBindings());
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";
