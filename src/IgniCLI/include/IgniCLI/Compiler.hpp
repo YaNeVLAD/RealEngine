@@ -13,7 +13,6 @@
 #include <fsm/slr/parser.hpp>
 #include <fsm/slr/table_builder.hpp>
 
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <list>

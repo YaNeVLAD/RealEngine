@@ -21,10 +21,10 @@ public:
 		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
 		const std::unordered_set<re::String>& globalNames,
 		const sem::SemanticAnalyzer& semantics)
-		: m_flatFunctions(flatFuncs)
+		: m_semantics(semantics)
+		, m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvalues)
 		, m_functionBoxedVars(funcBoxedVars)
-		, m_semantics(semantics)
 	{
 		m_scopeStack.emplace_back(globalNames); // Global scope
 	}

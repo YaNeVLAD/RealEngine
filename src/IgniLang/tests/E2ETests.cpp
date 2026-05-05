@@ -32,14 +32,14 @@ protected:
 
 TEST_P(E2ETestFixture, ExecutesCorrectly)
 {
-	fs::path scriptPath = GetParam();
+	const fs::path& scriptPath = GetParam();
 	std::string expectedOutput = ExtractExpectedOutput(scriptPath);
 
 	std::vector<std::string> sourceFiles;
 
 	if (fs::exists("assets/source/stdlib.igni"))
 	{
-		sourceFiles.push_back("assets/source/stdlib.igni");
+		sourceFiles.emplace_back("assets/source/stdlib.igni");
 	}
 	sourceFiles.push_back(scriptPath.string());
 
