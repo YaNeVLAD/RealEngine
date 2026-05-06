@@ -12,6 +12,14 @@
 namespace igni
 {
 
+enum class CallDispatchType
+{
+	Static,
+	Virtual,
+	Native,
+	Indirect
+};
+
 struct CallInfo
 {
 	std::shared_ptr<sem::FunctionType> target;
@@ -23,6 +31,9 @@ struct CallInfo
 	bool isVarargCall = false;
 
 	std::size_t varargCount = 0;
+
+	CallDispatchType dispatchMode = CallDispatchType::Static;
+	re::String asmLabel;
 };
 
 struct FunMeta

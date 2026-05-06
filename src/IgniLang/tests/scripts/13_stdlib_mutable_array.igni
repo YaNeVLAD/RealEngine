@@ -1,0 +1,28 @@
+// EXPECT_OUTPUT:
+// [0, 0, 0]
+// [0, 42, 0]
+// [0, 42, 0, 99]
+// [0, 42, 0, 99]
+// [7, 7, 7, 7]
+// END_EXPECT
+
+package program;
+
+fun main() {
+    val ma = MutableArray::<Int>(3);
+
+    ma.fill(0);
+    println(ma);
+
+    ma[1] = 42;
+    println(ma);
+
+    ma.push(99);
+    println(ma);
+
+    val regularArr = ma.toArray();
+    println(regularArr);
+
+    ma.fill(7);
+    println(ma);
+}

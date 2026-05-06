@@ -34,7 +34,7 @@ public:
 			}
 			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
 			{
-				if (classDecl->typeParams.empty() && !classDecl->isExternal)
+				if (classDecl->typeParams.empty())
 				{
 					for (const auto& member : classDecl->members)
 					{
@@ -92,7 +92,7 @@ public:
 		{
 			if (const auto classDecl = dynamic_cast<ast::ClassDecl*>(stmt.get()))
 			{
-				if (!classDecl->typeParams.empty() || classDecl->isExternal)
+				if (!classDecl->typeParams.empty())
 				{
 					continue;
 				}
@@ -167,17 +167,20 @@ private:
 		{
 			const auto& callInfo = m_bindings->callInfo.at(node);
 
-			if (!callInfo.mangledTargetName.Empty())
+			if (callInfo.dispatchMode == CallDispatchType::Static)
 			{
-				MarkReached(callInfo.mangledTargetName);
+				MarkReached(callInfo.asmLabel);
 			}
-			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+			else if (callInfo.dispatchMode == CallDispatchType::Virtual)
 			{
-				if (m_dynamicMethods.contains(memAccess->member))
+				if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
 				{
-					for (const auto& mangled : m_dynamicMethods.at(memAccess->member))
+					if (m_dynamicMethods.contains(memAccess->member))
 					{
-						MarkReached(mangled);
+						for (const auto& mangled : m_dynamicMethods.at(memAccess->member))
+						{
+							MarkReached(mangled);
+						}
 					}
 				}
 			}

@@ -1,7 +1,9 @@
 package global;
 
 fun less(lhs: Any, rhs: Any) = lhs < rhs;
+
 fun greater(lhs: Any, rhs: Any) = lhs > rhs;
+
 fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 
 //fun min(a: Int, b: Int): Int = if (a < b) a else b;
@@ -15,6 +17,7 @@ fun equal(lhs: Any, rhs: Any) = lhs == rhs;
 external suspend fun delay(milliseconds: Int): Unit;
 
 external fun print(args: Any...): Unit;
+
 external fun println(args: Any...): Unit;
 
 external class <T> Array(size: Int) {
@@ -25,11 +28,18 @@ external class <T> Array(size: Int) {
     external fun get(index: Int): T;
 
     fun isEmpty() = this.size == 0;
+
     fun isNotEmpty() = this.size != 0;
 
     fun forEach(action: (T) -> Unit) {
         for (item in this) {
             action(item);
+        }
+    }
+
+    fun forEachIndexed(action: (Int, T) -> Unit) {
+        for (i in 0..this.size - 1) {
+            action(i, this[i]);
         }
     }
 
@@ -59,6 +69,37 @@ external class <T> Array(size: Int) {
         }
 
         return false;
+    }
+
+    fun filter(predicate: (T) -> Bool): Array<T> {
+        var result = MutableArray::<T>(0);
+        for (item in this) {
+            if (predicate(item)) {
+                result.push(item);
+            }
+        }
+
+        return result.toArray();
+    }
+
+    fun any(predicate: (T) -> Bool): Bool {
+        for (item in this) {
+            if (predicate(item)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fun all(predicate: (T) -> Bool): Bool {
+        for (item in this) {
+            if (!predicate(item)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     fun mutate(): MutableArray<T> {
@@ -101,7 +142,22 @@ external class String {
 
     external fun get(index: Int): String;
 
+    external fun substring(start: Int, end: Int): String;
+
+    external fun indexOf(substr: String): Int;
+
+    external fun trim(): String;
+
+    external fun toInt(): Int;
+
+    external fun toDouble(): Double;
+
+    external fun startsWith(prefix: String): Bool;
+
+    external fun endsWith(suffix: String): Bool;
+
     fun isEmpty() = this.size == 0;
+
     fun isNotEmpty() = this.size != 0;
 
 }

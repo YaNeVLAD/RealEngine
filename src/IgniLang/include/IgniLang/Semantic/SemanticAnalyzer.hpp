@@ -364,7 +364,6 @@ public:
 			}
 			return bestMatch;
 		};
-		// ==========================================
 
 		if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(calleeType))
 		{ // Generic class constructor
@@ -387,10 +386,8 @@ public:
 					// Here generic class is not yet instantiated, so we don't need to add 'this' as the first argument
 					for (std::size_t i = 0; i < argTypes.size() && i < ctorAst->parameters.size(); ++i)
 					{
-						const auto paramTypeAst = ctorAst->parameters[i].type.get();
-						TypeResolver::InferTypeArguments(argTypes[i], paramTypeAst, classTmpl->typeParams, explicitTypeArgs);
+						TypeResolver::InferTypeArguments(argTypes[i], ctorAst->parameters[i].type.get(), classTmpl->typeParams, explicitTypeArgs);
 					}
-
 					for (const auto& arg : explicitTypeArgs)
 					{
 						if (!arg)
@@ -430,9 +427,7 @@ public:
 		{ // Non-generic class constructor
 			const auto it = classType->methods.find(classType->name);
 			if (it == classType->methods.end())
-			{
-				IGNI_SEM_ERR("Constructor not found for class '" + classType->name + "'");
-			}
+				IGNI_SEM_ERR(node, "Constructor not found for class '" + classType->name + "'");
 
 			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
 			{
@@ -483,7 +478,7 @@ public:
 
 		if (!concreteTarget)
 		{
-			IGNI_SEM_ERR(node, "No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
+			IGNI_SEM_ERR("No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
 		}
 
 		callInfo.target = concreteTarget;
@@ -492,7 +487,7 @@ public:
 		{
 			if (!m_context.location.currentFunction || !m_context.location.currentFunction->isSuspend)
 			{
-				IGNI_SEM_ERR(node, "Suspend function '" + concreteTarget->name + "' can only be called from a coroutine or another suspend function. Use 'launch'.");
+				IGNI_SEM_ERR("Suspend function '" + concreteTarget->name + "' can only be called from a coroutine or another suspend function. Use 'launch'.");
 			}
 		}
 
@@ -505,43 +500,72 @@ public:
 			}
 
 			argTypes.insert(argTypes.begin(), sym->type);
-
 			callInfo.isConstructorCall = false;
 			isMethodCall = false;
-			callInfo.mangledTargetName = concreteTarget->name;
+		}
+
+		re::String rawTargetName = "";
+		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+		{
+			rawTargetName = id->name;
+		}
+		else if (const auto mem = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+		{
+			rawTargetName = mem->member;
 		}
 
 		if (isIndirectCall)
 		{
-			callInfo.mangledTargetName = "";
+			callInfo.dispatchMode = CallDispatchType::Indirect;
 		}
-		else if (concreteTarget->isExternal)
+		else if (callInfo.isSuperCall)
 		{
-			if (!isMethodCall && !callInfo.isConstructorCall)
-			{
-				if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-				{
-					callInfo.mangledTargetName = id->name;
-				}
-				else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-				{
-					callInfo.mangledTargetName = memAccess->member;
-				}
-			}
-			else
-			{
-				callInfo.mangledTargetName = "";
-			}
+			callInfo.dispatchMode = CallDispatchType::Static;
+			callInfo.asmLabel = concreteTarget->name;
+		}
+		else if (callInfo.isConstructorCall)
+		{
+			callInfo.dispatchMode = concreteTarget->isExternal ? CallDispatchType::Virtual : CallDispatchType::Static;
+			callInfo.asmLabel = concreteTarget->isExternal ? "init" : concreteTarget->name;
 		}
 		else
 		{
-			if (isMethodCall && !callInfo.isConstructorCall && !callInfo.isSuperCall && !isGenericInstantiation)
-			{ // Non-generic or external methods are marked as dynamic
-				callInfo.mangledTargetName = "";
+			bool isExternalClassMethod = false;
+
+			if (isMethodCall && !concreteTarget->paramTypes.empty())
+			{
+				if (auto classType = std::dynamic_pointer_cast<ClassType>(concreteTarget->paramTypes[0]))
+				{
+					isExternalClassMethod = classType->classDecl ? classType->classDecl->isExternal : true;
+				}
+				else if (auto genClass = std::dynamic_pointer_cast<GenericClassTemplate>(concreteTarget->paramTypes[0]))
+				{
+					isExternalClassMethod = genClass->astNode ? genClass->astNode->isExternal : true;
+				}
+			}
+
+			if (concreteTarget->isExternal)
+			{
+				if (isMethodCall)
+				{
+					callInfo.dispatchMode = CallDispatchType::Virtual;
+					callInfo.asmLabel = rawTargetName;
+				}
+				else
+				{
+					callInfo.dispatchMode = CallDispatchType::Native;
+					callInfo.asmLabel = rawTargetName;
+				}
+			}
+			else if (isMethodCall && !isGenericInstantiation && !isExternalClassMethod)
+			{
+				callInfo.dispatchMode = CallDispatchType::Virtual;
+				callInfo.asmLabel = rawTargetName;
 			}
 			else
 			{
-				callInfo.mangledTargetName = concreteTarget->name;
+				callInfo.dispatchMode = CallDispatchType::Static;
+				callInfo.asmLabel = concreteTarget->name;
 			}
 		}
 

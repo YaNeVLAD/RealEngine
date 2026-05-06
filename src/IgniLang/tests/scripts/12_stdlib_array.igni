@@ -1,0 +1,69 @@
+// EXPECT_OUTPUT:
+// 0
+// 1
+// 10
+// 20
+// 30
+// 0
+// 10
+// 1
+// 20
+// 2
+// 30
+// [20, 40, 60]
+// 1060
+// 1
+// 0
+// [10, 30]
+// 1
+// 0
+// 0
+// 1
+// [10, 20, 30]
+// END_EXPECT
+
+package program;
+
+fun main() {
+    val arr = arrayOf(10, 20, 30);
+
+    println(arr.isEmpty());
+    println(arr.isNotEmpty());
+
+    fun printItem(x: Int) { println(x); }
+    arr.forEach(printItem);
+
+    fun printIndexed(i: Int, x: Int) {
+        println(i);
+        println(x);
+    }
+    arr.forEachIndexed(printIndexed);
+
+    fun doubleIt(x: Int): Int = x * 2;
+    val mapped = arr.map(doubleIt);
+    println(mapped);
+
+    fun addAcc(acc: Int, x: Int): Int = acc + x;
+    val sum = arr.fold(1000, addAcc);
+    println(sum);
+
+    println(arr.contains(20));
+    println(arr.contains(99));
+
+    fun notTwenty(x: Int): Bool = x != 20;
+    val filtered = arr.filter(notTwenty);
+    println(filtered);
+
+    fun isThirty(x: Int): Bool = x == 30;
+    fun isNinetyNine(x: Int): Bool = x == 99;
+    println(arr.any(isThirty));
+    println(arr.any(isNinetyNine));
+
+    fun gtFifty(x: Int): Bool = x > 50;
+    fun gtZero(x: Int): Bool = x > 0;
+    println(arr.all(gtFifty));
+    println(arr.all(gtZero));
+
+    val mutArr = arr.mutate();
+    println(mutArr);
+}

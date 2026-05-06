@@ -92,27 +92,107 @@ void InitArrayMethods(re::rvm::VirtualMachine* vm, const re::rvm::TypeInfoPtr& a
 	});
 }
 
-void InitStringMethods(const re::rvm::TypeInfoPtr& arrayType)
+void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 {
 	using namespace re::rvm;
 
-	arrayType->AddNativeGetter("size", [](const Value& obj) -> Value {
+	auto getString = [](const Value& value) -> re::String {
+		return std::get<re::String>(value);
+	};
+
+	stringType->AddNativeGetter("size", [](const Value& obj) -> Value {
 		const auto& str = std::get<re::String>(obj);
 
 		return static_cast<Int>(str.Size());
 	});
 
-	arrayType->AddNativeGetter("length", [](const Value& obj) -> Value {
+	stringType->AddNativeGetter("length", [](const Value& obj) -> Value {
 		const auto& str = std::get<re::String>(obj);
 
 		return static_cast<Int>(str.Length());
 	});
 
-	arrayType->AddNativeMethod("get", 1, [](const std::vector<Value>& args) -> Value {
-		const auto arr = std::get<re::String>(args[0]);
+	stringType->AddNativeMethod("get", 1, [](const std::vector<Value>& args) -> Value {
+		const auto str = std::get<re::String>(args[0]);
 		const auto index = std::get<Int>(args[1]);
 
-		return re::String(arr[index]);
+		if (index < 0 || index >= str.Size())
+		{
+			return re::String{};
+		}
+
+		return re::String(str[index]);
+	});
+
+	stringType->AddNativeMethod("substring", 2, [getString](const std::vector<Value>& args) -> Value {
+		const auto& s = getString(args[0]);
+
+		const int start = static_cast<int>(std::get<Int>(args[1]));
+		const int end = static_cast<int>(std::get<Int>(args[2]));
+
+		if (start < 0 || end > s.Size() || start > end)
+		{
+			return re::String{};
+		}
+
+		return s.Substring(start, end - start);
+	});
+
+	stringType->AddNativeMethod("indexOf", 1, [getString](const std::vector<Value>& args) -> Value {
+		const auto s = getString(args[0]);
+		const auto sub = getString(args[1]);
+
+		const auto pos = s.Find(sub);
+
+		return pos == re::String::NPos ? static_cast<Int>(-1) : static_cast<Int>(pos);
+	});
+
+	stringType->AddNativeMethod("trim", 0, [getString](const std::vector<Value>& args) -> Value {
+		auto s = getString(args[0]).ToString();
+		s.erase(0, s.find_first_not_of(" \t\n\r"));
+		s.erase(s.find_last_not_of(" \t\n\r") + 1);
+
+		return s;
+	});
+
+	stringType->AddNativeMethod("toInt", 0, [getString](const std::vector<Value>& args) -> Value {
+		try
+		{
+			return std::stoll(getString(args[0]).ToString());
+		}
+		catch (...)
+		{
+			return 0;
+		}
+	});
+
+	stringType->AddNativeMethod("toDouble", 0, [getString](const std::vector<Value>& args) -> Value {
+		try
+		{
+			return std::stod(getString(args[0]).ToString());
+		}
+		catch (...)
+		{
+			return 0;
+		}
+	});
+
+	stringType->AddNativeMethod("startsWith", 1, [getString](const std::vector<Value>& args) -> Value {
+		const auto s = getString(args[0]).ToString();
+		const auto prefix = getString(args[1]).ToString();
+
+		return s.compare(0, prefix.size(), prefix) == 0;
+	});
+
+	stringType->AddNativeMethod("endsWith", 1, [getString](const std::vector<Value>& args) -> Value {
+		const auto s = getString(args[0]).ToString();
+		const auto suffix = getString(args[1]).ToString();
+		if (s.size() < suffix.size())
+		{
+			return 0;
+		}
+
+		return s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 	});
 }
 
@@ -213,7 +293,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		return returnArr;
 	});
 
-	vm->RegisterNative("arrayOf", [vm](const std::vector<Value>& args) -> Value {
+	vm->RegisterNative("mutableArrayOf", [vm](const std::vector<Value>& args) -> Value {
 		if (!std::holds_alternative<ArrayInstancePtr>(args[0]))
 		{
 			return Null;

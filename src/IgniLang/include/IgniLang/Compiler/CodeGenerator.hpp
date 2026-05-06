@@ -149,7 +149,7 @@ public:
 				{
 					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
-						if (!fun->typeParams.empty())
+						if (!fun->typeParams.empty() || fun->isExternal)
 						{
 							continue;
 						}
@@ -399,124 +399,24 @@ public:
 			? node->arguments.size() - callInfo.varargCount + 1
 			: node->arguments.size();
 
+		bool hasSelf = false;
 		if (callInfo.isSuperCall)
 		{
 			m_out << "GET " << GetAsmName("this") << "\n";
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-			if (callInfo.isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
-			}
-
-			m_out << "CALL " << callInfo.mangledTargetName << " " << (passedArgs + 1) << "\n";
-			return;
+			hasSelf = true;
 		}
-
-		if (callInfo.isConstructorCall)
+		else if (callInfo.isConstructorCall)
 		{
-			m_out << "NEW \"" << callInfo.mangledClassName << "\"\n"; // Берем имя из таблицы!
+			m_out << "NEW \"" << callInfo.mangledClassName << "\"\n";
 			m_out << "DUP\n";
-
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-			if (callInfo.isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
-			}
-
-			if (!callInfo.mangledTargetName.Empty())
-			{
-				if (m_externals.contains(callInfo.mangledTargetName))
-				{
-					m_out << "NATIVE \"" << callInfo.mangledTargetName << "\" " << (passedArgs + 1) << "\n";
-				}
-				else
-				{
-					m_out << "CALL " << callInfo.mangledTargetName << " " << (passedArgs + 1) << "\n";
-				}
-			}
-			else if (passedArgs > 0)
-			{
-				m_out << "CALL_METHOD \"init\" " << passedArgs << "\n";
-			}
-
-			m_out << "POP\n";
-			return;
+			hasSelf = true;
 		}
-
-		if (!callInfo.mangledTargetName.Empty())
+		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
 		{
-			if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()); memberAccess)
-			{
-				if (memberAccess->object)
-				{
-					memberAccess->object->Accept(*this);
-				}
-			}
-
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-			if (callInfo.isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
-			}
-
-			const bool isMethod = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
-			const std::size_t totalArgs = isMethod ? (passedArgs + 1) : passedArgs;
-
-			if (m_externals.contains(callInfo.mangledTargetName))
-			{
-				m_out << "NATIVE \"" << callInfo.mangledTargetName << "\" " << totalArgs << "\n";
-			}
-			else
-			{
-				m_out << "CALL " << callInfo.mangledTargetName << " " << totalArgs << "\n";
-			}
-
-			return;
+			memAccess->object->Accept(*this);
+			hasSelf = true;
 		}
-
-		if (const auto memberAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-		{
-			if (memberAccess->object)
-			{
-				memberAccess->object->Accept(*this);
-			}
-
-			for (const auto& arg : node->arguments)
-			{
-				if (arg)
-				{
-					arg->Accept(*this);
-				}
-			}
-
-			if (callInfo.isVarargCall)
-			{
-				m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
-			}
-
-			m_out << "CALL_METHOD \"" << memberAccess->member << "\" " << passedArgs << "\n";
-			return;
-		}
-
-		if (node->callee)
+		else if (callInfo.dispatchMode == CallDispatchType::Indirect)
 		{
 			node->callee->Accept(*this);
 		}
@@ -534,7 +434,28 @@ public:
 			m_out << "PACK_ARRAY " << callInfo.varargCount << "\n";
 		}
 
-		m_out << "CALL_INDIRECT " << passedArgs << "\n";
+		const std::size_t totalArgs = hasSelf ? passedArgs + 1 : passedArgs;
+
+		switch (callInfo.dispatchMode)
+		{
+		case CallDispatchType::Static:
+			m_out << "CALL " << callInfo.asmLabel << " " << totalArgs << "\n";
+			break;
+		case CallDispatchType::Virtual:
+			m_out << "CALL_METHOD \"" << callInfo.asmLabel << "\" " << passedArgs << "\n";
+			break;
+		case CallDispatchType::Native:
+			m_out << "NATIVE \"" << callInfo.asmLabel << "\" " << totalArgs << "\n";
+			break;
+		case CallDispatchType::Indirect:
+			m_out << "CALL_INDIRECT " << passedArgs << "\n";
+			break;
+		}
+
+		if (callInfo.isConstructorCall)
+		{
+			m_out << "POP\n";
+		}
 	}
 
 	void Visit(const ast::UnaryExpr* node) override
@@ -944,7 +865,7 @@ public:
 		{
 			const auto& callInfo = m_semanticAnalyzer.GetBindings().callInfo.at(callNode);
 
-			re::String targetName = callInfo.mangledTargetName;
+			re::String targetName = callInfo.asmLabel;
 
 			if (targetName.Empty())
 			{
