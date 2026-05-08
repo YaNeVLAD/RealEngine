@@ -82,7 +82,7 @@ public:
 		std::erase_if(program->statements, [&](const std::unique_ptr<ast::Statement>& stmt) {
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
-				return fun->typeParams.empty() && !fun->isExternal && !m_reachableNames.contains(GetMangledName(fun));
+				return !m_reachableNames.contains(GetMangledName(fun));
 			}
 
 			return false;
@@ -100,15 +100,15 @@ public:
 				std::erase_if(classDecl->members, [&](const std::unique_ptr<ast::Decl>& member) {
 					if (const auto mFun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
-						return !mFun->isExternal && !m_reachableNames.contains(GetMangledName(mFun));
+						return !m_reachableNames.contains(GetMangledName(mFun));
 					}
 					if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 					{
-						return !mCtor->isExternal && !m_reachableNames.contains(GetMangledName(mCtor));
+						return !m_reachableNames.contains(GetMangledName(mCtor));
 					}
 					if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 					{
-						return !mDtor->isExternal && !m_reachableNames.contains(GetMangledName(mDtor));
+						return !m_reachableNames.contains(GetMangledName(mDtor));
 					}
 
 					return false;
