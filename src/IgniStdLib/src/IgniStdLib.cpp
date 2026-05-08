@@ -96,8 +96,8 @@ void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 {
 	using namespace re::rvm;
 
-	auto getString = [](const Value& value) -> re::String {
-		return std::get<re::String>(value);
+	auto getString = [](const Value& value) -> std::string {
+		return std::get<re::String>(value).ToString();
 	};
 
 	stringType->AddNativeGetter("size", [](const Value& obj) -> Value {
@@ -130,25 +130,25 @@ void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 		const int start = static_cast<int>(std::get<Int>(args[1]));
 		const int end = static_cast<int>(std::get<Int>(args[2]));
 
-		if (start < 0 || end > s.Size() || start > end)
+		if (start < 0 || end > s.size() || start > end)
 		{
 			return re::String{};
 		}
 
-		return s.Substring(start, end - start);
+		return s.substr(start, end - start);
 	});
 
 	stringType->AddNativeMethod("indexOf", 1, [getString](const std::vector<Value>& args) -> Value {
 		const auto s = getString(args[0]);
 		const auto sub = getString(args[1]);
 
-		const auto pos = s.Find(sub);
+		const auto pos = s.find(sub);
 
 		return pos == re::String::NPos ? static_cast<Int>(-1) : static_cast<Int>(pos);
 	});
 
 	stringType->AddNativeMethod("trim", 0, [getString](const std::vector<Value>& args) -> Value {
-		auto s = getString(args[0]).ToString();
+		auto s = getString(args[0]);
 		s.erase(0, s.find_first_not_of(" \t\n\r"));
 		s.erase(s.find_last_not_of(" \t\n\r") + 1);
 
@@ -158,7 +158,7 @@ void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 	stringType->AddNativeMethod("toInt", 0, [getString](const std::vector<Value>& args) -> Value {
 		try
 		{
-			return std::stoll(getString(args[0]).ToString());
+			return std::stoll(getString(args[0]));
 		}
 		catch (...)
 		{
@@ -169,7 +169,7 @@ void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 	stringType->AddNativeMethod("toDouble", 0, [getString](const std::vector<Value>& args) -> Value {
 		try
 		{
-			return std::stod(getString(args[0]).ToString());
+			return std::stod(getString(args[0]));
 		}
 		catch (...)
 		{
@@ -178,15 +178,15 @@ void InitStringMethods(const re::rvm::TypeInfoPtr& stringType)
 	});
 
 	stringType->AddNativeMethod("startsWith", 1, [getString](const std::vector<Value>& args) -> Value {
-		const auto s = getString(args[0]).ToString();
-		const auto prefix = getString(args[1]).ToString();
+		const auto s = getString(args[0]);
+		const auto prefix = getString(args[1]);
 
 		return s.compare(0, prefix.size(), prefix) == 0;
 	});
 
 	stringType->AddNativeMethod("endsWith", 1, [getString](const std::vector<Value>& args) -> Value {
-		const auto s = getString(args[0]).ToString();
-		const auto suffix = getString(args[1]).ToString();
+		const auto s = getString(args[0]);
+		const auto suffix = getString(args[1]);
 		if (s.size() < suffix.size())
 		{
 			return 0;

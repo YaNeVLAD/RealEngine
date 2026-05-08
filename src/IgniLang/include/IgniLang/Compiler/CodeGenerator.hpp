@@ -967,8 +967,22 @@ private:
 			m_out << "SET " << DeclareLocal("this") << "\n";
 		}
 
-		// Injecting member initializers
 		const re::String thisAsmName = GetAsmName("this");
+		if (const auto classType = m_semanticAnalyzer.GetClassType(classDecl->name))
+		{ // Initialize primary ctor fields
+			for (const auto& [name, _] : ctor->parameters)
+			{
+				if (classType->fields.contains(name))
+				{
+					m_out << "GET " << thisAsmName << "\n";
+					m_out << "GET " << GetAsmName(name) << "\n";
+					m_out << "SET_PROPERTY \"" << name << "\"\n";
+					m_out << "CONST 0\nPOP\n";
+				}
+			}
+		}
+
+		// Injecting member initializers
 		for (const auto& member : classDecl->members)
 		{
 			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))

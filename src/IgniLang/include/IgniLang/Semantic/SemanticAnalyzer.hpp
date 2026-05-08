@@ -1026,6 +1026,9 @@ public:
 			}
 		}
 
+		m_context.env.PushScope();
+		m_context.env.Define("this", classType, false);
+
 		for (const auto& member : node->members)
 		{ // Register member values
 			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
@@ -1065,6 +1068,8 @@ public:
 				classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
 			}
 		}
+
+		m_context.env.PopScope();
 
 		for (const auto& member : node->members)
 		{ // Register member functions
