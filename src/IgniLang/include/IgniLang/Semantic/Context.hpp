@@ -19,6 +19,11 @@ struct TraversalContext
 	bool isInsideLaunch = false;
 };
 
+struct LambdaMeta
+{
+	re::String mangledName;
+};
+
 struct SemanticContext
 {
 	Environment env;
@@ -39,6 +44,9 @@ struct SemanticContext
 	std::unordered_set<const ast::Node*> m_instantiatedNodes;
 	std::unordered_map<re::String, std::shared_ptr<ClassType>> instantiatedClasses;
 	std::unordered_map<re::String, std::shared_ptr<FunctionType>> instantiatedFunctions;
+
+	std::size_t lambdaCounter = 0;
+	std::vector<const ast::LambdaExpr*> allLambdas;
 
 	std::shared_ptr<ClassType> tInt = std::make_shared<ClassType>("Int");
 	std::shared_ptr<ClassType> tDouble = std::make_shared<ClassType>("Double");

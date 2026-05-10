@@ -38,6 +38,8 @@ namespace igni::ast
 	V(MemberAccessExpr) \
 	V(ConstructorDecl)  \
 	V(DestructorDecl)   \
+	V(TypeCastExpr)     \
+	V(LambdaExpr)       \
 	V(Program)
 
 #define FORWARD_DECLARE_AST_NODE(Name) struct Name;
@@ -127,6 +129,12 @@ struct TypeNode : Node
 
 	virtual std::unique_ptr<TypeNode> Clone(const TypeEnv* env = nullptr) const = 0;
 	std::unique_ptr<Node> CloneNode(const TypeEnv* env = nullptr) const override { return Clone(env); }
+};
+
+struct Parameter
+{
+	re::String name;
+	std::unique_ptr<TypeNode> type;
 };
 
 // ==========================================
@@ -853,12 +861,6 @@ struct VarDecl final : Visitable<VarDecl, Decl>
 
 struct FunDecl final : Visitable<FunDecl, Decl>
 {
-	struct Parameter
-	{
-		re::String name;
-		std::unique_ptr<TypeNode> type;
-	};
-
 	re::String name;
 	std::vector<Parameter> parameters;
 	bool isVararg = false;
@@ -998,7 +1000,7 @@ struct ClassDecl final : Visitable<ClassDecl, Decl>
 struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 {
 	re::String name;
-	std::vector<FunDecl::Parameter> parameters;
+	std::vector<Parameter> parameters;
 	std::unique_ptr<Block> body;
 
 	bool isVararg = false;
@@ -1029,7 +1031,7 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 		clone->isVararg = isVararg;
 		for (const auto& [pName, type] : parameters)
 		{
-			FunDecl::Parameter newP;
+			Parameter newP;
 			newP.name = pName;
 			if (type)
 			{
@@ -1095,6 +1097,52 @@ struct ImportDecl final : Visitable<ImportDecl>
 		auto clone = std::make_unique<ImportDecl>();
 		clone->path = path;
 		clone->isStar = isStar;
+
+		return clone;
+	}
+};
+
+struct TypeCastExpr : Visitable<TypeCastExpr, Expr>
+{
+	std::unique_ptr<Expr> expr;
+	std::unique_ptr<TypeNode> targetType;
+
+	void Print(int) const override
+	{
+	}
+
+	std::unique_ptr<Expr> CloneExpr(const TypeEnv* env) const override
+	{
+		auto clone = std::make_unique<TypeCastExpr>();
+		clone->expr = expr->CloneExpr(env);
+		clone->targetType = targetType->Clone(env);
+
+		return clone;
+	}
+};
+
+struct LambdaExpr : Visitable<LambdaExpr, Expr>
+{
+	std::vector<re::String> captures;
+
+	std::vector<Parameter> parameters;
+	std::unique_ptr<TypeNode> returnType;
+	std::unique_ptr<Block> body;
+
+	bool isVararg = false;
+
+	void Print(int) const override
+	{
+	}
+
+	std::unique_ptr<Expr> CloneExpr(const TypeEnv* env) const override
+	{
+		auto clone = std::make_unique<LambdaExpr>();
+
+		clone->captures = captures;
+		clone->returnType = returnType->Clone(env);
+
+		clone->isVararg = isVararg;
 
 		return clone;
 	}

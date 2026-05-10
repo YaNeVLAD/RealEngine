@@ -43,6 +43,11 @@ struct FunMeta
 	re::String parentClass;
 };
 
+struct LambdaMeta
+{
+	re::String mangledName;
+};
+
 class IGNI_API BindingContext
 {
 public:
@@ -59,6 +64,10 @@ public:
 	std::unordered_map<const ast::FunDecl*, re::String> mangledFunNames;
 
 	std::unordered_map<const ast::Node*, FunMeta> funMeta;
+
+	std::unordered_map<const ast::TypeCastExpr*, re::String> castTargets;
+
+	std::unordered_map<const ast::LambdaExpr*, LambdaMeta> lambdaMeta;
 
 	void SetExpressionType(const ast::Expr* expr, std::shared_ptr<sem::SemanticType> type)
 	{

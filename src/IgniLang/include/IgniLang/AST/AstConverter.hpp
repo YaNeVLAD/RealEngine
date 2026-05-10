@@ -453,7 +453,6 @@ private:
 			{
 			case "ValDecl"_hs:
 			case "VarDecl"_hs:
-			case "FunDecl"_hs:
 				outStmts.push_back(ConvertActualDecl(actualStmt.get()));
 				break;
 			case "return"_hs: {
@@ -501,6 +500,18 @@ private:
 
 		switch (exprNode->symbol.Hashed())
 		{
+		case "CastExpr"_hs: {
+			// CastExpr -> CastExpr [0] as [1] Type [2]
+			if (exprNode->children.size() == 3 && exprNode->children[1]->symbol.Hashed() == "as"_hs)
+			{
+				auto castExpr = std::make_unique<ast::TypeCastExpr>();
+				castExpr->token = *exprNode->children[1]->token;
+				castExpr->expr = ConvertExpr(exprNode->children[0].get());
+				castExpr->targetType = ConvertType(exprNode->children[2].get());
+				return castExpr;
+			}
+			break;
+		}
 		case "Designator"_hs: {
 			// Designator -> ident [0] OptExprTypeArgs [1]
 			if (exprNode->children.size() == 2 && exprNode->children[0]->symbol.Hashed() == "ident"_hs)
@@ -579,6 +590,50 @@ private:
 				return ConvertExpr(exprNode->children[1].get());
 			case "Designator"_hs:
 				return ConvertExpr(child.get());
+			case "LambdaExpr"_hs: {
+				auto lambda = std::make_unique<ast::LambdaExpr>();
+				lambda->token = *child->children[0]->token; // Токен 'fun'
+
+				int paramsIndex = 2;
+				int bodyIndex = 5;
+
+				// fun [0] [ [1] CaptureList [2] ] [3] ( [4] OptFormPars [5] ) [6] OptColonType [7] LambdaBody [8]
+				if (child->children[1]->symbol.Hashed() == "["_hs)
+				{
+					ExtractCaptures(child->children[2].get(), lambda->captures);
+					paramsIndex = 5;
+					bodyIndex = 8;
+				}
+
+				ast::FunDecl tempFun;
+				ExtractParameters(child->children[paramsIndex].get(), &tempFun);
+				lambda->parameters = std::move(tempFun.parameters);
+				lambda->isVararg = tempFun.isVararg;
+
+				if (const auto& optColon = child->children[paramsIndex + 2]; optColon->children.size() == 2)
+				{
+					lambda->returnType = ConvertType(optColon->children[1].get());
+				}
+
+				if (const auto& funBody = child->children[bodyIndex];
+					funBody->children[0]->symbol.Hashed() == "Block"_hs)
+				{
+					lambda->body = ConvertBlock(funBody->children[0].get());
+				}
+				else if (funBody->children[0]->symbol.Hashed() == "="_hs)
+				{
+					auto expr = ConvertExpr(funBody->children[1].get());
+					auto returnStatement = std::make_unique<ast::ReturnStmt>();
+					returnStatement->token = *funBody->children[0]->token;
+					returnStatement->expr = std::move(expr);
+
+					lambda->body = std::make_unique<ast::Block>();
+					lambda->body->token = returnStatement->token;
+					lambda->body->statements.push_back(std::move(returnStatement));
+				}
+
+				return lambda;
+			}
 			default:
 				throw std::invalid_argument("Invalid primary expression");
 			}
@@ -628,6 +683,7 @@ private:
 			break;
 		}
 
+		// Узел-обёртка: просто проваливаемся вниз
 		if (exprNode->children.size() == 1)
 		{
 			if (exprNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
@@ -637,6 +693,7 @@ private:
 			return ConvertExpr(exprNode->children[0].get());
 		}
 
+		// Бинарные операторы (включая Assign)
 		if (exprNode->children.size() == 3)
 		{
 			if (exprNode->children[1]->symbol.Hashed() == "="_hs)
@@ -699,9 +756,6 @@ private:
 
 	static std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
-		// ForStmt -> for [0] ( [1] ident [2] in [3] Expr [4] .. [5] Expr [6] ) [7] Block [8]
-		// ForStmt -> for [0] ( [1] ident [2] in [3] Expr [4] ) [5] Block [6]
-
 		auto stmt = std::make_unique<ast::ForStmt>();
 		stmt->token = *forNode->children[0]->token; // Токен 'for'
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
@@ -790,7 +844,6 @@ private:
 
 	static void ExtractTypeParams(const CstNode* optTypeParams, std::vector<ast::GenericTypeParam>& outParams)
 	{
-		// OptTypeParams -> < TypeParams > | \e
 		if (!optTypeParams || optTypeParams->children.empty() || optTypeParams->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
 			return;
@@ -801,7 +854,6 @@ private:
 
 	static void ExtractTypeParamList(const CstNode* typeParamsNode, std::vector<ast::GenericTypeParam>& outParams)
 	{
-		// TypeParams -> TypeParams , TypeParam | TypeParam
 		if (typeParamsNode->children.size() == 3)
 		{
 			ExtractTypeParamList(typeParamsNode->children[0].get(), outParams);
@@ -815,12 +867,12 @@ private:
 
 	static ast::GenericTypeParam ParseTypeParam(const CstNode* typeParamNode)
 	{
-		// TypeParam -> ident OptColonType
+		// TypeParam -> ident [0] OptColonType [1]
 		ast::GenericTypeParam param;
 		param.name = typeParamNode->children[0]->token->lexeme;
 
 		if (const auto& optColon = typeParamNode->children[1]; optColon->children.size() == 2)
-		{ // OptColonType -> : Type
+		{ // OptColonType -> : [0] Type [1]
 			param.boundType = ConvertType(optColon->children[1].get());
 		}
 		else
@@ -831,25 +883,23 @@ private:
 		return param;
 	}
 
-	static ast::FunDecl::Parameter ParseFormPar(const CstNode* node)
+	static ast::Parameter ParseFormPar(const CstNode* node)
 	{
-		// FormPar -> ident : Type
-		ast::FunDecl::Parameter p;
+		ast::Parameter p;
 		p.name = node->children[0]->token->lexeme;
 		p.type = ConvertType(node->children[2].get());
 		return p;
 	}
 
-	static ast::FunDecl::Parameter ParseVarargPar(const CstNode* node)
+	static ast::Parameter ParseVarargPar(const CstNode* node)
 	{
-		// VarargPar -> ident : Type ...
-		ast::FunDecl::Parameter p;
+		ast::Parameter p;
 		p.name = node->children[0]->token->lexeme;
 		p.type = ConvertType(node->children[2].get());
 		return p;
 	}
 
-	static void ExtractNormalPars(const CstNode* node, std::vector<ast::FunDecl::Parameter>& outParams)
+	static void ExtractNormalPars(const CstNode* node, std::vector<ast::Parameter>& outParams)
 	{
 		if (node->children.size() != 1)
 		{
@@ -970,7 +1020,7 @@ private:
 
 		const auto typeNode = ConvertType(parNode->children[3].get());
 
-		ast::FunDecl::Parameter param;
+		ast::Parameter param;
 		param.name = name;
 		param.type = typeNode->Clone();
 		ctorDecl->parameters.push_back(std::move(param));
@@ -1018,6 +1068,20 @@ private:
 			exprStmt->expr = std::move(assignExpr);
 
 			ctorDecl->body->statements.push_back(std::move(exprStmt));
+		}
+	}
+
+	static void ExtractCaptures(const CstNode* captureList, std::vector<re::String>& outCaptures)
+	{
+		// CaptureList -> CaptureList [0] , [1] ident [2] | ident [0]
+		if (captureList->children.size() == 3)
+		{
+			ExtractCaptures(captureList->children[0].get(), outCaptures);
+			outCaptures.emplace_back(captureList->children[2]->token->lexeme);
+		}
+		else if (captureList->children.size() == 1)
+		{
+			outCaptures.emplace_back(captureList->children[0]->token->lexeme);
 		}
 	}
 };

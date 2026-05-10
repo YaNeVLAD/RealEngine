@@ -223,6 +223,12 @@ public:
 				m_out << "RETURN\n\n";
 			}
 		}
+
+		m_out << "// --- Lambda Definitions ---\n";
+		for (const auto* lambda : m_semanticAnalyzer.GetLambdas())
+		{
+			GenerateLambdaBody(lambda);
+		}
 	}
 
 	void Visit(const ast::MemberAccessExpr* node) override
@@ -923,6 +929,40 @@ public:
 		}
 	}
 
+	void Visit(const ast::TypeCastExpr* node) override
+	{
+		if (node->expr)
+		{
+			node->expr->Accept(*this);
+		}
+
+		const re::String targetName = m_semanticAnalyzer.GetBindings().castTargets.at(node);
+
+		m_out << "CAST \"" << targetName << "\"\n";
+	}
+
+	void Visit(const ast::LambdaExpr* node) override
+	{
+		for (const auto& cap : node->captures)
+		{
+			if (auto upIt = std::ranges::find(m_currentUpvalues, cap); upIt != m_currentUpvalues.end())
+			{
+				m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
+			}
+			else if (IsLocal(cap))
+			{
+				m_out << "GET " << GetAsmName(cap) << "\n";
+			}
+			else
+			{
+				m_out << "GET_GLOBAL \"" << cap << "\"\n";
+			}
+		}
+
+		const auto& lambdaName = m_semanticAnalyzer.GetBindings().lambdaMeta.at(node).mangledName;
+		m_out << "MAKE_CLOSURE " << lambdaName << " " << node->captures.size() << "\n";
+	}
+
 private:
 	std::ostream& m_out;
 	std::size_t m_labelCount = 0;
@@ -1113,6 +1153,35 @@ private:
 		{
 			for (const auto& s : fun->body->statements)
 			{ // Avoiding recursive code generation by manually calling Accept for function statements
+				if (s)
+				{
+					s->Accept(*this);
+				}
+			}
+		}
+
+		m_out << "CONST 0\nRETURN\n\n";
+	}
+
+	void GenerateLambdaBody(const ast::LambdaExpr* lambda)
+	{
+		const auto& lambdaName = m_semanticAnalyzer.GetBindings().lambdaMeta.at(lambda).mangledName;
+		m_out << "FUN " << lambdaName << "\n";
+
+		m_currentLocals.clear();
+		m_varCounter = 0;
+
+		m_currentUpvalues = lambda->captures;
+
+		for (auto it = lambda->parameters.rbegin(); it != lambda->parameters.rend(); ++it)
+		{
+			m_out << "SET " << DeclareLocal(it->name) << "\n";
+		}
+
+		if (lambda->body)
+		{
+			for (const auto& s : lambda->body->statements)
+			{
 				if (s)
 				{
 					s->Accept(*this);

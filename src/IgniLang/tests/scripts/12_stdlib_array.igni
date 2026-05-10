@@ -30,37 +30,37 @@ fun main() {
     println(arr.isEmpty());
     println(arr.isNotEmpty());
 
-    fun printItem(x: Int) { println(x); }
+    val printItem = fun(x: Int) { println(x); };
     arr.forEach(printItem);
 
-    fun printIndexed(i: Int, x: Int) {
+    val printIndexed = fun(i: Int, x: Int) {
         println(i);
         println(x);
-    }
+    };
     arr.forEachIndexed(printIndexed);
 
-    fun doubleIt(x: Int): Int = x * 2;
+    val doubleIt = fun(x: Int): Int = x * 2;
     val mapped = arr.map(doubleIt);
     println(mapped);
 
-    fun addAcc(acc: Int, x: Int): Int = acc + x;
+    val addAcc = fun(acc: Int, x: Int): Int = acc + x;
     val sum = arr.fold(1000, addAcc);
     println(sum);
 
     println(arr.contains(20));
     println(arr.contains(99));
 
-    fun notTwenty(x: Int): Bool = x != 20;
+    val notTwenty = fun(x: Int): Bool = x != 20;
     val filtered = arr.filter(notTwenty);
     println(filtered);
 
-    fun isThirty(x: Int): Bool = x == 30;
-    fun isNinetyNine(x: Int): Bool = x == 99;
+    val isThirty = fun(x: Int): Bool = x == 30;
+    val isNinetyNine = fun(x: Int): Bool = x == 99;
     println(arr.any(isThirty));
     println(arr.any(isNinetyNine));
 
-    fun gtFifty(x: Int): Bool = x > 50;
-    fun gtZero(x: Int): Bool = x > 0;
+    val gtFifty = fun(x: Int): Bool = x > 50;
+    val gtZero = fun(x: Int): Bool = x > 0;
     println(arr.all(gtFifty));
     println(arr.all(gtZero));
 

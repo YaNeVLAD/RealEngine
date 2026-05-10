@@ -749,7 +749,7 @@ InterpreterResult VirtualMachine::Run()
 			if (!m_activeCoro->isAwaitedByHost)
 			{
 				m_activeCoro->stack.push_back(yieldedVal);
-				m_microtasks.push(m_activeCoro);
+				m_microtasks.emplace(m_activeCoro);
 			}
 			m_activeCoro->isAwaitedByHost = false;
 
@@ -805,6 +805,53 @@ InterpreterResult VirtualMachine::Run()
 
 			Push(coroutine);
 
+			break;
+		}
+
+		case OpCode::Cast: {
+			Value typeNameVal = READ_CONSTANT();
+			auto targetName = std::get<String>(typeNameVal);
+
+			Value val = Pop();
+
+			if (targetName == "Int")
+			{
+				if (auto* d = std::get_if<Double>(&val))
+				{
+					Push(static_cast<Int>(*d));
+				}
+				else if (std::holds_alternative<Int>(val))
+				{
+					Push(val);
+				}
+				else
+				{
+					EXIT_WITH_ERROR("Runtime Error: Cannot cast to Int");
+				}
+			}
+			else if (targetName == "Double")
+			{
+				if (auto* i = std::get_if<Int>(&val))
+				{
+					Push(static_cast<Double>(*i));
+				}
+				else if (std::holds_alternative<Double>(val))
+				{
+					Push(val);
+				}
+				else
+				{
+					EXIT_WITH_ERROR("Runtime Error: Cannot cast to Double");
+				}
+			}
+			else
+			{
+				// Для классов (Downcasting).
+				// В рантайме объекты это просто InstancePtr. Каст объекта не меняет
+				// его представления в памяти, поэтому мы просто возвращаем его на стек.
+				// (Опционально можно проверить GetType(val)->name == targetName)
+				Push(val);
+			}
 			break;
 		}
 

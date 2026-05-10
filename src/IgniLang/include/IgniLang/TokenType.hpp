@@ -32,6 +32,7 @@ namespace igni
     TOKEN(KwSuspend,    R"(suspend\b)",        "suspend")      \
     TOKEN(KwAwait,      R"(await\b)",          "await")        \
     TOKEN(KwLaunch,     R"(launch\b)",         "launch")       \
+    TOKEN(KwAs,         R"(as\b)",             "as")           \
     /* Literals */                                             \
     TOKEN(FloatConst,   R"([0-9]+\.[0-9]+)",   "floatCon")     \
     TOKEN(IntConst,     R"([0-9]+)",           "intCon")       \

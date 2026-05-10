@@ -146,6 +146,11 @@ public:
 		return m_context.bindings;
 	}
 
+	const std::vector<const ast::LambdaExpr*>& GetLambdas() const
+	{
+		return m_context.allLambdas;
+	}
+
 	// ==========================================
 	// EXPRESSIONS
 	// ==========================================
@@ -373,7 +378,7 @@ public:
 				for (const auto& member : classTmpl->astNode->members)
 				{ // Finding constructor in class members
 					if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-					{ // TODO: Add generics overload for constructors
+					{ // TODO: Think of generics overloads for constructors
 						ctorAst = ctor;
 						break;
 					}
@@ -1136,13 +1141,95 @@ public:
 		m_currentExprType = m_context.tUnit;
 	}
 
+	void Visit(const ast::TypeCastExpr* node) override
+	{
+		const auto srcType = Evaluate(node->expr.get());
+
+		const auto dstType = TypeResolver::Resolve(node->targetType.get(), m_context);
+		if (!dstType)
+		{
+			IGNI_SEM_ERR(node, "Unknown target type for cast");
+		}
+
+		// TODO: Add type casting correctness checks (e.g. String to Int -> Error)
+
+		m_context.bindings.castTargets[node] = dstType->name;
+
+		m_currentExprType = dstType;
+	}
+
+	void Visit(const ast::LambdaExpr* node) override
+	{
+		re::String lambdaName = "__lambda_" + std::to_string(m_context.lambdaCounter++);
+
+		const auto funType = std::make_shared<FunctionType>(lambdaName);
+		funType->isVararg = node->isVararg;
+
+		// 2. Создаем изолированный Scope для тела лямбды
+		m_context.env.PushScope();
+
+		// 3. Вносим ЗАХВАЧЕННЫЕ переменные в Scope лямбды
+		for (const auto& cap : node->captures)
+		{
+			const Symbol* sym = m_context.env.Resolve(cap);
+			if (!sym)
+			{
+				IGNI_SEM_ERR(node, "Cannot capture undefined variable '" + cap + "'");
+			}
+
+			// Определяем их внутри лямбды
+			m_context.env.Define(cap, sym->type, false);
+		}
+
+		// 4. Вносим ПАРАМЕТРЫ в Scope лямбды
+		for (const auto& [name, type] : node->parameters)
+		{
+			auto pType = TypeResolver::Resolve(type.get(), m_context);
+			funType->paramTypes.push_back(pType);
+			m_context.env.Define(name, pType, false);
+		}
+
+		// 5. Ожидаемый тип возврата
+		if (node->returnType)
+		{
+			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
+		}
+
+		const auto prevRetType = m_context.location.currentReturnType;
+		const auto prevFunType = m_context.location.currentFunction;
+
+		m_context.location.currentReturnType = funType->returnType;
+		m_context.location.currentFunction = funType;
+
+		// 6. Анализируем тело
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		// 7. Довыводим тип возврата, если он не был указан
+		if (!m_context.location.currentFunction->returnType)
+		{
+			m_context.location.currentFunction->returnType = m_context.tUnit;
+		}
+		funType->returnType = m_context.location.currentFunction->returnType;
+
+		m_context.location.currentReturnType = prevRetType;
+		m_context.location.currentFunction = prevFunType;
+		m_context.env.PopScope();
+
+		// 8. Сохраняем метаданные
+		m_context.bindings.lambdaMeta[node] = { lambdaName };
+		m_context.allLambdas.emplace_back(node);
+
+		m_currentExprType = funType;
+	}
+
 private:
 	SemanticContext m_context;
 
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	ast::Program* m_currentProgram = nullptr;
-
-	// --- Type Definitions ---
 
 	// ==========================================
 	// HELPER METHODS

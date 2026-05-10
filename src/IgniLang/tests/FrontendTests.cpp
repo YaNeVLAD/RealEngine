@@ -90,7 +90,13 @@ INSTANTIATE_TEST_SUITE_P(
 		std::make_pair("ExpressionBody", "fun mul(a: Int, b: Int) = a * b;"),
 		std::make_pair("Generics", "class <T> Box(val item: T) { fun get(): T = this.item; }"),
 		std::make_pair("AsyncAwait", "suspend fun fetch() { val data = await getNetwork(); launch process(data); }"),
-		std::make_pair("ControlFlow", "fun loop() { for(i in 0..10) { if (i == 5) { return; } } }")),
+		std::make_pair("ControlFlow", "fun loop() { for(i in 0..10) { if (i == 5) { return; } } }"),
+		std::make_pair("TypeCastingPrimitives", "val x = 3.14 as Int;"),
+		std::make_pair("TypeCastingObjects", "val str = obj as String;"),
+		std::make_pair("LambdaWithoutCapture", "val f = fun (x: Int): Int { return x * 2; };"),
+		std::make_pair("LambdaWithCaptureBlock", "val calc = fun [a, b] (x: Int) { return a + b + x; };"),
+		std::make_pair("LambdaWithCaptureExpr", "val calc = fun [multiplier] (x: Int) = x * multiplier;"),
+		std::make_pair("LambdaPassedAsArg", "val arr = arr.map(fun (x: Int) { return x * 2; });")),
 	[](const ::testing::TestParamInfo<std::pair<std::string, std::string>>& info) { return info.param.first; });
 
 class InvalidSyntaxTests : public FrontendTestFixture
@@ -113,5 +119,9 @@ INSTANTIATE_TEST_SUITE_P(
 		std::make_pair("MissingSemicolon", "val x = 5 val y = 6"),
 		std::make_pair("MismatchedBrackets", "fun unclosed() { val a = 1; "),
 		std::make_pair("BadFunctionDecl", "fun (a: Int) {}"),
-		std::make_pair("InvalidExpression", "val x = + * 5;")),
+		std::make_pair("InvalidExpression", "val x = + * 5;"),
+		std::make_pair("LambdaMissingSemicolonDecl", "val f = fun() {} val x = 5;"),
+		std::make_pair("LambdaDoubleSemicolonBody", "val f = fun() = x * 2;;"),
+		std::make_pair("LambdaEmptyCapture", "val f = fun [] () = 5;"),
+		std::make_pair("InvalidCast", "val x = 5 as ;")),
 	[](const ::testing::TestParamInfo<std::pair<std::string, std::string>>& info) { return info.param.first; });

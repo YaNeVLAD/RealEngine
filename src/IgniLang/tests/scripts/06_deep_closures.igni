@@ -10,26 +10,26 @@ package program;
 fun main() {
     var a = 5;
 
-    fun outer() {
+     val outer = fun [a] () {
         var b = 10;
 
-        fun inner() {
+        val inner = fun [a, b] () {
             a = a + b;
             b = b + 5;
-        }
+        };
 
         inner();
         println(a); // 5 + 10 = 15
 
         inner();
         println(a); // 15 + 15 = 30
-    }
+    };
 
     outer();
 
     var secret = 0;
-    fun setSecret(v: Int) { secret = v; }
-    fun getSecret(): Int = secret;
+    val setSecret = fun [secret] (v: Int) { secret = v; };
+    val getSecret = fun [secret] (): Int = secret;
 
     setSecret(42);
     println(getSecret()); // 42

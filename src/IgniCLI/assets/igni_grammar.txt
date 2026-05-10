@@ -95,7 +95,8 @@ Expr -> LogOrExpr = Expr | LogOrExpr
 LogOrExpr -> LogOrExpr or LogAndExpr | LogAndExpr
 LogAndExpr -> LogAndExpr and EqExpr | EqExpr
 EqExpr -> EqExpr == RelExpr | EqExpr != RelExpr | RelExpr
-RelExpr -> RelExpr < AddExpr | RelExpr <= AddExpr | RelExpr > AddExpr | RelExpr >= AddExpr | AddExpr
+RelExpr -> RelExpr < CastExpr | RelExpr <= CastExpr | RelExpr > CastExpr | RelExpr >= CastExpr | CastExpr
+CastExpr -> CastExpr as Type | AddExpr
 AddExpr -> AddExpr + MulExpr | AddExpr - MulExpr | MulExpr
 MulExpr -> MulExpr * UnaryExpr | MulExpr / UnaryExpr | MulExpr % UnaryExpr | UnaryExpr
 
@@ -115,7 +116,13 @@ Designator -> ident OptExprTypeArgs
             | Designator ?. ident OptExprTypeArgs
             | Designator ( OptActPars )
 
-PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr )
+PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr ) | LambdaExpr
+
+LambdaExpr -> fun ( OptFormPars ) OptColonType LambdaBody
+            | fun [ CaptureList ] ( OptFormPars ) OptColonType LambdaBody
+
+CaptureList -> CaptureList , ident | ident
+LambdaBody -> Block | = Expr
 
 OptExprTypeArgs -> :: < TypeList > | \e
 

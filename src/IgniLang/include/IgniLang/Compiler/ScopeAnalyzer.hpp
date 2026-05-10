@@ -331,6 +331,44 @@ public:
 		}
 	}
 
+	void Visit(const ast::LambdaExpr* node) override
+	{
+		for (const auto& cap : node->captures)
+		{
+			if (!m_scopeStack.front().contains(cap))
+			{
+				if (m_currentFunContext)
+				{
+					m_functionBoxedVars[m_currentFunContext].insert(cap);
+				}
+
+				if (!m_scopeStack.back().contains(cap))
+				{
+					m_freeVars.insert(cap);
+				}
+			}
+		}
+
+		m_scopeStack.emplace_back(m_scopeStack.back());
+
+		for (const auto& cap : node->captures)
+		{
+			m_scopeStack.back().insert(cap);
+		}
+
+		for (const auto& [name, _] : node->parameters)
+		{
+			m_scopeStack.back().insert(name);
+		}
+
+		if (node->body)
+		{
+			node->body->Accept(*this);
+		}
+
+		m_scopeStack.pop_back();
+	}
+
 private:
 	std::vector<std::unordered_set<re::String>> m_scopeStack;
 	std::unordered_set<re::String> m_freeVars;

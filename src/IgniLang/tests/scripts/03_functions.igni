@@ -27,8 +27,8 @@ fun main() {
     println(fibonacci(10));
 
     val secret = 42;
-    fun getSecret(): Int {
+    val getSecret = fun [secret] (): Int {
         return secret;
-    }
+    };
     println(getSecret());
 }

@@ -296,6 +296,16 @@ private:
 		VISIT_NEXT(node->callable);
 	}
 
+	void Visit(const ast::TypeCastExpr* node) override
+	{
+		VISIT_NEXT(node->expr);
+	}
+
+	void Visit(const ast::LambdaExpr* node) override
+	{
+		VISIT_NEXT(node->body);
+	}
+
 #undef VISIT_NEXT
 };
 

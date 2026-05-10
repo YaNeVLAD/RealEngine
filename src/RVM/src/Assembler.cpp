@@ -611,6 +611,22 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseCast = [&]() -> bool {
+		const auto typeNameOpt = lexer.next();
+		if (!typeNameOpt || typeNameOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected string literal after CAST\n";
+			return false;
+		}
+
+		const auto rawStr = typeNameOpt->lexeme.substr(1, typeNameOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::Cast));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -692,6 +708,8 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "CO_YIELD"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineYield)); break;
 		  case "CO_AWAIT"_hs:        outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineAwait)); break;
 		  case "CO_LAUNCH"_hs:       if (!parseLaunch()) return false; break;
+
+		  case "CAST"_hs:            if (!parseCast()) return false; break;
 
 		  case "CALL_METHOD"_hs:     if (!parseCallMethod()) return false; break;
 		  case "CALL"_hs:   	     if (!parseCall()) return false; break;
