@@ -1,0 +1,43 @@
+package benchmark;
+
+class DummyEntity(val id: Int, val payload: Double) {
+    fun process(): Double {
+        return this.payload * 1.5;
+    }
+}
+
+fun stressTestRefCount(obj: DummyEntity, iterations: Int): Double {
+    var acc = 0.0;
+
+    for (j in 0 .. iterations) {
+        val ref1 = obj;
+        val ref2 = ref1;
+        val ref3 = ref2;
+        val ref4 = ref3;
+
+        acc = acc + ref4.process();
+    }
+
+    return acc;
+}
+
+fun main() {
+    println("Starting GC & RefCount Benchmark...");
+
+    val startTime = clock();
+
+    var sum = 0.0;
+    for (i in 0 .. 10000) {
+        val entity = DummyEntity(i, i as Double);
+
+        sum = sum + stressTestRefCount(entity, 1000);
+    }
+
+    val endTime = clock();
+
+    println("Benchmark completed!");
+    println("Checksum: ", sum);
+
+    val elapsedTime = endTime - startTime;
+    println("Time elapsed: ", elapsedTime, " seconds.");
+}

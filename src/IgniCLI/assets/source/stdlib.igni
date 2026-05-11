@@ -20,6 +20,8 @@ external fun print(args: Any...): Unit;
 
 external fun println(args: Any...): Unit;
 
+external fun clock(): Double;
+
 external class <T> Array(size: Int) {
 
     external val size: Int;

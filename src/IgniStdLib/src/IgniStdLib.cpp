@@ -3,6 +3,7 @@
 #include <Core/String.hpp>
 #include <RVM/VirtualMachine.hpp>
 
+#include <chrono>
 #include <iostream>
 
 namespace
@@ -319,5 +320,12 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		vm->RequestDelay(ms);
 
 		return Null;
+	});
+
+	vm->RegisterNative("clock", [](const std::vector<Value>& args) -> Value {
+		const auto now = std::chrono::high_resolution_clock::now().time_since_epoch();
+		double seconds = std::chrono::duration<double>(now).count();
+
+		return seconds;
 	});
 }
