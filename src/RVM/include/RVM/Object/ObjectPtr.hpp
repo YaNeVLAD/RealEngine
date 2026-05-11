@@ -116,6 +116,7 @@ private:
 };
 
 template <typename T, typename... TArgs>
+	requires std::constructible_from<T, TArgs...>
 ObjectPtr<T> MakeObject(TArgs&&... args) noexcept(std::is_nothrow_constructible_v<T, TArgs...>)
 {
 	return ObjectPtr<T>(new T(std::forward<TArgs>(args)...));
@@ -126,14 +127,29 @@ class ObjectAllocator
 {
 public:
 	template <typename T, typename... TArgs>
-	ObjectPtr<T> Allocate(TArgs&&... args)
+		requires std::constructible_from<T, TArgs...>
+	ObjectPtr<T> Allocate(TArgs&&... args) noexcept(std::is_nothrow_constructible_v<T, TArgs...>)
 	{
 		T* obj = new T(std::forward<TArgs>(args)...);
 
-		obj->SetVM(static_cast<TVirtualMachine*>(this));
+		auto* vm = static_cast<TVirtualMachine*>(this);
+		obj->SetVM(vm);
+
+		obj->SetNext(m_allObjects);
+		m_allObjects = obj;
+
+		vm->OnObjectAllocated();
 
 		return ObjectPtr<T>(obj);
 	}
+
+	[[nodiscard]] Object** AllocatedObjects() noexcept
+	{
+		return &m_allObjects;
+	}
+
+private:
+	Object* m_allObjects{};
 };
 
 } // namespace re::rvm

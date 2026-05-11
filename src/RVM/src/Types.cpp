@@ -1,6 +1,8 @@
 #include <RVM/Types.hpp>
 
 #include <Core/Utils.hpp>
+#include <RVM/VirtualMachine.hpp>
+#include <ranges>
 
 #include <utility>
 
@@ -15,6 +17,26 @@ namespace re::rvm
 {
 
 using namespace utils;
+
+void Coroutine::Trace(VirtualMachine* vm)
+{
+	vm->MarkObject(caller.Get());
+	vm->MarkValue(transferValue);
+
+	for (auto const& val : stack)
+	{
+		vm->MarkValue(val);
+	}
+	for (auto const& val : variables)
+	{
+		vm->MarkValue(val);
+	}
+
+	for (auto const& frame : callFrames)
+	{
+		vm->MarkObject(frame.closure.Get());
+	}
+}
 
 TypeInfo::TypeInfo(String name)
 	: name(std::move(name))
@@ -58,10 +80,49 @@ TypeInfo& TypeInfo::AddNativeGetter(String const& propName, NativeGetterFn funct
 	return *this;
 }
 
+void TypeInfo::Trace(VirtualMachine* vm)
+{
+	for (const auto& method : methods | std::views::values)
+	{
+		vm->MarkValue(method);
+	}
+}
+
 Instance::Instance(TypeInfoPtr const& typeInfo)
 	: typeInfo(typeInfo)
 {
 	fields.resize(typeInfo->fieldNames.size(), Null);
+}
+
+void Instance::Trace(VirtualMachine* vm)
+{
+	vm->MarkObject(typeInfo.Get());
+	for (auto const& field : fields)
+	{
+		vm->MarkValue(field);
+	}
+}
+
+void ArrayInstance::Trace(VirtualMachine* vm)
+{
+	vm->MarkObject(typeInfo.Get());
+	for (auto const& elem : elements)
+	{
+		vm->MarkValue(elem);
+	}
+}
+
+void Upvalue::Trace(VirtualMachine* vm)
+{
+	vm->MarkValue(value);
+}
+
+void Closure::Trace(VirtualMachine* vm)
+{
+	for (auto const& uv : captured)
+	{
+		vm->MarkObject(uv.Get());
+	}
 }
 
 Value operator+(const Value& lhs, const Value& rhs)

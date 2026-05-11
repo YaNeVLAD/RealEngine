@@ -65,23 +65,31 @@ struct Instance : Object
 	std::vector<Value> fields;
 
 	explicit Instance(TypeInfoPtr const& typeInfo);
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 struct ArrayInstance : Object
 {
 	TypeInfoPtr typeInfo;
 	std::vector<Value> elements;
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 struct Upvalue : Object
 {
 	Value value;
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 struct Closure : Object
 {
 	std::int64_t ipOffset;
 	std::vector<UpvaluePtr> captured;
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 using NativeFn = std::function<Value(std::vector<Value> const&)>;
@@ -124,6 +132,8 @@ struct Coroutine : Object
 	CoroutinePtr caller = nullptr;
 
 	bool isAwaitedByHost = false;
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;
@@ -150,6 +160,8 @@ struct TypeInfo : Object
 	TypeInfo& SetAllocator(AllocatorFn alloc);
 
 	TypeInfo& AddNativeGetter(String const& propName, NativeGetterFn function);
+
+	void Trace(VirtualMachine* vm) override;
 };
 
 enum class OpCode : std::uint8_t

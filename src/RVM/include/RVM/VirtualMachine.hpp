@@ -3,6 +3,7 @@
 #include <RVM/Export.hpp>
 
 #include <RVM/Chunk.hpp>
+#include <RVM/Config.hpp>
 #include <RVM/Object/Object.hpp>
 #include <RVM/Types.hpp>
 
@@ -29,7 +30,7 @@ class RE_RVM_API VirtualMachine : public ObjectAllocator<VirtualMachine>
 public:
 	using DelayHandler = std::function<void(CoroutinePtr, std::uint64_t)>;
 
-	VirtualMachine();
+	explicit VirtualMachine(Config config = Config::Default());
 
 	InterpreterResult Interpret(Chunk const& chunk);
 
@@ -55,6 +56,14 @@ public:
 
 	void RequestDelay(std::uint64_t ms) const;
 
+	void MarkObject(Object* obj);
+	void MarkValue(Value const& val);
+
+	void SetConfig(const Config& config);
+	[[nodiscard]] const Config& GetConfig() const;
+
+	void OnObjectAllocated() noexcept;
+
 private:
 	InterpreterResult Run();
 
@@ -72,7 +81,15 @@ private:
 
 	bool SwitchToNextMicrotask();
 
+	void CollectCycles();
+
+	void RemoveFromAllObjects(const Object* obj);
+
 private:
+	Config m_config;
+	std::size_t m_allocationCount = 0;
+	bool m_isProcessingDestructors = false; // Защита от рекурсии!
+
 	CoroutinePtr m_activeCoro;
 
 	std::queue<CoroutinePtr> m_microtasks;

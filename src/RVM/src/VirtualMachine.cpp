@@ -6,6 +6,7 @@
 #include <Core/Meta/TypeInfo.hpp>
 
 #include <iostream>
+#include <ranges>
 
 #define READ_BYTE() (*m_ip++)
 #define READ_CONSTANT() (m_chunk->GetConstants()[READ_BYTE()])
@@ -44,7 +45,8 @@
 namespace re::rvm
 {
 
-VirtualMachine::VirtualMachine()
+VirtualMachine::VirtualMachine(const Config config)
+	: m_config(config)
 {
 	m_stack.reserve(256);
 	InitBuiltinTypes();
@@ -116,6 +118,13 @@ InterpreterResult VirtualMachine::Run()
 {
 	for (;;)
 	{
+		if (m_config.autoProcessDestructors && !m_pendingDestructors.empty() && !m_isProcessingDestructors)
+		{
+			m_isProcessingDestructors = true;
+			ProcessDestructors();
+			m_isProcessingDestructors = false;
+		}
+
 		const std::uint8_t instruction = READ_BYTE();
 		// std::cout << "Instruction: " << (int)instruction << " Stack size: " << m_stack.size() << std::endl;
 		switch (static_cast<OpCode>(instruction))
@@ -1005,12 +1014,41 @@ void VirtualMachine::ProcessDestructors()
 		return;
 	}
 
-	auto pending = std::move(m_pendingDestructors);
+	const auto pending = std::move(m_pendingDestructors);
 	m_pendingDestructors.clear();
 
 	for (Object* obj : pending)
 	{
-		// TODO: Add TypeInfo destructor call
+		if (auto* inst = dynamic_cast<Instance*>(obj))
+		{
+			String dtorName = "~" + inst->typeInfo->name;
+			if (auto it = inst->typeInfo->methods.find(dtorName); it != inst->typeInfo->methods.end())
+			{
+				if (const auto* closurePtr = std::get_if<ClosurePtr>(&it->second))
+				{
+					const auto dtorCoro = Allocate<Coroutine>();
+					dtorCoro->state = CoroutineState::Running;
+
+					CallFrame frame;
+					frame.returnAddress = nullptr;
+					frame.stackBase = 0;
+					frame.localsBase = 0;
+					frame.closure = *closurePtr;
+
+					dtorCoro->callFrames.push_back(frame);
+					dtorCoro->ip = m_chunk->GetCode().data() + (*closurePtr)->ipOffset;
+
+					dtorCoro->stack.emplace_back(ObjectPtr(inst));
+
+					SaveContext();
+					m_activeCoro = dtorCoro;
+					LoadContext();
+					Run();
+				}
+			}
+		}
+
+		RemoveFromAllObjects(obj);
 
 		delete obj;
 	}
@@ -1063,6 +1101,103 @@ bool VirtualMachine::SwitchToNextMicrotask()
 	m_activeCoro = nextCoro;
 
 	return true;
+}
+
+void VirtualMachine::CollectCycles()
+{
+	MarkObject(m_activeCoro.Get());
+	for (const auto& val : m_globals | std::views::values)
+	{
+		MarkValue(val);
+	}
+	for (const auto& type : m_types | std::views::values)
+	{
+		MarkObject(type.Get());
+	}
+	auto tempQueue = m_microtasks;
+	while (!tempQueue.empty())
+	{
+		MarkObject(tempQueue.front().Get());
+		tempQueue.pop();
+	}
+
+	Object** curr = AllocatedObjects();
+	while (*curr)
+	{
+		if (!(*curr)->m_isMarked)
+		{
+			Object* unreached = *curr;
+			*curr = unreached->m_next;
+
+			EnqueueForDestruction(unreached);
+		}
+		else
+		{
+			(*curr)->m_isMarked = false;
+			curr = &(*curr)->m_next;
+		}
+	}
+}
+
+void VirtualMachine::RemoveFromAllObjects(const Object* obj)
+{
+	Object** curr = AllocatedObjects();
+	while (*curr)
+	{
+		if (*curr == obj)
+		{
+			*curr = obj->m_next;
+			return;
+		}
+		curr = &(*curr)->m_next;
+	}
+}
+
+void VirtualMachine::MarkObject(Object* obj)
+{
+	if (!obj || obj->m_isMarked)
+	{
+		return;
+	}
+
+	obj->m_isMarked = true;
+	obj->Trace(this);
+}
+
+void VirtualMachine::MarkValue(Value const& val)
+{
+	// clang-format off
+	std::visit(utils::overloaded{
+		[this](InstancePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](ArrayInstancePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](ClosurePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](UpvaluePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](NativeObjectPtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](TypeInfoPtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](CoroutinePtr const& ptr) { MarkObject(ptr.Get()); },
+		[](const auto&) {}
+	}, val);
+	// clang-format on
+}
+
+void VirtualMachine::SetConfig(const Config& config)
+{
+	m_config = config;
+}
+
+const Config& VirtualMachine::GetConfig() const
+{
+	return m_config;
+}
+
+void VirtualMachine::OnObjectAllocated() noexcept
+{
+	++m_allocationCount;
+	if (m_config.autoCollectCycles && m_allocationCount >= m_config.gcThreshold)
+	{
+		m_allocationCount = 0;
+		CollectCycles();
+	}
 }
 
 } // namespace re::rvm

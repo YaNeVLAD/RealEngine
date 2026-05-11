@@ -22,12 +22,25 @@ public:
 
 	void SetVM(VirtualMachine* vm) noexcept;
 
+	[[nodiscard]] Object* GetNext() noexcept;
+
+	[[nodiscard]] const Object* GetNext() const noexcept;
+
+	[[nodiscard]] bool IsMarked() const noexcept;
+
+	void SetNext(Object* next) noexcept;
+
+	void SetMarked(bool isMarked) noexcept;
+
+	virtual void Trace(VirtualMachine* /* vm */) {}
+
 private:
-	std::size_t m_refCount{};
+	std::size_t m_refCount = 0;
 
-	bool m_isMarked{};
-	Object* next{};
+	bool m_isDestroying = false;
+	bool m_isMarked = false;
 
+	Object* m_next{};
 	VirtualMachine* m_vm{};
 
 	friend class VirtualMachine;
