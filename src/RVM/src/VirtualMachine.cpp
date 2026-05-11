@@ -1040,10 +1040,20 @@ void VirtualMachine::ProcessDestructors()
 
 					dtorCoro->stack.emplace_back(ObjectPtr(inst));
 
+					auto previousCoro = m_activeCoro;
 					SaveContext();
+
 					m_activeCoro = dtorCoro;
 					LoadContext();
+
 					Run();
+
+					m_activeCoro = previousCoro;
+					LoadContext();
+
+					dtorCoro->stack.clear();
+					dtorCoro->variables.clear();
+					dtorCoro->callFrames.clear();
 				}
 			}
 		}

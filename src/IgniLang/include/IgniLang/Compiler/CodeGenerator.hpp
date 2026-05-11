@@ -157,6 +157,14 @@ public:
 						m_out << "MAKE_CLOSURE " << m_funcAsmNames.at(fun) << " 0\n";
 						m_out << "BIND_METHOD \"" << classDecl->name << "\" \"" << fun->name << "\"\n";
 					}
+					else if (const auto* dtorDecl = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+					{
+						const auto& dtorMangledName = m_semanticAnalyzer.GetBindings().funMeta.at(dtorDecl).mangledName;
+
+						m_out << "MAKE_CLOSURE " << dtorMangledName << " 0\n";
+
+						m_out << "BIND_METHOD \"" << dtorDecl->name << "\" \"~" << dtorDecl->name << "\"\n";
+					}
 				}
 			}
 		}

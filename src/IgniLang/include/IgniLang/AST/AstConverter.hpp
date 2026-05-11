@@ -399,8 +399,11 @@ private:
 
 			if (!ctorDecl->isExternal)
 			{
-				const auto& bodyNode = actualDecl->children[5];
-				ctorDecl->body = ConvertBlock(bodyNode.get());
+				if (const auto& bodyNode = actualDecl->children[5];
+					bodyNode->children[0]->symbol.Hashed() == "Block"_hs)
+				{
+					ctorDecl->body = ConvertBlock(bodyNode->children[0].get());
+				}
 			}
 
 			return ctorDecl;
@@ -416,8 +419,11 @@ private:
 
 			if (!dtorDecl->isExternal)
 			{
-				const auto& bodyNode = actualDecl->children[5];
-				dtorDecl->body = ConvertBlock(bodyNode.get());
+				if (const auto& bodyNode = actualDecl->children[5];
+					bodyNode->children[0]->symbol.Hashed() == "Block"_hs)
+				{
+					dtorDecl->body = ConvertBlock(bodyNode->children[0].get());
+				}
 			}
 
 			return dtorDecl;
