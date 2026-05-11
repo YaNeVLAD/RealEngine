@@ -20,7 +20,7 @@ TypeInfo::TypeInfo(String name)
 	: name(std::move(name))
 {
 	allocator = [](TypeInfoPtr const& t) -> Value {
-		return std::make_shared<Instance>(t);
+		return MakeObject<Instance>(t);
 	};
 }
 
@@ -35,7 +35,7 @@ void TypeInfo::AddField(String const& fieldName)
 
 TypeInfo& TypeInfo::AddNativeMethod(String const& methodName, const std::int8_t argCount, NativeFn function)
 {
-	auto nativeObj = std::make_shared<NativeObject>();
+	auto nativeObj = MakeObject<NativeObject>();
 	nativeObj->name = methodName;
 	nativeObj->argCount = argCount;
 	nativeObj->function = std::move(function);
@@ -76,7 +76,7 @@ Value operator+(const Value& lhs, const Value& rhs)
 		[](String const& a, const Int b)     -> Value { return a + std::to_string(b); },
 		[](String const& a, const Double b)  -> Value { return a + std::to_string(b); },
 		[](ArrayInstancePtr const& a, ArrayInstancePtr const& b) -> Value {
-			auto result = std::make_shared<ArrayInstance>();
+			auto result = MakeObject<ArrayInstance>();
 			result->elements.reserve(a->elements.size() + b->elements.size());
 			result->typeInfo = a->typeInfo;
 

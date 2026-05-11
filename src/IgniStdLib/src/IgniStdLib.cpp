@@ -12,11 +12,11 @@ void InitArrayMethods(re::rvm::VirtualMachine* vm, const re::rvm::TypeInfoPtr& a
 {
 	using namespace re::rvm;
 
-	const auto mutableArrayType = std::make_shared<TypeInfo>("MutableArray");
+	const auto mutableArrayType = MakeObject<TypeInfo>("MutableArray");
 	vm->RegisterType(mutableArrayType);
 
 	auto allocator = [](const TypeInfoPtr& type) {
-		auto arr = std::make_shared<ArrayInstance>();
+		auto arr = MakeObject<ArrayInstance>();
 		arr->typeInfo = type;
 		return arr;
 	};
@@ -82,7 +82,7 @@ void InitArrayMethods(re::rvm::VirtualMachine* vm, const re::rvm::TypeInfoPtr& a
 	mutableArrayType->AddNativeMethod("toArray", 0, [arrayType](const std::vector<Value>& args) -> Value {
 		const auto mutArr = std::get<ArrayInstancePtr>(args[0]);
 
-		auto readOnlyArr = std::make_shared<ArrayInstance>();
+		auto readOnlyArr = MakeObject<ArrayInstance>();
 
 		readOnlyArr->elements = mutArr->elements;
 
@@ -200,7 +200,7 @@ void InitMathModule(re::rvm::VirtualMachine* vm)
 {
 	using namespace re::rvm;
 
-	auto mathType = std::make_shared<TypeInfo>("Math");
+	auto mathType = MakeObject<TypeInfo>("Math");
 
 	mathType
 		->AddNativeMethod("sqrt", 1, [](const std::vector<Value>& args) -> Value {
@@ -216,7 +216,7 @@ void InitMathModule(re::rvm::VirtualMachine* vm)
 			return std::pow(std::get<Double>(args[1]), std::get<Double>(args[2]));
 		});
 
-	auto mathInstance = std::make_shared<Instance>(mathType);
+	auto mathInstance = MakeObject<Instance>(mathType);
 
 	vm->RegisterGlobal("math", mathInstance);
 }
@@ -285,7 +285,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		}
 
 		const auto paramArr = std::get<ArrayInstancePtr>(args[0]);
-		auto returnArr = std::make_shared<ArrayInstance>();
+		auto returnArr = MakeObject<ArrayInstance>();
 
 		returnArr->elements = paramArr->elements;
 		returnArr->typeInfo = vm->GetTypeByName("Array");
@@ -300,7 +300,7 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		}
 
 		const auto paramArr = std::get<ArrayInstancePtr>(args[0]);
-		auto returnArr = std::make_shared<ArrayInstance>();
+		auto returnArr = MakeObject<ArrayInstance>();
 
 		returnArr->elements = paramArr->elements;
 		returnArr->typeInfo = vm->GetTypeByName("MutableArray");

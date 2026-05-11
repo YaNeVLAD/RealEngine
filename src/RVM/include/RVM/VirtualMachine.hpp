@@ -3,6 +3,7 @@
 #include <RVM/Export.hpp>
 
 #include <RVM/Chunk.hpp>
+#include <RVM/Object/Object.hpp>
 #include <RVM/Types.hpp>
 
 #include <cstdint>
@@ -20,8 +21,11 @@ enum class InterpreterResult : std::uint8_t
 	Suspended,
 };
 
-class RE_RVM_API VirtualMachine
+class RE_RVM_API VirtualMachine : public ObjectAllocator<VirtualMachine>
 {
+	template <typename T>
+	using HashMap = std::unordered_map<String, T>;
+
 public:
 	using DelayHandler = std::function<void(CoroutinePtr, std::uint64_t)>;
 
@@ -58,9 +62,8 @@ private:
 	Value const& Peek();
 	void Push(Value const& value);
 
-private:
-	template <typename T>
-	using HashMap = std::unordered_map<String, T>;
+	void EnqueueForDestruction(Object* obj);
+	void ProcessDestructors();
 
 	void InitBuiltinTypes();
 
@@ -75,6 +78,8 @@ private:
 	std::queue<CoroutinePtr> m_microtasks;
 
 	DelayHandler m_delayHandler;
+
+	std::vector<Object*> m_pendingDestructors;
 
 	TypeInfoPtr m_typeInt;
 	TypeInfoPtr m_typeDouble;
@@ -96,6 +101,8 @@ private:
 	std::unordered_map<String, Value> m_globals;
 
 	std::size_t m_currentLocalsBase = 0;
+
+	friend class Object;
 };
 
 } // namespace re::rvm

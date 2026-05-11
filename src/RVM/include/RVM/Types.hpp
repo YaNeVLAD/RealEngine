@@ -3,6 +3,7 @@
 #include <RVM/Export.hpp>
 
 #include <Core/String.hpp>
+#include <RVM/Object/ObjectPtr.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -16,7 +17,7 @@ namespace re::rvm
 {
 
 template <typename T>
-using Ptr = std::shared_ptr<T>;
+using Ptr = ObjectPtr<T>;
 
 struct TypeInfo;
 struct Instance;
@@ -58,7 +59,7 @@ using Value = std::variant<
 
 constexpr auto Null = Value{ Null_t{} };
 
-struct Instance
+struct Instance : Object
 {
 	TypeInfoPtr typeInfo;
 	std::vector<Value> fields;
@@ -66,18 +67,18 @@ struct Instance
 	explicit Instance(TypeInfoPtr const& typeInfo);
 };
 
-struct ArrayInstance
+struct ArrayInstance : Object
 {
 	TypeInfoPtr typeInfo;
 	std::vector<Value> elements;
 };
 
-struct Upvalue
+struct Upvalue : Object
 {
 	Value value;
 };
 
-struct Closure
+struct Closure : Object
 {
 	std::int64_t ipOffset;
 	std::vector<UpvaluePtr> captured;
@@ -85,7 +86,7 @@ struct Closure
 
 using NativeFn = std::function<Value(std::vector<Value> const&)>;
 
-struct NativeObject
+struct NativeObject : Object
 {
 	String name;
 	std::int8_t argCount;
@@ -108,7 +109,7 @@ struct CallFrame
 	ClosurePtr closure;
 };
 
-struct Coroutine
+struct Coroutine : Object
 {
 	CoroutineState state = CoroutineState::Suspended;
 	const std::uint8_t* ip = nullptr;
@@ -128,7 +129,7 @@ struct Coroutine
 using AllocatorFn = std::function<Value(TypeInfoPtr const&)>;
 using NativeGetterFn = std::function<Value(const Value& obj)>;
 
-struct TypeInfo
+struct TypeInfo : Object
 {
 	String name;
 	std::unordered_map<String, std::size_t> fieldIndexes;

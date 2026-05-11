@@ -59,7 +59,7 @@ InterpreterResult VirtualMachine::Interpret(Chunk const& chunk)
 	m_callStack.clear();
 	m_currentLocalsBase = 0;
 
-	m_activeCoro = std::make_shared<Coroutine>();
+	m_activeCoro = Allocate<Coroutine>();
 	m_activeCoro->state = CoroutineState::Running;
 
 	return Run();
@@ -301,7 +301,7 @@ InterpreterResult VirtualMachine::Run()
 			std::uint8_t argCount = READ_BYTE();
 
 			Value callableVal = m_stack[m_stack.size() - 1 - argCount];
-			if (auto* closurePtr = std::get_if<std::shared_ptr<Closure>>(&callableVal))
+			if (auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
 			{
 				auto closure = *closurePtr;
 				CallFrame frame;
@@ -314,7 +314,7 @@ InterpreterResult VirtualMachine::Run()
 				m_currentLocalsBase = m_variables.size();
 				m_ip = m_chunk->GetCode().data() + closure->ipOffset;
 			}
-			else if (auto* nativePtr = std::get_if<std::shared_ptr<NativeObject>>(&callableVal))
+			else if (auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
 			{
 				auto native = *nativePtr;
 				if (native->argCount != argCount)
@@ -416,6 +416,11 @@ InterpreterResult VirtualMachine::Run()
 			}
 
 			auto instance = it->second->allocator(it->second);
+			if (auto* instPtr = std::get_if<InstancePtr>(&instance))
+			{
+				(*instPtr)->SetVM(this);
+			}
+
 			Push(instance);
 			break;
 		}
@@ -506,7 +511,7 @@ InterpreterResult VirtualMachine::Run()
 			auto fieldCount = std::get<Int>(countVal);
 			auto className = std::get<String>(nameVal);
 
-			auto classInfo = std::make_shared<TypeInfo>(className);
+			auto classInfo = Allocate<TypeInfo>(className);
 
 			for (Int i = 0; i < fieldCount; ++i)
 			{
@@ -526,7 +531,7 @@ InterpreterResult VirtualMachine::Run()
 
 		case OpCode::Box: {
 			Value val = Pop();
-			auto upvalue = std::make_shared<Upvalue>();
+			auto upvalue = Allocate<Upvalue>();
 			upvalue->value = std::move(val);
 			Push(upvalue);
 			break;
@@ -579,14 +584,14 @@ InterpreterResult VirtualMachine::Run()
 			auto offset = std::get<std::int64_t>(offsetVal);
 			std::uint8_t upvalueCount = READ_BYTE();
 
-			auto closure = std::make_shared<Closure>();
+			auto closure = Allocate<Closure>();
 			closure->ipOffset = offset;
 			closure->captured.resize(upvalueCount);
 
 			for (int i = upvalueCount - 1; i >= 0; --i)
 			{
 				Value val = Pop();
-				closure->captured[i] = std::get<std::shared_ptr<Upvalue>>(val);
+				closure->captured[i] = std::get<UpvaluePtr>(val);
 			}
 
 			Push(closure);
@@ -604,7 +609,7 @@ InterpreterResult VirtualMachine::Run()
 				EXIT_WITH_ERROR("Unknown native function " + funcName);
 			}
 
-			auto nativeObj = std::make_shared<NativeObject>();
+			auto nativeObj = Allocate<NativeObject>();
 			nativeObj->name = funcName;
 			nativeObj->argCount = argCount;
 			nativeObj->function = it->second;
@@ -616,7 +621,7 @@ InterpreterResult VirtualMachine::Run()
 		case OpCode::PackArray: {
 			std::uint8_t count = READ_BYTE();
 
-			auto arr = std::make_shared<ArrayInstance>();
+			auto arr = Allocate<ArrayInstance>();
 			arr->typeInfo = m_typeArray;
 			arr->elements.resize(count);
 
@@ -680,7 +685,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 
 			auto closure = std::get<ClosurePtr>(closureVal);
-			auto coro = std::make_shared<Coroutine>();
+			auto coro = Allocate<Coroutine>();
 			coro->state = CoroutineState::Suspended;
 			coro->ip = m_chunk->GetCode().data() + closure->ipOffset;
 
@@ -783,7 +788,7 @@ InterpreterResult VirtualMachine::Run()
 			}
 
 			auto closure = std::get<ClosurePtr>(closureVal);
-			auto coroutine = std::make_shared<Coroutine>();
+			auto coroutine = Allocate<Coroutine>();
 			coroutine->state = CoroutineState::Suspended;
 			coroutine->ip = m_chunk->GetCode().data() + closure->ipOffset;
 
@@ -988,13 +993,36 @@ void VirtualMachine::RequestDelay(const std::uint64_t ms) const
 	}
 }
 
+void VirtualMachine::EnqueueForDestruction(Object* obj)
+{
+	m_pendingDestructors.emplace_back(obj);
+}
+
+void VirtualMachine::ProcessDestructors()
+{
+	if (m_pendingDestructors.empty())
+	{
+		return;
+	}
+
+	auto pending = std::move(m_pendingDestructors);
+	m_pendingDestructors.clear();
+
+	for (Object* obj : pending)
+	{
+		// TODO: Add TypeInfo destructor call
+
+		delete obj;
+	}
+}
+
 void VirtualMachine::InitBuiltinTypes()
 {
-	m_typeInt = std::make_shared<TypeInfo>(String("Int"));
-	m_typeDouble = std::make_shared<TypeInfo>(String("Double"));
-	m_typeString = std::make_shared<TypeInfo>(String("String"));
-	m_typeNull = std::make_shared<TypeInfo>(String("Null"));
-	m_typeArray = std::make_shared<TypeInfo>(String("Array"));
+	m_typeInt = Allocate<TypeInfo>(String("Int"));
+	m_typeDouble = Allocate<TypeInfo>(String("Double"));
+	m_typeString = Allocate<TypeInfo>(String("String"));
+	m_typeNull = Allocate<TypeInfo>(String("Null"));
+	m_typeArray = Allocate<TypeInfo>(String("Array"));
 
 	m_types[m_typeInt->name] = m_typeInt;
 	m_types[m_typeDouble->name] = m_typeDouble;
