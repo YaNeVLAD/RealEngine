@@ -115,9 +115,17 @@ struct Statement : Node
 	std::unique_ptr<Node> CloneNode(const TypeEnv* env = nullptr) const override { return CloneStmt(env); }
 };
 
+struct Annotation
+{
+	fsm::token<TokenType> token;
+	re::String name;
+	std::unique_ptr<Expr> argument;
+};
+
 struct Decl : Statement
 {
 	Visibility visibility = Visibility::Public;
+	std::vector<Annotation> annotations;
 
 	virtual std::unique_ptr<Decl> CloneDecl(const TypeEnv* env = nullptr) const = 0;
 	std::unique_ptr<Statement> CloneStmt(const TypeEnv* env = nullptr) const override { return CloneDecl(env); }

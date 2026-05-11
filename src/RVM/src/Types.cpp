@@ -80,6 +80,67 @@ TypeInfo& TypeInfo::AddNativeGetter(String const& propName, NativeGetterFn funct
 	return *this;
 }
 
+bool TypeInfo::HasAnnotation(const String& annoName) const noexcept
+{
+	return annotations.contains(annoName);
+}
+
+Value TypeInfo::GetAnnotation(const String& annoName) const noexcept
+{
+	if (const auto it = annotations.find(annoName); it != annotations.end())
+	{
+		return it->second;
+	}
+
+	return Null;
+}
+
+bool TypeInfo::HasFieldAnnotation(const String& fieldName, const String& annoName) const noexcept
+{
+	if (const auto it = fieldAnnotations.find(fieldName); it != fieldAnnotations.end())
+	{
+		return it->second.contains(annoName);
+	}
+
+	return false;
+}
+
+Value TypeInfo::GetFieldAnnotation(const String& fieldName, const String& annoName) const noexcept
+{
+	if (const auto it = fieldAnnotations.find(fieldName); it != fieldAnnotations.end())
+	{
+		if (const auto annoIt = it->second.find(annoName); annoIt != it->second.end())
+		{
+			return annoIt->second;
+		}
+	}
+
+	return Null;
+}
+
+bool TypeInfo::HasMethodAnnotation(const String& methodName, const String& annoName) const noexcept
+{
+	if (const auto it = methodAnnotations.find(methodName); it != methodAnnotations.end())
+	{
+		return it->second.contains(annoName);
+	}
+
+	return false;
+}
+
+Value TypeInfo::GetMethodAnnotation(const String& methodName, const String& annoName) const noexcept
+{
+	if (const auto it = methodAnnotations.find(methodName); it != methodAnnotations.end())
+	{
+		if (const auto annoIt = it->second.find(annoName); annoIt != it->second.end())
+		{
+			return annoIt->second;
+		}
+	}
+
+	return Null;
+}
+
 void TypeInfo::Trace(VirtualMachine* vm)
 {
 	for (const auto& method : methods | std::views::values)

@@ -859,13 +859,65 @@ InterpreterResult VirtualMachine::Run()
 				}
 			}
 			else
-			{
-				// Для классов (Downcasting).
-				// В рантайме объекты это просто InstancePtr. Каст объекта не меняет
-				// его представления в памяти, поэтому мы просто возвращаем его на стек.
-				// (Опционально можно проверить GetType(val)->name == targetName)
+			{ // No need to convert InstancePtr to other type
 				Push(val);
 			}
+			break;
+		}
+
+		case OpCode::AnnotateType: {
+			Value typeNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_TYPE");
+			}
+
+			typeInfo->annotations[std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateField: {
+			Value typeNameVal = READ_CONSTANT();
+			Value fieldNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_FIELD");
+			}
+
+			typeInfo->fieldAnnotations[std::get<String>(fieldNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateMethod: {
+			Value typeNameVal = READ_CONSTANT();
+			Value methodNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_METHOD");
+			}
+
+			typeInfo->methodAnnotations[std::get<String>(methodNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateGlobal: {
+			Value globalNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			m_globalAnnotations[std::get<String>(globalNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
 			break;
 		}
 
@@ -1208,6 +1260,29 @@ void VirtualMachine::OnObjectAllocated() noexcept
 		m_allocationCount = 0;
 		CollectCycles();
 	}
+}
+
+bool VirtualMachine::HasGlobalAnnotation(const String& globalName, const String& annoName) const noexcept
+{
+	if (const auto it = m_globalAnnotations.find(globalName); it != m_globalAnnotations.end())
+	{
+		return it->second.contains(annoName);
+	}
+
+	return false;
+}
+
+Value VirtualMachine::GetGlobalAnnotation(const String& globalName, const String& annoName) const noexcept
+{
+	if (const auto it = m_globalAnnotations.find(globalName); it != m_globalAnnotations.end())
+	{
+		if (const auto annoIt = it->second.find(annoName); annoIt != it->second.end())
+		{
+			return annoIt->second;
+		}
+	}
+
+	return Null;
 }
 
 } // namespace re::rvm

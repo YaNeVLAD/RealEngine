@@ -169,6 +169,52 @@ public:
 			}
 		}
 
+		m_out << "// --- Annotations ---\n";
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+			{
+				if (!fun->typeParams.empty() || fun->isExternal)
+				{
+					continue;
+				}
+				EmitAnnotations(fun, "", fun->name, "GLOBAL");
+			}
+			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
+			{
+				if (classDecl->isExternal || !classDecl->typeParams.empty())
+				{
+					continue;
+				}
+
+				EmitAnnotations(classDecl, "", classDecl->name, "TYPE");
+
+				for (const auto& member : classDecl->members)
+				{
+					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+					{
+						EmitAnnotations(varDecl, classDecl->name, varDecl->name, "FIELD");
+					}
+					else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+					{
+						EmitAnnotations(valDecl, classDecl->name, valDecl->name, "FIELD");
+					}
+					else if (const auto funDecl = dynamic_cast<const ast::FunDecl*>(member.get()))
+					{
+						EmitAnnotations(funDecl, classDecl->name, funDecl->name, "METHOD");
+					}
+					else if (const auto ctorDecl = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
+					{
+						EmitAnnotations(ctorDecl, classDecl->name, ctorDecl->name, "METHOD");
+					}
+					else if (const auto dtorDecl = dynamic_cast<const ast::DestructorDecl*>(member.get()))
+					{
+						EmitAnnotations(dtorDecl, classDecl->name, "~" + dtorDecl->name, "METHOD");
+					}
+				}
+			}
+		}
+
 		m_out << "// --- Entry Point ---\n";
 		m_out << "CALL main 0\nRETURN\n\n";
 
@@ -797,6 +843,7 @@ public:
 		if (m_currentFunction == nullptr)
 		{ // Global var declaration
 			m_out << "SET_GLOBAL \"" << node->name << "\"\n";
+			EmitAnnotations(node, "", node->name, "GLOBAL");
 		}
 		else
 		{
@@ -1198,6 +1245,38 @@ private:
 		}
 
 		m_out << "CONST 0\nRETURN\n\n";
+	}
+
+	void EmitAnnotations(const ast::Decl* decl, const re::String& typeName, const re::String& targetName, const re::String& kind)
+	{
+		for (const auto& anno : decl->annotations)
+		{
+			if (anno.argument)
+			{
+				anno.argument->Accept(*this);
+			}
+			else
+			{
+				m_out << "CONST 1\n";
+			}
+
+			if (const auto hash = kind.Hashed(); hash == "GLOBAL"_hs)
+			{
+				m_out << "ANNOTATE_GLOBAL \"" << targetName << "\" \"" << anno.name << "\"\n";
+			}
+			else if (hash == "TYPE"_hs)
+			{
+				m_out << "ANNOTATE_TYPE \"" << targetName << "\" \"" << anno.name << "\"\n";
+			}
+			else if (hash == "FIELD"_hs)
+			{
+				m_out << "ANNOTATE_FIELD \"" << typeName << "\" \"" << targetName << "\" \"" << anno.name << "\"\n";
+			}
+			else if (hash == "METHOD"_hs)
+			{
+				m_out << "ANNOTATE_METHOD \"" << typeName << "\" \"" << targetName << "\" \"" << anno.name << "\"\n";
+			}
+		}
 	}
 };
 

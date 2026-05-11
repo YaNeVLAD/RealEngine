@@ -173,6 +173,7 @@ private:
 	static std::unique_ptr<ast::Decl> ConvertTopLevelDecl(const CstNode* topLevelDecl)
 	{
 		// TopLevelDecl -> AnnotationList [0] OptVisibility [1] Decl [2]
+		const auto& annListNode = topLevelDecl->children[0];
 		const auto& optVisNode = topLevelDecl->children[1];
 		const auto& declNode = topLevelDecl->children[2];
 		const auto& actualDecl = declNode->children[0];
@@ -180,6 +181,7 @@ private:
 		if (auto decl = ConvertActualDecl(actualDecl.get()))
 		{
 			decl->visibility = ParseVisibility(optVisNode.get());
+			ExtractAnnotations(annListNode.get(), decl->annotations);
 
 			return decl;
 		}
@@ -985,6 +987,7 @@ private:
 			const auto& classMemberNode = listNode->children[1];
 
 			// ClassMember -> AnnotationList [0] OptVisibility [1] ClassMemberDecl [2]
+			const auto& annListNode = classMemberNode->children[0];
 			const auto& optVisNode = classMemberNode->children[1];
 			const auto& classMemberDeclNode = classMemberNode->children[2];
 			const auto& actualMemberDecl = classMemberDeclNode->children[0];
@@ -992,6 +995,7 @@ private:
 			if (auto decl = ConvertActualDecl(actualMemberDecl.get()))
 			{
 				decl->visibility = ParseVisibility(optVisNode.get());
+				ExtractAnnotations(annListNode.get(), decl->annotations);
 				outMembers.push_back(std::move(decl));
 			}
 		}
@@ -1088,6 +1092,35 @@ private:
 		else if (captureList->children.size() == 1)
 		{
 			outCaptures.emplace_back(captureList->children[0]->token->lexeme);
+		}
+	}
+
+	static void ExtractAnnotations(const CstNode* listNode, std::vector<ast::Annotation>& outAnnotations)
+	{
+		// AnnotationList -> AnnotationList [0] Annotation [1] | \e
+		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
+		{
+			return;
+		}
+
+		if (listNode->children.size() == 2)
+		{
+			ExtractAnnotations(listNode->children[0].get(), outAnnotations);
+
+			const auto& annotationNode = listNode->children[1];
+			// Annotation -> @ [0] ident [1] OptParenExpr [2]
+			ast::Annotation anno;
+			anno.token = *annotationNode->children[0]->token;
+			anno.name = annotationNode->children[1]->token->lexeme;
+
+			// OptParenExpr -> ( [0] Expr [1] ) [2] | \e
+			if (const auto& optParen = annotationNode->children[2];
+				!optParen->children.empty() && optParen->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+			{
+				anno.argument = ConvertExpr(optParen->children[1].get());
+			}
+
+			outAnnotations.push_back(std::move(anno));
 		}
 	}
 };

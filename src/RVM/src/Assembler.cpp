@@ -627,6 +627,22 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		return true;
 	};
 
+	auto parseAnnotate = [&](OpCode op, const int stringArgsCount) -> bool {
+		outChunk.Write(static_cast<std::uint8_t>(op));
+		for (int i = 0; i < stringArgsCount; ++i)
+		{
+			const auto opt = lexer.next();
+			if (!opt || opt->type != TokenType::String)
+			{
+				std::cerr << "Expected string literal in ANNOTATE instruction\n";
+				return false;
+			}
+			const auto rawStr = opt->lexeme.substr(1, opt->lexeme.size() - 2);
+			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+		}
+		return true;
+	};
+
 	while (const auto tokenOpt = lexer.next())
 	{
 		const auto& token = *tokenOpt;
@@ -710,6 +726,11 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "CO_LAUNCH"_hs:       if (!parseLaunch()) return false; break;
 
 		  case "CAST"_hs:            if (!parseCast()) return false; break;
+
+		  case "ANNOTATE_TYPE"_hs:   if (!parseAnnotate(OpCode::AnnotateType, 2)) return false; break;
+		  case "ANNOTATE_FIELD"_hs:  if (!parseAnnotate(OpCode::AnnotateField, 3)) return false; break;
+		  case "ANNOTATE_METHOD"_hs: if (!parseAnnotate(OpCode::AnnotateMethod, 3)) return false; break;
+		  case "ANNOTATE_GLOBAL"_hs: if (!parseAnnotate(OpCode::AnnotateGlobal, 2)) return false; break;
 
 		  case "CALL_METHOD"_hs:     if (!parseCallMethod()) return false; break;
 		  case "CALL"_hs:   	     if (!parseCall()) return false; break;

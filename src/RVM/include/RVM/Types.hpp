@@ -149,6 +149,10 @@ struct TypeInfo : Object
 
 	std::unordered_map<String, NativeGetterFn> getters;
 
+	std::unordered_map<String, Value> annotations;
+	std::unordered_map<String, std::unordered_map<String, Value>> fieldAnnotations;
+	std::unordered_map<String, std::unordered_map<String, Value>> methodAnnotations;
+
 	AllocatorFn allocator;
 
 	explicit TypeInfo(String name);
@@ -160,6 +164,15 @@ struct TypeInfo : Object
 	TypeInfo& SetAllocator(AllocatorFn alloc);
 
 	TypeInfo& AddNativeGetter(String const& propName, NativeGetterFn function);
+
+	bool HasAnnotation(const String& annoName) const noexcept;
+	Value GetAnnotation(const String& annoName) const noexcept;
+
+	bool HasFieldAnnotation(const String& fieldName, const String& annoName) const noexcept;
+	Value GetFieldAnnotation(const String& fieldName, const String& annoName) const noexcept;
+
+	bool HasMethodAnnotation(const String& methodName, const String& annoName) const noexcept;
+	Value GetMethodAnnotation(const String& methodName, const String& annoName) const noexcept;
 
 	void Trace(VirtualMachine* vm) override;
 };
@@ -496,7 +509,20 @@ enum class OpCode : std::uint8_t
 	// ---------------------------------------------------------
 	// TYPE CAST
 	// ---------------------------------------------------------
+
 	Cast,
+
+	// ---------------------------------------------------------
+	// ANNOTATIONS
+	// ---------------------------------------------------------
+
+	AnnotateType,
+
+	AnnotateField,
+
+	AnnotateMethod,
+
+	AnnotateGlobal,
 
 	// ---------------------------------------------------------
 	// TERMINATION

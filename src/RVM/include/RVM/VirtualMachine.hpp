@@ -64,6 +64,9 @@ public:
 
 	void OnObjectAllocated() noexcept;
 
+	bool HasGlobalAnnotation(const String& globalName, const String& annoName) const noexcept;
+	Value GetGlobalAnnotation(const String& globalName, const String& annoName) const noexcept;
+
 private:
 	InterpreterResult Run();
 
@@ -88,7 +91,9 @@ private:
 private:
 	Config m_config;
 	std::size_t m_allocationCount = 0;
-	bool m_isProcessingDestructors = false; // Защита от рекурсии!
+	bool m_isProcessingDestructors = false;
+
+	std::unordered_map<String, std::unordered_map<String, Value>> m_globalAnnotations;
 
 	CoroutinePtr m_activeCoro;
 
