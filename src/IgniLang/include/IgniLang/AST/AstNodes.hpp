@@ -40,6 +40,7 @@ namespace igni::ast
 	V(DestructorDecl)   \
 	V(TypeCastExpr)     \
 	V(LambdaExpr)       \
+	V(AnnotationDecl)   \
 	V(Program)
 
 #define FORWARD_DECLARE_AST_NODE(Name) struct Name;
@@ -612,6 +613,8 @@ struct IfStmt final : Visitable<IfStmt, Statement>
 	std::unique_ptr<Block> thenBranch;
 	std::unique_ptr<Statement> elseBranch;
 
+	bool isCompileTime = false;
+
 	void Print(int depth = 0) const override
 	{
 		PrintIndent(depth);
@@ -789,6 +792,38 @@ struct GenericTypeParam
 	}
 };
 
+struct AnnotationDecl : Visitable<AnnotationDecl, Decl>
+{
+	re::String name;
+	std::vector<Parameter> parameters;
+	bool isExternal = false;
+
+	void Print(int) const override
+	{
+	}
+
+	std::unique_ptr<Decl> CloneDecl(const TypeEnv* env) const override
+	{
+		auto clone = std::make_unique<AnnotationDecl>();
+
+		clone->name = name;
+		clone->isExternal = isExternal;
+
+		for (const auto& [pName, type] : parameters)
+		{
+			Parameter newP;
+			newP.name = pName;
+			if (type)
+			{
+				newP.type = type->Clone(env);
+			}
+			clone->parameters.push_back(std::move(newP));
+		}
+
+		return clone;
+	}
+};
+
 struct ValDecl final : Visitable<ValDecl, Decl>
 {
 	re::String name;
@@ -913,13 +948,13 @@ struct FunDecl final : Visitable<FunDecl, Decl>
 		auto clone = std::make_unique<FunDecl>();
 		clone->visibility = visibility;
 		clone->name = name;
-		for (const auto& p : parameters)
+		for (const auto& [pName, type] : parameters)
 		{
 			Parameter newP;
-			newP.name = p.name;
-			if (p.type)
+			newP.name = pName;
+			if (type)
 			{
-				newP.type = p.type->Clone(env);
+				newP.type = type->Clone(env);
 			}
 			clone->parameters.push_back(std::move(newP));
 		}

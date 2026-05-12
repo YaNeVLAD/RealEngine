@@ -202,4 +202,9 @@ struct FunctionGroup final : re::utils::Clonable<FunctionGroup, SemanticType>
 	}
 };
 
+struct AnnotationType : re::utils::Clonable<AnnotationType, SemanticType>
+{
+	explicit AnnotationType(const re::String& n) { name = n; }
+};
+
 } // namespace igni::sem

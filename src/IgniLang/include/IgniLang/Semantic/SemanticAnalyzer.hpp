@@ -606,11 +606,15 @@ public:
 
 	void Visit(const ast::VarDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		Declaration::Var(node->name, node->initializer.get(), node->type.get(), m_context);
 	}
 
 	void Visit(const ast::ValDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		Declaration::Val(node->name, node->initializer.get(), node->type.get(), m_context);
 	}
 
@@ -621,6 +625,8 @@ public:
 
 	void Visit(const ast::ConstructorDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		std::shared_ptr<FunctionType> funType;
 
 		re::String lookupName = node->name;
@@ -674,6 +680,8 @@ public:
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		std::shared_ptr<FunctionType> funType;
 
 		re::String lookupName = node->name;
@@ -782,6 +790,30 @@ public:
 
 	void Visit(const ast::IfStmt* node) override
 	{
+		if (node->isCompileTime)
+		{
+			const bool conditionResult = EvaluateConstExpr(node->condition.get());
+
+			const auto mutableNode = const_cast<ast::IfStmt*>(node);
+			if (conditionResult)
+			{
+				mutableNode->elseBranch = nullptr;
+				if (node->thenBranch)
+				{
+					node->thenBranch->Accept(*this);
+				}
+			}
+			else
+			{
+				mutableNode->thenBranch = nullptr;
+				if (node->elseBranch)
+				{
+					node->elseBranch->Accept(*this);
+				}
+			}
+			return;
+		}
+
 		const auto condType = Evaluate(node->condition.get());
 		TypeResolver::ExpectAssignable(condType.get(), m_context.tBool.get(), "if condition", node);
 
@@ -883,6 +915,8 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		if (!node->typeParams.empty() || node->isExternal)
 		{ // Ignore generic and external functions
 			return;
@@ -974,6 +1008,8 @@ public:
 
 	void Visit(const ast::ClassDecl* node) override
 	{
+		ValidateAnnotations(node);
+
 		if (!node->typeParams.empty())
 		{ // Ignore generic classes declarations
 			return;
@@ -1307,7 +1343,21 @@ private:
 
 		for (std::size_t i = 0; i < originalStmtCount; ++i)
 		{
-			ast::Statement* stmt = node->statements[i].get();
+			const ast::Statement* stmt = node->statements[i].get();
+			if (const auto annoDecl = dynamic_cast<const ast::AnnotationDecl*>(stmt))
+			{
+				auto annoType = std::make_shared<AnnotationType>(annoDecl->name);
+
+				if (isGlobal)
+				{
+					m_context.env.Define(annoDecl->name, annoType, true);
+				}
+				else if (currentModule)
+				{
+					currentModule->exports[annoDecl->name] = annoType;
+				}
+				continue;
+			}
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt))
 			{
 				if (!classDecl->typeParams.empty())
@@ -1460,6 +1510,91 @@ private:
 		}
 
 		m_context.location.currentPackage = nullptr;
+	}
+
+	static bool EvaluateConstExpr(const ast::Expr* expr)
+	{
+		if (!expr)
+		{
+			return false;
+		}
+
+		if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(expr))
+		{ // Literals
+			if (lit->token.type == TokenType::KwTrue)
+			{
+				return true;
+			}
+			if (lit->token.type == TokenType::KwFalse)
+			{
+				return false;
+			}
+			if (lit->token.type == TokenType::IntConst)
+			{
+				return std::stoll(lit->token.lexeme.data()) != 0;
+			}
+			return false;
+		}
+
+		if (const auto bin = dynamic_cast<const ast::BinaryExpr*>(expr))
+		{ // Binary expressions
+			using namespace re::literals;
+			const auto hash = bin->op.Hashed();
+
+			if (hash == "and"_hs)
+			{
+				return EvaluateConstExpr(bin->left.get()) && EvaluateConstExpr(bin->right.get());
+			}
+			if (hash == "or"_hs)
+			{
+				return EvaluateConstExpr(bin->left.get()) || EvaluateConstExpr(bin->right.get());
+			}
+			if (hash == "=="_hs)
+			{
+				return EvaluateConstExpr(bin->left.get()) == EvaluateConstExpr(bin->right.get());
+			}
+			if (hash == "!="_hs)
+			{
+				return EvaluateConstExpr(bin->left.get()) != EvaluateConstExpr(bin->right.get());
+			}
+		}
+
+		if (const auto un = dynamic_cast<const ast::UnaryExpr*>(expr))
+		{ // Unary expressions
+			using namespace re::literals;
+			if (un->op.Hashed() == "!"_hs)
+			{
+				return !EvaluateConstExpr(un->operand.get());
+			}
+		}
+
+		// TODO: Add Reflection (typeOf(T).hasAnnotation(...))
+
+		IGNI_SEM_ERR(expr, "Expression cannot be evaluated at compile time");
+		return false;
+	}
+
+	void ValidateAnnotations(const ast::Decl* decl)
+	{
+		if (!decl)
+			return;
+
+		for (const auto& anno : decl->annotations)
+		{
+			const Symbol* sym = m_context.env.Resolve(anno.name);
+
+			if (!sym)
+			{
+				IGNI_SEM_ERR(decl, "Undefined annotation '" + anno.name + "'");
+			}
+
+			if (!std::dynamic_pointer_cast<AnnotationType>(sym->type))
+			{
+				IGNI_SEM_ERR(decl, "'" + anno.name + "' is not an annotation class");
+			}
+
+			// TODO Validate argument types
+		}
 	}
 };
 

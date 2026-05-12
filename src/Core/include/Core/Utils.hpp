@@ -40,7 +40,7 @@ struct Clonable : TBase
 {
 	using TBase::TBase;
 
-	typename TBase::ReturnType Clone() const override
+	TBase::ReturnType Clone() const override
 	{
 		return std::make_shared<TDerived>(static_cast<const TDerived&>(*this));
 	}

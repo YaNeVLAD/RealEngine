@@ -430,6 +430,26 @@ private:
 
 			return dtorDecl;
 		}
+		case "AnnotationDecl"_hs: {
+			// AnnotationDecl -> OptModifierList [0] annotation [1] class [2] ident [3] OptPrimaryCtor [4] ; [5]
+			auto annoDecl = std::make_unique<ast::AnnotationDecl>();
+			annoDecl->token = *actualDecl->children[1]->token;
+			annoDecl->name = actualDecl->children[3]->token->lexeme;
+
+			auto mods = ExtractModifiers(actualDecl->children[0].get());
+			annoDecl->isExternal = mods.isExternal;
+
+			if (const auto& optPrimaryCtor = actualDecl->children[4];
+				!optPrimaryCtor->children.empty() && optPrimaryCtor->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
+			{
+				// OptPrimaryCtor -> ( [0] PrimaryCtorPars [1] ) [2]
+				const auto& parsNode = optPrimaryCtor->children[1];
+
+				ExtractAnnotationParams(parsNode.get(), annoDecl->parameters);
+			}
+
+			return annoDecl;
+		}
 		default:
 			return nullptr;
 		}
@@ -728,12 +748,20 @@ private:
 
 	static std::unique_ptr<ast::IfStmt> ConvertIfStmt(const CstNode* ifNode)
 	{
+		// IfStmt -> OptCompileTime [0] if [1] ( [2] Expr [3] ) [4] Block [5] OptElse [6]
 		auto ifStmt = std::make_unique<ast::IfStmt>();
-		ifStmt->token = *ifNode->children[0]->token;
-		ifStmt->condition = ConvertExpr(ifNode->children[2].get());
-		ifStmt->thenBranch = ConvertBlock(ifNode->children[4].get());
+		ifStmt->token = *ifNode->children[1]->token;
 
-		if (const auto& optElse = ifNode->children[5]; optElse->children.size() == 2)
+		if (const auto& optCompileTime = ifNode->children[0];
+			!optCompileTime->children.empty() && optCompileTime->children[0]->symbol.Hashed() == "compile_time"_hs)
+		{
+			ifStmt->isCompileTime = true;
+		}
+
+		ifStmt->condition = ConvertExpr(ifNode->children[3].get());
+		ifStmt->thenBranch = ConvertBlock(ifNode->children[5].get());
+
+		if (const auto& optElse = ifNode->children[6]; optElse->children.size() == 2)
 		{
 			const auto& elseBody = optElse->children[1]->children[0];
 			switch (elseBody->symbol.Hashed())
@@ -979,7 +1007,7 @@ private:
 			return;
 		}
 
-		// ClassMemberList -> ClassMemberList ClassMember
+		// ClassMemberList -> ClassMemberList [0] ClassMember [1]
 		if (listNode->children.size() == 2)
 		{
 			ExtractClassMembers(listNode->children[0].get(), outMembers);
@@ -1122,6 +1150,42 @@ private:
 
 			outAnnotations.push_back(std::move(anno));
 		}
+	}
+
+	static void ExtractAnnotationParams(const CstNode* listNode, std::vector<ast::Parameter>& outParams)
+	{
+		// PrimaryCtorPars -> PrimaryCtorPars [0] , [1] PrimaryCtorPar [2] | PrimaryCtorPar [0] | \e [0]
+		if (!listNode || listNode->children.empty() || listNode->symbol.Hashed() == "<EPSILON>"_hs)
+		{
+			return;
+		}
+		if (listNode->children.size() == 1 && listNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
+		{
+			return;
+		}
+
+		if (listNode->children.size() == 3)
+		{
+			ExtractAnnotationParams(listNode->children[0].get(), outParams);
+			ParseAnnotationParam(listNode->children[2].get(), outParams);
+		}
+		else if (listNode->children.size() == 1)
+		{
+			ParseAnnotationParam(listNode->children[0].get(), outParams);
+		}
+	}
+
+	static void ParseAnnotationParam(const CstNode* parNode, std::vector<ast::Parameter>& outParams)
+	{
+		// PrimaryCtorPar -> OptValVar [0] ident [1] : [2] Type [3]
+		const re::String name = parNode->children[1]->token->lexeme;
+		auto typeNode = ConvertType(parNode->children[3].get());
+
+		ast::Parameter param;
+		param.name = name;
+		param.type = std::move(typeNode);
+
+		outParams.push_back(std::move(param));
 	}
 };
 
