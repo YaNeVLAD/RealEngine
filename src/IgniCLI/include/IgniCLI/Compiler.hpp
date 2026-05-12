@@ -169,8 +169,8 @@ public:
 		}
 
 		// --- PHASE 4: OPTIMIZATION ---
-		opt::DeadCodeEliminator dce;
-		dce.Eliminate(linkedProgram.get(), semanticAnalyzer.GetBindings());
+		// opt::DeadCodeEliminator dce;
+		// dce.Eliminate(linkedProgram.get(), semanticAnalyzer.GetBindings());
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Bytecode...\n";

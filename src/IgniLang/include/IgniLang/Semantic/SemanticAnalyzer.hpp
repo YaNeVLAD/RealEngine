@@ -183,13 +183,52 @@ public:
 			return;
 		}
 
+		bool isImplicitThis = false;
+		std::shared_ptr<SemanticType> exprType = nullptr;
+
 		const Symbol* sym = m_context.env.Resolve(node->name);
-		if (!sym)
+		const bool isGlobal = sym && GetGlobalNames().contains(node->name);
+		if (m_context.location.currentClass)
 		{
-			IGNI_SEM_ERR("Undefined variable '" + node->name + "'");
+			auto curr = m_context.location.currentClass;
+			while (curr)
+			{
+				if (auto it = curr->fields.find(node->name); it != curr->fields.end())
+				{
+					if (!sym || isGlobal)
+					{
+						isImplicitThis = true;
+						exprType = it->second.type;
+					}
+					break;
+				}
+				if (auto it = curr->methods.find(node->name); it != curr->methods.end())
+				{
+					if (!sym || isGlobal)
+					{
+						isImplicitThis = true;
+						exprType = it->second;
+					}
+					break;
+				}
+				curr = curr->baseClass;
+			}
 		}
 
-		if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(sym->type))
+		if (isImplicitThis)
+		{
+			m_context.bindings.implicitThisNames.insert(node);
+		}
+		else
+		{
+			if (!sym)
+			{
+				IGNI_SEM_ERR("Undefined variable '" + node->name + "'");
+			}
+			exprType = sym->type;
+		}
+
+		if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(exprType))
 		{
 			if (group->overloads.size() == 1 && group->templates.empty())
 			{
@@ -203,7 +242,7 @@ public:
 			}
 		}
 
-		m_currentExprType = sym->type;
+		m_currentExprType = exprType;
 	}
 
 	void Visit(const ast::MemberAccessExpr* node) override
@@ -280,10 +319,8 @@ public:
 		const auto arrType = Evaluate(node->array.get());
 		const auto indexType = Evaluate(node->index.get());
 
-		TypeResolver::ExpectAssignable(indexType.get(), m_context.tInt.get(), "array index", node);
-
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
-		{ // allow index access operation to any class with get(Int) method
+		{ // allow index access operation to any class with get(T) method
 			if (const auto it = classType->methods.find("get"); it != classType->methods.end())
 			{
 				if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
@@ -334,6 +371,12 @@ public:
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
 		{ // Explicit type arguments ident::<T>
 			callInfo.isSuperCall = id->name.Hashed() == "super"_hs;
+
+			if (m_context.bindings.implicitThisNames.contains(id))
+			{
+				callInfo.isImplicitThisCall = true;
+			}
+
 			for (const auto& t : id->typeArgs)
 			{
 				explicitTypeArgs.push_back(TypeResolver::Resolve(t.get(), m_context));
@@ -479,7 +522,8 @@ public:
 		}
 		else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
 		{ // Function or Method call overloads
-			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
+			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr || callInfo.isImplicitThisCall;
+
 			concreteTarget = resolveOverload(group, isMethodCall);
 
 			if (!concreteTarget && !group->templates.empty())
@@ -760,8 +804,36 @@ public:
 
 		// Mutability check
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->target.get()))
-		{ // val ident
-			if (const Symbol* sym = m_context.env.Resolve(id->name); sym && sym->isReadOnly)
+		{
+			if (m_context.bindings.implicitThisNames.contains(id))
+			{
+				auto curr = m_context.location.currentClass;
+				while (curr)
+				{
+					if (auto it = curr->fields.find(id->name); it != curr->fields.end())
+					{
+						if (it->second.isReadOnly)
+						{
+							bool isInsideCtor = false;
+							if (m_context.location.currentFunction)
+							{ // allow val mutations in constructor
+								if (const re::String expectedCtorName = m_context.location.currentClass->name + "_" + m_context.location.currentClass->name;
+									m_context.location.currentFunction->name.Find(expectedCtorName) != re::String::NPos)
+								{
+									isInsideCtor = true;
+								}
+							}
+							if (!isInsideCtor)
+							{
+								IGNI_SEM_ERR(node, "Cannot reassign read-only implicit field '" + id->name + "' of class '" + m_context.location.currentClass->name + "'");
+							}
+						}
+						break;
+					}
+					curr = curr->baseClass;
+				}
+			}
+			else if (const Symbol* sym = m_context.env.Resolve(id->name); sym && sym->isReadOnly)
 			{
 				IGNI_SEM_ERR("Cannot reassign to read-only variable '" + id->name + "'");
 			}

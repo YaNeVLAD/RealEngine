@@ -344,6 +344,13 @@ public:
 			name = "this";
 		}
 
+		if (m_semanticAnalyzer.GetBindings().implicitThisNames.contains(node))
+		{
+			m_out << "GET " << GetAsmName("this") << "\n";
+			m_out << "GET_PROPERTY \"" << name << "\"\n";
+			return;
+		}
+
 		if (m_importAliases.contains(name))
 		{
 			m_out << "GET_GLOBAL \"" << m_importAliases.at(name) << "\"\n";
@@ -381,7 +388,17 @@ public:
 		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->target.get()))
 		{
 			const auto& name = id->name;
-			if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
+			if (m_semanticAnalyzer.GetBindings().implicitThisNames.contains(id))
+			{
+				m_out << "GET " << GetAsmName("this") << "\n";
+				if (node->value)
+				{
+					node->value->Accept(*this);
+				}
+				m_out << "SET_PROPERTY \"" << name << "\"\n";
+				m_out << "CONST 0\n";
+			}
+			else if (const auto upIt = std::ranges::find(m_currentUpvalues, name); upIt != m_currentUpvalues.end())
 			{
 				m_out << "GET_UPVALUE " << std::distance(m_currentUpvalues.begin(), upIt) << "\n";
 				if (node->value)
@@ -461,6 +478,11 @@ public:
 
 		bool hasSelf = false;
 		if (callInfo.isSuperCall)
+		{
+			m_out << "GET " << GetAsmName("this") << "\n";
+			hasSelf = true;
+		}
+		else if (callInfo.isImplicitThisCall)
 		{
 			m_out << "GET " << GetAsmName("this") << "\n";
 			hasSelf = true;

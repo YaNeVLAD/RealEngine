@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace igni
 {
@@ -31,6 +32,7 @@ struct CallInfo
 	bool isConstructorCall = false;
 	bool isSuperCall = false;
 	bool isVarargCall = false;
+	bool isImplicitThisCall = false;
 
 	std::size_t varargCount = 0;
 
@@ -70,6 +72,8 @@ public:
 	std::unordered_map<const ast::TypeCastExpr*, re::String> castTargets;
 
 	std::unordered_map<const ast::LambdaExpr*, LambdaMeta> lambdaMeta;
+
+	std::unordered_set<const ast::IdentifierExpr*> implicitThisNames;
 
 	void SetExpressionType(const ast::Expr* expr, std::shared_ptr<sem::SemanticType> type)
 	{
