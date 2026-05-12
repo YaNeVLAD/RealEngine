@@ -22,6 +22,8 @@ external fun println(args: Any...): Unit;
 
 external fun clock(): Double;
 
+external fun typeof(obj: Any): Type;
+
 external class <T> Array(size: Int) {
 
     external val size: Int;
@@ -162,4 +164,10 @@ external class String {
 
     fun isNotEmpty() = this.size != 0;
 
+}
+
+external class Type {
+    external fun hasAnnotation(annoName: String): Bool;
+    external fun hasFieldAnnotation(fieldName: String, annoName: String): Bool;
+    external fun hasMethodAnnotation(methodName: String, annoName: String): Bool;
 }

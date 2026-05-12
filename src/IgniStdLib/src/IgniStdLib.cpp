@@ -223,6 +223,33 @@ void InitMathModule(re::rvm::VirtualMachine* vm)
 }
 
 } // namespace
+void InitTypeMethods(const re::rvm::TypeInfoPtr& typeInfoType)
+{
+	using namespace re::rvm;
+
+	typeInfoType->AddNativeMethod("hasAnnotation", 1, [](const std::vector<Value>& args) -> Value {
+		const auto& self = std::get<TypeInfoPtr>(args[0]);
+		const auto& annotation = std::get<re::String>(args[1]);
+
+		return self->HasAnnotation(annotation) ? 1 : 0;
+	});
+
+	typeInfoType->AddNativeMethod("hasFieldAnnotation", 2, [](const std::vector<Value>& args) -> Value {
+		const auto& self = std::get<TypeInfoPtr>(args[0]);
+		const auto& fieldName = std::get<re::String>(args[1]);
+		const auto& annotation = std::get<re::String>(args[2]);
+
+		return self->HasFieldAnnotation(fieldName, annotation) ? 1 : 0;
+	});
+
+	typeInfoType->AddNativeMethod("hasMethodAnnotation", 2, [](const std::vector<Value>& args) -> Value {
+		const auto& self = std::get<TypeInfoPtr>(args[0]);
+		const auto& methodName = std::get<re::String>(args[1]);
+		const auto& annotation = std::get<re::String>(args[2]);
+
+		return self->HasMethodAnnotation(methodName, annotation) ? 1 : 0;
+	});
+}
 
 IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 {
@@ -236,6 +263,11 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 	if (const auto arrayType = vm->GetTypeByName("String"))
 	{
 		InitStringMethods(arrayType);
+	}
+
+	if (const auto typeInfoType = vm->GetTypeByName("Type"))
+	{
+		InitTypeMethods(typeInfoType);
 	}
 
 	InitMathModule(vm);
@@ -327,5 +359,19 @@ IGNI_STD_API void IgniPluginInit(re::rvm::VirtualMachine* vm)
 		double seconds = std::chrono::duration<double>(now).count();
 
 		return seconds;
+	});
+
+	vm->RegisterNative("typeof", [vm](const std::vector<Value>& args) -> Value {
+		if (args.empty())
+		{
+			return Null;
+		}
+
+		if (auto typeInfo = vm->GetType(args[0]))
+		{
+			return typeInfo;
+		}
+
+		return Null;
 	});
 }

@@ -347,6 +347,40 @@ public:
 			}
 		}
 
+		// === COMPILER INTRINSICS ===
+		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+		{ // typeof(expr)
+			if (id->name == "typeof" && node->arguments.size() == 1)
+			{
+				Evaluate(node->arguments[0].get());
+
+				callInfo.dispatchMode = CallDispatchType::TypeOf;
+				callInfo.target = nullptr;
+
+				m_currentExprType = m_context.tType;
+				m_context.bindings.callInfo[node] = callInfo;
+				return;
+			}
+
+			if (id->name == "Type" && !id->typeArgs.empty() && node->arguments.empty())
+			{ // Type::<T>()
+				auto targetType = TypeResolver::Resolve(id->typeArgs[0].get(), m_context);
+				if (!targetType)
+				{
+					IGNI_SEM_ERR(node, "Unknown type in Type::<T>()");
+				}
+
+				callInfo.dispatchMode = CallDispatchType::TypeLiteral;
+				callInfo.asmLabel = targetType->name;
+				callInfo.target = nullptr;
+
+				m_currentExprType = m_context.tType;
+				m_context.bindings.callInfo[node] = callInfo;
+				return;
+			}
+		}
+		// ===========================
+
 		std::shared_ptr<FunctionType> concreteTarget = nullptr;
 		bool isMethodCall = false;
 		bool isIndirectCall = false;
@@ -1279,6 +1313,7 @@ private:
 		m_context.env.Define("String", m_context.tString, true);
 		m_context.env.Define("Unit", m_context.tUnit, true);
 		m_context.env.Define("Any", m_context.tAny, true);
+		m_context.env.Define("Type", m_context.tType, true);
 	}
 
 	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)
@@ -1512,7 +1547,21 @@ private:
 		m_context.location.currentPackage = nullptr;
 	}
 
-	static bool EvaluateConstExpr(const ast::Expr* expr)
+	static re::String ExtractStringLiteral(const ast::Expr* expr)
+	{
+		if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(expr))
+		{
+			if (lit->token.type == TokenType::StringConst)
+			{
+				return lit->token.lexeme.substr(1, lit->token.lexeme.length() - 2);
+			}
+		}
+		IGNI_SEM_ERR(expr, "Expected compile-time string literal");
+
+		return {};
+	}
+
+	bool EvaluateConstExpr(const ast::Expr* expr)
 	{
 		if (!expr)
 		{
@@ -1568,7 +1617,68 @@ private:
 			}
 		}
 
-		// TODO: Add Reflection (typeOf(T).hasAnnotation(...))
+		if (const auto call = dynamic_cast<const ast::CallExpr*>(expr))
+		{
+			if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(call->callee.get()))
+			{
+				// Если мы вызываем метод у Type::<T>().hasAnnotation(...)
+				if (const auto innerCall = dynamic_cast<const ast::CallExpr*>(memAccess->object.get()))
+				{
+					if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(innerCall->callee.get()))
+					{
+						if (id->name == "Type" && !id->typeArgs.empty())
+						{
+							const auto targetType = TypeResolver::Resolve(id->typeArgs[0].get(), m_context);
+							const auto classType = std::dynamic_pointer_cast<ClassType>(targetType);
+
+							if (!classType || !classType->classDecl)
+							{
+								return false;
+							}
+
+							// Обработка Type::<T>().hasAnnotation("Name")
+							if (memAccess->member == "hasAnnotation" && call->arguments.size() == 1)
+							{
+								const auto annoName = ExtractStringLiteral(call->arguments[0].get());
+								for (const auto& anno : classType->classDecl->annotations)
+								{
+									if (anno.name == annoName)
+									{
+										return true;
+									}
+								}
+								return false;
+							}
+
+							// Обработка Type::<T>().hasMethodAnnotation("Method", "Name")
+							if (memAccess->member == "hasMethodAnnotation" && call->arguments.size() == 2)
+							{
+								const auto methodName = ExtractStringLiteral(call->arguments[0].get());
+								const auto annoName = ExtractStringLiteral(call->arguments[1].get());
+
+								for (const auto& member : classType->classDecl->members)
+								{
+									if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
+									{
+										if (fun->name == methodName)
+										{
+											for (const auto& anno : fun->annotations)
+											{
+												if (anno.name == annoName)
+												{
+													return true;
+												}
+											}
+										}
+									}
+								}
+								return false;
+							}
+						}
+					}
+				}
+			}
+		}
 
 		IGNI_SEM_ERR(expr, "Expression cannot be evaluated at compile time");
 		return false;

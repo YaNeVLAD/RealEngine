@@ -578,6 +578,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
 		outChunk.Write(PATCH_VALUE);
+
 		return true;
 	};
 
@@ -596,6 +597,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
 		outChunk.Write(PATCH_VALUE);
+
 		return true;
 	};
 
@@ -608,6 +610,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineLaunch));
 		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+
 		return true;
 	};
 
@@ -640,6 +643,23 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			const auto rawStr = opt->lexeme.substr(1, opt->lexeme.size() - 2);
 			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
+
+		return true;
+	};
+
+	auto parseLoadType = [&]() -> bool {
+		const auto argOpt = lexer.next();
+		if (!argOpt || argOpt->type != TokenType::String)
+		{
+			std::cerr << "Expected string literal after LOAD_TYPE\n";
+			return false;
+		}
+
+		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+
+		outChunk.Write(static_cast<std::uint8_t>(OpCode::LoadType));
+		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
+
 		return true;
 	};
 
@@ -703,6 +723,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "GET_PROPERTY"_hs:    if (!parseGetProperty()) return false; break;
 		  case "SET_PROPERTY"_hs:    if (!parseSetProperty()) return false; break;
 		  case "TYPE_OF"_hs:         outChunk.Write(static_cast<std::uint8_t>(OpCode::TypeOf)); break;
+		  case "LOAD_TYPE"_hs:       if (!parseLoadType()) return false; break;
 		  case "TYPE"_hs:            if (!parseType()) return false; break;
 
 		  case "BOX"_hs:             outChunk.Write(static_cast<uint8_t>(OpCode::Box)); break;

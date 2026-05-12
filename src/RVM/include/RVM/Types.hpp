@@ -448,6 +448,9 @@ enum class OpCode : std::uint8_t
 	// Description: Pops a value and pushes its corresponding TypeInfo object.
 	TypeOf,
 
+	// Bytecode: [LoadType, const_index_string]
+	LoadType,
+
 	// Bytecode: [DefType, field_count]
 	// Stack: ..., [field_nameN], ..., [type_name] -> ...
 	// Description: Reads 1 byte (fields count). Pops field names and the type name

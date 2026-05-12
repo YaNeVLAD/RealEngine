@@ -17,7 +17,9 @@ enum class CallDispatchType
 	Static,
 	Virtual,
 	Native,
-	Indirect
+	Indirect,
+	TypeOf,
+	TypeLiteral,
 };
 
 struct CallInfo

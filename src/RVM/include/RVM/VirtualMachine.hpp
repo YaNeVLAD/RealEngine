@@ -108,6 +108,7 @@ private:
 	TypeInfoPtr m_typeString;
 	TypeInfoPtr m_typeArray;
 	TypeInfoPtr m_typeNull;
+	TypeInfoPtr m_typeTypeInfo;
 
 	const Chunk* m_chunk = nullptr;
 	const std::uint8_t* m_ip = nullptr;

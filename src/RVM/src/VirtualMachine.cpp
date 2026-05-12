@@ -921,6 +921,17 @@ InterpreterResult VirtualMachine::Run()
 			break;
 		}
 
+		case OpCode::LoadType: {
+			Value typeNameVal = READ_CONSTANT();
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in LOAD_TYPE");
+			}
+			Push(typeInfo);
+			break;
+		}
+
 		case OpCode::Return: {
 			Value retVal = Null;
 			if (!m_stack.empty())
@@ -1123,11 +1134,13 @@ void VirtualMachine::InitBuiltinTypes()
 	m_typeString = Allocate<TypeInfo>(String("String"));
 	m_typeNull = Allocate<TypeInfo>(String("Null"));
 	m_typeArray = Allocate<TypeInfo>(String("Array"));
+	m_typeTypeInfo = Allocate<TypeInfo>(String("Type"));
 
 	m_types[m_typeInt->name] = m_typeInt;
 	m_types[m_typeDouble->name] = m_typeDouble;
 	m_types[m_typeString->name] = m_typeString;
 	m_types[m_typeArray->name] = m_typeArray;
+	m_types[m_typeTypeInfo->name] = m_typeTypeInfo;
 }
 
 void VirtualMachine::SaveContext()

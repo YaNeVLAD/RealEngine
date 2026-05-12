@@ -510,6 +510,12 @@ public:
 		case CallDispatchType::Indirect:
 			m_out << "CALL_INDIRECT " << passedArgs << "\n";
 			break;
+		case CallDispatchType::TypeOf:
+			m_out << "TYPE_OF\n";
+			break;
+		case CallDispatchType::TypeLiteral:
+			m_out << "LOAD_TYPE \"" << callInfo.asmLabel << "\"\n";
+			break;
 		}
 
 		if (callInfo.isConstructorCall)

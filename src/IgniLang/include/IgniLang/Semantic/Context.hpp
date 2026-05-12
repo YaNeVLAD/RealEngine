@@ -53,6 +53,8 @@ struct SemanticContext
 	std::shared_ptr<ClassType> tBool = std::make_shared<ClassType>("Bool");
 	std::shared_ptr<ClassType> tString = std::make_shared<ClassType>("String");
 	std::shared_ptr<ClassType> tAny = std::make_shared<ClassType>("Any");
+	std::shared_ptr<ClassType> tType = std::make_shared<ClassType>("Type");
+
 	std::shared_ptr<PrimitiveType> tUnit = std::make_shared<PrimitiveType>("Unit");
 	std::shared_ptr<PrimitiveType> tNull = std::make_shared<PrimitiveType>("Null");
 
