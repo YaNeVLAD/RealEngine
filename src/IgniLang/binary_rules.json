@@ -1,9 +1,0 @@
-{
-  "binary_operations": [
-    {"op": "+", "lhs": "Int", "rhs": "Int", "result": "Int"},
-    {"op": "+", "lhs": "Double", "rhs": "Double", "result": "Double"},
-    {"op": "+", "lhs": "Int", "rhs": "Double", "result": "Double"},
-    {"op": "+", "lhs": "Double", "rhs": "Int", "result": "Double"},
-    {"op": "+", "lhs": "String", "rhs": "String", "result": "String"}
-  ]
-}
