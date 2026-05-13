@@ -1,0 +1,16 @@
+{
+  "binary_operations": [
+    {"op": "+", "lhs": "Int", "rhs": "Int", "result": "Int"},
+    {"op": "+", "lhs": "Double", "rhs": "Double", "result": "Double"}
+  ],
+  "unary_operations": [
+    {"op": "-", "operand": "Int", "result": "Int"},
+    {"op": "-", "operand": "Double", "result": "Double"},
+    {"op": "!", "operand": "Bool", "result": "Bool"},
+    {"op": "~", "operand": "Int", "result": "Int"}
+  ],
+  "valid_primitive_casts": [
+    {"from": "Double", "to": "Int"},
+    {"from": "Int", "to": "Double"}
+  ]
+}
