@@ -2,9 +2,12 @@
 #include <iostream>
 
 #include "Builder.hpp"
+
 #include "Emitters/BinaryOpsEmitter.hpp"
 #include "Emitters/CastRulesEmitter.hpp"
+#include "Emitters/ImplicitPromotionsEmitter.hpp"
 #include "Emitters/UnaryOpsEmitter.hpp"
+
 #include "GeneratorEngine.hpp"
 
 #include <nlohmann/json.hpp>
@@ -39,7 +42,8 @@ int main(const int argc, char** argv)
 	GeneratorEngine<
 		BinaryOpsEmitter,
 		UnaryOpsEmitter,
-		CastRulesEmitter>
+		CastRulesEmitter,
+		ImplicitPromotionsEmitter>
 		engine;
 
 	engine.Run(data, builder);

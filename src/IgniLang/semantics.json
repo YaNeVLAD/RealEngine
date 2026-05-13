@@ -12,5 +12,8 @@
   "valid_primitive_casts": [
     {"from": "Double", "to": "Int"},
     {"from": "Int", "to": "Double"}
+  ],
+  "implicit_promotions": [
+    {"from": "Int", "to": "Double"}
   ]
 }

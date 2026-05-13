@@ -3,11 +3,13 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
+#include <IgniLang/Semantic/Helpers/CallResolver.hpp>
 #include <IgniLang/Semantic/Helpers/CallValidator.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Overload.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Variable.hpp>
 #include <IgniLang/Semantic/Helpers/Export.hpp>
+#include <IgniLang/Semantic/Helpers/FunctionAnalyzer.hpp>
 #include <IgniLang/Semantic/Helpers/Generic/Class.hpp>
 #include <IgniLang/Semantic/Helpers/Generic/Function.hpp>
 #include <IgniLang/Semantic/Helpers/Import.hpp>
@@ -356,326 +358,7 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
-		CallInfo callInfo;
-		callInfo.isSuperCall = false;
-
-		const auto calleeType = Evaluate(node->callee.get());
-
-		std::vector<std::shared_ptr<SemanticType>> argTypes;
-		for (std::size_t i = 0; i < node->arguments.size(); ++i)
-		{
-			argTypes.emplace_back(Evaluate(node->arguments[i].get()));
-		}
-
-		std::vector<std::shared_ptr<SemanticType>> explicitTypeArgs;
-		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-		{ // Explicit type arguments ident::<T>
-			callInfo.isSuperCall = id->name.Hashed() == "super"_hs;
-
-			if (m_context.bindings.implicitThisNames.contains(id))
-			{
-				callInfo.isImplicitThisCall = true;
-			}
-
-			for (const auto& t : id->typeArgs)
-			{
-				explicitTypeArgs.push_back(TypeResolver::Resolve(t.get(), m_context));
-			}
-		}
-		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-		{
-			for (const auto& t : memAccess->typeArgs)
-			{
-				explicitTypeArgs.push_back(TypeResolver::Resolve(t.get(), m_context));
-			}
-		}
-
-		// === COMPILER INTRINSICS ===
-		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-		{ // typeof(expr)
-			if (id->name == "typeof" && node->arguments.size() == 1)
-			{
-				Evaluate(node->arguments[0].get());
-
-				callInfo.dispatchMode = CallDispatchType::TypeOf;
-				callInfo.target = nullptr;
-
-				m_currentExprType = m_context.tType;
-				m_context.bindings.callInfo[node] = callInfo;
-				return;
-			}
-
-			if (id->name == "Type" && !id->typeArgs.empty() && node->arguments.empty())
-			{ // Type::<T>()
-				auto targetType = TypeResolver::Resolve(id->typeArgs[0].get(), m_context);
-				if (!targetType)
-				{
-					IGNI_SEM_ERR(node, "Unknown type in Type::<T>()");
-				}
-
-				callInfo.dispatchMode = CallDispatchType::TypeLiteral;
-				callInfo.asmLabel = targetType->name;
-				callInfo.target = nullptr;
-
-				m_currentExprType = m_context.tType;
-				m_context.bindings.callInfo[node] = callInfo;
-				return;
-			}
-		}
-		// ===========================
-
-		std::shared_ptr<FunctionType> concreteTarget = nullptr;
-		bool isMethodCall = false;
-		bool isIndirectCall = false;
-		bool isGenericInstantiation = false;
-
-		auto resolveOverload = [&](const std::shared_ptr<FunctionGroup>& group, bool isMethod) -> std::shared_ptr<FunctionType> {
-			std::shared_ptr<FunctionType> bestMatch = nullptr;
-			int matchCount = 0;
-			for (const auto& overload : group->overloads)
-			{
-				if (CallValidator::IsApplicable(overload.get(), argTypes, isMethod))
-				{
-					bestMatch = overload;
-					matchCount++;
-				}
-			}
-			if (matchCount > 1)
-			{
-				IGNI_SEM_ERR(node, "Ambiguous call: multiple matching overloads found");
-			}
-			return bestMatch;
-		};
-
-		if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(calleeType))
-		{ // Generic class constructor
-			if (explicitTypeArgs.empty())
-			{
-				const ast::ConstructorDecl* ctorAst = nullptr;
-				for (const auto& member : classTmpl->astNode->members)
-				{ // Finding constructor in class members
-					if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
-					{ // TODO: Think of generics overloads for constructors
-						ctorAst = ctor;
-						break;
-					}
-				}
-
-				if (ctorAst)
-				{
-					explicitTypeArgs.resize(classTmpl->typeParams.size(), nullptr);
-
-					// Here generic class is not yet instantiated, so we don't need to add 'this' as the first argument
-					for (std::size_t i = 0; i < argTypes.size() && i < ctorAst->parameters.size(); ++i)
-					{
-						TypeResolver::InferTypeArguments(argTypes[i], ctorAst->parameters[i].type.get(), classTmpl->typeParams, explicitTypeArgs);
-					}
-					for (const auto& arg : explicitTypeArgs)
-					{
-						if (!arg)
-						{
-							IGNI_SEM_ERR("Could not infer type arguments for generic class '" + classTmpl->name + "'. Use explicit ::<T> syntax.");
-						}
-					}
-				}
-				else
-				{
-					IGNI_SEM_ERR("Generic class '" + classTmpl->name + "' has no parameters to infer types from. Use explicit ::<T> syntax.");
-				}
-			}
-
-			const auto concreteClass = m_context.instantiateClassCallback(classTmpl, explicitTypeArgs);
-			const auto it = concreteClass->methods.find(concreteClass->name);
-			if (it == concreteClass->methods.end())
-			{
-				IGNI_SEM_ERR("Constructor not found for generic class '" + concreteClass->name + "'");
-			}
-
-			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
-			{
-				concreteTarget = resolveOverload(group, true);
-			}
-
-			callInfo.isConstructorCall = true;
-			callInfo.mangledClassName = classTmpl->astNode->isExternal ? classTmpl->name : concreteClass->name;
-			isMethodCall = true;
-
-			if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
-			{
-				id->name = classTmpl->astNode->isExternal ? classTmpl->name : concreteClass->name;
-			}
-		}
-		else if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
-		{ // Non-generic class constructor
-			const auto it = classType->methods.find(classType->name);
-			if (it == classType->methods.end())
-				IGNI_SEM_ERR(node, "Constructor not found for class '" + classType->name + "'");
-
-			if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
-			{
-				concreteTarget = resolveOverload(group, true);
-			}
-
-			callInfo.isConstructorCall = true;
-			callInfo.mangledClassName = classType->name;
-			isMethodCall = true;
-		}
-		else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
-		{ // Function or Method call overloads
-			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr || callInfo.isImplicitThisCall;
-
-			concreteTarget = resolveOverload(group, isMethodCall);
-
-			if (!concreteTarget && !group->templates.empty())
-			{
-				// TODO: Add generic function instantiation like SFINAE
-				concreteTarget = CallValidator::ResolveAndInstantiateGeneric(group->templates[0], explicitTypeArgs, argTypes, m_context);
-				isGenericInstantiation = true;
-			}
-		}
-		else if (const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType))
-		{ // Non-generic function fallback (e.g. lambda variables)
-			isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
-			concreteTarget = funType;
-
-			isIndirectCall = true;
-			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-			{
-				if (m_context.bindings.resolvedNames.contains(id))
-				{
-					isIndirectCall = false;
-				}
-			}
-			else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-			{
-				if (m_context.bindings.resolvedMembers.contains(memAccess))
-				{
-					isIndirectCall = false;
-				}
-			}
-		}
-		else
-		{
-			IGNI_SEM_ERR("Attempt to call a non-callable type");
-		}
-
-		if (!concreteTarget)
-		{
-			IGNI_SEM_ERR("No matching overload found for call to '" + re::String(node->callee ? node->callee->token.lexeme : "unknown") + "'");
-		}
-
-		callInfo.target = concreteTarget;
-
-		if (concreteTarget->isSuspend && !m_context.location.isInsideLaunch)
-		{
-			if (!m_context.location.currentFunction || !m_context.location.currentFunction->isSuspend)
-			{
-				IGNI_SEM_ERR("Suspend function '" + concreteTarget->name + "' can only be called from a coroutine or another suspend function. Use 'launch'.");
-			}
-		}
-
-		if (callInfo.isSuperCall)
-		{ // super(Args...) constructor call
-			const Symbol* sym = m_context.env.Resolve("this");
-			if (!sym)
-			{
-				IGNI_SEM_ERR(node, "Undefined variable 'this'");
-			}
-
-			argTypes.insert(argTypes.begin(), sym->type);
-			callInfo.isConstructorCall = false;
-			isMethodCall = false;
-		}
-
-		re::String rawTargetName = "";
-		if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
-		{
-			rawTargetName = id->name;
-		}
-		else if (const auto mem = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
-		{
-			rawTargetName = mem->member;
-		}
-
-		if (isIndirectCall)
-		{
-			callInfo.dispatchMode = CallDispatchType::Indirect;
-		}
-		else if (callInfo.isSuperCall)
-		{
-			callInfo.dispatchMode = CallDispatchType::Static;
-			callInfo.asmLabel = concreteTarget->name;
-		}
-		else if (callInfo.isConstructorCall)
-		{
-			callInfo.dispatchMode = concreteTarget->isExternal ? CallDispatchType::Virtual : CallDispatchType::Static;
-			callInfo.asmLabel = concreteTarget->isExternal ? "init" : concreteTarget->name;
-		}
-		else
-		{
-			bool isExternalClassMethod = false;
-
-			if (isMethodCall && !concreteTarget->paramTypes.empty())
-			{
-				if (auto classType = std::dynamic_pointer_cast<ClassType>(concreteTarget->paramTypes[0]))
-				{
-					isExternalClassMethod = classType->classDecl ? classType->classDecl->isExternal : true;
-				}
-				else if (auto genClass = std::dynamic_pointer_cast<GenericClassTemplate>(concreteTarget->paramTypes[0]))
-				{
-					isExternalClassMethod = genClass->astNode ? genClass->astNode->isExternal : true;
-				}
-			}
-
-			if (concreteTarget->isExternal)
-			{
-				if (isMethodCall)
-				{
-					callInfo.dispatchMode = CallDispatchType::Virtual;
-					callInfo.asmLabel = rawTargetName;
-				}
-				else
-				{
-					callInfo.dispatchMode = CallDispatchType::Native;
-					callInfo.asmLabel = rawTargetName;
-				}
-			}
-			else if (isMethodCall && !isGenericInstantiation && !isExternalClassMethod)
-			{
-				callInfo.dispatchMode = CallDispatchType::Virtual;
-				callInfo.asmLabel = rawTargetName;
-			}
-			else
-			{
-				callInfo.dispatchMode = CallDispatchType::Static;
-				callInfo.asmLabel = concreteTarget->name;
-			}
-		}
-
-		CallValidator::ValidateArguments(node, concreteTarget.get(), argTypes, isMethodCall, callInfo);
-
-		if (concreteTarget->returnType == nullptr)
-		{
-			IGNI_SEM_ERR("Cannot infer return type for forward call of '" + concreteTarget->name + "'.");
-		}
-
-		m_context.bindings.callInfo[node] = callInfo;
-
-		if (callInfo.isConstructorCall)
-		{
-			if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
-			{
-				m_currentExprType = classType;
-			}
-			else
-			{
-				m_currentExprType = concreteTarget->paramTypes[0];
-			}
-		}
-		else
-		{
-			m_currentExprType = concreteTarget->returnType;
-		}
+		m_currentExprType = CallResolver::Process(node, m_context);
 	}
 
 	// ==========================================
@@ -704,97 +387,39 @@ public:
 	void Visit(const ast::ConstructorDecl* node) override
 	{
 		ValidateAnnotations(node);
+		const re::String lookupName = m_context.bindings.funMeta.contains(node)
+			? m_context.bindings.funMeta.at(node).mangledName
+			: node->name;
 
-		std::shared_ptr<FunctionType> funType;
-
-		re::String lookupName = node->name;
-		if (m_context.bindings.funMeta.contains(node))
-		{
-			lookupName = m_context.bindings.funMeta.at(node).mangledName;
-		}
-
-		if (m_context.instantiatedFunctions.contains(lookupName))
-		{
-			funType = m_context.instantiatedFunctions.at(lookupName);
-		}
-
+		const auto funType = m_context.instantiatedFunctions.at(lookupName);
 		if (!funType)
 		{
 			IGNI_SEM_ERR("Cannot resolve constructor '" + node->name + "'");
 		}
 
-		m_context.env.PushScope();
-		m_context.env.Define("this", funType->paramTypes[0], false);
-
-		for (std::size_t i = 0; i < node->parameters.size(); ++i)
-		{
-			std::shared_ptr<SemanticType> paramType = funType->paramTypes[i + 1];
-			if (node->isVararg && i == node->parameters.size() - 1)
-			{
-				paramType = GetVarargArrayType(paramType);
-			}
-			m_context.env.Define(node->parameters[i].name, paramType, false);
-		}
-
-		const auto previousReturnType = m_context.location.currentReturnType;
-		const auto previousFunctionType = m_context.location.currentFunction;
-
-		m_context.location.currentReturnType = funType->returnType;
-		m_context.location.currentFunction = funType;
-
-		if (node->body)
-		{
-			node->body->Accept(*this);
-		}
-		else if (!node->isExternal)
+		if (!node->body && !node->isExternal)
 		{
 			IGNI_SEM_ERR("Non-external constructor must have a body");
 		}
 
-		m_context.location.currentReturnType = previousReturnType;
-		m_context.location.currentFunction = previousFunctionType;
-		m_context.env.PopScope();
+		FunctionAnalyzer::AnalyzeBody(*this, m_context, funType, node->parameters, node->body.get(), true, m_context.location.currentClass);
 	}
 
 	void Visit(const ast::DestructorDecl* node) override
 	{
 		ValidateAnnotations(node);
 
-		std::shared_ptr<FunctionType> funType;
+		const re::String lookupName = m_context.bindings.funMeta.contains(node)
+			? m_context.bindings.funMeta.at(node).mangledName
+			: node->name;
 
-		re::String lookupName = node->name;
-		if (m_context.bindings.funMeta.contains(node))
-		{
-			lookupName = m_context.bindings.funMeta.at(node).mangledName;
-		}
-
-		if (m_context.instantiatedFunctions.contains(lookupName))
-		{
-			funType = m_context.instantiatedFunctions.at(lookupName);
-		}
-
+		const auto funType = m_context.instantiatedFunctions.at(lookupName);
 		if (!funType)
 		{
 			IGNI_SEM_ERR("Cannot resolve destructor '" + node->name + "'");
 		}
 
-		m_context.env.PushScope();
-		m_context.env.Define("this", funType->paramTypes[0], false);
-
-		const auto previousReturnType = m_context.location.currentReturnType;
-		const auto previousFunctionType = m_context.location.currentFunction;
-
-		m_context.location.currentReturnType = funType->returnType;
-		m_context.location.currentFunction = funType;
-
-		if (node->body)
-		{
-			node->body->Accept(*this);
-		}
-
-		m_context.location.currentReturnType = previousReturnType;
-		m_context.location.currentFunction = previousFunctionType;
-		m_context.env.PopScope();
+		FunctionAnalyzer::AnalyzeBody(*this, m_context, funType, {}, node->body.get(), true, m_context.location.currentClass);
 	}
 
 	void Visit(const ast::AssignExpr* node) override
@@ -1029,18 +654,16 @@ public:
 		}
 
 		std::shared_ptr<FunctionType> funType;
+		bool isMethod = false;
+		std::shared_ptr<ClassType> parentClass = nullptr;
 
 		if (m_context.location.currentFunction != nullptr)
 		{ // Local function
 			funType = std::make_shared<FunctionType>(node->name);
 			funType->isSuspend = node->isSuspend;
 			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
-			if (funType->returnType == nullptr && !node->isExprBody)
-			{
-				funType->returnType = m_context.tUnit;
-			}
-
 			funType->isVararg = node->isVararg;
+
 			for (const auto& [_, type] : node->parameters)
 			{
 				funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
@@ -1049,67 +672,28 @@ public:
 		}
 		else
 		{ // Global function or Class method
-			re::String lookupName = node->name;
-			if (m_context.bindings.funMeta.contains(node))
-			{
-				lookupName = m_context.bindings.funMeta.at(node).mangledName;
-			}
+			const re::String lookupName = m_context.bindings.funMeta.contains(node)
+				? m_context.bindings.funMeta.at(node).mangledName
+				: node->name;
 
-			if (m_context.instantiatedFunctions.contains(lookupName))
-			{
-				funType = m_context.instantiatedFunctions.at(lookupName);
-			}
-
+			funType = m_context.instantiatedFunctions.at(lookupName);
 			if (!funType)
 			{
 				IGNI_SEM_ERR(node, "Cannot resolve function '" + node->name + "'");
 			}
-		}
 
-		m_context.env.PushScope();
-
-		bool isMethod = false;
-		if (m_context.bindings.funMeta.contains(node))
-		{
-			const auto& meta = m_context.bindings.funMeta.at(node);
-			isMethod = meta.isMethod;
-			if (isMethod)
+			if (m_context.bindings.funMeta.contains(node))
 			{
-				m_context.env.Define("this", GetClassType(meta.parentClass), false);
+				const auto& meta = m_context.bindings.funMeta.at(node);
+				isMethod = meta.isMethod;
+				if (isMethod)
+				{
+					parentClass = GetClassType(meta.parentClass);
+				}
 			}
 		}
 
-		for (std::size_t i = 0; i < node->parameters.size(); ++i)
-		{
-			const std::size_t typeIdx = isMethod ? i + 1 : i;
-
-			std::shared_ptr<SemanticType> paramType = funType->paramTypes[typeIdx];
-			if (node->isVararg && i == node->parameters.size() - 1)
-			{
-				paramType = GetVarargArrayType(paramType);
-			}
-			m_context.env.Define(node->parameters[i].name, paramType, false);
-		}
-
-		const auto previousReturnType = m_context.location.currentReturnType;
-		const auto previousFunctionType = m_context.location.currentFunction;
-
-		m_context.location.currentReturnType = funType->returnType;
-		m_context.location.currentFunction = funType;
-
-		if (node->body)
-		{
-			node->body->Accept(*this);
-		}
-
-		if (m_context.location.currentFunction->returnType == nullptr)
-		{ // No return in function -> fallback to Unit
-			m_context.location.currentFunction->returnType = m_context.tUnit;
-		}
-
-		m_context.location.currentReturnType = previousReturnType;
-		m_context.location.currentFunction = previousFunctionType;
-		m_context.env.PopScope();
+		FunctionAnalyzer::AnalyzeBody(*this, m_context, funType, node->parameters, node->body.get(), isMethod, parentClass);
 	}
 
 	void Visit(const ast::ClassDecl* node) override
@@ -1304,66 +888,38 @@ public:
 	{
 		re::String lambdaName = "__lambda_" + std::to_string(m_context.lambdaCounter++);
 
-		const auto funType = std::make_shared<FunctionType>(lambdaName);
+		auto funType = std::make_shared<FunctionType>(lambdaName);
 		funType->isVararg = node->isVararg;
 
-		// 2. Создаем изолированный Scope для тела лямбды
-		m_context.env.PushScope();
-
-		// 3. Вносим ЗАХВАЧЕННЫЕ переменные в Scope лямбды
-		for (const auto& cap : node->captures)
-		{
-			const Symbol* sym = m_context.env.Resolve(cap);
-			if (!sym)
-			{
-				IGNI_SEM_ERR(node, "Cannot capture undefined variable '" + cap + "'");
-			}
-
-			// Определяем их внутри лямбды
-			m_context.env.Define(cap, sym->type, false);
-		}
-
-		// 4. Вносим ПАРАМЕТРЫ в Scope лямбды
+		// Формируем типы параметров
 		for (const auto& [name, type] : node->parameters)
 		{
-			auto pType = TypeResolver::Resolve(type.get(), m_context);
-			funType->paramTypes.push_back(pType);
-			m_context.env.Define(name, pType, false);
+			funType->paramTypes.push_back(TypeResolver::Resolve(type.get(), m_context));
 		}
-
-		// 5. Ожидаемый тип возврата
 		if (node->returnType)
 		{
 			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
 		}
 
-		const auto prevRetType = m_context.location.currentReturnType;
-		const auto prevFunType = m_context.location.currentFunction;
+		auto injectCaptures = [&] {
+			for (const auto& cap : node->captures)
+			{
+				const Symbol* sym = m_context.env.Resolve(cap);
+				if (!sym)
+				{
+					IGNI_SEM_ERR(node, "Cannot capture undefined variable '" + cap + "'");
+				}
+				m_context.env.Define(cap, sym->type, false);
+			}
+		};
 
-		m_context.location.currentReturnType = funType->returnType;
-		m_context.location.currentFunction = funType;
+		FunctionAnalyzer::AnalyzeBody(*this,
+			m_context, funType,
+			node->parameters, node->body.get(),
+			false, nullptr, injectCaptures);
 
-		// 6. Анализируем тело
-		if (node->body)
-		{
-			node->body->Accept(*this);
-		}
-
-		// 7. Довыводим тип возврата, если он не был указан
-		if (!m_context.location.currentFunction->returnType)
-		{
-			m_context.location.currentFunction->returnType = m_context.tUnit;
-		}
-		funType->returnType = m_context.location.currentFunction->returnType;
-
-		m_context.location.currentReturnType = prevRetType;
-		m_context.location.currentFunction = prevFunType;
-		m_context.env.PopScope();
-
-		// 8. Сохраняем метаданные
 		m_context.bindings.lambdaMeta[node] = { lambdaName };
 		m_context.allLambdas.emplace_back(node);
-
 		m_currentExprType = funType;
 	}
 
