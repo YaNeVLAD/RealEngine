@@ -43,29 +43,20 @@ add_custom_command(TARGET IgniTests PRE_BUILD
         COMMENT "Copying test scripts to output directory..."
 )
 
-# --- 1. ТАРГЕТ КОДОГЕНЕРАТОРА ---
-# Предположим, вы создали папку tools/CodeGen в модуле языка
+# CODEGEN_TOOL_TARGET
 add_executable(SemanticsCodeGen tools/CodeGen/main.cpp)
 target_link_libraries(SemanticsCodeGen PRIVATE ReCore nlohmann_json::nlohmann_json)
 
-# --- 2. НАСТРОЙКА ПУТЕЙ ---
 set(SEMANTICS_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/semantics.json")
 set(GENERATED_CPP "${CMAKE_CURRENT_BINARY_DIR}/GeneratedSemantics.cpp")
 
-# --- 3. АВТОМАТИЧЕСКАЯ ГЕНЕРАЦИЯ ---
 add_custom_command(
         OUTPUT ${GENERATED_CPP}
-        # Используем скомпилированный таргет как команду
         COMMAND SemanticsCodeGen ${SEMANTICS_CONFIG} ${GENERATED_CPP}
-        # Указываем в зависимостях и сам генератор, и конфиг.
-        # Если изменится код генератора ИЛИ json-конфиг, CMake перегенерирует файл.
         DEPENDS SemanticsCodeGen ${SEMANTICS_CONFIG}
         COMMENT "Generating semantics logic from JSON using SemanticsCodeGen..."
 )
 
-# --- 4. ПОДКЛЮЧЕНИЕ К ОСНОВНОМУ ПРОЕКТУ ---
-# Добавляем сгенерированный файл прямо в исходники IgniLang
 target_sources(IgniLang PRIVATE ${GENERATED_CPP})
 
-# Добавляем папку сборки в include, чтобы вы могли заинклудить сгенерированный хедер (если он будет)
 target_include_directories(IgniLang PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
