@@ -4,7 +4,9 @@
 #include "Builder.hpp"
 
 #include "Emitters/BinaryOpsEmitter.hpp"
+#include "Emitters/BuiltinsEmitter.hpp"
 #include "Emitters/CastRulesEmitter.hpp"
+#include "Emitters/DesugaringEmitter.hpp"
 #include "Emitters/ImplicitPromotionsEmitter.hpp"
 #include "Emitters/UnaryOpsEmitter.hpp"
 
@@ -33,6 +35,7 @@ int main(const int argc, char** argv)
 
 	builder.Include("Core/String.hpp", true);
 	builder.Include("Core/HashedString.hpp", true);
+	builder.Include("IgniLang/BindingContext.hpp", true);
 	builder.EmptyLine();
 
 	auto nsScope = builder.Namespace("igni::sem::generated");
@@ -43,7 +46,9 @@ int main(const int argc, char** argv)
 		BinaryOpsEmitter,
 		UnaryOpsEmitter,
 		CastRulesEmitter,
-		ImplicitPromotionsEmitter>
+		ImplicitPromotionsEmitter,
+		DesugaringEmitter,
+		BuiltinsEmitter>
 		engine;
 
 	engine.Run(data, builder);

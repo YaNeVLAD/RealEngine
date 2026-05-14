@@ -16,7 +16,7 @@ class CastRulesEmitter
 public:
 	static constexpr auto TargetKey = "valid_primitive_casts"_hs;
 
-	void Emit(const nlohmann::json& data, Builder<std::string>& builder) const
+	static void Emit(const nlohmann::json& data, Builder<std::string>& builder)
 	{
 		auto funcScope = builder.Function("bool", "IsValidPrimitiveCast",
 			"const re::String& from, const re::String& to");

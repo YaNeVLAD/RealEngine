@@ -24,6 +24,11 @@
 namespace igni::sem
 {
 
+namespace generated
+{
+re::String GetDesugaredMethod(const re::String& astNodeName, bool isWrite);
+}
+
 class SemanticAnalyzer final : public ast::BaseAstVisitor
 {
 public:
@@ -321,9 +326,10 @@ public:
 		const auto arrType = Evaluate(node->array.get());
 		const auto indexType = Evaluate(node->index.get());
 
+		const re::String readMethod = generated::GetDesugaredMethod("IndexExpr", false);
 		if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
 		{ // allow index access operation to any class with get(T) method
-			if (const auto it = classType->methods.find("get"); it != classType->methods.end())
+			if (const auto it = classType->methods.find(readMethod); it != classType->methods.end())
 			{
 				if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
 				{
@@ -506,9 +512,11 @@ public:
 		else if (const auto idxAccess = dynamic_cast<const ast::IndexExpr*>(node->target.get()))
 		{
 			const auto arrType = Evaluate(idxAccess->array.get());
+			const auto writeMethod = generated::GetDesugaredMethod("IndexExpr", true);
+
 			if (const auto classType = std::dynamic_pointer_cast<ClassType>(arrType))
 			{
-				if (!classType->methods.contains("set"))
+				if (!classType->methods.contains(writeMethod))
 				{
 					IGNI_SEM_ERR("Type '" + classType->name + "' does not support indexed assignment (missing 'set' method)");
 				}

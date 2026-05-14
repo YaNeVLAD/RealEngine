@@ -15,5 +15,24 @@
   ],
   "implicit_promotions": [
     {"from": "Int", "to": "Double"}
+  ],
+  "operator_desugaring": {
+    "IndexExpr": {"read": "get", "write": "set"}
+  },
+  "intrinsics": [
+    {
+      "name": "typeof",
+      "dispatch": "TypeOf",
+      "expected_args": 1,
+      "requires_type_args": false,
+      "returns_type": "Type"
+    },
+    {
+      "name": "Type",
+      "dispatch": "TypeLiteral",
+      "expected_args": 0,
+      "requires_type_args": true,
+      "returns_type": "Type"
+    }
   ]
 }

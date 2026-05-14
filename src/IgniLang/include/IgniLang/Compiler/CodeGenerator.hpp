@@ -8,6 +8,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
+namespace igni::sem::generated
+{
+re::String GetDesugaredMethod(const re::String& astNodeName, bool isWrite);
+}
+
 namespace igni
 {
 
@@ -452,7 +457,7 @@ public:
 			{
 				node->value->Accept(*this); // arg2
 			}
-			m_out << "CALL_METHOD \"set\" 2\n";
+			m_out << "CALL_METHOD \"" << sem::generated::GetDesugaredMethod("IndexExpr", true) << "\" 1\n";
 		}
 		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
 		{
@@ -804,7 +809,7 @@ public:
 
 			m_out << "GET " << asmArrName << "\n";
 			m_out << "GET " << asmIndexName << "\n";
-			m_out << "CALL_METHOD \"get\" 1\n";
+			m_out << "CALL_METHOD \"" << sem::generated::GetDesugaredMethod("IndexExpr", false) << "\" 1\n";
 			const auto asmIterName = DeclareLocal(node->iteratorName);
 			m_out << "SET " << asmIterName << "\n";
 

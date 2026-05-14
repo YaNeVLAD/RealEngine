@@ -6,46 +6,59 @@
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 
+namespace igni::sem::generated
+{
+bool TryMatchIntrinsic(const re::String& name, std::size_t argsCount, bool hasTypeArgs, CallDispatchType& outDispatch, re::String& outRetType);
+}
+
 namespace igni::sem::CallResolver
 {
 
 namespace detail
 {
-// --- 1. Обработка встроенных интринсиков компилятора ---
+
 inline std::shared_ptr<SemanticType> TryProcessIntrinsic(
 	const ast::CallExpr* node, SemanticContext& ctx, CallInfo& callInfo)
 {
 	const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get());
 	if (!id)
+	{
 		return nullptr;
-
-	if (id->name == "typeof" && node->arguments.size() == 1)
-	{
-		callInfo.dispatchMode = CallDispatchType::TypeOf;
-		ctx.bindings.callInfo[node] = callInfo;
-		return ctx.tType;
 	}
-	if (id->name == "Type" && !id->typeArgs.empty() && node->arguments.empty())
-	{
-		auto targetType = TypeResolver::Resolve(id->typeArgs[0].get(), ctx);
-		if (!targetType)
-			IGNI_SEM_ERR(node, "Unknown type in Type::<T>()");
 
-		callInfo.dispatchMode = CallDispatchType::TypeLiteral;
-		callInfo.asmLabel = targetType->name;
+	CallDispatchType dispatch;
+	re::String retTypeName;
+	if (generated::TryMatchIntrinsic(id->name, node->arguments.size(), !id->typeArgs.empty(), dispatch, retTypeName))
+	{
+		callInfo.dispatchMode = dispatch;
+
+		if (dispatch == CallDispatchType::TypeLiteral)
+		{
+			const auto targetType = TypeResolver::Resolve(id->typeArgs[0].get(), ctx);
+			if (!targetType)
+			{
+				IGNI_SEM_ERR(node, "Unknown type in Type::<T>()");
+			}
+			callInfo.asmLabel = targetType->name;
+		}
+
 		ctx.bindings.callInfo[node] = callInfo;
-		return ctx.tType;
+
+		if (const Symbol* sym = ctx.env.Resolve(retTypeName))
+		{
+			return std::dynamic_pointer_cast<SemanticType>(sym->type);
+		}
+		IGNI_SEM_ERR(node, "Compiler error: Intrinsic return type '" + retTypeName + "' not found");
 	}
 
 	return nullptr;
 }
 
-// --- 2. Поиск лучшей перегрузки ---
 inline std::shared_ptr<FunctionType> FindBestOverload(
 	const ast::CallExpr* node,
 	const std::shared_ptr<FunctionGroup>& group,
 	const std::vector<std::shared_ptr<SemanticType>>& argTypes,
-	bool isMethod)
+	const bool isMethod)
 {
 	std::shared_ptr<FunctionType> bestMatch = nullptr;
 	int matchCount = 0;
@@ -58,7 +71,10 @@ inline std::shared_ptr<FunctionType> FindBestOverload(
 		}
 	}
 	if (matchCount > 1)
+	{
 		IGNI_SEM_ERR(node, "Ambiguous call: multiple matching overloads found");
+	}
+
 	return bestMatch;
 }
 
@@ -70,10 +86,9 @@ struct TargetResolution
 	bool isGenericInstantiation = false;
 };
 
-// --- 3. Разрешение целевой функции/метода ---
 inline TargetResolution ResolveTarget(
 	const ast::CallExpr* node,
-	SemanticContext& ctx,
+	const SemanticContext& ctx,
 	const std::shared_ptr<SemanticType>& calleeType,
 	const std::vector<std::shared_ptr<SemanticType>>& argTypes,
 	std::vector<std::shared_ptr<SemanticType>>& explicitTypeArgs,
@@ -82,7 +97,7 @@ inline TargetResolution ResolveTarget(
 	TargetResolution res;
 
 	if (const auto classTmpl = std::dynamic_pointer_cast<GenericClassTemplate>(calleeType))
-	{ // Конструктор дженерик-класса
+	{ // Generic ctor
 		if (explicitTypeArgs.empty())
 		{
 			const ast::ConstructorDecl* ctorAst = nullptr;
@@ -117,33 +132,43 @@ inline TargetResolution ResolveTarget(
 		const auto concreteClass = ctx.instantiateClassCallback(classTmpl, explicitTypeArgs);
 		const auto it = concreteClass->methods.find(concreteClass->name);
 		if (it == concreteClass->methods.end())
+		{
 			IGNI_SEM_ERR(node, "Constructor not found for generic class '" + concreteClass->name + "'");
+		}
 
 		if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
+		{
 			res.target = FindBestOverload(node, group, argTypes, true);
+		}
 
 		callInfo.isConstructorCall = true;
 		callInfo.mangledClassName = classTmpl->astNode->isExternal ? classTmpl->name : concreteClass->name;
 		res.isMethodCall = true;
 
 		if (const auto id = dynamic_cast<ast::IdentifierExpr*>(node->callee.get()))
+		{
 			id->name = classTmpl->astNode->isExternal ? classTmpl->name : concreteClass->name;
+		}
 	}
 	else if (const auto classType = std::dynamic_pointer_cast<ClassType>(calleeType))
-	{ // Обычный конструктор
+	{ // Non-generic ctor
 		const auto it = classType->methods.find(classType->name);
 		if (it == classType->methods.end())
+		{
 			IGNI_SEM_ERR(node, "Constructor not found for class '" + classType->name + "'");
+		}
 
 		if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(it->second))
+		{
 			res.target = FindBestOverload(node, group, argTypes, true);
+		}
 
 		callInfo.isConstructorCall = true;
 		callInfo.mangledClassName = classType->name;
 		res.isMethodCall = true;
 	}
 	else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
-	{ // Обычный метод или функция (перегрузки)
+	{ // Function or method
 		res.isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr || callInfo.isImplicitThisCall;
 		res.target = FindBestOverload(node, group, argTypes, res.isMethodCall);
 
@@ -154,7 +179,7 @@ inline TargetResolution ResolveTarget(
 		}
 	}
 	else if (const auto funType = std::dynamic_pointer_cast<FunctionType>(calleeType))
-	{ // Переменная-лямбда
+	{ // Lambda fallback
 		res.isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr;
 		res.target = funType;
 		res.isIndirectCall = true;
@@ -176,11 +201,13 @@ inline TargetResolution ResolveTarget(
 	}
 
 	if (!res.target)
+	{
 		IGNI_SEM_ERR(node, "No matching overload found");
+	}
+
 	return res;
 }
 
-// --- 4. Определение типа вызова ВМ ---
 inline void DetermineDispatchMode(
 	const ast::CallExpr* node,
 	const TargetResolution& res,
@@ -188,9 +215,13 @@ inline void DetermineDispatchMode(
 {
 	re::String rawTargetName = "";
 	if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->callee.get()))
+	{
 		rawTargetName = id->name;
+	}
 	else if (const auto mem = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+	{
 		rawTargetName = mem->member;
+	}
 
 	if (res.isIndirectCall)
 	{
@@ -211,10 +242,14 @@ inline void DetermineDispatchMode(
 		bool isExtClassMethod = false;
 		if (res.isMethodCall && !res.target->paramTypes.empty())
 		{
-			if (auto ct = std::dynamic_pointer_cast<ClassType>(res.target->paramTypes[0]))
+			if (const auto ct = std::dynamic_pointer_cast<ClassType>(res.target->paramTypes[0]))
+			{
 				isExtClassMethod = ct->classDecl ? ct->classDecl->isExternal : true;
-			else if (auto gt = std::dynamic_pointer_cast<GenericClassTemplate>(res.target->paramTypes[0]))
+			}
+			else if (const auto gt = std::dynamic_pointer_cast<GenericClassTemplate>(res.target->paramTypes[0]))
+			{
 				isExtClassMethod = gt->astNode ? gt->astNode->isExternal : true;
+			}
 		}
 
 		if (res.target->isExternal)
@@ -236,9 +271,6 @@ inline void DetermineDispatchMode(
 }
 } // namespace detail
 
-// ===============================================
-// ФАСАД (Точка входа)
-// ===============================================
 inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, SemanticContext& ctx)
 {
 	CallInfo callInfo;

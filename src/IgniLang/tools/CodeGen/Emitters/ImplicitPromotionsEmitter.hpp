@@ -15,7 +15,7 @@ class ImplicitPromotionsEmitter
 public:
 	static constexpr auto TargetKey = "implicit_promotions"_hs;
 
-	void Emit(const nlohmann::json& data, Builder<std::string>& builder) const
+	static void Emit(const nlohmann::json& data, Builder<std::string>& builder)
 	{
 		auto funcScope = builder.Function("bool", "IsImplicitlyConvertible",
 			"const re::String& from, const re::String& to");
