@@ -26,6 +26,8 @@
 namespace igni::sem
 {
 
+using namespace re::literals;
+
 class SemanticAnalyzer final : public ast::BaseAstVisitor
 {
 public:

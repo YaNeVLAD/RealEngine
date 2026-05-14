@@ -1,8 +1,8 @@
+#include <IgniCLI/Runners/DotNetRunner.hpp>
+#include <IgniCLI/Runners/RvmRunner.hpp>
+#include <IgniLang/Compiler/DotNetBackend.hpp>
 #include <IgniLang/Compiler/Pipeline.hpp>
 #include <IgniLang/Compiler/RvmBackend.hpp>
-// #include <IgniLang/Compiler/DotNetBackend.hpp> // Раскомментируешь позже
-#include <IgniCLI/Runners/RvmRunner.hpp>
-// #include <IgniCLI/Runners/DotNetRunner.hpp> // Раскомментируешь позже
 
 #include <filesystem>
 #include <iostream>
@@ -21,7 +21,6 @@ int main(const int argc, char** argv)
 		return 1;
 	}
 
-	// В будущем здесь можно читать флаги вроде --target=dotnet
 	std::string targetId = "rvm";
 	std::vector<std::string> sourceFiles;
 
@@ -30,7 +29,7 @@ int main(const int argc, char** argv)
 		sourceFiles.emplace_back("assets/source/stdlib.igni");
 	}
 
-	for (int i = 1; i < argc; ++i)
+	for (std::size_t i = 1; i < argc; ++i)
 	{
 		sourceFiles.emplace_back(argv[i]);
 	}

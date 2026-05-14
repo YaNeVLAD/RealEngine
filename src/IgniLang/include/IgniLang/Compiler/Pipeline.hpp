@@ -51,13 +51,15 @@ public:
 	CompilationResult Compile(
 		const std::vector<std::string>& filePaths,
 		const std::string& targetId,
-		compiler::IBackend& backend) const
+		IBackend& backend) const
 	{
 		CompilationResult result;
 		DiagnosticEngine diagnostics;
 
+		std::list<std::string> sourceBuffers;
+
 		// --- PHASE 1: FRONTEND ---
-		auto parsedPrograms = RunFrontend(filePaths, diagnostics);
+		auto parsedPrograms = RunFrontend(filePaths, diagnostics, sourceBuffers);
 		if (diagnostics.HasErrors())
 		{
 			diagnostics.PrintToConsole();
@@ -113,7 +115,10 @@ public:
 private:
 	fsm::slr::table<re::String> m_table;
 
-	std::vector<std::unique_ptr<ast::Program>> RunFrontend(const std::vector<std::string>& filePaths, DiagnosticEngine& diagnostics) const
+	std::vector<std::unique_ptr<ast::Program>> RunFrontend(
+		const std::vector<std::string>& filePaths,
+		DiagnosticEngine& diagnostics,
+		std::list<std::string>& sourceBuffers) const
 	{
 		fsm::slr::parser parser(m_table, "<EPSILON>");
 		AstConverter astConverter;
@@ -122,7 +127,8 @@ private:
 		for (const auto& path : filePaths)
 		{
 			std::cout << "[Info] Parsing " << path << "...\n";
-			std::string source = ReadFile(path);
+			sourceBuffers.emplace_back(ReadFile(path));
+			const std::string& source = sourceBuffers.back();
 			auto tokens = CreateLexer(source).tokenize();
 
 			std::vector<fsm::token<TokenType>> validTokens;
@@ -193,4 +199,4 @@ private:
 	}
 };
 
-} // namespace igni
+} // namespace igni::compiler
