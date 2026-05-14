@@ -367,7 +367,7 @@ InterpreterResult VirtualMachine::Run()
 			auto methodIt = typeInfo->methods.find(methodName);
 			if (methodIt == typeInfo->methods.end())
 			{
-				EXIT_WITH_ERROR("Runtime Error: Undefined method '" << methodName);
+				EXIT_WITH_ERROR("Runtime Error: Undefined method '" << methodName << "'" << "in type '" << typeInfo->name << "'");
 			}
 
 			Value callableVal = methodIt->second;

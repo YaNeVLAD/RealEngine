@@ -2,7 +2,6 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
-#include <IgniLang/Semantic/SemanticError.hpp>
 #include <memory>
 #include <vector>
 
@@ -36,7 +35,25 @@ inline void AnalyzeBody(
 		const std::size_t typeIdx = isMethod ? i + 1 : i;
 		std::shared_ptr<SemanticType> paramType = funType->paramTypes[typeIdx];
 
-		// ВАЖНО: Массивы vararg уже сформированы на этапе объявления
+		if (funType->isVararg && i == astParams.size() - 1)
+		{
+			if (const Symbol* sym = ctx.env.Resolve("Array"))
+			{
+				if (const auto tmpl = std::dynamic_pointer_cast<GenericClassTemplate>(sym->type))
+				{
+					paramType = ctx.instantiateClassCallback(tmpl, { paramType });
+				}
+				else
+				{
+					paramType = std::dynamic_pointer_cast<SemanticType>(sym->type);
+				}
+			}
+			else
+			{
+				paramType = ctx.tUnit;
+			}
+		}
+
 		ctx.env.Define(astParams[i].name, paramType, false);
 	}
 

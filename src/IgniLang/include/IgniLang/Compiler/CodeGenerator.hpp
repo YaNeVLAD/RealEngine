@@ -457,7 +457,7 @@ public:
 			{
 				node->value->Accept(*this); // arg2
 			}
-			m_out << "CALL_METHOD \"" << sem::generated::GetDesugaredMethod("IndexExpr", true) << "\" 1\n";
+			m_out << "CALL_METHOD \"" << sem::generated::GetDesugaredMethod("IndexExpr", true) << "\" 2\n";
 		}
 		else if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->target.get()))
 		{
