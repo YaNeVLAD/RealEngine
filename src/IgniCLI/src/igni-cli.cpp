@@ -1,15 +1,13 @@
-#include <Core/LibraryLoader.hpp>
-#include <IgniCLI/Compiler.hpp>
-#include <RVM/Assembler.hpp>
-#include <RVM/EventLoop.hpp>
-#include <RVM/VirtualMachine.hpp>
+#include <IgniLang/Compiler/Pipeline.hpp>
+#include <IgniLang/Compiler/RvmBackend.hpp>
+// #include <IgniLang/Compiler/DotNetBackend.hpp> // Раскомментируешь позже
+#include <IgniCLI/Runners/RvmRunner.hpp>
+// #include <IgniCLI/Runners/DotNetRunner.hpp> // Раскомментируешь позже
 
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
-
-using IgniPluginInitFn = void (*)(re::rvm::VirtualMachine*);
 
 int main(const int argc, char** argv)
 {
@@ -23,6 +21,8 @@ int main(const int argc, char** argv)
 		return 1;
 	}
 
+	// В будущем здесь можно читать флаги вроде --target=dotnet
+	std::string targetId = "rvm";
 	std::vector<std::string> sourceFiles;
 
 	if (std::filesystem::exists("assets/source/stdlib.igni"))
@@ -37,59 +37,45 @@ int main(const int argc, char** argv)
 
 	try
 	{
-		const igni::Compiler pipeline("assets/igni_grammar.txt");
-		const std::string assemblyCode = pipeline.CompileFiles(sourceFiles);
-
-		std::cout << "[Info] Assembly generated successfully.\n";
-		std::cout << "------- ASM -------\n"
-				  << assemblyCode
-				  << "\n-------------------\n";
-
-		std::unique_ptr<re::LibraryLoader> stdlibPlugin = nullptr;
-
-		re::rvm::EventLoop eventLoop;
-		re::rvm::VirtualMachine vm;
-		vm.SetDelayHandler([&eventLoop](const re::rvm::CoroutinePtr& coro, const std::uint64_t ms) {
-			eventLoop.Delay(coro, ms);
-		});
-
-		try
+		// 1. Выбираем Бэкенд на основе таргета
+		std::unique_ptr<igni::compiler::IBackend> backend;
+		if (targetId == "rvm")
 		{
-			constexpr auto STD_LIB_NAME = "IgniStdLib.dll";
-
-			stdlibPlugin = std::make_unique<re::LibraryLoader>(STD_LIB_NAME);
-			const auto initFn = stdlibPlugin->GetSymbol<IgniPluginInitFn>("IgniPluginInit");
-			initFn(&vm);
-
-			std::cout << "[Info] Standard library plugin loaded successfully.\n";
+			backend = std::make_unique<igni::compiler::RvmBackend>();
 		}
-		catch (const std::exception& e)
+		/* else if (targetId == "dotnet") {
+			backend = std::make_unique<igni::compiler::DotNetBackend>();
+		} */
+		else
 		{
-			std::cerr << "[Warning] Could not load standard library: " << e.what() << "\n";
-		}
-
-		re::rvm::Chunk chunk;
-		if (re::rvm::Assembler assembler; !assembler.Compile(assemblyCode, chunk))
-		{
-			std::cerr << "[Error] Assembler failed to compile bytecode.\n";
+			std::cerr << "Unknown target: " << targetId << "\n";
 			return 1;
 		}
 
-		std::cout << "[Info] Running Virtual Machine...\n";
-		std::cout << "=================================\n";
+		const igni::compiler::Pipeline pipeline("assets/igni_grammar.txt");
+		const auto result = pipeline.Compile(sourceFiles, targetId, *backend);
 
-		auto result = vm.Interpret(chunk);
-		if (result == re::rvm::InterpreterResult::Suspended)
+		if (!result.success)
 		{
-			result = eventLoop.Run(vm);
-		}
-
-		std::cout << "=================================\n";
-		if (result != re::rvm::InterpreterResult::Success)
-		{
-			std::cerr << "[VM Error] Program exited with a runtime error.\n";
+			std::cerr << "[Compiler] Compilation failed due to errors.\n";
 			return 1;
 		}
+
+		std::cout << "[Info] Code generated successfully.\n";
+		std::cout << "------- GENERATED CODE -------\n"
+				  << result.generatedCode
+				  << "\n------------------------------\n";
+
+		std::unique_ptr<igni::cli::IRunner> runner;
+		if (targetId == "rvm")
+		{
+			runner = std::make_unique<igni::cli::RvmRunner>();
+		}
+		/* else if (targetId == "dotnet") {
+			runner = std::make_unique<igni::cli::DotNetRunner>();
+		} */
+
+		return runner->Run(result.generatedCode);
 	}
 	catch (const std::exception& e)
 	{

@@ -2,6 +2,7 @@
 
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Compiler/CodeGenerator.hpp>
+#include <IgniLang/Compiler/IBackend.hpp>
 #include <IgniLang/Compiler/ScopeAnalyzer.hpp>
 
 #include <sstream>
@@ -14,15 +15,15 @@
 namespace igni::compiler
 {
 
-class TextCompiler
+class RvmBackend : public IBackend
 {
 public:
-	std::string Compile(
+	std::string Generate(
 		const ast::Program* program,
 		const std::unordered_set<re::String>& globalNames,
 		const std::unordered_map<re::String, re::String>& importAliases,
 		const std::unordered_set<re::String>& externals,
-		const sem::SemanticAnalyzer& semanticAnalyzer)
+		const sem::SemanticAnalyzer& semanticAnalyzer) override
 	{
 		std::vector<const ast::FunDecl*> flatFunctions;
 		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;

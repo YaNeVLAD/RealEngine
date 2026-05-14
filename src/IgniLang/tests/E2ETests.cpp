@@ -1,6 +1,6 @@
 #include "TestUtils.hpp"
 
-#include "../../IgniCLI/include/IgniCLI/Compiler.hpp"
+#include "../include/IgniLang/Compiler/Pipeline.hpp"
 
 #include <Core/LibraryLoader.hpp>
 #include <RVM/Assembler.hpp>
