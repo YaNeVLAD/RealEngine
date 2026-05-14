@@ -21,7 +21,7 @@ OptParenExpr -> ( Expr ) | \e
 OptVisibility -> public | private | internal | \e
 
 OptModifierList -> OptModifierList Modifier | \e
-Modifier -> external | compile_time | override | suspend
+Modifier -> external | comptime | override | suspend
 
 OptMod -> external | \e
 OptInit -> = Expr | \e
@@ -52,7 +52,7 @@ DestructorDecl -> OptModifierList ~ ident ( ) FunBody
 
 FunDecl -> OptModifierList fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
 OptFunModList -> OptFunModList FunMod | \e
-FunMod -> external | compile_time | override | suspend
+FunMod -> external | comptime | override | suspend
 FunName -> ident | ident . ident
 OptFormPars -> FormPars | \e
 FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
@@ -85,7 +85,7 @@ Statement -> VarDecl
 OptExpr -> Expr | \e
 
 IfStmt -> OptCompileTime if ( Expr ) Block OptElse
-OptCompileTime -> compile_time | \e
+OptCompileTime -> comptime | \e
 OptElse -> else ElseBody | \e
 ElseBody -> IfStmt | Block
 

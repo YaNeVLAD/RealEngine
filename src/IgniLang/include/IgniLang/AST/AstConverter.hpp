@@ -76,7 +76,7 @@ private:
 			{
 				mods.isSuspend = true;
 			}
-			else if (modHash == "compile_time"_hs)
+			else if (modHash == "comptime"_hs)
 			{
 				mods.isCompileTime = true;
 			}
@@ -753,7 +753,7 @@ private:
 		ifStmt->token = *ifNode->children[1]->token;
 
 		if (const auto& optCompileTime = ifNode->children[0];
-			!optCompileTime->children.empty() && optCompileTime->children[0]->symbol.Hashed() == "compile_time"_hs)
+			!optCompileTime->children.empty() && optCompileTime->children[0]->symbol.Hashed() == "comptime"_hs)
 		{
 			ifStmt->isCompileTime = true;
 		}
