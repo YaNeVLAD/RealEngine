@@ -16,9 +16,12 @@ class UnaryOpsEmitter
 public:
 	static constexpr auto TargetKey = "unary_operations"_hs;
 
-	static void Emit(const nlohmann::json& data, Builder<std::string>& builder)
+	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
-		auto funcScope = builder.Function("re::String", "GetUnaryOperationResult",
+		h.Line("re::String GetUnaryOperationResult(const re::String& op, const re::String& operand);");
+		h.EmptyLine();
+
+		auto funcScope = cpp.Function("re::String", "GetUnaryOperationResult",
 			"const re::String& op, const re::String& operand");
 
 		for (const auto& rule : data)
@@ -29,12 +32,12 @@ public:
 
 			std::string condition = "op.Hashed() == \"" + opHash + "\"_hs && operand == \"" + operand + "\"";
 
-			auto ifScope = builder.If(condition);
-			builder.Line("return \"" + result + "\";");
+			auto ifScope = cpp.If(condition);
+			cpp.Line("return \"" + result + "\";");
 		}
 
-		builder.EmptyLine();
-		builder.Line("return \"\";");
+		cpp.EmptyLine();
+		cpp.Line("return \"\";");
 	}
 };
 

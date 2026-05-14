@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "rvm": {
+      "primitive_mapping": {
+        "Int": "Int",
+        "Double": "Double",
+        "Bool": "Bool",
+        "String": "String",
+        "Any": "Any"
+      }
+    },
+    "dotnet": {
+      "primitive_mapping": {
+        "Int": "System.Int64",
+        "Double": "System.Double",
+        "Bool": "System.Boolean",
+        "String": "System.String",
+        "Any": "System.Object"
+      }
+    }
+  }
+}

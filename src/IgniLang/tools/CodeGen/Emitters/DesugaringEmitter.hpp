@@ -15,21 +15,24 @@ class DesugaringEmitter
 public:
 	static constexpr auto TargetKey = "operator_desugaring"_hs;
 
-	void Emit(const nlohmann::json& data, Builder<std::string>& builder)
+	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
-		auto funcScope = builder.Function("re::String", "GetDesugaredMethod",
+		h.Line("re::String GetDesugaredMethod(const re::String& astNodeName, bool isWrite);");
+		h.EmptyLine();
+
+		auto funcScope = cpp.Function("re::String", "GetDesugaredMethod",
 			"const re::String& astNodeName, bool isWrite");
 
 		for (auto& [nodeName, rules] : data.items())
 		{
-			auto ifScope = builder.If("astNodeName == \"" + nodeName + "\"");
+			auto ifScope = cpp.If("astNodeName == \"" + nodeName + "\"");
 
-			builder.Line("if (isWrite) return \"" + rules["write"].get<std::string>() + "\";");
-			builder.Line("return \"" + rules["read"].get<std::string>() + "\";");
+			cpp.Line("if (isWrite) return \"" + rules["write"].get<std::string>() + "\";");
+			cpp.Line("return \"" + rules["read"].get<std::string>() + "\";");
 		}
 
-		builder.EmptyLine();
-		builder.Line("return \"\";");
+		cpp.EmptyLine();
+		cpp.Line("return \"\";");
 	}
 };
 

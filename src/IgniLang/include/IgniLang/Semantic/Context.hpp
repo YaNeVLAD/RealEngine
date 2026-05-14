@@ -48,11 +48,11 @@ struct SemanticContext
 	std::size_t lambdaCounter = 0;
 	std::vector<const ast::LambdaExpr*> allLambdas;
 
-	std::shared_ptr<ClassType> tInt = std::make_shared<ClassType>("Int");
-	std::shared_ptr<ClassType> tDouble = std::make_shared<ClassType>("Double");
-	std::shared_ptr<ClassType> tBool = std::make_shared<ClassType>("Bool");
-	std::shared_ptr<ClassType> tString = std::make_shared<ClassType>("String");
-	std::shared_ptr<ClassType> tAny = std::make_shared<ClassType>("Any");
+	std::shared_ptr<ClassType> tInt;
+	std::shared_ptr<ClassType> tDouble;
+	std::shared_ptr<ClassType> tBool;
+	std::shared_ptr<ClassType> tString;
+	std::shared_ptr<ClassType> tAny;
 	std::shared_ptr<ClassType> tType = std::make_shared<ClassType>("Type");
 
 	std::shared_ptr<PrimitiveType> tUnit = std::make_shared<PrimitiveType>("Unit");

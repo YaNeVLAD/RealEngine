@@ -16,24 +16,27 @@ class CastRulesEmitter
 public:
 	static constexpr auto TargetKey = "valid_primitive_casts"_hs;
 
-	static void Emit(const nlohmann::json& data, Builder<std::string>& builder)
+	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
-		auto funcScope = builder.Function("bool", "IsValidPrimitiveCast",
+		h.Line("bool IsValidPrimitiveCast(const re::String& from, const re::String& to);");
+		h.EmptyLine();
+
+		auto funcScope = cpp.Function("bool", "IsValidPrimitiveCast",
 			"const re::String& from, const re::String& to");
 
 		for (const auto& rule : data)
 		{
-			std::string from = rule["from"].get<std::string>();
-			std::string to = rule["to"].get<std::string>();
+			auto from = rule["from"].get<std::string>();
+			auto to = rule["to"].get<std::string>();
 
 			std::string condition = "from == \"" + from + "\" && to == \"" + to + "\"";
 
-			auto ifScope = builder.If(condition);
-			builder.Line("return true;");
+			auto ifScope = cpp.If(condition);
+			cpp.Line("return true;");
 		}
 
-		builder.EmptyLine();
-		builder.Line("return false;");
+		cpp.EmptyLine();
+		cpp.Line("return false;");
 	}
 };
 

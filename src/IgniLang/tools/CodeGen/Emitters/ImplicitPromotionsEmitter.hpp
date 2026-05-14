@@ -15,9 +15,12 @@ class ImplicitPromotionsEmitter
 public:
 	static constexpr auto TargetKey = "implicit_promotions"_hs;
 
-	static void Emit(const nlohmann::json& data, Builder<std::string>& builder)
+	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
-		auto funcScope = builder.Function("bool", "IsImplicitlyConvertible",
+		h.Line("bool IsImplicitlyConvertible(const re::String& from, const re::String& to);");
+		h.EmptyLine();
+
+		auto funcScope = cpp.Function("bool", "IsImplicitlyConvertible",
 			"const re::String& from, const re::String& to");
 
 		for (const auto& rule : data)
@@ -27,12 +30,12 @@ public:
 
 			std::string condition = "from == \"" + from + "\" && to == \"" + to + "\"";
 
-			auto ifScope = builder.If(condition);
-			builder.Line("return true;");
+			auto ifScope = cpp.If(condition);
+			cpp.Line("return true;");
 		}
 
-		builder.EmptyLine();
-		builder.Line("return false;");
+		cpp.EmptyLine();
+		cpp.Line("return false;");
 	}
 };
 

@@ -18,21 +18,19 @@
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
+#include <GeneratedSemantics.hpp>
+
 #include <algorithm>
 #include <complex>
 
 namespace igni::sem
 {
 
-namespace generated
-{
-re::String GetDesugaredMethod(const re::String& astNodeName, bool isWrite);
-}
-
 class SemanticAnalyzer final : public ast::BaseAstVisitor
 {
 public:
-	SemanticAnalyzer()
+	explicit SemanticAnalyzer(const generated::TargetConfig& config)
+		: m_targetConfig(config)
 	{
 		m_context.evaluateFunctionCallback = [this](const auto& node) {
 			return this->Evaluate(node);
@@ -933,6 +931,7 @@ public:
 
 private:
 	SemanticContext m_context;
+	generated::TargetConfig m_targetConfig;
 
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	ast::Program* m_currentProgram = nullptr;
@@ -943,12 +942,26 @@ private:
 
 	void InitBuiltins()
 	{
+		auto getTypeName = [&](const re::String& igniName) {
+			if (m_targetConfig.primitiveMapping.contains(igniName))
+			{
+				return m_targetConfig.primitiveMapping.at(igniName);
+			}
+			return igniName;
+		};
+
+		m_context.tInt = std::make_shared<ClassType>(getTypeName("Int"));
+		m_context.tDouble = std::make_shared<ClassType>(getTypeName("Double"));
+		m_context.tBool = std::make_shared<ClassType>(getTypeName("Bool"));
+		m_context.tString = std::make_shared<ClassType>(getTypeName("String"));
+		m_context.tAny = std::make_shared<ClassType>(getTypeName("Any"));
+
 		m_context.env.Define("Int", m_context.tInt, true);
 		m_context.env.Define("Double", m_context.tDouble, true);
 		m_context.env.Define("Bool", m_context.tBool, true);
 		m_context.env.Define("String", m_context.tString, true);
-		m_context.env.Define("Unit", m_context.tUnit, true);
 		m_context.env.Define("Any", m_context.tAny, true);
+		m_context.env.Define("Unit", m_context.tUnit, true);
 		m_context.env.Define("Type", m_context.tType, true);
 	}
 

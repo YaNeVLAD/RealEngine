@@ -13,20 +13,22 @@ template <typename... TEmitters>
 class GeneratorEngine
 {
 public:
-	void Run(const nlohmann::json& root, Builder<std::string>& builder) const
+	void Run(const nlohmann::json& root, Builder<std::string>& headerBuilder, Builder<std::string>& sourceBuilder) const
 	{
-		(RunEmitter<TEmitters>(root, builder), ...);
+		(RunEmitter<TEmitters>(root, headerBuilder, sourceBuilder), ...);
 	}
 
 private:
 	template <typename TEmitter>
-	void RunEmitter(const nlohmann::json& root, Builder<std::string>& builder) const
+	void RunEmitter(const nlohmann::json& root, Builder<std::string>& headerBuilder, Builder<std::string>& sourceBuilder) const
 	{
 		if (const char* key = TEmitter::TargetKey; root.contains(key))
 		{
 			TEmitter emitter;
-			emitter.Emit(root[key], builder);
-			builder.EmptyLine();
+			emitter.Emit(root[key], headerBuilder, sourceBuilder);
+
+			headerBuilder.EmptyLine();
+			sourceBuilder.EmptyLine();
 		}
 		else
 		{

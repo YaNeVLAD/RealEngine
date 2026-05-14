@@ -9,6 +9,8 @@
 #include <IgniLang/Optimization/DeadCodeEliminator.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
+#include <GeneratedSemantics.hpp>
+
 #include <fsm/cfg.hpp>
 #include <fsm/slr/parser.hpp>
 #include <fsm/slr/table_builder.hpp>
@@ -41,7 +43,7 @@ public:
 					  .build(fsm::slr::collision_policy::prefer_shift);
 	}
 
-	[[nodiscard]] std::string CompileFiles(const std::vector<std::string>& filePaths) const
+	[[nodiscard]] std::string CompileFiles(const std::vector<std::string>& filePaths, const std::string& targetId = "rvm") const
 	{
 		fsm::slr::parser parser(m_table, "<EPSILON>");
 		AstConverter astConverter;
@@ -129,7 +131,9 @@ public:
 
 		// --- PHASE 2: SEMANTIC ANALYSIS ---
 		std::cout << "[Info] Running Semantic Analysis...\n";
-		sem::SemanticAnalyzer semanticAnalyzer;
+		auto config = sem::generated::GetTargetConfig(targetId);
+
+		sem::SemanticAnalyzer semanticAnalyzer(config);
 
 		try
 		{
