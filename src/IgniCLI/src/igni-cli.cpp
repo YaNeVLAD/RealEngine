@@ -24,27 +24,46 @@ int main(const int argc, char** argv)
 	std::string targetId = "rvm";
 	std::vector<std::string> sourceFiles;
 
-	if (std::filesystem::exists("assets/source/stdlib.igni"))
+	for (int i = 1; i < argc; ++i)
 	{
-		sourceFiles.emplace_back("assets/source/stdlib.igni");
+		if (std::string arg = argv[i]; arg == "--dotnet")
+		{
+			targetId = "dotnet";
+		}
+		else if (arg == "--rvm")
+		{
+			targetId = "rvm";
+		}
+		else if (arg.length() > 0 && arg[0] == '-')
+		{
+			std::cerr << "[Warning] Unknown flag ignored: " << arg << "\n";
+		}
+		else
+		{
+			sourceFiles.emplace_back(arg);
+		}
 	}
 
-	for (std::size_t i = 1; i < argc; ++i)
+	if (const std::string stdlibPath = "assets/source/stdlib_" + targetId + ".igni"; std::filesystem::exists(stdlibPath))
 	{
-		sourceFiles.emplace_back(argv[i]);
+		sourceFiles.insert(sourceFiles.begin(), stdlibPath);
+	}
+	else
+	{
+		std::cerr << "[Warning] Standard library not found: " << stdlibPath << "\n";
 	}
 
 	try
 	{
-		// 1. Выбираем Бэкенд на основе таргета
 		std::unique_ptr<igni::compiler::IBackend> backend;
 		if (targetId == "rvm")
 		{
 			backend = std::make_unique<igni::compiler::RvmBackend>();
 		}
-		/* else if (targetId == "dotnet") {
+		else if (targetId == "dotnet")
+		{
 			backend = std::make_unique<igni::compiler::DotNetBackend>();
-		} */
+		}
 		else
 		{
 			std::cerr << "Unknown target: " << targetId << "\n";
@@ -70,9 +89,10 @@ int main(const int argc, char** argv)
 		{
 			runner = std::make_unique<igni::cli::RvmRunner>();
 		}
-		/* else if (targetId == "dotnet") {
+		else if (targetId == "dotnet")
+		{
 			runner = std::make_unique<igni::cli::DotNetRunner>();
-		} */
+		}
 
 		return runner->Run(result.generatedCode);
 	}

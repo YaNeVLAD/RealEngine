@@ -22,7 +22,9 @@ struct SemanticType : re::utils::Prototype<SemanticType>
 	{
 		using namespace re::literals;
 
-		if (name.Hashed() == "Any"_hs || other->name.Hashed() == "Any"_hs)
+		const auto thisHash = name.Hashed();
+		const auto otherHash = other->name.Hashed();
+		if (thisHash == "Any"_hs || otherHash == "Any"_hs || thisHash == "System.Object"_hs || otherHash == "System.Object"_hs)
 		{
 			return true;
 		}
@@ -67,6 +69,8 @@ struct FunctionType final : re::utils::Clonable<FunctionType, SemanticType>
 	bool isExternal = false;
 	bool isSuspend = false;
 
+	re::String nativeTargetName;
+
 	ast::Visibility visibility = ast::Visibility::Public;
 	re::String moduleName;
 
@@ -76,8 +80,10 @@ struct FunctionType final : re::utils::Clonable<FunctionType, SemanticType>
 	{
 		using namespace re::literals;
 
-		if (name.Hashed() == "Any"_hs)
-		{ // TODO: Remove after Generics and typecast
+		const auto thisHash = name.Hashed();
+		const auto otherHash = other->name.Hashed();
+		if (thisHash == "Any"_hs || otherHash == "Any"_hs || thisHash == "System.Object"_hs || otherHash == "System.Object"_hs)
+		{
 			return true;
 		}
 

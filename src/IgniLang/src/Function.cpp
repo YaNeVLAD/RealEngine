@@ -30,7 +30,22 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 	funType->isExternal = decl->isExternal;
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
+	funType->nativeTargetName = decl->name;
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
+
+	for (const auto& anno : decl->annotations)
+	{ // FFI - external function name lookup
+		if (ctx.ffiAnnotations.contains(anno.name) && anno.argument)
+		{
+			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
+			{
+				if (lit->token.type == TokenType::StringConst)
+				{
+					funType->nativeTargetName = lit->token.lexeme.substr(1, lit->token.lexeme.length() - 2);
+				}
+			}
+		}
+	}
 
 	if (funType->returnType == nullptr && decl->isExprBody)
 	{ // On-demand type evaluation for expression functions
@@ -97,6 +112,20 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
+
+	for (const auto& anno : decl->annotations)
+	{ // FFI - external function name lookup
+		if (ctx.ffiAnnotations.contains(anno.name) && anno.argument)
+		{
+			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
+			{
+				if (lit->token.type == TokenType::StringConst)
+				{
+					funType->nativeTargetName = lit->token.lexeme.substr(1, lit->token.lexeme.length() - 2);
+				}
+			}
+		}
+	}
 
 	if (funType->returnType == nullptr && decl->isExprBody)
 	{

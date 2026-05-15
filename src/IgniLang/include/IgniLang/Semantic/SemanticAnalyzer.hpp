@@ -46,6 +46,8 @@ public:
 			return Generic::Function::Instantiate(tmpl, args, m_context);
 		};
 
+		m_context.ffiAnnotations = m_targetConfig.ffiAnnotations;
+
 		InitBuiltins();
 	}
 

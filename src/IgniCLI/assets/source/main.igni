@@ -1,71 +1,8 @@
 package program;
 
-class Matrix(val rows: Int, val cols: Int) {
-
-	val data = MutableArray::<Double>(this.rows * this.cols);
-
-	fun get(row: Int, col: Int): Double {
-		return this.data[row * this.cols + col];
-	}
-
-	fun set(row: Int, col: Int, value: Double) {
-        this.data[row * this.cols + col] = value;
-    }
-
-}
-
-fun mulMatrix(a: Matrix, b: Matrix): Matrix {
-	if (a.cols != b.rows) {
-        println("Error: Incompatible matrix dimensions");
-        return Matrix(0, 0);
-    }
-
-	val result = Matrix(a.rows, b.cols);
-    result.data.fill(0.0);
-
-    for (i in 0..a.rows - 1) {
-        for (j in 0..b.cols - 1) {
-            var sum = 0.0;
-
-            for (k in 0..a.cols - 1) {
-                val aVal = a.get(i, k);
-                val bVal = b.get(k, j);
-                sum = sum + (aVal * bVal);
-            }
-
-            result.set(i, j, sum);
-        }
-    }
-
-    return result;
-}
+@NativeName("println")
+external fun logToConsole(args: Any...): Unit;
 
 fun main() {
-	// A (2x3)
-    // [1.0, 2.0, 3.0]
-    // [4.0, 5.0, 6.0]
-    val a = Matrix(2, 3);
-    a.set(0, 0, 1.0); a.set(0, 1, 2.0); a.set(0, 2, 3.0);
-    a.set(1, 0, 4.0); a.set(1, 1, 5.0); a.set(1, 2, 6.0);
-
-    // B (3x2)
-    // [7.0,  8.0 ]
-    // [9.0,  10.0]
-    // [11.0, 12.0]
-    val b = Matrix(3, 2);
-    b.set(0, 0, 7.0);  b.set(0, 1, 8.0);
-    b.set(1, 0, 9.0);  b.set(1, 1, 10.0);
-    b.set(2, 0, 11.0); b.set(2, 1, 12.0);
-
-    val c = mulMatrix(a, b);
-
-    println("Matrix C (Result):");
-    println("Rows: ", c.rows, "; ", "Cols: ", c.cols, "\n");
-
-    // Ожидаемый результат:
-    // [58.0,  64.0 ]
-    // [139.0, 154.0]
-    for (i in 0..c.data.size - 1) {
-        println(c.data[i]);
-    }
+	logToConsole("Hello FFI through annotations!");
 }

@@ -30,6 +30,8 @@ struct SemanticContext
 	TraversalContext location;
 	BindingContext bindings;
 
+	std::unordered_set<re::String> ffiAnnotations;
+
 	std::unordered_map<re::String, re::String> importAliases;
 
 	std::unordered_map<re::String, std::shared_ptr<ClassType>> allClassTypes;

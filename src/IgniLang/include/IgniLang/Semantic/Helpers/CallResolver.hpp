@@ -255,7 +255,7 @@ inline void DetermineDispatchMode(
 		if (res.target->isExternal)
 		{
 			callInfo.dispatchMode = res.isMethodCall ? CallDispatchType::Virtual : CallDispatchType::Native;
-			callInfo.asmLabel = rawTargetName;
+			callInfo.asmLabel = res.target->nativeTargetName.Empty() ? rawTargetName : res.target->nativeTargetName;
 		}
 		else if (res.isMethodCall && !res.isGenericInstantiation && !isExtClassMethod)
 		{

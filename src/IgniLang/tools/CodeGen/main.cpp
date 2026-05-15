@@ -42,6 +42,7 @@ int main(const int argc, char** argv)
 	headerBuilder.Line("#pragma once");
 	headerBuilder.Include("Core/String.hpp", true);
 	headerBuilder.Include("unordered_map", true);
+	headerBuilder.Include("unordered_set", true);
 	headerBuilder.Include("IgniLang/BindingContext.hpp", true);
 	headerBuilder.EmptyLine();
 
