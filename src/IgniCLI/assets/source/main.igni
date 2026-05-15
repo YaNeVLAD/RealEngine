@@ -1,8 +1,15 @@
 package program;
 
-@NativeName("println")
-external fun logToConsole(args: Any...): Unit;
-
 fun main() {
-	logToConsole("Hello FFI through annotations!");
+	var sum = 0;
+
+	for (i in 1..5) {
+		if (i % 2 == 0) {
+			println(i);
+		} else {
+			sum = sum + i;
+		}
+	}
+
+	println(sum);
 }
