@@ -972,7 +972,9 @@ private:
 	std::shared_ptr<SemanticType> Evaluate(const ast::Expr* expr)
 	{
 		if (!expr)
+		{
 			return m_context.tUnit;
+		}
 
 		const std::shared_ptr<SemanticType> previousType = m_currentExprType;
 		m_currentExprType = m_context.tUnit;
@@ -987,6 +989,9 @@ private:
 		}
 
 		std::shared_ptr<SemanticType> resultType = m_currentExprType;
+
+		m_context.bindings.SetExpressionType(expr, resultType);
+
 		m_currentExprType = previousType;
 
 		return resultType;

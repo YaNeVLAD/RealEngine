@@ -6,6 +6,7 @@
         "Double": "Double",
         "Bool": "Bool",
         "String": "String",
+        "Unit": "Unit",
         "Any": "Any"
       },
       "ffi_annotations": [ "NativeName" ]
@@ -16,6 +17,7 @@
         "Double": "System.Double",
         "Bool": "System.Boolean",
         "String": "System.String",
+        "Unit": "System.Void",
         "Any": "System.Object"
       },
       "ffi_annotations": [ "DotNetMethod" ]

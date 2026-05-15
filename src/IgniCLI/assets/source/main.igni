@@ -1,15 +1,14 @@
 package program;
 
-fun main() {
-	var sum = 0;
-
-	for (i in 1..5) {
-		if (i % 2 == 0) {
-			println(i);
-		} else {
-			sum = sum + i;
-		}
+class Vector2(val x: Int, val y: Int) {
+	fun printSum() {
+		val sum = x + y;
+        println(sum);
 	}
+}
 
-	println(sum);
+fun main() {
+	val vec = Vector2(100, 50);
+
+	vec.printSum();
 }
