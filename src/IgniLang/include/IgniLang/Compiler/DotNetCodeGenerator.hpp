@@ -358,6 +358,15 @@ public:
 		}
 	}
 
+	void Visit(const ast::ReturnStmt* node) override
+	{
+		if (node->expr)
+		{
+			node->expr->Accept(*this);
+		}
+		*m_currentOut << "    ret\n";
+	}
+
 private:
 	std::ostream& m_out;
 	std::ostream* m_currentOut = &m_out;
