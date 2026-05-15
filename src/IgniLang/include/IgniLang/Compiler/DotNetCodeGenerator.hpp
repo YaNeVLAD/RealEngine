@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/FlatMap.hpp"
+
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
@@ -12,6 +14,9 @@ namespace igni
 
 class DotNetCodeGenerator final : public ast::BaseAstVisitor
 {
+	template <std::size_t N>
+	using HashedStringMap = re::FlatMap<re::HashedString, std::string_view, N>;
+
 public:
 	static constexpr auto TYPE_OBJECT = "class [mscorlib]System.Object";
 	static constexpr auto TYPE_VOID = "void";
@@ -190,23 +195,24 @@ public:
 			node->right->Accept(*this);
 		}
 
-		switch (node->op.Hashed())
-		{ // clang-format off
-		case "+"_hs:  *m_currentOut << "    add\n"; break;
-		case "-"_hs:  *m_currentOut << "    sub\n"; break;
-		case "*"_hs:  *m_currentOut << "    mul\n"; break;
-		case "/"_hs:  *m_currentOut << "    div\n"; break;
-		case "%"_hs:  *m_currentOut << "    rem\n"; break;
+		static constexpr HashedStringMap BinaryOpMap = { {
+			{ "+"_hs, "    add\n" },
+			{ "-"_hs, "    sub\n" },
+			{ "*"_hs, "    mul\n" },
+			{ "/"_hs, "    div\n" },
+			{ "%"_hs, "    rem\n" },
+			{ ">"_hs, "    cgt\n" },
+			{ "<"_hs, "    clt\n" },
+			{ "=="_hs, "    ceq\n" },
+			{ "!="_hs, "    ceq\n    ldc.i4.0\n    ceq\n" },
+			{ "<="_hs, "    cgt\n    ldc.i4.0\n    ceq\n" },
+			{ ">="_hs, "    clt\n    ldc.i4.0\n    ceq\n" },
+		} };
 
-		case "=="_hs: *m_currentOut << "    ceq\n"; break;
-		case ">"_hs:  *m_currentOut << "    cgt\n"; break;
-		case "<"_hs:  *m_currentOut << "    clt\n"; break;
-
-		case "!="_hs: *m_currentOut << "    ceq\n    ldc.i4.0\n    ceq\n"; break;
-		case "<="_hs: *m_currentOut << "    cgt\n    ldc.i4.0\n    ceq\n"; break;
-		case ">="_hs: *m_currentOut << "    clt\n    ldc.i4.0\n    ceq\n"; break;
-		default: break;
-		} // clang-format on
+		if (const auto instruction = BinaryOpMap[node->op.Hashed()])
+		{
+			*m_currentOut << *instruction;
+		}
 	}
 
 	void Visit(const ast::IfStmt* node) override
@@ -497,18 +503,24 @@ private:
 	static re::String MapTypeToCIL(const re::String& semTypeName)
 	{
 		using namespace re::literals;
-		switch (semTypeName.Hashed())
-		{ // clang-format off
-        case "System.Int64"_hs:   return "int64";
-        case "System.Double"_hs:  return "float64";
-        case "System.String"_hs:  return "string";
-        case "System.Boolean"_hs: return "bool";
-        case "Unit"_hs:
-		case "System.Void"_hs:    return TYPE_VOID;
-        case "Any"_hs:
-		case "System.Object"_hs:  return TYPE_OBJECT;
-        default:                  return "class " + semTypeName;
-       } // clang-format on
+
+		static constexpr HashedStringMap SemTypeMap = { {
+			{ "System.Int64"_hs, "int64" },
+			{ "System.Double"_hs, "float64" },
+			{ "System.String"_hs, "string" },
+			{ "System.Boolean"_hs, "bool" },
+			{ "Unit"_hs, TYPE_VOID },
+			{ "System.Void"_hs, TYPE_VOID },
+			{ "Any"_hs, TYPE_OBJECT },
+			{ "System.Object"_hs, TYPE_OBJECT },
+		} };
+
+		if (const auto mapped = SemTypeMap[semTypeName.Hashed()])
+		{
+			return mapped->data();
+		}
+
+		return "class " + semTypeName;
 	}
 
 	static re::String MapAstType(const ast::TypeNode* node)
@@ -517,16 +529,21 @@ private:
 
 		if (const auto s = dynamic_cast<const ast::SimpleTypeNode*>(node))
 		{
-			switch (s->name.Hashed())
-			{ // clang-format off
-			case "Int"_hs:    return "int64";
-			case "Double"_hs: return "float64";
-			case "String"_hs: return "string";
-			case "Bool"_hs:   return "bool";
-			case "Unit"_hs:   return TYPE_VOID;
-			case "Any"_hs:    return TYPE_OBJECT;
-			default:          return "class " + s->name;
-			} // clang-format on
+			static constexpr HashedStringMap AstTypeMap = { {
+				{ "Int"_hs, "int64" },
+				{ "Double"_hs, "float64" },
+				{ "String"_hs, "string" },
+				{ "Bool"_hs, "bool" },
+				{ "Unit"_hs, TYPE_VOID },
+				{ "Any"_hs, TYPE_OBJECT },
+			} };
+
+			if (const auto mapped = AstTypeMap[s->name.Hashed()])
+			{
+				return mapped->data();
+			}
+
+			return "class " + s->name;
 		}
 
 		return TYPE_OBJECT;
@@ -562,30 +579,24 @@ private:
 		return sig;
 	}
 
+	template <typename Container, typename Value>
+	[[nodiscard]] static int IndexOf(const Container& container, const Value& value)
+	{
+		const auto it = std::ranges::find(container, value);
+
+		return it != container.end()
+			? static_cast<int>(std::distance(container.begin(), it))
+			: -1;
+	}
+
 	[[nodiscard]] int GetLocalIndex(const re::String& name) const
 	{
-		for (int i = 0; i < static_cast<int>(m_locals.size()); ++i)
-		{
-			if (m_locals[i] == name)
-			{
-				return i;
-			}
-		}
-
-		return -1;
+		return IndexOf(m_locals, name);
 	}
 
 	[[nodiscard]] int GetArgIndex(const re::String& name) const
 	{
-		for (int i = 0; i < static_cast<int>(m_args.size()); ++i)
-		{
-			if (m_args[i] == name)
-			{
-				return i;
-			}
-		}
-
-		return -1;
+		return IndexOf(m_args, name);
 	}
 };
 
