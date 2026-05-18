@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Core/FlatMap.hpp>
 #include <Core/String.hpp>
+#include <Core/flat_map.hpp>
 #include <IgniCLI/BuildType.hpp>
 #include <IgniLang/BuildTarget.hpp>
 
@@ -80,12 +80,12 @@ private:
 
 		Options options;
 
-		static constexpr auto TARGET_MAP = re::MakeFlatMap<re::HashedString, enum BuildTarget>({
+		static constexpr auto TARGET_MAP = re::make_flat_map<re::HashedString, enum BuildTarget>({
 			{ "--dotnet"_hs, BuildTarget::DotNet },
 			{ "--rvm"_hs, BuildTarget::RVM },
 		});
 
-		static constexpr auto TYPE_MAP = re::MakeFlatMap<re::HashedString, enum BuildType>({
+		static constexpr auto TYPE_MAP = re::make_flat_map<re::HashedString, enum BuildType>({
 			{ "--dll"_hs, BuildType::DynamicLibrary },
 			{ "--exe"_hs, BuildType::Executable },
 		});

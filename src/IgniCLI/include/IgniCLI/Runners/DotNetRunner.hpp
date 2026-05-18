@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/FlatMap.hpp>
+#include <Core/flat_map.hpp>
 #include <IgniCLI/BuildType.hpp>
 #include <IgniCLI/Runners/IRunner.hpp>
 
@@ -28,7 +28,7 @@ public:
 	{
 		using namespace std::literals;
 
-		static constexpr auto BUILD_TYPE_EXT = re::MakeFlatMap<enum BuildType, std::string_view>({
+		static constexpr auto BUILD_TYPE_EXT = re::make_flat_map<enum BuildType, std::string_view>({
 			{ BuildType::DynamicLibrary, ".dll"sv },
 			{ BuildType::Executable, ".exe"sv },
 		});

@@ -2,8 +2,8 @@
 
 #include "../Builder.hpp"
 
-#include <Core/FlatMap.hpp>
 #include <Core/HashedString.hpp>
+#include <Core/flat_map.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -15,7 +15,7 @@ using namespace re::literals;
 class TargetConfigEmitter
 {
 	template <std::size_t N>
-	using HashedStringMap = re::FlatMap<re::HashedString, std::string_view, N>;
+	using HashedStringMap = re::flat_map<re::HashedString, std::string_view, N>;
 
 public:
 	static constexpr auto TargetKey = "targets"_hs;

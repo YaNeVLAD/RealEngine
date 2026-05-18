@@ -1,7 +1,6 @@
 #pragma once
 
-#include "Core/FlatMap.hpp"
-
+#include <Core/flat_map.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
@@ -16,7 +15,7 @@ namespace igni
 class DotNetCodeGenerator final : public ast::BaseAstVisitor
 {
 	template <std::size_t N>
-	using HashedStringMap = re::FlatMap<re::HashedString, std::string_view, N>;
+	using HashedStringMap = re::flat_map<re::HashedString, std::string_view, N>;
 
 	static constexpr auto TYPE_OBJECT = "class [mscorlib]System.Object";
 	static constexpr auto TYPE_VOID = "void";

@@ -1,4 +1,4 @@
-#include <Core/FlatMap.hpp>
+#include <Core/flat_map.hpp>
 #include <IgniCLI/CLArguments.hpp>
 #include <IgniCLI/Runners/DotNetRunner.hpp>
 #include <IgniCLI/Runners/RvmRunner.hpp>
@@ -31,7 +31,7 @@ int main(const int argc, char** argv)
 	}
 
 	const auto target = args.BuildTarget();
-	static constexpr auto TARGET_NAME_MAP = re::MakeFlatMap<enum igni::BuildTarget, const char*>({
+	static constexpr auto TARGET_NAME_MAP = re::make_flat_map<enum igni::BuildTarget, const char*>({
 		{ igni::BuildTarget::DotNet, "dotnet" },
 		{ igni::BuildTarget::RVM, "rvm" },
 	});
