@@ -31,10 +31,10 @@ int main(const int argc, char** argv)
 	}
 
 	const auto target = args.BuildTarget();
-	static constexpr re::FlatMap<igni::BuildTarget, const char*, 2> TARGET_NAME_MAP = { {
+	static constexpr auto TARGET_NAME_MAP = re::MakeFlatMap<enum igni::BuildTarget, const char*>({
 		{ igni::BuildTarget::DotNet, "dotnet" },
 		{ igni::BuildTarget::RVM, "rvm" },
-	} };
+	});
 	const auto targetId = TARGET_NAME_MAP[target];
 
 	auto& sourceFiles = args.SourceFiles();

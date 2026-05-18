@@ -32,15 +32,6 @@ class CLArguments final
 	static constexpr auto NO_SOURCE_ERROR = "[Error] No source files provided.\n";
 	static constexpr auto NO_BUILD_TYPE_ERROR = "[Error] No build type provided.\n";
 
-	template <typename TEnum, std::size_t N>
-	using EnumMap = re::FlatMap<re::HashedString, TEnum, N>;
-
-	template <std::size_t N>
-	using BuildTypeMap = EnumMap<BuildType, N>;
-
-	template <std::size_t N>
-	using BuildTargetMap = EnumMap<BuildTarget, N>;
-
 public:
 	CLArguments(const int argc, char** argv)
 	{
@@ -89,15 +80,15 @@ private:
 
 		Options options;
 
-		static constexpr BuildTargetMap TARGET_MAP = { {
+		static constexpr auto TARGET_MAP = re::MakeFlatMap<re::HashedString, enum BuildTarget>({
 			{ "--dotnet"_hs, BuildTarget::DotNet },
 			{ "--rvm"_hs, BuildTarget::RVM },
-		} };
+		});
 
-		static constexpr BuildTypeMap TYPE_MAP = { {
+		static constexpr auto TYPE_MAP = re::MakeFlatMap<re::HashedString, enum BuildType>({
 			{ "--dll"_hs, BuildType::DynamicLibrary },
 			{ "--exe"_hs, BuildType::Executable },
-		} };
+		});
 
 		for (int i = 1; i < argc; ++i)
 		{

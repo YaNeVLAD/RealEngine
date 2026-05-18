@@ -18,9 +18,6 @@ class DotNetRunner : public IRunner
 	static constexpr auto IL_FILE = "IgniProgram.il";
 	static constexpr auto EXE_FILE_NAME = "IgniProgram";
 
-	template <std::size_t N>
-	using BuildTypeMap = re::FlatMap<BuildType, std::string_view, N>;
-
 public:
 	explicit DotNetRunner(const BuildType buildType)
 		: m_buildType(buildType)
@@ -31,10 +28,10 @@ public:
 	{
 		using namespace std::literals;
 
-		static constexpr BuildTypeMap BUILD_TYPE_EXT = { {
+		static constexpr auto BUILD_TYPE_EXT = re::MakeFlatMap<enum BuildType, std::string_view>({
 			{ BuildType::DynamicLibrary, ".dll"sv },
 			{ BuildType::Executable, ".exe"sv },
-		} };
+		});
 		const auto ext = BUILD_TYPE_EXT[m_buildType];
 		const auto target = ext->substr(1);
 

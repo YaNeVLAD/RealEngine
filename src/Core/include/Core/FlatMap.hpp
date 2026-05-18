@@ -84,4 +84,10 @@ private:
 template <typename TKey, typename TValue, std::size_t Size>
 FlatMap(const std::pair<TKey, TValue> (&)[Size]) -> FlatMap<TKey, TValue, Size>;
 
+template <typename TKey, typename TValue, std::size_t Size>
+[[nodiscard]] constexpr auto MakeFlatMap(const std::pair<TKey, TValue> (&arr)[Size])
+{
+	return FlatMap<TKey, TValue, Size>(arr);
+}
+
 } // namespace re
