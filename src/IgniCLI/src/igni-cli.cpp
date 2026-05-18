@@ -1,3 +1,5 @@
+#include <Core/FlatMap.hpp>
+#include <IgniCLI/CLArguments.hpp>
 #include <IgniCLI/Runners/DotNetRunner.hpp>
 #include <IgniCLI/Runners/RvmRunner.hpp>
 #include <IgniLang/Compiler/DotNetBackend.hpp>
@@ -15,36 +17,28 @@ int main(const int argc, char** argv)
 	SetConsoleOutputCP(CP_UTF8);
 #endif
 
-	if (argc < 2)
+	using namespace std::literals;
+
+	auto args = igni::cli::CLArguments(argc, argv);
+	if (!args.Valid())
 	{
-		std::cerr << "Usage: igni-cli <file1.igni> <file2.igni> ...\n";
+		for (const auto& err : args.Errors())
+		{
+			std::cerr << err;
+		}
+
 		return 1;
 	}
 
-	std::string targetId = "rvm";
-	std::vector<std::string> sourceFiles;
+	const auto target = args.BuildTarget();
+	static constexpr re::FlatMap<igni::BuildTarget, const char*, 2> TARGET_NAME_MAP = { {
+		{ igni::BuildTarget::DotNet, "dotnet" },
+		{ igni::BuildTarget::RVM, "rvm" },
+	} };
+	const auto targetId = TARGET_NAME_MAP[target];
 
-	for (int i = 1; i < argc; ++i)
-	{
-		if (std::string arg = argv[i]; arg == "--dotnet")
-		{
-			targetId = "dotnet";
-		}
-		else if (arg == "--rvm")
-		{
-			targetId = "rvm";
-		}
-		else if (arg.length() > 0 && arg[0] == '-')
-		{
-			std::cerr << "[Warning] Unknown flag ignored: " << arg << "\n";
-		}
-		else
-		{
-			sourceFiles.emplace_back(arg);
-		}
-	}
-
-	if (const std::string stdlibPath = "assets/source/stdlib_" + targetId + ".igni"; std::filesystem::exists(stdlibPath))
+	auto& sourceFiles = args.SourceFiles();
+	if (const std::string stdlibPath = "assets/source/stdlib_"s + *targetId + ".igni"; std::filesystem::exists(stdlibPath))
 	{
 		sourceFiles.insert(sourceFiles.begin(), stdlibPath);
 	}
@@ -56,22 +50,17 @@ int main(const int argc, char** argv)
 	try
 	{
 		std::unique_ptr<igni::compiler::IBackend> backend;
-		if (targetId == "rvm")
+		if (target == igni::BuildTarget::RVM)
 		{
 			backend = std::make_unique<igni::compiler::RvmBackend>();
 		}
-		else if (targetId == "dotnet")
+		else if (target == igni::BuildTarget::DotNet)
 		{
 			backend = std::make_unique<igni::compiler::DotNetBackend>();
 		}
-		else
-		{
-			std::cerr << "Unknown target: " << targetId << "\n";
-			return 1;
-		}
 
 		const igni::compiler::Pipeline pipeline("assets/igni_grammar.txt");
-		const auto result = pipeline.Compile(sourceFiles, targetId, *backend);
+		const auto result = pipeline.Compile(sourceFiles, target, *backend);
 
 		if (!result.success)
 		{
@@ -85,13 +74,13 @@ int main(const int argc, char** argv)
 				  << "\n------------------------------\n";
 
 		std::unique_ptr<igni::cli::IRunner> runner;
-		if (targetId == "rvm")
+		if (target == igni::BuildTarget::RVM)
 		{
 			runner = std::make_unique<igni::cli::RvmRunner>();
 		}
-		else if (targetId == "dotnet")
+		else if (target == igni::BuildTarget::DotNet)
 		{
-			runner = std::make_unique<igni::cli::DotNetRunner>();
+			runner = std::make_unique<igni::cli::DotNetRunner>(args.BuildType());
 		}
 
 		return runner->Run(result.generatedCode);

@@ -49,8 +49,8 @@ public:
 	}
 
 	CompilationResult Compile(
-		const std::vector<std::string>& filePaths,
-		const std::string& targetId,
+		const std::vector<re::String>& filePaths,
+		BuildTarget target,
 		IBackend& backend) const
 	{
 		CompilationResult result;
@@ -59,7 +59,7 @@ public:
 		std::list<std::string> sourceBuffers;
 
 		// --- PHASE 1: FRONTEND ---
-		auto parsedPrograms = RunFrontend(filePaths, diagnostics, sourceBuffers);
+		const auto parsedPrograms = RunFrontend(filePaths, diagnostics, sourceBuffers);
 		if (diagnostics.HasErrors())
 		{
 			diagnostics.PrintToConsole();
@@ -67,8 +67,8 @@ public:
 		}
 
 		// --- PHASE 2: SEMANTICS ---
-		std::cout << "[Info] Running Semantic Analysis for target: " << targetId << "...\n";
-		auto config = sem::generated::GetTargetConfig(targetId);
+		std::cout << "[Info] Running Semantic Analysis for target: " << static_cast<int>(target) << "...\n";
+		auto config = sem::generated::GetTargetConfig(target);
 		auto semanticAnalyzer = std::make_shared<sem::SemanticAnalyzer>(config);
 
 		sem::g_Diagnostics = &diagnostics;
@@ -94,8 +94,8 @@ public:
 		auto linkedProgram = LinkAsts(parsedPrograms);
 
 		// --- PHASE 4: OPTIMIZATION ---
-		opt::DeadCodeEliminator dce;
-		dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings());
+		// opt::DeadCodeEliminator dce;
+		// dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings());
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Code using injected Backend...\n";
@@ -116,7 +116,7 @@ private:
 	fsm::slr::table<re::String> m_table;
 
 	std::vector<std::unique_ptr<ast::Program>> RunFrontend(
-		const std::vector<std::string>& filePaths,
+		const std::vector<re::String>& filePaths,
 		DiagnosticEngine& diagnostics,
 		std::list<std::string>& sourceBuffers) const
 	{

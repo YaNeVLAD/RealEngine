@@ -8,7 +8,7 @@ namespace re
 {
 
 template <typename TKey, typename TValue, std::size_t Size>
-class FlatMap
+class FlatMap final
 {
 public:
 	constexpr FlatMap(const std::pair<TKey, TValue> (&arr)[Size])

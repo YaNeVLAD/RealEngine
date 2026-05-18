@@ -5,6 +5,7 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <vector>
@@ -17,10 +18,11 @@ class DotNetCodeGenerator final : public ast::BaseAstVisitor
 	template <std::size_t N>
 	using HashedStringMap = re::FlatMap<re::HashedString, std::string_view, N>;
 
-public:
 	static constexpr auto TYPE_OBJECT = "class [mscorlib]System.Object";
 	static constexpr auto TYPE_VOID = "void";
+	static constexpr auto ANNO_BASE_CLASS = "DotNetBaseClass";
 
+public:
 	DotNetCodeGenerator(std::ostream& out, const sem::SemanticAnalyzer& semantics)
 		: m_out(out)
 		, m_semanticAnalyzer(semantics)
@@ -29,11 +31,43 @@ public:
 
 	void Generate(const ast::Program* program)
 	{
+		auto scanAnnotations = [&](const std::vector<ast::Annotation>& annotations) {
+			for (const auto& anno : annotations)
+			{
+				if (const auto strArg = GetAnnotationStringArg(anno))
+				{
+					ExtractAssemblies(*strArg);
+				}
+			}
+		};
+
+		for (const auto& stmt : program->statements)
+		{
+			if (const auto decl = dynamic_cast<const ast::Decl*>(stmt.get()))
+			{
+				scanAnnotations(decl->annotations);
+
+				if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(decl))
+				{
+					for (const auto& member : classDecl->members)
+					{
+						scanAnnotations(member->annotations);
+					}
+				}
+			}
+		}
+
 		m_out << "// Auto-generated .NET CIL\n";
 		m_out << ".assembly IgniProgram { }\n";
 		m_out << ".assembly extern mscorlib { }\n\n";
 
-		m_out << ".class public auto ansi beforefieldinit Program extends [mscorlib]System.Object\n{\n";
+		for (const auto& asmName : m_externAssemblies)
+		{
+			m_out << ".assembly extern " << asmName << " { }\n";
+		}
+		m_out << "\n";
+
+		m_out << ".class public auto ansi beforefieldinit IgniGlobalModule extends [mscorlib]System.Object\n{\n";
 		m_currentClass = nullptr;
 
 		for (const auto& stmt : program->statements)
@@ -57,10 +91,14 @@ public:
 	void Visit(const ast::ClassDecl* node) override
 	{
 		if (node->isExternal || !node->typeParams.empty())
+		{
 			return;
+		}
 
 		m_currentClass = node;
-		m_out << ".class public auto ansi beforefieldinit " << node->name << " extends [mscorlib]System.Object\n{\n";
+
+		const re::String baseClass = GetBaseClass(node->annotations);
+		m_out << ".class public auto ansi beforefieldinit " << node->name << " extends " << baseClass << "\n{\n";
 
 		if (const auto semClass = m_semanticAnalyzer.GetClassType(node->name))
 		{
@@ -91,7 +129,11 @@ public:
 
 		PrepareMethodScope(true, node->parameters);
 
-		*m_currentOut << "    ldarg.0\n    call instance void [mscorlib]System.Object::.ctor()\n";
+		// Исправленный баг: базовый класс вытаскиваем из аннотаций класса, а не конструктора!
+		const re::String baseClass = GetBaseClass(m_currentClass->annotations);
+		const auto baseCtor = baseClass + "::.ctor()";
+
+		*m_currentOut << "    ldarg.0\n    call instance void " << baseCtor << "\n";
 
 		const re::String sig = ".method public hidebysig specialname rtspecialname instance void .ctor(" + BuildParamSignature(node->parameters) + ") cil managed";
 		EmitMethodBody(sig, node->body.get(), false);
@@ -347,7 +389,7 @@ public:
 		const re::String retType = callInfo.target && callInfo.target->returnType
 			? MapTypeToCIL(callInfo.target->returnType->name)
 			: TYPE_VOID;
-		*m_currentOut << "    call " << retType << " Program::" << callInfo.asmLabel << "()\n";
+		*m_currentOut << "    call " << retType << " IgniGlobalModule::" << callInfo.asmLabel << "()\n";
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -378,6 +420,8 @@ private:
 	std::vector<re::String> m_localTypes;
 	std::vector<re::String> m_args;
 	std::size_t m_labelCount = 0;
+
+	std::vector<re::String> m_externAssemblies;
 
 	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params)
 	{
@@ -558,12 +602,12 @@ private:
 		return TYPE_OBJECT;
 	}
 
-	[[nodiscard]] static std::string BuildParamSignature(const std::vector<ast::Parameter>& params)
+	[[nodiscard]] static re::String BuildParamSignature(const std::vector<ast::Parameter>& params)
 	{
-		std::string sig;
+		re::String sig;
 		for (std::size_t i = 0; i < params.size(); ++i)
 		{
-			sig += MapAstType(params[i].type.get()).ToString();
+			sig += MapAstType(params[i].type.get());
 			if (i < params.size() - 1)
 			{
 				sig += ", ";
@@ -573,12 +617,12 @@ private:
 		return sig;
 	}
 
-	[[nodiscard]] static std::string BuildTypeSignature(const std::vector<std::shared_ptr<sem::SemanticType>>& types, const std::size_t startIndex)
+	[[nodiscard]] static re::String BuildTypeSignature(const std::vector<std::shared_ptr<sem::SemanticType>>& types, const std::size_t startIndex)
 	{
-		std::string sig;
+		re::String sig;
 		for (std::size_t i = startIndex; i < types.size(); ++i)
 		{
-			sig += MapTypeToCIL(types[i]->name).ToString();
+			sig += MapTypeToCIL(types[i]->name);
 			if (i < types.size() - 1)
 			{
 				sig += ", ";
@@ -586,6 +630,58 @@ private:
 		}
 
 		return sig;
+	}
+
+	[[nodiscard]] static std::optional<re::String> GetAnnotationStringArg(const ast::Annotation& anno)
+	{
+		if (anno.argument)
+		{
+			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
+			{
+				if (lit->token.type == TokenType::StringConst)
+				{
+					return lit->token.lexeme.substr(1, lit->token.lexeme.length() - 2);
+				}
+			}
+		}
+
+		return std::nullopt;
+	}
+
+	[[nodiscard]] static re::String GetBaseClass(const std::vector<ast::Annotation>& annotations)
+	{
+		for (const auto& anno : annotations)
+		{
+			if (anno.name == ANNO_BASE_CLASS)
+			{
+				if (const auto strArg = GetAnnotationStringArg(anno))
+				{
+					return *strArg;
+				}
+			}
+		}
+
+		return "[mscorlib]System.Object";
+	}
+
+	void ExtractAssemblies(const re::String& signature)
+	{
+		std::size_t start = 0;
+		while ((start = signature.Find('[', start)) != re::String::NPos)
+		{
+			const std::size_t end = signature.Find(']', start);
+			if (end == std::string::npos)
+			{
+				break;
+			}
+
+			if (const re::String asmName = signature.Substring(start + 1, end - start - 1);
+				asmName != "mscorlib" && std::ranges::find(m_externAssemblies, asmName) == m_externAssemblies.end())
+			{
+				m_externAssemblies.push_back(asmName);
+			}
+			start = end + 1;
+		}
 	}
 
 	template <typename Container, typename Value>

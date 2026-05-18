@@ -44,6 +44,7 @@ int main(const int argc, char** argv)
 	headerBuilder.Include("unordered_map", true);
 	headerBuilder.Include("unordered_set", true);
 	headerBuilder.Include("IgniLang/BindingContext.hpp", true);
+	headerBuilder.Include("IgniLang/BuildTarget.hpp", true);
 	headerBuilder.EmptyLine();
 
 	auto nsHeader = headerBuilder.Namespace("igni::sem::generated");

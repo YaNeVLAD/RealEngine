@@ -1,0 +1,11 @@
+package program;
+
+@DotNetMethod("void [UnityEngine]UnityEngine.Debug::Log(object)")
+external fun log(msg: String): Unit;
+
+@DotNetBaseClass("[UnityEngine]UnityEngine.MonoBehaviour")
+class IgniHelloWorld {
+    fun Start() {
+		log("Igni передаёт: Здарова, заебал!");
+    }
+}

@@ -2,6 +2,8 @@ package global;
 
 annotation class DotNetMethod(val signature: String);
 
+annotation class DotNetBaseClass(val signature: String);
+
 @DotNetMethod("void [mscorlib]System.Console::WriteLine(int64)")
 external fun println(args: Any...): Unit;
 

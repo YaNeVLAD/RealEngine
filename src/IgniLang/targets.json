@@ -20,7 +20,7 @@
         "Unit": "System.Void",
         "Any": "System.Object"
       },
-      "ffi_annotations": [ "DotNetMethod" ]
+      "ffi_annotations": [ "DotNetMethod", "DotNetBaseClass" ]
     }
   }
 }

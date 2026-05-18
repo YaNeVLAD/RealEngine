@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Core/FlatMap.hpp>
+#include <IgniCLI/BuildType.hpp>
 #include <IgniCLI/Runners/IRunner.hpp>
 
 #include <filesystem>
@@ -13,14 +15,36 @@ namespace igni::cli
 class DotNetRunner : public IRunner
 {
 	static constexpr auto WIN_PATH = R"(C:\Windows\Microsoft.NET\Framework64\v4.0.30319\ilasm.exe)";
-	static constexpr auto IL_FILE = "temp_output.il";
-	static constexpr auto EXE_FILE = "temp_output.exe";
+	static constexpr auto IL_FILE = "IgniProgram.il";
+	static constexpr auto EXE_FILE_NAME = "IgniProgram";
+
+	template <std::size_t N>
+	using BuildTypeMap = re::FlatMap<BuildType, std::string_view, N>;
 
 public:
+	explicit DotNetRunner(const BuildType buildType)
+		: m_buildType(buildType)
+	{
+	}
+
 	int Run(const std::string& generatedCode) override
 	{
+		using namespace std::literals;
+
+		static constexpr BuildTypeMap BUILD_TYPE_EXT = { {
+			{ BuildType::DynamicLibrary, ".dll"sv },
+			{ BuildType::Executable, ".exe"sv },
+		} };
+		const auto ext = BUILD_TYPE_EXT[m_buildType];
+		const auto target = ext->substr(1);
+
 		{
-			std::ofstream out(IL_FILE);
+			std::ofstream out(IL_FILE, std::ios::binary);
+
+			// UTF-8 BOM
+			constexpr unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+			out.write(reinterpret_cast<const char*>(bom), sizeof(bom));
+
 			out << generatedCode;
 		}
 
@@ -32,25 +56,32 @@ public:
 			ilasmPath = WIN_PATH;
 		}
 
-		const std::string compileCmd = "\"" + ilasmPath + "\" " + IL_FILE + " /exe /output=" + EXE_FILE + " /quiet";
+		const auto outFile = std::string(EXE_FILE_NAME) + ext->data();
+		const auto compileCmd = std::format("{} {} /{} /output={} /quiet", ilasmPath, IL_FILE, target, outFile);
 		if (const int res = std::system(compileCmd.c_str()); res != 0)
 		{
 			std::cerr << "[Error] ilasm failed to assemble the program.\n";
 			return res;
 		}
+		std::cout << "[Success] Generated " << outFile << " successfully!\n";
 
-		std::cout << "[Info] Running .NET Program:\n------------------\n";
+		int res = 0;
+		const bool shouldRun = m_buildType == BuildType::Executable;
+		if (shouldRun)
+		{
+			std::cout << "------------------\n[Info] Running " << outFile << ":\n------------------\n";
+			res = std::system(outFile.c_str());
+			std::cout << "------------------\n[Info] Program finished with code " << res << "\n";
 
-		// На современных системах .exe может требовать 'dotnet' для запуска,
-		// если это не self-contained. Но ilasm обычно делает обычный PE.
-		const int runRes = std::system(EXE_FILE);
-		std::cout << "\n------------------\n[Info] Program finished with code " << runRes << std::endl;
-
+			std::filesystem::remove(outFile);
+		}
 		std::filesystem::remove(IL_FILE);
-		std::filesystem::remove(EXE_FILE);
 
-		return runRes;
+		return res;
 	}
+
+private:
+	BuildType m_buildType;
 };
 
 } // namespace igni::cli
