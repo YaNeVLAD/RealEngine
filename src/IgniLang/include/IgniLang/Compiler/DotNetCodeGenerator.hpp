@@ -129,7 +129,6 @@ public:
 
 		PrepareMethodScope(true, node->parameters);
 
-		// Исправленный баг: базовый класс вытаскиваем из аннотаций класса, а не конструктора!
 		const re::String baseClass = GetBaseClass(m_currentClass->annotations);
 		const auto baseCtor = baseClass + "::.ctor()";
 

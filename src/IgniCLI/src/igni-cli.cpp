@@ -90,6 +90,4 @@ int main(const int argc, char** argv)
 		std::cerr << "\n[Compiler Fatal Error] " << e.what() << "\n";
 		return 1;
 	}
-
-	return 0;
 }
