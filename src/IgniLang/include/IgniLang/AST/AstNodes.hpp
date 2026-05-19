@@ -120,7 +120,7 @@ struct Annotation
 {
 	fsm::token<TokenType> token;
 	re::String name;
-	std::unique_ptr<Expr> argument;
+	std::shared_ptr<Expr> argument;
 };
 
 struct Decl : Statement
@@ -849,6 +849,7 @@ struct ValDecl final : Visitable<ValDecl, Decl>
 	{
 		auto clone = std::make_unique<ValDecl>();
 		clone->visibility = visibility;
+		clone->annotations = annotations;
 		clone->name = name;
 		if (initializer)
 		{

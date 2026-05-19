@@ -58,6 +58,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	const auto realFunDecl = dynamic_cast<ast::FunDecl*>(clonedDecl.get());
 	realFunDecl->name = uniqueName;
 	realFunDecl->typeParams.clear();
+	realFunDecl->annotations = tmpl->astNode->annotations;
 
 	std::shared_ptr<FunctionType> funType;
 	if (tmpl->isMethod)
@@ -68,6 +69,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	{
 		funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
 	}
+	funType->annotations = tmpl->astNode->annotations;
 
 	m_context.instantiatedFunctions[uniqueName] = funType;
 	m_context.env.Define(uniqueName, funType, true);

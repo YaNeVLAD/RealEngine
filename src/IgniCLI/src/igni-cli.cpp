@@ -47,7 +47,7 @@ int main(const int argc, char** argv)
 		std::cerr << "[Warning] Standard library not found: " << stdlibPath << "\n";
 	}
 
-	try
+	// try
 	{
 		std::unique_ptr<igni::compiler::IBackend> backend;
 		if (target == igni::BuildTarget::RVM)
@@ -85,9 +85,9 @@ int main(const int argc, char** argv)
 
 		return runner->Run(result.generatedCode);
 	}
-	catch (const std::exception& e)
-	{
-		std::cerr << "\n[Compiler Fatal Error] " << e.what() << "\n";
-		return 1;
-	}
+	// catch (const std::exception& e)
+	// {
+		// std::cerr << "\n[Compiler Fatal Error] " << e.what() << "\n";
+		// return 1;
+	// }
 }

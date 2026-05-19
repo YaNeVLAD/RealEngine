@@ -960,11 +960,20 @@ private:
 		m_context.tString = std::make_shared<ClassType>(getTypeName("String"));
 		m_context.tAny = std::make_shared<ClassType>(getTypeName("Any"));
 
-		m_context.env.Define("Int", m_context.tInt, true);
-		m_context.env.Define("Double", m_context.tDouble, true);
-		m_context.env.Define("Bool", m_context.tBool, true);
-		m_context.env.Define("String", m_context.tString, true);
-		m_context.env.Define("Any", m_context.tAny, true);
+		auto defineType = [&](const re::String& igniName, const std::shared_ptr<ClassType>& type) {
+			m_context.env.Define(igniName, type, true);
+			if (type->name != igniName)
+			{
+				m_context.env.Define(type->name, type, true);
+			}
+		};
+
+		defineType("Int", m_context.tInt);
+		defineType("Double", m_context.tDouble);
+		defineType("Bool", m_context.tBool);
+		defineType("String", m_context.tString);
+		defineType("Any", m_context.tAny);
+
 		m_context.env.Define("Unit", m_context.tUnit, true);
 		m_context.env.Define("Type", m_context.tType, true);
 	}

@@ -139,7 +139,7 @@ public:
 
 	void Visit(const ast::FunDecl* node) override
 	{
-		if (node->isExternal)
+		if (node->isExternal || !node->typeParams.empty())
 		{
 			return;
 		}
@@ -150,7 +150,7 @@ public:
 		const re::String instanceKw = m_currentClass ? "instance " : "static ";
 		const bool isEntryPoint = (node->name == "main" && !m_currentClass);
 
-		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + node->name + "(" + BuildParamSignature(node->parameters) + ") cil managed";
+		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + node->name + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
 		EmitMethodBody(sig, node->body.get(), isEntryPoint);
 	}
 
@@ -193,6 +193,30 @@ public:
 				node->value->Accept(*this);
 			}
 			EmitIdentifierAccess(id, true, node->value.get());
+		}
+		else if (const auto idxAccess = dynamic_cast<const ast::IndexExpr*>(node->target.get()))
+		{
+			idxAccess->array->Accept(*this);
+			idxAccess->index->Accept(*this);
+			*m_currentOut << "    conv.i4\n";
+
+			if (node->value)
+			{
+				node->value->Accept(*this);
+			}
+
+			re::String elemType = "System.Object";
+			if (const auto arrSemType = m_semanticAnalyzer.GetBindings().GetExpressionType(idxAccess->array.get()))
+			{
+				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(arrSemType))
+				{
+					if (!classType->typeArguments.empty())
+					{
+						elemType = classType->typeArguments[0]->name;
+					}
+				}
+			}
+			*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
 		}
 	}
 
@@ -308,7 +332,66 @@ public:
 	{
 		if (node->isForEach)
 		{
-			return; // TODO: Add Array iteration
+			const std::size_t currentLabel = m_labelCount++;
+			const std::string startLabel = "L_foreach_start_" + std::to_string(currentLabel);
+			const std::string endLabel = "L_foreach_end_" + std::to_string(currentLabel);
+
+			const std::string arrName = "_arr_" + std::to_string(currentLabel);
+			DeclareLocal(arrName, node->startExpr.get());
+			const int arrIdx = GetLocalIndex(arrName);
+
+			const std::string idxName = "_idx_" + std::to_string(currentLabel);
+			m_locals.emplace_back(idxName);
+			m_localTypes.emplace_back("int64");
+			const int idxIdx = static_cast<int>(m_locals.size() - 1);
+			*m_currentOut << "    ldc.i8 0\n    stloc " << idxIdx << "\n";
+
+			re::String elemCilType = "class [mscorlib]System.Object";
+			re::String pureSemType = "System.Object";
+
+			if (const auto collSemType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->startExpr.get()))
+			{
+				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(collSemType))
+				{
+					if (!classType->typeArguments.empty())
+					{
+						pureSemType = classType->typeArguments[0]->name;
+						elemCilType = MapTypeToCIL(pureSemType);
+					}
+				}
+			}
+
+			m_locals.push_back(node->iteratorName);
+			m_localTypes.push_back(elemCilType);
+			const int iterIdx = static_cast<int>(m_locals.size() - 1);
+
+			*m_currentOut << startLabel << ":\n";
+
+			*m_currentOut << "    ldloc " << idxIdx << "\n";
+			*m_currentOut << "    ldloc " << arrIdx << "\n";
+			*m_currentOut << "    ldlen\n    conv.i8\n";
+			*m_currentOut << "    bge " << endLabel << "\n";
+
+			*m_currentOut << "    ldloc " << arrIdx << "\n";
+			*m_currentOut << "    ldloc " << idxIdx << "\n";
+			*m_currentOut << "    conv.i4\n";
+			*m_currentOut << "    ldelem." << GetElemSuffix(pureSemType) << "\n";
+			*m_currentOut << "    stloc " << iterIdx << " // " << node->iteratorName << "\n";
+
+			if (node->body)
+			{
+				node->body->Accept(*this);
+			}
+
+			*m_currentOut << "    ldloc " << idxIdx << "\n";
+			*m_currentOut << "    ldc.i8 1\n";
+			*m_currentOut << "    add\n";
+			*m_currentOut << "    stloc " << idxIdx << "\n";
+
+			*m_currentOut << "    br " << startLabel << "\n";
+
+			*m_currentOut << endLabel << ":\n";
+			return;
 		}
 
 		const std::string startLabel = "L_for_start_" + std::to_string(m_labelCount);
@@ -322,8 +405,8 @@ public:
 		const int limitIdx = GetLocalIndex(limitName);
 
 		*m_currentOut << startLabel << ":\n"
-					  << "    ldloc." << iterIdx << "\n"
-					  << "    ldloc." << limitIdx << "\n"
+					  << "    ldloc " << iterIdx << "\n"
+					  << "    ldloc " << limitIdx << "\n"
 					  << "    bgt " << endLabel << "\n";
 
 		if (node->body)
@@ -331,7 +414,7 @@ public:
 			node->body->Accept(*this);
 		}
 
-		*m_currentOut << "    ldloc." << iterIdx << "\n    ldc.i8 1\n    add\n    stloc." << iterIdx << "\n"
+		*m_currentOut << "    ldloc " << iterIdx << "\n    ldc.i8 1\n    add\n    stloc " << iterIdx << "\n"
 					  << "    br " << startLabel << "\n"
 					  << endLabel << ":\n";
 	}
@@ -339,28 +422,173 @@ public:
 	void Visit(const ast::CallExpr* node) override
 	{
 		const auto& callInfo = m_semanticAnalyzer.GetBindings().callInfo.at(node);
+		const auto& targetAnnos = callInfo.target->annotations;
 
-		auto emitArgs = [&] {
-			for (const auto& arg : node->arguments)
+		auto emitArgs = [&](const bool ignoreVararg = false) {
+			if (callInfo.target->isVararg && !ignoreVararg)
 			{
-				if (arg)
+				const std::size_t normalCount = callInfo.target->paramTypes.size() - 1;
+
+				for (std::size_t i = 0; i < normalCount; ++i)
 				{
-					arg->Accept(*this);
+					if (node->arguments[i])
+					{
+						node->arguments[i]->Accept(*this);
+					}
 				}
+
+				const std::size_t varargCount = node->arguments.size() - normalCount;
+				*m_currentOut << "    ldc.i4 " << varargCount << "\n";
+
+				const re::String elemType = callInfo.target->paramTypes.back()->name;
+				re::String cilElemType = MapTypeToCIL(elemType);
+				if (cilElemType.Find("[]") != re::String::NPos)
+				{
+					cilElemType = cilElemType.Substring(0, cilElemType.Length() - 2);
+				}
+
+				*m_currentOut << "    newarr " << cilElemType << "\n";
+
+				for (std::size_t i = 0; i < varargCount; ++i)
+				{
+					*m_currentOut << "    dup\n";
+					*m_currentOut << "    ldc.i4 " << i << "\n";
+
+					if (node->arguments[normalCount + i])
+					{
+						node->arguments[normalCount + i]->Accept(*this);
+
+						if (elemType == "Any" || elemType == "System.Object")
+						{
+							if (const auto argSemType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->arguments[normalCount + i].get()))
+							{
+								if (argSemType->name == "System.Int64")
+								{
+									*m_currentOut << "    box [mscorlib]System.Int64\n";
+								}
+								else if (argSemType->name == "System.Double")
+								{
+									*m_currentOut << "    box [mscorlib]System.Double\n";
+								}
+								else if (argSemType->name == "System.Boolean")
+								{
+									*m_currentOut << "    box [mscorlib]System.Boolean\n";
+								}
+							}
+						}
+					}
+
+					*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
+				}
+			}
+			else
+			{
+				for (const auto& arg : node->arguments)
+					if (arg)
+					{
+						arg->Accept(*this);
+					}
 			}
 		};
 
+		if (const auto inlineOp = GetAnnotationArg(targetAnnos, "DotNetOpcode"); inlineOp)
+		{
+			if (const auto& op = *inlineOp; op == "ldlen")
+			{
+				if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+				{
+					memAccess->object->Accept(*this);
+				}
+				*m_currentOut << "    ldlen\n    conv.i8\n";
+			}
+			else if (op == "ldelem")
+			{
+				if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+				{
+					memAccess->object->Accept(*this);
+				}
+				if (!node->arguments.empty() && node->arguments[0])
+				{
+					node->arguments[0]->Accept(*this);
+				}
+				*m_currentOut << "    conv.i4\n";
+
+				re::String elemType = "System.Object";
+				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->paramTypes[0]))
+				{
+					if (!classType->typeArguments.empty())
+					{
+						elemType = classType->typeArguments[0]->name;
+					}
+				}
+				*m_currentOut << "    ldelem." << GetElemSuffix(elemType) << "\n";
+			}
+			else if (op == "stelem")
+			{
+				if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+				{
+					memAccess->object->Accept(*this);
+				}
+				if (!node->arguments.empty() && node->arguments[0])
+				{
+					node->arguments[0]->Accept(*this);
+				}
+				*m_currentOut << "    conv.i4\n";
+
+				if (node->arguments.size() > 1 && node->arguments[1])
+				{
+					node->arguments[1]->Accept(*this);
+				}
+
+				re::String elemType = "System.Object";
+				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->paramTypes[0]))
+				{
+					if (!classType->typeArguments.empty())
+					{
+						elemType = classType->typeArguments[0]->name;
+					}
+				}
+				*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
+			}
+			else if (op == "newarr")
+			{
+				emitArgs(true);
+				re::String elemType = "class [mscorlib]System.Object";
+				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->returnType))
+				{
+					if (!classType->typeArguments.empty())
+					{
+						elemType = MapTypeToCIL(classType->typeArguments[0]->name);
+					}
+				}
+				*m_currentOut << "    newarr " << elemType << "\n";
+			}
+			else
+			{
+				emitArgs();
+				*m_currentOut << "    " << op << "\n";
+			}
+			return;
+		}
+
 		if (callInfo.dispatchMode == CallDispatchType::Native)
 		{
+			if (const auto dotnetMethod = GetAnnotationArg(targetAnnos, "DotNetMethod"))
+			{
+				emitArgs(true);
+				*m_currentOut << "    call " << *dotnetMethod << "\n";
+				return;
+			}
 			emitArgs();
-			*m_currentOut << "    call " << callInfo.asmLabel << "\n";
+			*m_currentOut << "    call " << callInfo.target->name << "\n";
 			return;
 		}
 
 		if (callInfo.isConstructorCall)
 		{
 			emitArgs();
-			*m_currentOut << "    newobj instance void " << callInfo.mangledClassName << "::.ctor(" << BuildTypeSignature(callInfo.target->paramTypes, 1) << ")\n";
+			*m_currentOut << "    newobj instance void " << callInfo.mangledClassName << "::.ctor("
+						  << BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) << ")\n";
 			return;
 		}
 
@@ -378,7 +606,7 @@ public:
 			emitArgs();
 			*m_currentOut << "    callvirt instance " << MapTypeToCIL(callInfo.target->returnType->name)
 						  << " " << callInfo.target->paramTypes[0]->name << "::" << callInfo.asmLabel
-						  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 1) << ")\n";
+						  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) << ")\n";
 
 			return;
 		}
@@ -387,7 +615,18 @@ public:
 		const re::String retType = callInfo.target && callInfo.target->returnType
 			? MapTypeToCIL(callInfo.target->returnType->name)
 			: TYPE_VOID;
-		*m_currentOut << "    call " << retType << " IgniGlobalModule::" << callInfo.asmLabel << "()\n";
+
+		re::String finalAsmLabel = callInfo.asmLabel;
+		if (const std::size_t firstAt = finalAsmLabel.Find('@'); firstAt != re::String::NPos)
+		{
+			if (const std::size_t secondAt = finalAsmLabel.Find('@', firstAt + 1); secondAt != re::String::NPos)
+			{
+				finalAsmLabel = finalAsmLabel.Substring(0, secondAt);
+			}
+		}
+
+		*m_currentOut << "    call " << retType << " IgniGlobalModule::" << finalAsmLabel
+					  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) << ")\n";
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -405,6 +644,26 @@ public:
 			node->expr->Accept(*this);
 		}
 		*m_currentOut << "    ret\n";
+	}
+
+	void Visit(const ast::IndexExpr* node) override
+	{
+		node->array->Accept(*this);
+		node->index->Accept(*this);
+		*m_currentOut << "    conv.i4\n";
+
+		re::String elemType = "System.Object";
+		if (const auto arrSemType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->array.get()))
+		{
+			if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(arrSemType))
+			{
+				if (!classType->typeArguments.empty())
+				{
+					elemType = classType->typeArguments[0]->name;
+				}
+			}
+		}
+		*m_currentOut << "    ldelem." << GetElemSuffix(elemType) << "\n";
 	}
 
 private:
@@ -515,12 +774,12 @@ private:
 
 		if (const int locIdx = GetLocalIndex(id->name); locIdx != -1)
 		{
-			*m_currentOut << "    " << (isStore ? "stloc." : "ldloc.") << locIdx << " // " << id->name << "\n";
+			*m_currentOut << "    " << (isStore ? "stloc " : "ldloc ") << locIdx << " // " << id->name << "\n";
 			return;
 		}
 		if (const int argIdx = GetArgIndex(id->name); argIdx != -1)
 		{
-			*m_currentOut << "    " << (isStore ? "starg." : "ldarg.") << argIdx << " // " << id->name << "\n";
+			*m_currentOut << "    " << (isStore ? "starg " : "ldarg ") << argIdx << " // " << id->name << "\n";
 		}
 	}
 
@@ -548,7 +807,7 @@ private:
 			*m_currentOut << "    ldc.i8 0\n";
 		}
 
-		*m_currentOut << "    stloc." << idx << " // " << name << "\n";
+		*m_currentOut << "    stloc " << idx << " // " << name << "\n";
 	}
 
 	static re::String MapTypeToCIL(const re::String& semTypeName)
@@ -571,6 +830,12 @@ private:
 			return mapped->data();
 		}
 
+		if (semTypeName.Find("Array@") != re::String::NPos)
+		{
+			const re::String innerType = semTypeName.Substring(6, semTypeName.Length() - 6);
+			return MapTypeToCIL(innerType) + "[]";
+		}
+
 		return "class " + semTypeName;
 	}
 
@@ -580,6 +845,11 @@ private:
 
 		if (const auto s = dynamic_cast<const ast::SimpleTypeNode*>(node))
 		{
+			if (s->name == "Array" && !s->typeArgs.empty())
+			{
+				return MapAstType(s->typeArgs[0].get()) + "[]";
+			}
+
 			static constexpr HashedStringMap AstTypeMap = { {
 				{ "Int"_hs, "int64" },
 				{ "Double"_hs, "float64" },
@@ -594,18 +864,40 @@ private:
 				return mapped->data();
 			}
 
-			return "class " + s->name;
+			return MapTypeToCIL(s->name);
 		}
 
 		return TYPE_OBJECT;
 	}
 
-	[[nodiscard]] static re::String BuildParamSignature(const std::vector<ast::Parameter>& params)
+	static re::String GetElemSuffix(const re::String& semTypeName)
+	{
+		using namespace re::literals;
+
+		static constexpr HashedStringMap SemTypeMap = { {
+			{ "System.Int64"_hs, "i8" },
+			{ "System.Double"_hs, "r8" },
+			{ "System.Boolean"_hs, "i4" },
+		} };
+
+		return SemTypeMap.get(semTypeName.Hashed(), "ref");
+	}
+
+	[[nodiscard]] static std::string BuildParamSignature(const std::vector<ast::Parameter>& params, const bool isVararg = false)
 	{
 		re::String sig;
 		for (std::size_t i = 0; i < params.size(); ++i)
 		{
-			sig += MapAstType(params[i].type.get());
+			auto typeSig = MapAstType(params[i].type.get());
+			if (isVararg && i == params.size() - 1)
+			{
+				if (typeSig.Find("[]") == re::String::NPos)
+				{
+					typeSig += "[]";
+				}
+			}
+
+			sig += typeSig;
 			if (i < params.size() - 1)
 			{
 				sig += ", ";
@@ -615,12 +907,25 @@ private:
 		return sig;
 	}
 
-	[[nodiscard]] static re::String BuildTypeSignature(const std::vector<std::shared_ptr<sem::SemanticType>>& types, const std::size_t startIndex)
+	[[nodiscard]] static re::String BuildTypeSignature(
+		const std::vector<std::shared_ptr<sem::SemanticType>>& types,
+		const std::size_t startIndex,
+		const bool isVararg = false)
 	{
 		re::String sig;
 		for (std::size_t i = startIndex; i < types.size(); ++i)
 		{
-			sig += MapTypeToCIL(types[i]->name);
+			re::String typeSig = MapTypeToCIL(types[i]->name);
+
+			if (isVararg && i == types.size() - 1)
+			{
+				if (typeSig.Find("[]") == re::String::NPos)
+				{
+					typeSig += "[]";
+				}
+			}
+
+			sig += typeSig;
 			if (i < types.size() - 1)
 			{
 				sig += ", ";
@@ -628,6 +933,18 @@ private:
 		}
 
 		return sig;
+	}
+
+	[[nodiscard]] static std::optional<re::String> GetAnnotationArg(const std::vector<ast::Annotation>& annotations, const re::String& targetName)
+	{
+		for (const auto& anno : annotations)
+		{
+			if (anno.name == targetName)
+			{
+				return GetAnnotationStringArg(anno);
+			}
+		}
+		return std::nullopt;
 	}
 
 	[[nodiscard]] static std::optional<re::String> GetAnnotationStringArg(const ast::Annotation& anno)

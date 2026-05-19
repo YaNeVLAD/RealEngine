@@ -53,14 +53,21 @@ inline std::shared_ptr<ClassType> Instantiate(
 	}
 
 	auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
-	auto realClassDecl = dynamic_cast<ast::ClassDecl*>(clonedDecl.get());
+	const auto realClassDecl = dynamic_cast<ast::ClassDecl*>(clonedDecl.get());
 	realClassDecl->name = uniqueName;
 	realClassDecl->typeParams.clear();
+	realClassDecl->annotations = tmpl->astNode->annotations;
+	for (std::size_t i = 0; i < realClassDecl->members.size() && i < tmpl->astNode->members.size(); ++i)
+	{
+		realClassDecl->members[i]->annotations = tmpl->astNode->members[i]->annotations;
+	}
 
 	auto classType = std::make_shared<ClassType>(uniqueName, tmpl->astNode);
 	classType->classDecl = realClassDecl;
 	classType->moduleName = tmpl->moduleName;
 	classType->typeArguments = typeArgs;
+	classType->annotations = clonedDecl->annotations;
+	classType->annotations = tmpl->astNode->annotations;
 	m_context.instantiatedClasses[uniqueName] = classType;
 
 	m_context.env.Define(uniqueName, classType, true);

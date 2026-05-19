@@ -8,6 +8,11 @@ class Vector2(val x: Int, val y: Int) {
 }
 
 fun main() {
+	val arr = arrayOf(1, 2, 3, 4, 5);
+	for (elem in arr) {
+		println(elem);
+	}
+
 	val vec = Vector2(100, 50);
 
 	vec.printSum();

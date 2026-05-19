@@ -174,7 +174,18 @@ inline TargetResolution ResolveTarget(
 
 		if (!res.target && !group->templates.empty())
 		{
-			res.target = CallValidator::ResolveAndInstantiateGeneric(group->templates[0], explicitTypeArgs, argTypes, ctx);
+			const auto tmpl = group->templates[0];
+			std::vector<std::shared_ptr<SemanticType>> inferenceArgs = argTypes;
+
+			if (tmpl->astNode && tmpl->astNode->isVararg)
+			{
+				if (const std::size_t normalCount = tmpl->astNode->parameters.size() - 1; inferenceArgs.size() > normalCount + 1)
+				{
+					inferenceArgs.erase(inferenceArgs.begin() + static_cast<long long>(normalCount) + 1, inferenceArgs.end());
+				}
+			}
+
+			res.target = CallValidator::ResolveAndInstantiateGeneric(tmpl, explicitTypeArgs, inferenceArgs, ctx);
 			res.isGenericInstantiation = true;
 		}
 	}
@@ -335,6 +346,20 @@ inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, Semantic
 	}
 
 	detail::DetermineDispatchMode(node, resolution, callInfo);
+
+	if (resolution.target->isVararg)
+	{
+		if (const std::size_t normalCount = resolution.target->paramTypes.size() - 1; argTypes.size() > normalCount)
+		{
+			const auto arrayType = resolution.target->paramTypes.back();
+			argTypes.erase(argTypes.begin() + static_cast<long long>(normalCount), argTypes.end());
+			argTypes.push_back(arrayType);
+		}
+		else if (argTypes.size() == normalCount)
+		{
+			argTypes.push_back(resolution.target->paramTypes.back());
+		}
+	}
 
 	CallValidator::ValidateArguments(node, resolution.target.get(), argTypes, resolution.isMethodCall, callInfo);
 	ctx.bindings.callInfo[node] = callInfo;

@@ -18,6 +18,8 @@ struct SemanticType : re::utils::Prototype<SemanticType>
 
 	bool isNullable = false;
 
+	std::vector<ast::Annotation> annotations{};
+
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
 		using namespace re::literals;

@@ -31,6 +31,7 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
 	funType->nativeTargetName = decl->name;
+	funType->annotations = decl->annotations;
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
 	for (const auto& anno : decl->annotations)
@@ -111,6 +112,7 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 	funType->isExternal = decl->isExternal;
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
+	funType->annotations = decl->annotations;
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
 	for (const auto& anno : decl->annotations)
@@ -194,6 +196,7 @@ std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, cons
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
 	funType->paramTypes = std::move(paramTypes);
+	funType->annotations = decl->annotations;
 
 	ctx.allFunctionNames.insert(mangledName);
 	ctx.instantiatedFunctions[mangledName] = funType;
@@ -220,6 +223,7 @@ std::shared_ptr<FunctionType> Destructor(const ast::DestructorDecl* decl, const 
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
 	funType->paramTypes.push_back(classType);
+	funType->annotations = decl->annotations;
 
 	ctx.instantiatedFunctions[mangledName] = funType;
 

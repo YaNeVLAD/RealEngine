@@ -46,7 +46,7 @@ public:
 		requires std::three_way_comparable_with<TKey, K>
 	[[nodiscard]] constexpr TValue const& get(K const& key, TValue const& fallback) const
 	{
-		auto it = Find(key);
+		auto it = find(key);
 
 		return it != m_data.end() ? it->second : fallback;
 	}
@@ -55,7 +55,7 @@ public:
 		requires std::three_way_comparable_with<TKey, K>
 	[[nodiscard]] constexpr const TValue* try_get(K const& key) const noexcept
 	{
-		auto it = Find(key);
+		auto it = find(key);
 
 		return it != m_data.end() ? &it->second : nullptr;
 	}
@@ -64,13 +64,13 @@ public:
 		requires std::three_way_comparable_with<TKey, K>
 	[[nodiscard]] constexpr const TValue* operator[](K const& key) const noexcept
 	{
-		return TryGet(key);
+		return try_get(key);
 	}
 
 	template <typename K>
 	[[nodiscard]] constexpr bool contains(K const& key) const noexcept
 	{
-		return Find(key) != m_data.end();
+		return find(key) != m_data.end();
 	}
 
 	[[nodiscard]] constexpr auto begin() const noexcept
