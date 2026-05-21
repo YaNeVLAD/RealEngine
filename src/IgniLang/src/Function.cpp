@@ -2,6 +2,7 @@
 
 #include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Semantic/Helpers/NameMangler.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 
 namespace igni::sem::Declaration
@@ -9,19 +10,17 @@ namespace igni::sem::Declaration
 
 std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext& ctx, const re::String& moduleName)
 {
-	re::String mangledName = decl->name;
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
+	std::vector<re::String> pTypeNames;
 
 	for (const auto& [_, type] : decl->parameters)
 	{
 		auto pType = TypeResolver::Resolve(type.get(), ctx);
 		paramTypes.push_back(pType);
-
-		if (!decl->isExternal)
-		{
-			mangledName = mangledName + "@" + pType->name;
-		}
+		pTypeNames.push_back(pType->name);
 	}
+
+	re::String mangledName = NameMangler::Mangle(decl->name, pTypeNames, decl->isExternal);
 
 	auto funType = std::make_shared<FunctionType>(mangledName);
 	funType->moduleName = moduleName;
@@ -90,8 +89,8 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 
 std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared_ptr<ClassType>& classType, SemanticContext& ctx)
 {
-	re::String mangledName = classType->name + "_" + decl->name;
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
+	std::vector<re::String> pTypeNames;
 
 	paramTypes.push_back(classType);
 
@@ -99,11 +98,10 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 	{
 		auto pType = TypeResolver::Resolve(type.get(), ctx);
 		paramTypes.push_back(pType);
-		if (!decl->isExternal)
-		{
-			mangledName = mangledName + "@" + pType->name;
-		}
+		pTypeNames.push_back(pType->name);
 	}
+
+	re::String mangledName = NameMangler::MangleMethod(classType->name, decl->name, pTypeNames, decl->isExternal);
 
 	auto funType = std::make_shared<FunctionType>(mangledName);
 	funType->moduleName = classType->moduleName;
@@ -172,8 +170,8 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 
 std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, const std::shared_ptr<ClassType>& classType, bool isClassExternal, SemanticContext& ctx)
 {
-	re::String mangledName = classType->name + "_" + classType->name;
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
+	std::vector<re::String> pTypeNames;
 
 	paramTypes.push_back(classType);
 
@@ -181,12 +179,10 @@ std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, cons
 	{
 		auto pType = TypeResolver::Resolve(type.get(), ctx);
 		paramTypes.push_back(pType);
-
-		if (!isClassExternal && !decl->isExternal)
-		{
-			mangledName = mangledName + "@" + pType->name;
-		}
+		pTypeNames.push_back(pType->name);
 	}
+
+	re::String mangledName = NameMangler::MangleMethod(classType->name, classType->name, pTypeNames, isClassExternal || decl->isExternal);
 
 	auto funType = std::make_shared<FunctionType>(mangledName);
 	funType->returnType = ctx.tUnit;
@@ -213,7 +209,7 @@ std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, cons
 
 std::shared_ptr<FunctionType> Destructor(const ast::DestructorDecl* decl, const std::shared_ptr<ClassType>& classType, bool isClassExternal, SemanticContext& ctx)
 {
-	auto mangledName = classType->name + "_destructor";
+	auto mangledName = NameMangler::MangleDestructor(classType->name);
 	ctx.allFunctionNames.insert(mangledName);
 
 	auto funType = std::make_shared<FunctionType>(mangledName);

@@ -28,7 +28,7 @@ public:
 			{
 				if (fun->typeParams.empty() && !fun->isExternal)
 				{
-					re::String mangledName = GetMangledName(fun);
+					re::String mangledName = m_bindings->GetMangledName(fun);
 					m_allBodies[mangledName] = fun->body.get();
 				}
 			}
@@ -40,18 +40,18 @@ public:
 					{
 						if (const auto mFun = dynamic_cast<const ast::FunDecl*>(member.get()))
 						{
-							re::String mangledName = GetMangledName(mFun);
+							re::String mangledName = m_bindings->GetMangledName(mFun);
 							m_allBodies[mangledName] = mFun->body.get();
 
 							m_dynamicMethods[mFun->name].push_back(mangledName);
 						}
 						else if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 						{
-							m_allBodies[GetMangledName(mCtor)] = mCtor->body.get();
+							m_allBodies[m_bindings->GetMangledName(mCtor)] = mCtor->body.get();
 						}
 						else if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 						{
-							m_allBodies[GetMangledName(mDtor)] = mDtor->body.get();
+							m_allBodies[m_bindings->GetMangledName(mDtor)] = mDtor->body.get();
 						}
 					}
 				}
@@ -82,7 +82,7 @@ public:
 		std::erase_if(program->statements, [&](const std::unique_ptr<ast::Statement>& stmt) {
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
-				return !m_reachableNames.contains(GetMangledName(fun));
+				return !m_reachableNames.contains(m_bindings->GetMangledName(fun));
 			}
 
 			return false;
@@ -100,15 +100,15 @@ public:
 				std::erase_if(classDecl->members, [&](const std::unique_ptr<ast::Decl>& member) {
 					if (const auto mFun = dynamic_cast<const ast::FunDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(GetMangledName(mFun));
+						return !m_reachableNames.contains(m_bindings->GetMangledName(mFun));
 					}
 					if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(GetMangledName(mCtor));
+						return !m_reachableNames.contains(m_bindings->GetMangledName(mCtor));
 					}
 					if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 					{
-						return !m_reachableNames.contains(GetMangledName(mDtor));
+						return !m_reachableNames.contains(m_bindings->GetMangledName(mDtor));
 					}
 
 					return false;
@@ -124,29 +124,6 @@ private:
 	std::unordered_map<re::String, const ast::Block*> m_allBodies;
 
 	std::unordered_map<re::String, std::vector<re::String>> m_dynamicMethods;
-
-	re::String GetMangledName(const ast::Decl* decl) const
-	{
-		if (m_bindings && m_bindings->funMeta.contains(decl))
-		{
-			return m_bindings->funMeta.at(decl).mangledName;
-		}
-
-		if (const auto f = dynamic_cast<const ast::FunDecl*>(decl))
-		{
-			return f->name;
-		}
-		if (const auto c = dynamic_cast<const ast::ConstructorDecl*>(decl))
-		{
-			return c->name;
-		}
-		if (const auto d = dynamic_cast<const ast::DestructorDecl*>(decl))
-		{
-			return d->name;
-		}
-
-		return {};
-	}
 
 	void MarkReached(const re::String& name)
 	{

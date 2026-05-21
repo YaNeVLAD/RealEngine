@@ -395,9 +395,7 @@ public:
 	void Visit(const ast::ConstructorDecl* node) override
 	{
 		ValidateAnnotations(node);
-		const re::String lookupName = m_context.bindings.funMeta.contains(node)
-			? m_context.bindings.funMeta.at(node).mangledName
-			: node->name;
+		const re::String lookupName = m_context.bindings.GetMangledName(node);
 
 		const auto funType = m_context.instantiatedFunctions.at(lookupName);
 		if (!funType)
@@ -417,9 +415,7 @@ public:
 	{
 		ValidateAnnotations(node);
 
-		const re::String lookupName = m_context.bindings.funMeta.contains(node)
-			? m_context.bindings.funMeta.at(node).mangledName
-			: node->name;
+		const re::String lookupName = m_context.bindings.GetMangledName(node);
 
 		const auto funType = m_context.instantiatedFunctions.at(lookupName);
 		if (!funType)
@@ -682,9 +678,7 @@ public:
 		}
 		else
 		{ // Global function or Class method
-			const re::String lookupName = m_context.bindings.funMeta.contains(node)
-				? m_context.bindings.funMeta.at(node).mangledName
-				: node->name;
+			const re::String lookupName = m_context.bindings.GetMangledName(node);
 
 			funType = m_context.instantiatedFunctions.at(lookupName);
 			if (!funType)

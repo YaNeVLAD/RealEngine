@@ -94,8 +94,8 @@ public:
 		auto linkedProgram = LinkAsts(parsedPrograms);
 
 		// --- PHASE 4: OPTIMIZATION ---
-		// opt::DeadCodeEliminator dce;
-		// dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings());
+		opt::DeadCodeEliminator dce;
+		dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings());
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Code using injected Backend...\n";

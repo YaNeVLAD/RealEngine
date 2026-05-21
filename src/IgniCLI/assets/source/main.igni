@@ -7,13 +7,23 @@ class Vector2(val x: Int, val y: Int) {
 	}
 }
 
+fun compare(comp: (Int, Int) -> Bool): Bool {
+	return comp(42, 24);
+}
+
 fun main() {
-	val arr = arrayOf(1, 2, 3, 4, 5);
-	for (elem in arr) {
-		println(elem);
-	}
+	val a = 42;
+	val function = fun [a] (x: Int) {
+		println(a);
+		val a = 24;
+		println(a);
+	};
 
-	val vec = Vector2(100, 50);
+	println(compare(fun (x: Int, y: Int): Bool { return true; }));
 
-	vec.printSum();
+	val l1 = fun (x: Int): Int { return x; };
+	val sum = l1(42) + l1(24);
+	println(sum);
+
+	function(88);
 }

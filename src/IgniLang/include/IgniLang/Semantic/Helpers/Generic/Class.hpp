@@ -4,6 +4,7 @@
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Overload.hpp>
+#include <IgniLang/Semantic/Helpers/NameMangler.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
@@ -20,16 +21,17 @@ inline std::shared_ptr<ClassType> Instantiate(
 		IGNI_SEM_ERR(tmpl->astNode, "Generic class '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
-	re::String uniqueName = tmpl->name;
+	std::vector<re::String> tArgNames;
 	for (const auto& arg : typeArgs)
 	{
 		if (!arg)
 		{
 			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument for '" + tmpl->name + "'");
 		}
-
-		uniqueName = uniqueName + "@" + arg->name;
+		tArgNames.push_back(arg->name);
 	}
+
+	re::String uniqueName = NameMangler::MangleGeneric(tmpl->name, tArgNames);
 
 	if (m_context.instantiatedClasses.contains(uniqueName))
 	{

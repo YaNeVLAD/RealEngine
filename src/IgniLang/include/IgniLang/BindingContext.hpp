@@ -89,6 +89,36 @@ public:
 
 		return nullptr;
 	}
+
+	[[nodiscard]] re::String GetMangledName(const ast::Node* node) const
+	{
+		if (funMeta.contains(node))
+		{
+			return funMeta.at(node).mangledName;
+		}
+
+		if (const auto lambda = dynamic_cast<const ast::LambdaExpr*>(node))
+		{
+			if (lambdaMeta.contains(lambda))
+			{
+				return lambdaMeta.at(lambda).mangledName;
+			}
+		}
+		if (const auto fun = dynamic_cast<const ast::FunDecl*>(node))
+		{
+			return fun->name;
+		}
+		if (const auto ctor = dynamic_cast<const ast::ConstructorDecl*>(node))
+		{
+			return ctor->name;
+		}
+		if (const auto dtor = dynamic_cast<const ast::DestructorDecl*>(node))
+		{
+			return dtor->name;
+		}
+
+		return {};
+	}
 };
 
 } // namespace igni

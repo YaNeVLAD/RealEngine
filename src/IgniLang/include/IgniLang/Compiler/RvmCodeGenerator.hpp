@@ -19,10 +19,10 @@ namespace igni
 // ==========================================
 // PASS 2: Code Generator (Visitor)
 // ==========================================
-class CodeGenerator final : public ast::BaseAstVisitor
+class RvmCodeGenerator final : public ast::BaseAstVisitor
 {
 public:
-	CodeGenerator(
+	RvmCodeGenerator(
 		std::ostream& out,
 		const std::vector<const ast::FunDecl*>& flatFuncs,
 		const std::unordered_map<const ast::FunDecl*, std::vector<re::String>>& funcUpvals,
@@ -95,15 +95,12 @@ public:
 			{
 				continue;
 			}
-
-			if (m_semanticAnalyzer.GetBindings().funMeta.contains(fun))
-			{
-				m_funcAsmNames[fun] = m_semanticAnalyzer.GetBindings().funMeta.at(fun).mangledName;
+			re::String mangledName = m_semanticAnalyzer.GetBindings().GetMangledName(fun);
+			if (mangledName.Empty())
+			{ // Fallback
+				mangledName = fun->name + "_fn_" + std::to_string(funcId++);
 			}
-			else
-			{
-				m_funcAsmNames[fun] = fun->name + "_fn_" + std::to_string(funcId++);
-			}
+			m_funcAsmNames[fun] = mangledName;
 		}
 
 		m_out << "// --- Type Definitions ---\n";
@@ -1074,11 +1071,7 @@ private:
 
 	void GenerateConstructor(const ast::ConstructorDecl* ctor, const ast::ClassDecl* classDecl)
 	{
-		re::String asmName = ctor->name;
-		if (m_semanticAnalyzer.GetBindings().funMeta.contains(ctor))
-		{
-			asmName = m_semanticAnalyzer.GetBindings().funMeta.at(ctor).mangledName;
-		}
+		const re::String asmName = m_semanticAnalyzer.GetBindings().GetMangledName(ctor);
 		m_out << "FUN " << asmName << "\n";
 		m_currentLocals.clear();
 		m_varCounter = 0;
@@ -1149,11 +1142,7 @@ private:
 
 	void GenerateDestructor(const ast::DestructorDecl* dtor, const ast::ClassDecl* classDecl)
 	{
-		re::String asmName = dtor->name;
-		if (m_semanticAnalyzer.GetBindings().funMeta.contains(dtor))
-		{
-			asmName = m_semanticAnalyzer.GetBindings().funMeta.at(dtor).mangledName;
-		}
+		const re::String asmName = m_semanticAnalyzer.GetBindings().GetMangledName(dtor);
 		m_out << "FUN " << asmName << "\n";
 		m_currentLocals.clear();
 		m_varCounter = 0;

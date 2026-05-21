@@ -1,8 +1,8 @@
 #pragma once
 
 #include <IgniLang/AST/AstNodes.hpp>
-#include <IgniLang/Compiler/CodeGenerator.hpp>
 #include <IgniLang/Compiler/IBackend.hpp>
+#include <IgniLang/Compiler/RvmCodeGenerator.hpp>
 #include <IgniLang/Compiler/ScopeAnalyzer.hpp>
 
 #include <sstream>
@@ -33,7 +33,7 @@ public:
 		analyzer.Analyze(program);
 
 		std::stringstream out;
-		CodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals, semanticAnalyzer);
+		RvmCodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals, semanticAnalyzer);
 		generator.Generate(program);
 
 		return out.str();

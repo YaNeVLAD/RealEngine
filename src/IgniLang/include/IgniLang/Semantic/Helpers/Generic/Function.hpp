@@ -3,6 +3,7 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
+#include <IgniLang/Semantic/Helpers/NameMangler.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
@@ -20,17 +21,17 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		IGNI_SEM_ERR(tmpl->astNode, "Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
-	re::String genericSuffix;
+	std::vector<re::String> tArgNames;
 	for (const auto& arg : typeArgs)
 	{
 		if (!arg)
 		{
 			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument");
 		}
-		genericSuffix = genericSuffix + "@" + arg->name;
+		tArgNames.push_back(arg->name);
 	}
 
-	const re::String baseName = tmpl->name + genericSuffix;
+	const re::String baseName = NameMangler::MangleGeneric(tmpl->name, tArgNames);
 	const re::String uniqueName = tmpl->isMethod ? tmpl->parentClass->name + "_" + baseName : baseName;
 
 	if (m_context.instantiatedFunctions.contains(uniqueName))
