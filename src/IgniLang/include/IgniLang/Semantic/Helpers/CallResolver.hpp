@@ -347,20 +347,6 @@ inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, Semantic
 
 	detail::DetermineDispatchMode(node, resolution, callInfo);
 
-	if (resolution.target->isVararg)
-	{
-		if (const std::size_t normalCount = resolution.target->paramTypes.size() - 1; argTypes.size() > normalCount)
-		{
-			const auto arrayType = resolution.target->paramTypes.back();
-			argTypes.erase(argTypes.begin() + static_cast<long long>(normalCount), argTypes.end());
-			argTypes.push_back(arrayType);
-		}
-		else if (argTypes.size() == normalCount)
-		{
-			argTypes.push_back(resolution.target->paramTypes.back());
-		}
-	}
-
 	CallValidator::ValidateArguments(node, resolution.target.get(), argTypes, resolution.isMethodCall, callInfo);
 	ctx.bindings.callInfo[node] = callInfo;
 

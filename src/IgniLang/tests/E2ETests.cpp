@@ -1,6 +1,8 @@
 #include "TestUtils.hpp"
 
-#include "../include/IgniLang/Compiler/Pipeline.hpp"
+#include <IgniLang/BuildTarget.hpp>
+#include <IgniLang/Compiler/Pipeline.hpp>
+#include <IgniLang/Compiler/RvmBackend.hpp>
 
 #include <Core/LibraryLoader.hpp>
 #include <RVM/Assembler.hpp>
@@ -35,18 +37,22 @@ TEST_P(E2ETestFixture, ExecutesCorrectly)
 	const fs::path& scriptPath = GetParam();
 	std::string expectedOutput = ExtractExpectedOutput(scriptPath);
 
-	std::vector<std::string> sourceFiles;
+	std::vector<re::String> sourceFiles;
 
 	if (fs::exists("assets/source/stdlib.igni"))
 	{
 		sourceFiles.emplace_back("assets/source/stdlib.igni");
 	}
-	sourceFiles.push_back(scriptPath.string());
+	sourceFiles.emplace_back(scriptPath.string());
 
-	igni::Compiler compiler("assets/igni_grammar.txt");
+	igni::compiler::Pipeline pipeline("assets/igni_grammar.txt");
+	igni::compiler::RvmBackend backend;
+
 	std::string asmCode;
 	ASSERT_NO_THROW({
-		asmCode = compiler.CompileFiles(sourceFiles);
+		auto result = pipeline.Compile(sourceFiles, igni::BuildTarget::RVM, backend);
+		ASSERT_TRUE(result.success) << "Compilation failed for script: " << scriptPath.filename().string();
+		asmCode = result.generatedCode;
 	}) << "Compiler pipeline crashed on: "
 	   << scriptPath.filename().string();
 

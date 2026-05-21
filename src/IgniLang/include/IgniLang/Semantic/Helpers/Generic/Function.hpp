@@ -3,7 +3,6 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Helpers/Declaration/Function.hpp>
-#include <IgniLang/Semantic/Helpers/NameMangler.hpp>
 #include <IgniLang/Semantic/Helpers/TypeResolver.hpp>
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
@@ -21,17 +20,17 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		IGNI_SEM_ERR(tmpl->astNode, "Generic function '" + tmpl->name + "' expected " + std::to_string(tmpl->typeParams.size()) + " type arguments, but got " + std::to_string(typeArgs.size()));
 	}
 
-	std::vector<re::String> tArgNames;
+	re::String genericSuffix;
 	for (const auto& arg : typeArgs)
 	{
 		if (!arg)
 		{
 			IGNI_SEM_ERR(tmpl->astNode, "Invalid or unknown type argument");
 		}
-		tArgNames.push_back(arg->name);
+		genericSuffix = genericSuffix + "@" + arg->name;
 	}
 
-	const re::String baseName = NameMangler::MangleGeneric(tmpl->name, tArgNames);
+	const re::String baseName = tmpl->name + genericSuffix;
 	const re::String uniqueName = tmpl->isMethod ? tmpl->parentClass->name + "_" + baseName : baseName;
 
 	if (m_context.instantiatedFunctions.contains(uniqueName))
@@ -71,6 +70,11 @@ inline std::shared_ptr<FunctionType> Instantiate(
 		funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
 	}
 	funType->annotations = tmpl->astNode->annotations;
+
+	if (funType->isExternal && funType->nativeTargetName == uniqueName)
+	{
+		funType->nativeTargetName = tmpl->name;
+	}
 
 	m_context.instantiatedFunctions[uniqueName] = funType;
 	m_context.env.Define(uniqueName, funType, true);
