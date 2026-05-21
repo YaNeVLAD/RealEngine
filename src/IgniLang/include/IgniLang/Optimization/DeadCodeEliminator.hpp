@@ -202,7 +202,7 @@ private:
 	{
 		if (m_bindings && m_bindings->resolvedNames.contains(node))
 		{
-			MarkReached(m_bindings->resolvedNames.at(node)); // Захват замыканий
+			MarkReached(m_bindings->resolvedNames.at(node));
 		}
 	}
 
@@ -210,7 +210,7 @@ private:
 	{
 		if (m_bindings && m_bindings->resolvedMembers.contains(node))
 		{
-			MarkReached(m_bindings->resolvedMembers.at(node)); // Референсы на методы
+			MarkReached(m_bindings->resolvedMembers.at(node));
 		}
 		VISIT_NEXT(node->object);
 	}
