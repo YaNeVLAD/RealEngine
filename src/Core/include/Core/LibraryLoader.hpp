@@ -13,7 +13,7 @@
 namespace re
 {
 
-class LibraryLoader
+class RE_CORE_API LibraryLoader
 {
 public:
 	explicit LibraryLoader(String const& path);
