@@ -60,7 +60,7 @@ int main(const int argc, char** argv)
 		}
 
 		const igni::compiler::Pipeline pipeline("assets/igni_grammar.txt");
-		const auto result = pipeline.Compile(sourceFiles, target, *backend);
+		const auto result = pipeline.Compile(sourceFiles, target, args.BuildType(), args.DisableDCE(), *backend);
 
 		if (!result.success)
 		{

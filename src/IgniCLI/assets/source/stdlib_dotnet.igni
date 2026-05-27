@@ -7,7 +7,16 @@ annotation class DotNetBaseClass(val signature: String);
 annotation class DotNetOpcode(val operation: String);
 
 @DotNetMethod("void [mscorlib]System.Console::WriteLine(int64)")
-external fun println(args: Any...): Unit;
+external fun println(value: Int): Unit;
+
+@DotNetMethod("void [mscorlib]System.Console::WriteLine(float64)")
+external fun println(value: Double): Unit;
+
+@DotNetMethod("void [mscorlib]System.Console::WriteLine(string)")
+external fun println(value: String): Unit;
+
+@DotNetMethod("void [mscorlib]System.Console::WriteLine(bool)")
+external fun println(value: Bool): Unit;
 
 external class <T> Array {
 

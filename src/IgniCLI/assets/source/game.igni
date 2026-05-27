@@ -1,0 +1,37 @@
+package program;
+
+import engine.*;
+
+class Player(val id: Int) {
+    var speed: Double = 150.0; // Сила импульса для движения
+}
+
+var player: Player? = null;
+
+// Вызывается из Unity при старте сцены
+fun onGameStart() {
+    // Спавним игрока в центре сцены
+    val playerId = engine.spawnEntity("PlayerPrefab", 0.0, 0.0);
+    player = Player(playerId);
+
+    // Спавним одного врага чуть в стороне
+    engine.spawnEntity("EnemyPrefab", 4.0, 3.0);
+}
+
+// Вызывается из Unity каждый кадр
+fun onUpdate(deltaTime: Double, time: Double) {
+    if (player == null) {
+        return;
+    }
+
+	val p = player as Player;
+
+    // Читаем ввод от клавиатуры/геймпада через C# мост
+    val moveX = engine.getAxis("Horizontal");
+    val moveY = engine.getAxis("Vertical");
+
+    // Если игрок давит на кнопки, прикладываем физический импульс
+    if (moveX != 0.0 || moveY != 0.0) {
+        engine.applyImpulse(p.id, moveX, moveY, p.speed * deltaTime);
+    }
+}

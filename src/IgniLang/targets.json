@@ -7,9 +7,10 @@
         "Bool": "Bool",
         "String": "String",
         "Unit": "Unit",
+        "Null": "Null",
         "Any": "Any"
       },
-      "ffi_annotations": [ "NativeName" ]
+      "ffi_annotations": [ "NativeName", "RvmNative" ]
     },
     "dotnet": {
       "primitive_mapping": {
@@ -18,6 +19,7 @@
         "Bool": "System.Boolean",
         "String": "System.String",
         "Unit": "System.Void",
+        "Null": "System.Object",
         "Any": "System.Object"
       },
       "ffi_annotations": [ "DotNetMethod", "DotNetBaseClass", "DotNetOpcode" ]

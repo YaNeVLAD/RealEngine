@@ -71,6 +71,62 @@ public:
 
 		for (const auto& stmt : program->statements)
 		{
+			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(stmt.get()))
+			{
+				re::String cilType = "class [mscorlib]System.Object";
+				if (varDecl->initializer)
+				{
+					if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get()))
+					{
+						cilType = MapTypeToCIL(semType->name);
+					}
+				}
+				m_globalVars[varDecl->name] = cilType;
+				m_out << "  .field public static " << cilType << " '" << varDecl->name << "'\n";
+			}
+			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(stmt.get()))
+			{
+				re::String cilType = "class [mscorlib]System.Object";
+				if (valDecl->initializer)
+				{
+					if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get()))
+					{
+						cilType = MapTypeToCIL(semType->name);
+					}
+				}
+				m_globalVars[valDecl->name] = cilType;
+				m_out << "  .field public static " << cilType << " '" << valDecl->name << "'\n";
+			}
+		}
+
+		if (!m_globalVars.empty())
+		{
+			m_out << "  .method private hidebysig specialname rtspecialname static void .cctor() cil managed\n  {\n    .maxstack 8\n";
+			m_currentOut = &m_out;
+			for (const auto& stmt : program->statements)
+			{
+				if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(stmt.get()))
+				{
+					if (varDecl->initializer)
+					{
+						varDecl->initializer->Accept(*this);
+						m_out << "    stsfld " << m_globalVars[varDecl->name] << " IgniGlobalModule::" << varDecl->name << "\n";
+					}
+				}
+				else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(stmt.get()))
+				{
+					if (valDecl->initializer)
+					{
+						valDecl->initializer->Accept(*this);
+						m_out << "    stsfld " << m_globalVars[valDecl->name] << " IgniGlobalModule::" << valDecl->name << "\n";
+					}
+				}
+			}
+			m_out << "    ret\n  }\n\n";
+		}
+
+		for (const auto& stmt : program->statements)
+		{
 			if (!dynamic_cast<const ast::ClassDecl*>(stmt.get()) && stmt)
 			{
 				stmt->Accept(*this);
@@ -133,6 +189,30 @@ public:
 
 		*m_currentOut << "    ldarg.0\n    call instance void " << baseCtor << "\n";
 
+		for (const auto& member : m_currentClass->members)
+		{
+			if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
+			{
+				if (varDecl->initializer)
+				{
+					*m_currentOut << "    ldarg.0 // this\n";
+					varDecl->initializer->Accept(*this);
+					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get());
+					*m_currentOut << "    stfld " << MapTypeToCIL(semType->name) << " " << m_currentClass->name << "::" << varDecl->name << "\n";
+				}
+			}
+			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
+			{
+				if (valDecl->initializer)
+				{
+					*m_currentOut << "    ldarg.0 // this\n";
+					valDecl->initializer->Accept(*this);
+					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get());
+					*m_currentOut << "    stfld " << MapTypeToCIL(semType->name) << " " << m_currentClass->name << "::" << valDecl->name << "\n";
+				}
+			}
+		}
+
 		const re::String sig = ".method public hidebysig specialname rtspecialname instance void .ctor(" + BuildParamSignature(node->parameters) + ") cil managed";
 		EmitMethodBody(sig, node->body.get(), false);
 	}
@@ -150,7 +230,9 @@ public:
 		const re::String instanceKw = m_currentClass ? "instance " : "static ";
 		const bool isEntryPoint = (node->name == "main" && !m_currentClass);
 
-		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + node->name + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
+		re::String methodName = isEntryPoint ? "main" : m_semanticAnalyzer.GetBindings().GetMangledName(node);
+
+		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + methodName + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
 		EmitMethodBody(sig, node->body.get(), isEntryPoint);
 	}
 
@@ -167,11 +249,21 @@ public:
 
 	void Visit(const ast::VarDecl* node) override
 	{
+		if (m_currentOut == &m_out)
+		{
+			return;
+		}
+
 		DeclareLocal(node->name, node->initializer.get());
 	}
 
 	void Visit(const ast::ValDecl* node) override
 	{
+		if (m_currentOut == &m_out)
+		{
+			return;
+		}
+
 		DeclareLocal(node->name, node->initializer.get());
 	}
 
@@ -241,10 +333,38 @@ public:
 		case TokenType::IntConst:    *m_currentOut << "    ldc.i8 " << node->token.lexeme << "\n"; break;
 		case TokenType::FloatConst:  *m_currentOut << "    ldc.r8 " << node->token.lexeme << "\n"; break;
 		case TokenType::StringConst: *m_currentOut << "    ldstr " << node->token.lexeme << "\n"; break;
+		case TokenType::KwNull:      *m_currentOut << "    ldnull\n"; break;
 		case TokenType::KwTrue:      *m_currentOut << "    ldc.i4.1\n"; break;
 		case TokenType::KwFalse:     *m_currentOut << "    ldc.i4.0\n"; break;
 		default: break;
         } // clang-format on
+	}
+
+	void Visit(const ast::UnaryExpr* node) override
+	{
+		if (node->op == "-")
+		{
+			node->operand->Accept(*this);
+			*m_currentOut << "    neg\n";
+		}
+		else if (node->op == "!" || node->op == "not")
+		{
+			node->operand->Accept(*this);
+			*m_currentOut << "    ldc.i4.0\n    ceq\n";
+		}
+		else if (node->op == "++" || node->op == "--")
+		{
+			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->operand.get()))
+			{
+				EmitIdentifierAccess(id, false, nullptr);
+
+				*m_currentOut << "    dup\n";
+				*m_currentOut << "    ldc.i8 1\n";
+				*m_currentOut << (node->op == "++" ? "    add\n" : "    sub\n");
+
+				EmitIdentifierAccess(id, true, nullptr);
+			}
+		}
 	}
 
 	void Visit(const ast::BinaryExpr* node) override
@@ -268,6 +388,10 @@ public:
 			{ ">"_hs, "    cgt\n" },
 			{ "<"_hs, "    clt\n" },
 			{ "=="_hs, "    ceq\n" },
+			{ "||"_hs, "    or\n" },
+			{ "&&"_hs, "    and\n" },
+			{ "or"_hs, "    or\n" },
+			{ "and"_hs, "    and\n" },
 			{ "!="_hs, "    ceq\n    ldc.i4.0\n    ceq\n" },
 			{ "<="_hs, "    cgt\n    ldc.i4.0\n    ceq\n" },
 			{ ">="_hs, "    clt\n    ldc.i4.0\n    ceq\n" },
@@ -571,6 +695,19 @@ public:
 			return;
 		}
 
+		if (callInfo.dispatchMode == CallDispatchType::Indirect)
+		{ // TODO: Remove lambda dummy
+			emitArgs();
+
+			*m_currentOut << "    // [TODO] Lambda Invoke Implementation\n";
+			*m_currentOut << "    pop\n";
+			if (callInfo.target && callInfo.target->returnType && callInfo.target->returnType->name != "Unit")
+			{
+				*m_currentOut << "    ldc.i8 0\n";
+			}
+			return;
+		}
+
 		if (callInfo.dispatchMode == CallDispatchType::Native)
 		{
 			if (const auto dotnetMethod = GetAnnotationArg(targetAnnos, "DotNetMethod"))
@@ -629,11 +766,27 @@ public:
 					  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) << ")\n";
 	}
 
+	void Visit(const ast::LambdaExpr* node) override
+	{
+		*m_currentOut << "    ldnull // [TODO] Lambda Class Generation\n";
+	}
+
 	void Visit(const ast::ExprStmt* node) override
 	{
 		if (node->expr)
 		{
 			node->expr->Accept(*this);
+
+			if (!dynamic_cast<const ast::AssignExpr*>(node->expr.get()))
+			{
+				if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->expr.get()))
+				{
+					if (semType->name != "Unit" && semType->name != "System.Void")
+					{
+						*m_currentOut << "    pop\n";
+					}
+				}
+			}
 		}
 	}
 
@@ -666,6 +819,17 @@ public:
 		*m_currentOut << "    ldelem." << GetElemSuffix(elemType) << "\n";
 	}
 
+	void Visit(const ast::TypeCastExpr* node) override
+	{
+		node->expr->Accept(*this);
+
+		if (m_semanticAnalyzer.GetBindings().castTargets.contains(node))
+		{
+			const re::String targetType = m_semanticAnalyzer.GetBindings().castTargets.at(node);
+			*m_currentOut << "    castclass " << MapTypeToCIL(targetType) << "\n";
+		}
+	}
+
 private:
 	std::ostream& m_out;
 	std::ostream* m_currentOut = &m_out;
@@ -679,6 +843,8 @@ private:
 	std::size_t m_labelCount = 0;
 
 	std::vector<re::String> m_externAssemblies;
+
+	std::unordered_map<re::String, re::String> m_globalVars;
 
 	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params)
 	{
@@ -772,6 +938,12 @@ private:
 			return;
 		}
 
+		if (m_globalVars.contains(id->name))
+		{
+			*m_currentOut << "    " << (isStore ? "stsfld " : "ldsfld ") << m_globalVars.at(id->name) << " IgniGlobalModule::" << id->name << "\n";
+			return;
+		}
+
 		if (const int locIdx = GetLocalIndex(id->name); locIdx != -1)
 		{
 			*m_currentOut << "    " << (isStore ? "stloc " : "ldloc ") << locIdx << " // " << id->name << "\n";
@@ -821,6 +993,7 @@ private:
 			{ "System.Boolean"_hs, "bool" },
 			{ "Unit"_hs, TYPE_VOID },
 			{ "System.Void"_hs, TYPE_VOID },
+			{ "Null"_hs, TYPE_OBJECT },
 			{ "Any"_hs, TYPE_OBJECT },
 			{ "System.Object"_hs, TYPE_OBJECT },
 		} };

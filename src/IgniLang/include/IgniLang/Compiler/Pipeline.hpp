@@ -2,6 +2,7 @@
 
 #include <GeneratedSemantics.hpp>
 #include <IgniLang/AST/AstConverter.hpp>
+#include <IgniLang/BuildType.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
 #include <IgniLang/Compiler/IBackend.hpp>
 #include <IgniLang/Diagnostic/Diagnostic.hpp>
@@ -51,6 +52,8 @@ public:
 	CompilationResult Compile(
 		const std::vector<re::String>& filePaths,
 		BuildTarget target,
+		BuildType buildType,
+		bool disableDCE,
 		IBackend& backend) const
 	{
 		CompilationResult result;
@@ -95,7 +98,7 @@ public:
 
 		// --- PHASE 4: OPTIMIZATION ---
 		opt::DeadCodeEliminator dce;
-		dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings());
+		dce.Eliminate(linkedProgram.get(), semanticAnalyzer->GetBindings(), buildType == BuildType::DynamicLibrary, disableDCE);
 
 		// --- PHASE 5: CODE GENERATION ---
 		std::cout << "[Info] Generating Code using injected Backend...\n";

@@ -1,0 +1,35 @@
+package engine;
+
+annotation class RvmNative(val name: String);
+
+@DotNetMethod("int64 ['IgniEngine']IgniBridge::Spawn(string, float64, float64)")
+@RvmNative("Engine_Spawn")
+external fun spawnEntity(prefabName: String, x: Double, y: Double): Int;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::Destroy(int64)")
+@RvmNative("Engine_Destroy")
+external fun destroyEntity(entityId: Int): Unit;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetX(int64)")
+@RvmNative("Engine_GetX")
+external fun getX(entityId: Int): Double;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetY(int64)")
+@RvmNative("Engine_GetY")
+external fun getY(entityId: Int): Double;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::SetPosition(int64, float64, float64)")
+@RvmNative("Engine_SetPosition")
+external fun setPosition(entityId: Int, x: Double, y: Double): Unit;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::ApplyImpulse(int64, float64, float64, float64)")
+@RvmNative("Engine_ApplyImpulse")
+external fun applyImpulse(entityId: Int, dirX: Double, dirY: Double, force: Double): Unit;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetAxis(string)")
+@RvmNative("Engine_GetAxis")
+external fun getAxis(axisName: String): Double;
+
+@DotNetMethod("bool ['IgniEngine']IgniBridge::IsActionPressed(string)")
+@RvmNative("Engine_IsActionPressed")
+external fun isActionPressed(actionName: String): Bool;

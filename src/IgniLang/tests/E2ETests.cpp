@@ -50,7 +50,7 @@ TEST_P(E2ETestFixture, ExecutesCorrectly)
 
 	std::string asmCode;
 	ASSERT_NO_THROW({
-		auto result = pipeline.Compile(sourceFiles, igni::BuildTarget::RVM, backend);
+		auto result = pipeline.Compile(sourceFiles, igni::BuildTarget::RVM, igni::BuildType::Executable, false, backend);
 		ASSERT_TRUE(result.success) << "Compilation failed for script: " << scriptPath.filename().string();
 		asmCode = result.generatedCode;
 	}) << "Compiler pipeline crashed on: "

@@ -169,7 +169,16 @@ inline TargetResolution ResolveTarget(
 	}
 	else if (const auto group = std::dynamic_pointer_cast<FunctionGroup>(calleeType))
 	{ // Function or method
-		res.isMethodCall = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()) != nullptr || callInfo.isImplicitThisCall;
+		res.isMethodCall = callInfo.isImplicitThisCall;
+		if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+		{
+			if (const auto objType = ctx.bindings.GetExpressionType(memAccess->object.get());
+				objType && !std::dynamic_pointer_cast<ModuleType>(objType))
+			{
+				res.isMethodCall = true;
+			}
+		}
+
 		res.target = FindBestOverload(node, group, argTypes, res.isMethodCall);
 
 		if (!res.target && !group->templates.empty())

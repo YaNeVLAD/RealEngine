@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace igni::cli
+namespace igni
 {
 
 enum class BuildType : std::int8_t
@@ -13,4 +13,4 @@ enum class BuildType : std::int8_t
 	DynamicLibrary,
 };
 
-} // namespace igni::cli
+} // namespace igni

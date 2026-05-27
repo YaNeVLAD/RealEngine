@@ -14,13 +14,24 @@ namespace igni::opt
 class DeadCodeEliminator final : public ast::BaseAstVisitor
 {
 public:
-	void Eliminate(ast::Program* program, const BindingContext& bindings)
+	void Eliminate(ast::Program* program, const BindingContext& bindings, bool isDll, bool disableDCE)
 	{
+		if (disableDCE)
+		{
+			return;
+		}
+
 		m_bindings = &bindings;
 		m_reachableNames.clear();
 		m_worklist.clear();
 		m_allBodies.clear();
 		m_dynamicMethods.clear();
+
+		auto hasKeepAnnotation = [](const std::vector<ast::Annotation>& annos) {
+			return std::ranges::any_of(annos, [&](const auto& annotation) {
+				return annotation.name == "Keep" || annotation.name == "Export";
+			});
+		};
 
 		for (const auto& stmt : program->statements)
 		{
@@ -30,6 +41,11 @@ public:
 				{
 					re::String mangledName = m_bindings->GetMangledName(fun);
 					m_allBodies[mangledName] = fun->body.get();
+
+					if (isDll || fun->name == "main" || hasKeepAnnotation(fun->annotations))
+					{
+						MarkReached(mangledName);
+					}
 				}
 			}
 			else if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
@@ -42,23 +58,33 @@ public:
 						{
 							re::String mangledName = m_bindings->GetMangledName(mFun);
 							m_allBodies[mangledName] = mFun->body.get();
-
 							m_dynamicMethods[mFun->name].push_back(mangledName);
+
+							if (isDll || hasKeepAnnotation(mFun->annotations))
+							{
+								MarkReached(mangledName);
+							}
 						}
 						else if (const auto mCtor = dynamic_cast<const ast::ConstructorDecl*>(member.get()))
 						{
 							m_allBodies[m_bindings->GetMangledName(mCtor)] = mCtor->body.get();
+							if (isDll || hasKeepAnnotation(mCtor->annotations))
+							{
+								MarkReached(m_bindings->GetMangledName(mCtor));
+							}
 						}
 						else if (const auto mDtor = dynamic_cast<const ast::DestructorDecl*>(member.get()))
 						{
 							m_allBodies[m_bindings->GetMangledName(mDtor)] = mDtor->body.get();
+							if (isDll || hasKeepAnnotation(mDtor->annotations))
+							{
+								MarkReached(m_bindings->GetMangledName(mDtor));
+							}
 						}
 					}
 				}
 			}
 		}
-
-		MarkReached("main");
 
 		for (const auto& stmt : program->statements)
 		{
@@ -82,6 +108,11 @@ public:
 		std::erase_if(program->statements, [&](const std::unique_ptr<ast::Statement>& stmt) {
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
 			{
+				if (fun->isExternal)
+				{
+					return false;
+				}
+
 				return !m_reachableNames.contains(m_bindings->GetMangledName(fun));
 			}
 

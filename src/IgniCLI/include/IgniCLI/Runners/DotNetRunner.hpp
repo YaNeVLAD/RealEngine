@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/flat_map.hpp>
-#include <IgniCLI/BuildType.hpp>
 #include <IgniCLI/Runners/IRunner.hpp>
+#include <IgniLang/BuildType.hpp>
 
 #include <filesystem>
 #include <fstream>

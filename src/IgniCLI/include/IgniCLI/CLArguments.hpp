@@ -2,8 +2,8 @@
 
 #include <Core/String.hpp>
 #include <Core/flat_map.hpp>
-#include <IgniCLI/BuildType.hpp>
 #include <IgniLang/BuildTarget.hpp>
+#include <IgniLang/BuildType.hpp>
 
 #include <iostream>
 #include <optional>
@@ -19,6 +19,7 @@ class CLArguments final
 		BuildTarget buildTarget = BuildTarget::Unknown;
 		BuildType buildType = BuildType::Unknown;
 		std::vector<re::String> sourceFiles;
+		bool disableDCE = false;
 	};
 
 	static constexpr auto USAGE_HINT = "Usage: igni-cli [options] <file1.igni> <file2.igni> ...\n"
@@ -26,7 +27,8 @@ class CLArguments final
 									   "  --rvm      Compile for RVM\n"
 									   "  --dotnet   Compile for .NET CIL\n"
 									   "  --dll      Build as dynamic library\n"
-									   "  --exe      Build as executable\n";
+									   "  --exe      Build as executable\n"
+									   "  --no-dce   Disable Dead Code Elimination\n";
 
 	static constexpr auto NO_TARGET_ERROR = "[Error] No target provided.\n";
 	static constexpr auto NO_SOURCE_ERROR = "[Error] No source files provided.\n";
@@ -51,6 +53,11 @@ public:
 	BuildType BuildType() const
 	{
 		return m_options->buildType;
+	}
+
+	bool DisableDCE() const
+	{
+		return m_options->disableDCE;
 	}
 
 	std::vector<re::String>& SourceFiles()
@@ -95,15 +102,19 @@ private:
 			const re::String arg = argv[i];
 			const auto hashed = arg.Hashed();
 
-			const auto type = TYPE_MAP[hashed];
-			if (type)
+			if (hashed == "--no-dce"_hs)
+			{
+				options.disableDCE = true;
+				continue;
+			}
+
+			if (const auto type = TYPE_MAP[hashed])
 			{
 				options.buildType = *type;
 				continue;
 			}
 
-			const auto target = TARGET_MAP[hashed];
-			if (target)
+			if (const auto target = TARGET_MAP[hashed])
 			{
 				options.buildTarget = *target;
 				continue;

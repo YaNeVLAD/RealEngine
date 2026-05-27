@@ -122,7 +122,7 @@ TEST_P(DotNetE2ETestFixture, ExecutesCorrectlyOnDotNet)
 
 	std::string cilCode;
 	ASSERT_NO_THROW({
-		auto result = pipeline.Compile(sourceFiles, igni::BuildTarget::DotNet, backend);
+		auto result = pipeline.Compile(sourceFiles, igni::BuildTarget::DotNet, igni::BuildType::Executable, false, backend);
 		ASSERT_TRUE(result.success) << "Compilation failed for script: " << scriptPath.filename().string();
 		cilCode = result.generatedCode;
 	}) << "Compiler pipeline crashed on: "
