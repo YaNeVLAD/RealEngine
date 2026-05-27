@@ -39,9 +39,9 @@ TEST_P(E2ETestFixture, ExecutesCorrectly)
 
 	std::vector<re::String> sourceFiles;
 
-	if (fs::exists("assets/source/stdlib.igni"))
+	if (fs::exists("assets/source/stdlib_rvm.igni"))
 	{
-		sourceFiles.emplace_back("assets/source/stdlib.igni");
+		sourceFiles.emplace_back("assets/source/stdlib_rvm.igni");
 	}
 	sourceFiles.emplace_back(scriptPath.string());
 

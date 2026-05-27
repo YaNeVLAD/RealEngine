@@ -23,6 +23,7 @@ add_executable(IgniTests
         tests/IgniLangTests.cpp
         tests/FrontendTests.cpp
         tests/E2ETests.cpp
+        tests/DotNetE2ETests.cpp
 )
 
 target_link_libraries(IgniTests
