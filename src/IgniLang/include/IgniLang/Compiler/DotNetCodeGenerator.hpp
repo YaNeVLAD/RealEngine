@@ -4,6 +4,7 @@
 #include <IgniLang/AST/AstNodes.hpp>
 #include <IgniLang/AST/Utils/AnnotationUtils.hpp>
 #include <IgniLang/Compiler/DotNet/CILEmitter.hpp>
+#include <IgniLang/Compiler/DotNet/LambdaHelper.hpp>
 #include <IgniLang/Compiler/DotNet/TypeMapper.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
@@ -32,6 +33,7 @@ public:
 		: CILEmitter(out)
 		, m_out(out)
 		, m_semanticAnalyzer(semantics)
+		, m_lambdaHelper(*this, semantics)
 	{
 	}
 
@@ -148,10 +150,10 @@ public:
 			}
 		}
 
-		for (std::size_t i = 0; i < m_lambdas.size(); ++i)
-		{
-			GenerateLambdaClass(m_lambdas[i]);
-		}
+		m_lambdaHelper.GenerateAllClasses(m_out, [&](const re::String& sig, const ast::Block* body, const bool isEntry, const std::vector<ast::Parameter>& params) {
+			PrepareMethodScope(true, params, body);
+			EmitMethodBody(sig, body, isEntry);
+		});
 	}
 
 	void Visit(const ast::ClassDecl* node) override
@@ -193,7 +195,7 @@ public:
 			return;
 		}
 
-		PrepareMethodScope(true, node->parameters);
+		PrepareMethodScope(true, node->parameters, node->body.get());
 
 		if (const re::String baseClass = GetBaseClass(m_currentClass->annotations); baseClass == "[mscorlib]System.Object")
 		{
@@ -236,7 +238,7 @@ public:
 			return;
 		}
 
-		PrepareMethodScope(m_currentClass != nullptr, node->parameters);
+		PrepareMethodScope(m_currentClass != nullptr, node->parameters, node->body.get());
 
 		const re::String retType = node->returnType ? MapAstType(node->returnType.get()) : TYPE_VOID;
 		const re::String instanceKw = m_currentClass ? "instance " : "static ";
@@ -810,27 +812,30 @@ public:
 		const re::String lambdaClassName = semType->name;
 
 		std::vector<re::String> capTypes;
+		std::vector<bool> isByRef;
+
 		for (const auto& capName : node->captures)
 		{
 			re::String cilType = "class [mscorlib]System.Object";
-			bool resolved = false;
+			bool refFlag = false;
 
-			if (m_currentLambdaData)
+			if (const auto* currentLambda = m_lambdaHelper.GetCurrentLambda())
 			{
-				for (size_t i = 0; i < m_currentLambdaData->node->captures.size(); ++i)
+				for (std::size_t i = 0; i < currentLambda->node->captures.size(); ++i)
 				{
-					if (m_currentLambdaData->node->captures[i] == capName)
+					if (currentLambda->node->captures[i] == capName)
 					{
-						cilType = m_currentLambdaData->captureTypes[i];
+						cilType = currentLambda->captureTypes[i];
 						LdArg(0); // 'this'
-						LdFld(cilType, m_currentLambdaData->className, capName);
-						resolved = true;
+						LdFld(cilType + (currentLambda->isByRef[i] ? "[]" : ""), currentLambda->className, capName);
+
+						refFlag = currentLambda->isByRef[i];
 						break;
 					}
 				}
 			}
 
-			if (!resolved)
+			if (!refFlag)
 			{
 				if (m_globalVars.contains(capName))
 				{
@@ -840,6 +845,11 @@ public:
 				else if (const int locIdx = GetLocalIndex(capName); locIdx != -1)
 				{
 					cilType = m_localTypes[locIdx];
+					if (cilType.Find("[]") != re::String::NPos)
+					{
+						cilType = cilType.Substring(0, cilType.Length() - 2);
+						refFlag = true;
+					}
 					LdLoc(locIdx);
 				}
 				else if (const int argIdx = GetArgIndex(capName); argIdx != -1)
@@ -849,17 +859,18 @@ public:
 				}
 			}
 			capTypes.push_back(cilType);
+			isByRef.push_back(refFlag);
 		}
 
 		re::String sig = "instance void " + lambdaClassName + "::.ctor(";
-		for (size_t i = 0; i < capTypes.size(); ++i)
+		for (std::size_t i = 0; i < capTypes.size(); ++i)
 		{
-			sig += capTypes[i] + (i < capTypes.size() - 1 ? ", " : "");
+			sig += capTypes[i] + (isByRef[i] ? "[]" : "") + (i < capTypes.size() - 1 ? ", " : "");
 		}
 		sig += ")";
 
 		Emit("newobj " + sig);
-		m_lambdas.push_back({ node, lambdaClassName, capTypes });
+		m_lambdaHelper.RegisterLambda({ node, lambdaClassName, capTypes, isByRef });
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -937,16 +948,9 @@ private:
 	std::vector<re::String> m_externAssemblies;
 	std::unordered_map<re::String, re::String> m_globalVars;
 
-	struct LambdaData
-	{
-		const ast::LambdaExpr* node;
-		re::String className;
-		std::vector<re::String> captureTypes;
-	};
-
-	std::vector<LambdaData> m_lambdas;
-	const LambdaData* m_currentLambdaData = nullptr;
 	std::vector<re::String> m_argTypes;
+
+	dotnet::LambdaHelper m_lambdaHelper;
 
 	void SetOutStream(std::ostream& out)
 	{
@@ -954,13 +958,18 @@ private:
 		SetStream(out);
 	}
 
-	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params)
+	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params, const ast::Block* body = nullptr)
 	{
 		m_isWritingGlobal = false;
 		m_locals.clear();
 		m_localTypes.clear();
 		m_args.clear();
 		m_argTypes.clear();
+
+		if (body)
+		{
+			m_lambdaHelper.ScanCaptures(body);
+		}
 
 		if (hasThis)
 		{
@@ -1038,26 +1047,46 @@ private:
 
 	void EmitIdentifierAccess(const ast::IdentifierExpr* id, const bool isStore, const ast::Expr* assignValue)
 	{
-		if (m_currentLambdaData)
+		if (const auto* lambdaData = m_lambdaHelper.GetCurrentLambda())
 		{
-			for (size_t i = 0; i < m_currentLambdaData->node->captures.size(); ++i)
+			for (size_t i = 0; i < lambdaData->node->captures.size(); ++i)
 			{
-				if (m_currentLambdaData->node->captures[i] == id->name)
+				if (lambdaData->node->captures[i] == id->name)
 				{
-					const re::String cilType = m_currentLambdaData->captureTypes[i];
-					LdArg(0); // 'this'
-					if (assignValue)
-					{
-						assignValue->Accept(*this);
-					}
+					const re::String cilType = lambdaData->captureTypes[i];
+					const bool isByRef = lambdaData->isByRef[i];
 
-					if (isStore)
+					LdArg(0);
+					LdFld(cilType + (isByRef ? "[]" : ""), lambdaData->className, id->name);
+
+					if (isByRef)
 					{
-						StFld(cilType, m_currentLambdaData->className, id->name);
+						if (isStore)
+						{
+							LdcI4(0);
+							if (assignValue)
+							{
+								assignValue->Accept(*this);
+							}
+							StElem(GetElemSuffix(cilType));
+						}
+						else
+						{
+							LdcI4(0);
+							LdElem(GetElemSuffix(cilType));
+						}
 					}
 					else
 					{
-						LdFld(cilType, m_currentLambdaData->className, id->name);
+						if (isStore)
+						{
+							if (assignValue)
+							{
+								assignValue->Accept(*this);
+							}
+							LdArg(0);
+							StFld(cilType, lambdaData->className, id->name);
+						}
 					}
 					return;
 				}
@@ -1107,13 +1136,37 @@ private:
 
 		if (const int locIdx = GetLocalIndex(id->name); locIdx != -1)
 		{
-			if (isStore)
+			const bool isCaptured = m_lambdaHelper.IsCaptured(id->name);
+			if (isCaptured)
 			{
-				StLoc(locIdx);
+				LdLoc(locIdx);
+				if (isStore)
+				{
+					LdcI4(0);
+					if (assignValue)
+					{
+						assignValue->Accept(*this);
+					}
+					const re::String baseType = m_localTypes[locIdx].Substring(0, m_localTypes[locIdx].Length() - 2);
+					StElem(GetElemSuffix(baseType));
+				}
+				else
+				{
+					LdcI4(0);
+					const re::String baseType = m_localTypes[locIdx].Substring(0, m_localTypes[locIdx].Length() - 2);
+					LdElem(GetElemSuffix(baseType));
+				}
 			}
 			else
 			{
-				LdLoc(locIdx);
+				if (isStore)
+				{
+					StLoc(locIdx);
+				}
+				else
+				{
+					LdLoc(locIdx);
+				}
 			}
 			return;
 		}
@@ -1141,10 +1194,22 @@ private:
 			}
 		}
 
+		const bool isCaptured = m_lambdaHelper.IsCaptured(name);
 		m_locals.push_back(name);
-		m_localTypes.push_back(cilType);
+		m_localTypes.push_back(cilType + (isCaptured ? "[]" : ""));
 
 		const int idx = static_cast<int>(m_locals.size() - 1);
+
+		if (isCaptured)
+		{
+			LdcI4(1);
+			NewArr(cilType);
+			StLoc(idx);
+
+			LdLoc(idx);
+			LdcI4(0);
+		}
+
 		if (initExpr)
 		{
 			initExpr->Accept(*this);
@@ -1154,7 +1219,14 @@ private:
 			LdcI8(0);
 		}
 
-		StLoc(idx);
+		if (isCaptured)
+		{
+			StElem(GetElemSuffix(cilType));
+		}
+		else
+		{
+			StLoc(idx);
+		}
 	}
 
 	[[nodiscard]] static re::String BuildTypeSignature(
@@ -1237,39 +1309,6 @@ private:
 	[[nodiscard]] int GetArgIndex(const re::String& name) const
 	{
 		return IndexOf(m_args, name);
-	}
-
-	void GenerateLambdaClass(LambdaData data)
-	{
-		m_out << ".class public auto ansi beforefieldinit " << data.className << " extends [mscorlib]System.Object\n{\n";
-
-		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
-		{
-			m_out << "  .field public " << data.captureTypes[i] << " '" << data.node->captures[i] << "'\n";
-		}
-
-		m_out << "  .method public hidebysig specialname rtspecialname instance void .ctor(";
-		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
-		{
-			m_out << data.captureTypes[i] << (i < data.captureTypes.size() - 1 ? ", " : "");
-		}
-		m_out << ") cil managed\n  {\n    .maxstack 8\n    ldarg.0\n    call instance void [mscorlib]System.Object::.ctor()\n";
-
-		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
-		{
-			m_out << "    ldarg.0\n    ldarg " << (i + 1) << "\n    stfld " << data.captureTypes[i] << " " << data.className << "::" << data.node->captures[i] << "\n";
-		}
-		m_out << "    ret\n  }\n\n";
-
-		m_currentLambdaData = &data;
-		PrepareMethodScope(true, data.node->parameters);
-
-		const re::String retType = data.node->returnType ? MapAstType(data.node->returnType.get()) : TYPE_VOID;
-		const re::String sig = ".method public hidebysig instance " + retType + " Invoke(" + BuildParamSignature(data.node->parameters, false) + ") cil managed";
-		EmitMethodBody(sig, data.node->body.get(), false);
-
-		m_currentLambdaData = nullptr;
-		EndClass();
 	}
 };
 

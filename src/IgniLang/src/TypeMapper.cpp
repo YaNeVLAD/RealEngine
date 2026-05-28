@@ -86,6 +86,9 @@ re::String TypeMapper::GetElemSuffix(const re::String& semTypeName)
 		{ "System.Int64"_hs, "i8" },
 		{ "System.Double"_hs, "r8" },
 		{ "System.Boolean"_hs, "i4" },
+		{ "int64"_hs, "i8" },
+		{ "float64"_hs, "r8" },
+		{ "bool"_hs, "i4" },
 	} };
 
 	return SemTypeMap.get(semTypeName.Hashed(), "ref");
