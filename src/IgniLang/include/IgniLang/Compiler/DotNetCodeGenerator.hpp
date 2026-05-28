@@ -148,9 +148,9 @@ public:
 			}
 		}
 
-		for (const auto& lambda : m_lambdas)
+		for (std::size_t i = 0; i < m_lambdas.size(); ++i)
 		{
-			GenerateLambdaClass(lambda);
+			GenerateLambdaClass(m_lambdas[i]);
 		}
 	}
 
@@ -195,9 +195,11 @@ public:
 
 		PrepareMethodScope(true, node->parameters);
 
-		const re::String baseClass = GetBaseClass(m_currentClass->annotations);
-		LdArg(0);
-		Call("instance void " + baseClass + "::.ctor()");
+		if (const re::String baseClass = GetBaseClass(m_currentClass->annotations); baseClass == "[mscorlib]System.Object")
+		{
+			LdArg0();
+			Call("instance void [mscorlib]System.Object::.ctor()");
+		}
 
 		for (const auto& member : m_currentClass->members)
 		{
@@ -205,20 +207,20 @@ public:
 			{
 				if (varDecl->initializer)
 				{
-					LdArg(0);
+					LdArg0();
 					varDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get());
-					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << varDecl->name << "\n";
+					StFld(MapToCIL(semType->name), m_currentClass->name, varDecl->name);
 				}
 			}
 			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
 			{
 				if (valDecl->initializer)
 				{
-					LdArg(0);
+					LdArg0();
 					valDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get());
-					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << valDecl->name << "\n";
+					StFld(MapToCIL(semType->name), m_currentClass->name, valDecl->name);
 				}
 			}
 		}
@@ -238,12 +240,23 @@ public:
 
 		const re::String retType = node->returnType ? MapAstType(node->returnType.get()) : TYPE_VOID;
 		const re::String instanceKw = m_currentClass ? "instance " : "static ";
-		const bool isEntryPoint = (node->name == "main" && !m_currentClass);
 
-		const re::String methodName = isEntryPoint ? "main" : m_semanticAnalyzer.GetBindings().GetMangledName(node);
+		re::String methodName;
+		if (node->name == "main" && !m_currentClass)
+		{
+			methodName = "main";
+		}
+		else if (m_currentClass)
+		{
+			methodName = node->name;
+		}
+		else
+		{
+			methodName = m_semanticAnalyzer.GetBindings().GetMangledName(node);
+		}
+
 		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + methodName + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
-
-		EmitMethodBody(sig, node->body.get(), isEntryPoint);
+		EmitMethodBody(sig, node->body.get(), node->name == "main" && !m_currentClass);
 	}
 
 	void Visit(const ast::Block* node) override
@@ -288,10 +301,6 @@ public:
 		}
 		else if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->target.get()))
 		{
-			if (!m_semanticAnalyzer.GetBindings().implicitThisNames.contains(id) && node->value)
-			{
-				node->value->Accept(*this);
-			}
 			EmitIdentifierAccess(id, true, node->value.get());
 		}
 		else if (const auto idxAccess = dynamic_cast<const ast::IndexExpr*>(node->target.get()))
@@ -765,45 +774,79 @@ public:
 			return;
 		}
 
-		emitArgs();
-		const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
-
 		re::String finalAsmLabel = callInfo.asmLabel;
-		if (const std::size_t firstAt = finalAsmLabel.Find('@'); firstAt != re::String::NPos)
+		re::String cleanName = finalAsmLabel;
+
+		if (const std::size_t firstAt = cleanName.Find('@'); firstAt != re::String::NPos)
 		{
-			if (const std::size_t secondAt = finalAsmLabel.Find('@', firstAt + 1); secondAt != re::String::NPos)
+			cleanName = cleanName.Substring(0, firstAt);
+		}
+
+		if (cleanName.Length() > 0)
+		{
+			if (const std::size_t underPos = cleanName.Find('_'); underPos != re::String::NPos)
 			{
-				finalAsmLabel = finalAsmLabel.Substring(0, secondAt);
+				re::String prefix = cleanName.Substring(0, underPos);
+				re::String suffix = cleanName.Substring(underPos + 1, cleanName.Length() - underPos - 1);
+
+				if (prefix == suffix && m_currentClass && callInfo.dispatchMode != CallDispatchType::Virtual)
+				{
+					LdArg(0);
+					emitArgs();
+					Call("instance void " + prefix + "::.ctor(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
+					return;
+				}
 			}
 		}
 
+		emitArgs();
+		const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
 		Call(retType + " IgniGlobalModule::" + finalAsmLabel + "(" + BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) + ")");
 	}
 
 	void Visit(const ast::LambdaExpr* node) override
 	{
 		const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(node);
-		re::String lambdaClassName = semType->name;
+		const re::String lambdaClassName = semType->name;
 
 		std::vector<re::String> capTypes;
 		for (const auto& capName : node->captures)
 		{
 			re::String cilType = "class [mscorlib]System.Object";
+			bool resolved = false;
 
-			if (m_globalVars.contains(capName))
+			if (m_currentLambdaData)
 			{
-				cilType = m_globalVars.at(capName);
-				Emit("ldsfld " + cilType + " IgniGlobalModule::" + capName);
+				for (size_t i = 0; i < m_currentLambdaData->node->captures.size(); ++i)
+				{
+					if (m_currentLambdaData->node->captures[i] == capName)
+					{
+						cilType = m_currentLambdaData->captureTypes[i];
+						LdArg(0); // 'this'
+						LdFld(cilType, m_currentLambdaData->className, capName);
+						resolved = true;
+						break;
+					}
+				}
 			}
-			else if (const int locIdx = GetLocalIndex(capName); locIdx != -1)
+
+			if (!resolved)
 			{
-				cilType = m_localTypes[locIdx];
-				LdLoc(locIdx);
-			}
-			else if (const int argIdx = GetArgIndex(capName); argIdx != -1)
-			{
-				cilType = m_argTypes[argIdx];
-				LdArg(argIdx);
+				if (m_globalVars.contains(capName))
+				{
+					cilType = m_globalVars.at(capName);
+					Emit("ldsfld " + cilType + " IgniGlobalModule::" + capName);
+				}
+				else if (const int locIdx = GetLocalIndex(capName); locIdx != -1)
+				{
+					cilType = m_localTypes[locIdx];
+					LdLoc(locIdx);
+				}
+				else if (const int argIdx = GetArgIndex(capName); argIdx != -1)
+				{
+					cilType = m_argTypes[argIdx];
+					LdArg(argIdx);
+				}
 			}
 			capTypes.push_back(cilType);
 		}
@@ -816,7 +859,7 @@ public:
 		sig += ")";
 
 		Emit("newobj " + sig);
-		m_lambdas.emplace_back(node, lambdaClassName, capTypes);
+		m_lambdas.push_back({ node, lambdaClassName, capTypes });
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -1002,13 +1045,20 @@ private:
 				if (m_currentLambdaData->node->captures[i] == id->name)
 				{
 					const re::String cilType = m_currentLambdaData->captureTypes[i];
-					LdArg(0); // this (lambda capture)
+					LdArg(0); // 'this'
 					if (assignValue)
 					{
 						assignValue->Accept(*this);
 					}
-					*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << cilType << " " << m_currentLambdaData->className << "::" << id->name << "\n";
 
+					if (isStore)
+					{
+						StFld(cilType, m_currentLambdaData->className, id->name);
+					}
+					else
+					{
+						LdFld(cilType, m_currentLambdaData->className, id->name);
+					}
 					return;
 				}
 			}
@@ -1016,7 +1066,7 @@ private:
 
 		if (m_semanticAnalyzer.GetBindings().implicitThisNames.contains(id))
 		{
-			LdArg(0);
+			LdArg(0); // 'this'
 			if (assignValue)
 			{
 				assignValue->Accept(*this);
@@ -1024,15 +1074,34 @@ private:
 
 			const auto classType = m_semanticAnalyzer.GetClassType(m_currentClass->name);
 			const auto fieldType = classType->fields.at(id->name).type;
-			*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << MapToCIL(fieldType->name)
-						  << " " << classType->name << "::" << id->name << "\n";
 
+			if (isStore)
+			{
+				StFld(MapToCIL(fieldType->name), classType->name, id->name);
+			}
+			else
+			{
+				LdFld(MapToCIL(fieldType->name), classType->name, id->name);
+			}
 			return;
+		}
+
+		if (assignValue)
+		{
+			assignValue->Accept(*this);
 		}
 
 		if (m_globalVars.contains(id->name))
 		{
-			*m_currentOut << "    " << (isStore ? "stsfld " : "ldsfld ") << m_globalVars.at(id->name) << " IgniGlobalModule::" << id->name << "\n";
+			if (isStore)
+			{
+				StSFld(m_globalVars.at(id->name), "IgniGlobalModule", id->name);
+			}
+			else
+			{
+				LdSFld(m_globalVars.at(id->name), "IgniGlobalModule", id->name);
+			}
+
 			return;
 		}
 
@@ -1170,7 +1239,7 @@ private:
 		return IndexOf(m_args, name);
 	}
 
-	void GenerateLambdaClass(const LambdaData& data)
+	void GenerateLambdaClass(LambdaData data)
 	{
 		m_out << ".class public auto ansi beforefieldinit " << data.className << " extends [mscorlib]System.Object\n{\n";
 
@@ -1200,7 +1269,7 @@ private:
 		EmitMethodBody(sig, data.node->body.get(), false);
 
 		m_currentLambdaData = nullptr;
-		m_out << "}\n\n";
+		EndClass();
 	}
 };
 
