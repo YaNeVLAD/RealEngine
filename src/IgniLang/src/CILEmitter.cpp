@@ -1,7 +1,5 @@
 #include <IgniLang/Compiler/DotNet/CILEmitter.hpp>
 
-#include <vector>
-
 namespace igni::dotnet
 {
 
@@ -237,7 +235,7 @@ void CILEmitter::ConvI8() const
 	*m_out << "    conv.i8\n";
 }
 
-void CILEmitter::Emit(const std::string_view& opcode) const
+void CILEmitter::Emit(const re::String& opcode) const
 {
 	*m_out << "    " << opcode << "\n";
 }

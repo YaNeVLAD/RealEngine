@@ -3,6 +3,7 @@
 #include <Core/String.hpp>
 
 #include <ostream>
+#include <vector>
 
 namespace igni::dotnet
 {
@@ -66,7 +67,7 @@ public:
 	void ConvI4() const;
 	void ConvI8() const;
 
-	void Emit(const std::string_view& opcode) const;
+	void Emit(const re::String& opcode) const;
 	void Comment(const std::string_view& comment) const;
 	void Raw(const std::string& rawData) const;
 

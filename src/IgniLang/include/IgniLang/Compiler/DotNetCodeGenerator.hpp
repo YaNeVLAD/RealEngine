@@ -52,7 +52,6 @@ public:
 			if (const auto decl = dynamic_cast<const ast::Decl*>(stmt.get()))
 			{
 				scanAnnotations(decl->annotations);
-
 				if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(decl))
 				{
 					for (const auto& member : classDecl->members)
@@ -66,7 +65,6 @@ public:
 		m_out << "// Auto-generated .NET CIL\n";
 		m_out << ".assembly IgniProgram { }\n";
 		m_out << ".assembly extern mscorlib { }\n\n";
-
 		for (const auto& asmName : m_externAssemblies)
 		{
 			m_out << ".assembly extern " << asmName << " { }\n";
@@ -109,7 +107,7 @@ public:
 		if (!m_globalVars.empty())
 		{
 			m_out << "  .method private hidebysig specialname rtspecialname static void .cctor() cil managed\n  {\n    .maxstack 8\n";
-			m_currentOut = &m_out;
+			SetOutStream(m_out);
 			for (const auto& stmt : program->statements)
 			{
 				if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(stmt.get()))
@@ -129,8 +127,9 @@ public:
 					}
 				}
 			}
-			m_out << "    ret\n  }\n\n";
+			Ret();
 		}
+		SetOutStream(m_out);
 
 		for (const auto& stmt : program->statements)
 		{
@@ -163,8 +162,8 @@ public:
 		}
 
 		m_currentClass = node;
-
 		const re::String baseClass = GetBaseClass(node->annotations);
+
 		m_out << ".class public auto ansi beforefieldinit " << node->name << " extends " << baseClass << "\n{\n";
 
 		if (const auto semClass = m_semanticAnalyzer.GetClassType(node->name))
@@ -197,9 +196,8 @@ public:
 		PrepareMethodScope(true, node->parameters);
 
 		const re::String baseClass = GetBaseClass(m_currentClass->annotations);
-		const auto baseCtor = baseClass + "::.ctor()";
-
-		*m_currentOut << "    ldarg.0\n    call instance void " << baseCtor << "\n";
+		LdArg(0);
+		Call("instance void " + baseClass + "::.ctor()");
 
 		for (const auto& member : m_currentClass->members)
 		{
@@ -207,7 +205,7 @@ public:
 			{
 				if (varDecl->initializer)
 				{
-					*m_currentOut << "    ldarg.0 // this\n";
+					LdArg(0);
 					varDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get());
 					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << varDecl->name << "\n";
@@ -217,7 +215,7 @@ public:
 			{
 				if (valDecl->initializer)
 				{
-					*m_currentOut << "    ldarg.0 // this\n";
+					LdArg(0);
 					valDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get());
 					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << valDecl->name << "\n";
@@ -242,9 +240,9 @@ public:
 		const re::String instanceKw = m_currentClass ? "instance " : "static ";
 		const bool isEntryPoint = (node->name == "main" && !m_currentClass);
 
-		re::String methodName = isEntryPoint ? "main" : m_semanticAnalyzer.GetBindings().GetMangledName(node);
-
+		const re::String methodName = isEntryPoint ? "main" : m_semanticAnalyzer.GetBindings().GetMangledName(node);
 		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + methodName + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
+
 		EmitMethodBody(sig, node->body.get(), isEntryPoint);
 	}
 
@@ -261,21 +259,19 @@ public:
 
 	void Visit(const ast::VarDecl* node) override
 	{
-		if (m_currentOut == &m_out)
+		if (m_isWritingGlobal)
 		{
 			return;
 		}
-
 		DeclareLocal(node->name, node->initializer.get());
 	}
 
 	void Visit(const ast::ValDecl* node) override
 	{
-		if (m_currentOut == &m_out)
+		if (m_isWritingGlobal)
 		{
 			return;
 		}
-
 		DeclareLocal(node->name, node->initializer.get());
 	}
 
@@ -302,8 +298,7 @@ public:
 		{
 			idxAccess->array->Accept(*this);
 			idxAccess->index->Accept(*this);
-			*m_currentOut << "    conv.i4\n";
-
+			Emit("conv.i4");
 			if (node->value)
 			{
 				node->value->Accept(*this);
@@ -320,7 +315,7 @@ public:
 					}
 				}
 			}
-			*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
+			Emit("stelem." + GetElemSuffix(elemType));
 		}
 	}
 
@@ -342,14 +337,14 @@ public:
 	{
 		switch (node->token.type)
 		{ // clang-format off
-		case TokenType::IntConst:    *m_currentOut << "    ldc.i8 " << node->token.lexeme << "\n"; break;
-		case TokenType::FloatConst:  *m_currentOut << "    ldc.r8 " << node->token.lexeme << "\n"; break;
-		case TokenType::StringConst: *m_currentOut << "    ldstr " << node->token.lexeme << "\n"; break;
-		case TokenType::KwNull:      *m_currentOut << "    ldnull\n"; break;
-		case TokenType::KwTrue:      *m_currentOut << "    ldc.i4.1\n"; break;
-		case TokenType::KwFalse:     *m_currentOut << "    ldc.i4.0\n"; break;
+		case TokenType::IntConst: LdcI8(std::stoll(std::string(node->token.lexeme))); break;
+		case TokenType::FloatConst: Emit(re::String("ldc.r8 ") + node->token.lexeme); break;
+		case TokenType::StringConst: Emit(re::String("ldstr ") + node->token.lexeme); break;
+		case TokenType::KwNull: Emit("ldnull"); break;
+		case TokenType::KwTrue: LdcI4_True(); break;
+		case TokenType::KwFalse: LdcI4_False(); break;
 		default: break;
-        } // clang-format on
+		} // clang-format on
 	}
 
 	void Visit(const ast::UnaryExpr* node) override
@@ -357,23 +352,22 @@ public:
 		if (node->op == "-")
 		{
 			node->operand->Accept(*this);
-			*m_currentOut << "    neg\n";
+			Emit("neg");
 		}
 		else if (node->op == "!" || node->op == "not")
 		{
 			node->operand->Accept(*this);
-			*m_currentOut << "    ldc.i4.0\n    ceq\n";
+			LdcI4_False();
+			Emit("ceq");
 		}
 		else if (node->op == "++" || node->op == "--")
 		{
 			if (const auto id = dynamic_cast<const ast::IdentifierExpr*>(node->operand.get()))
 			{
 				EmitIdentifierAccess(id, false, nullptr);
-
-				*m_currentOut << "    dup\n";
-				*m_currentOut << "    ldc.i8 1\n";
-				*m_currentOut << (node->op == "++" ? "    add\n" : "    sub\n");
-
+				Emit("dup");
+				LdcI8(1);
+				Emit(node->op == "++" ? "add" : "sub");
 				EmitIdentifierAccess(id, true, nullptr);
 			}
 		}
@@ -382,6 +376,7 @@ public:
 	void Visit(const ast::BinaryExpr* node) override
 	{
 		using namespace re::literals;
+
 		if (node->left)
 		{
 			node->left->Accept(*this);
@@ -392,26 +387,41 @@ public:
 		}
 
 		static constexpr HashedStringMap BinaryOpMap = { {
-			{ "+"_hs, "    add\n" },
-			{ "-"_hs, "    sub\n" },
-			{ "*"_hs, "    mul\n" },
-			{ "/"_hs, "    div\n" },
-			{ "%"_hs, "    rem\n" },
-			{ ">"_hs, "    cgt\n" },
-			{ "<"_hs, "    clt\n" },
-			{ "=="_hs, "    ceq\n" },
-			{ "||"_hs, "    or\n" },
-			{ "&&"_hs, "    and\n" },
-			{ "or"_hs, "    or\n" },
-			{ "and"_hs, "    and\n" },
-			{ "!="_hs, "    ceq\n    ldc.i4.0\n    ceq\n" },
-			{ "<="_hs, "    cgt\n    ldc.i4.0\n    ceq\n" },
-			{ ">="_hs, "    clt\n    ldc.i4.0\n    ceq\n" },
+			{ "+"_hs, "add" },
+			{ "-"_hs, "sub" },
+			{ "*"_hs, "mul" },
+			{ "/"_hs, "div" },
+			{ "%"_hs, "rem" },
+			{ ">"_hs, "cgt" },
+			{ "<"_hs, "clt" },
+			{ "=="_hs, "ceq" },
+			{ "||"_hs, "or" },
+			{ "&&"_hs, "and" },
+			{ "or"_hs, "or" },
+			{ "and"_hs, "and" },
 		} };
 
 		if (const auto instruction = BinaryOpMap[node->op.Hashed()])
 		{
-			*m_currentOut << *instruction;
+			Emit(*instruction);
+		}
+		else if (node->op == "!=")
+		{
+			Emit("ceq");
+			LdcI4_False();
+			Emit("ceq");
+		}
+		else if (node->op == "<=")
+		{
+			Emit("cgt");
+			LdcI4_False();
+			Emit("ceq");
+		}
+		else if (node->op == ">=")
+		{
+			Emit("clt");
+			LdcI4_False();
+			Emit("ceq");
 		}
 	}
 
@@ -424,8 +434,7 @@ public:
 		{
 			node->condition->Accept(*this);
 		}
-
-		*m_currentOut << "    brfalse " << (node->elseBranch ? elseLabel : endLabel) << "\n";
+		BrFalse(node->elseBranch ? elseLabel : endLabel);
 
 		if (node->thenBranch)
 		{
@@ -434,12 +443,11 @@ public:
 
 		if (node->elseBranch)
 		{
-			*m_currentOut << "    br " << endLabel << "\n"
-						  << elseLabel << ":\n";
+			Br(endLabel);
+			MarkLabel(elseLabel);
 			node->elseBranch->Accept(*this);
 		}
-
-		*m_currentOut << endLabel << ":\n";
+		MarkLabel(endLabel);
 	}
 
 	void Visit(const ast::WhileStmt* node) override
@@ -447,21 +455,20 @@ public:
 		const std::string startLabel = "L_while_start_" + std::to_string(m_labelCount);
 		const std::string endLabel = "L_while_end_" + std::to_string(m_labelCount++);
 
-		*m_currentOut << startLabel << ":\n";
-
+		MarkLabel(startLabel);
 		if (node->condition)
 		{
 			node->condition->Accept(*this);
 		}
-
-		*m_currentOut << "    brfalse " << endLabel << "\n";
+		BrFalse(endLabel);
 
 		if (node->body)
 		{
 			node->body->Accept(*this);
 		}
-		*m_currentOut << "    br " << startLabel << "\n"
-					  << endLabel << ":\n";
+
+		Br(startLabel);
+		MarkLabel(endLabel);
 	}
 
 	void Visit(const ast::ForStmt* node) override
@@ -480,7 +487,9 @@ public:
 			m_locals.emplace_back(idxName);
 			m_localTypes.emplace_back("int64");
 			const int idxIdx = static_cast<int>(m_locals.size() - 1);
-			*m_currentOut << "    ldc.i8 0\n    stloc " << idxIdx << "\n";
+
+			LdcI8(0);
+			StLoc(idxIdx);
 
 			re::String elemCilType = "class [mscorlib]System.Object";
 			re::String pureSemType = "System.Object";
@@ -501,32 +510,32 @@ public:
 			m_localTypes.push_back(elemCilType);
 			const int iterIdx = static_cast<int>(m_locals.size() - 1);
 
-			*m_currentOut << startLabel << ":\n";
+			MarkLabel(startLabel);
 
-			*m_currentOut << "    ldloc " << idxIdx << "\n";
-			*m_currentOut << "    ldloc " << arrIdx << "\n";
-			*m_currentOut << "    ldlen\n    conv.i8\n";
-			*m_currentOut << "    bge " << endLabel << "\n";
+			LdLoc(idxIdx);
+			LdLoc(arrIdx);
+			Emit("ldlen");
+			Emit("conv.i8");
+			Emit("bge " + endLabel);
 
-			*m_currentOut << "    ldloc " << arrIdx << "\n";
-			*m_currentOut << "    ldloc " << idxIdx << "\n";
-			*m_currentOut << "    conv.i4\n";
-			*m_currentOut << "    ldelem." << GetElemSuffix(pureSemType) << "\n";
-			*m_currentOut << "    stloc " << iterIdx << " // " << node->iteratorName << "\n";
+			LdLoc(arrIdx);
+			LdLoc(idxIdx);
+			Emit("conv.i4");
+			Emit("ldelem." + GetElemSuffix(pureSemType));
+			StLoc(iterIdx);
 
 			if (node->body)
 			{
 				node->body->Accept(*this);
 			}
 
-			*m_currentOut << "    ldloc " << idxIdx << "\n";
-			*m_currentOut << "    ldc.i8 1\n";
-			*m_currentOut << "    add\n";
-			*m_currentOut << "    stloc " << idxIdx << "\n";
+			LdLoc(idxIdx);
+			LdcI8(1);
+			Emit("add");
+			StLoc(idxIdx);
 
-			*m_currentOut << "    br " << startLabel << "\n";
-
-			*m_currentOut << endLabel << ":\n";
+			Br(startLabel);
+			MarkLabel(endLabel);
 			return;
 		}
 
@@ -540,19 +549,23 @@ public:
 		DeclareLocal(limitName, node->endExpr.get());
 		const int limitIdx = GetLocalIndex(limitName);
 
-		*m_currentOut << startLabel << ":\n"
-					  << "    ldloc " << iterIdx << "\n"
-					  << "    ldloc " << limitIdx << "\n"
-					  << "    bgt " << endLabel << "\n";
+		MarkLabel(startLabel);
+		LdLoc(iterIdx);
+		LdLoc(limitIdx);
+		Emit("bgt " + endLabel);
 
 		if (node->body)
 		{
 			node->body->Accept(*this);
 		}
 
-		*m_currentOut << "    ldloc " << iterIdx << "\n    ldc.i8 1\n    add\n    stloc " << iterIdx << "\n"
-					  << "    br " << startLabel << "\n"
-					  << endLabel << ":\n";
+		LdLoc(iterIdx);
+		LdcI8(1);
+		Emit("add");
+		StLoc(iterIdx);
+
+		Br(startLabel);
+		MarkLabel(endLabel);
 	}
 
 	void Visit(const ast::CallExpr* node) override
@@ -574,7 +587,7 @@ public:
 				}
 
 				const std::size_t varargCount = node->arguments.size() - normalCount;
-				*m_currentOut << "    ldc.i4 " << varargCount << "\n";
+				Emit("ldc.i4 " + std::to_string(varargCount));
 
 				const re::String elemType = callInfo.target->paramTypes.back()->name;
 				re::String cilElemType = MapToCIL(elemType);
@@ -583,12 +596,12 @@ public:
 					cilElemType = cilElemType.Substring(0, cilElemType.Length() - 2);
 				}
 
-				*m_currentOut << "    newarr " << cilElemType << "\n";
+				Emit("newarr " + cilElemType);
 
 				for (std::size_t i = 0; i < varargCount; ++i)
 				{
-					*m_currentOut << "    dup\n";
-					*m_currentOut << "    ldc.i4 " << i << "\n";
+					Emit("dup");
+					Emit("ldc.i4 " + std::to_string(i));
 
 					if (node->arguments[normalCount + i])
 					{
@@ -600,30 +613,31 @@ public:
 							{
 								if (argSemType->name == "System.Int64")
 								{
-									*m_currentOut << "    box [mscorlib]System.Int64\n";
+									Emit("box [mscorlib]System.Int64");
 								}
 								else if (argSemType->name == "System.Double")
 								{
-									*m_currentOut << "    box [mscorlib]System.Double\n";
+									Emit("box [mscorlib]System.Double");
 								}
 								else if (argSemType->name == "System.Boolean")
 								{
-									*m_currentOut << "    box [mscorlib]System.Boolean\n";
+									Emit("box [mscorlib]System.Boolean");
 								}
 							}
 						}
 					}
-
-					*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
+					Emit("stelem." + GetElemSuffix(elemType));
 				}
 			}
 			else
 			{
 				for (const auto& arg : node->arguments)
+				{
 					if (arg)
 					{
 						arg->Accept(*this);
 					}
+				}
 			}
 		};
 
@@ -635,7 +649,8 @@ public:
 				{
 					memAccess->object->Accept(*this);
 				}
-				*m_currentOut << "    ldlen\n    conv.i8\n";
+				Emit("ldlen");
+				Emit("conv.i8");
 			}
 			else if (op == "ldelem")
 			{
@@ -647,7 +662,7 @@ public:
 				{
 					node->arguments[0]->Accept(*this);
 				}
-				*m_currentOut << "    conv.i4\n";
+				Emit("conv.i4");
 
 				re::String elemType = "System.Object";
 				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->paramTypes[0]))
@@ -657,7 +672,7 @@ public:
 						elemType = classType->typeArguments[0]->name;
 					}
 				}
-				*m_currentOut << "    ldelem." << GetElemSuffix(elemType) << "\n";
+				Emit("ldelem." + GetElemSuffix(elemType));
 			}
 			else if (op == "stelem")
 			{
@@ -669,8 +684,7 @@ public:
 				{
 					node->arguments[0]->Accept(*this);
 				}
-				*m_currentOut << "    conv.i4\n";
-
+				Emit("conv.i4");
 				if (node->arguments.size() > 1 && node->arguments[1])
 				{
 					node->arguments[1]->Accept(*this);
@@ -680,11 +694,9 @@ public:
 				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->paramTypes[0]))
 				{
 					if (!classType->typeArguments.empty())
-					{
 						elemType = classType->typeArguments[0]->name;
-					}
 				}
-				*m_currentOut << "    stelem." << GetElemSuffix(elemType) << "\n";
+				Emit("stelem." + GetElemSuffix(elemType));
 			}
 			else if (op == "newarr")
 			{
@@ -693,16 +705,14 @@ public:
 				if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(callInfo.target->returnType))
 				{
 					if (!classType->typeArguments.empty())
-					{
 						elemType = MapToCIL(classType->typeArguments[0]->name);
-					}
 				}
-				*m_currentOut << "    newarr " << elemType << "\n";
+				Emit("newarr " + elemType);
 			}
 			else
 			{
 				emitArgs();
-				*m_currentOut << "    " << op << "\n";
+				Emit(op);
 			}
 			return;
 		}
@@ -715,8 +725,7 @@ public:
 			}
 			emitArgs();
 			const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
-			*m_currentOut << "    callvirt instance " << retType << " " << callInfo.target->name << "::Invoke(" << BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) << ")\n";
-
+			CallVirtual(retType + " " + callInfo.target->name + "::Invoke(" + BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) + ")");
 			return;
 		}
 
@@ -725,19 +734,18 @@ public:
 			if (const auto dotnetMethod = ast::AnnotationUtils::GetAnnotationArg(targetAnnos, "DotNetMethod"))
 			{
 				emitArgs(true);
-				*m_currentOut << "    call " << *dotnetMethod << "\n";
+				Call(*dotnetMethod);
 				return;
 			}
 			emitArgs();
-			*m_currentOut << "    call " << callInfo.target->name << "\n";
+			Call(callInfo.target->name);
 			return;
 		}
 
 		if (callInfo.isConstructorCall)
 		{
 			emitArgs();
-			*m_currentOut << "    newobj instance void " << callInfo.mangledClassName << "::.ctor("
-						  << BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) << ")\n";
+			Emit("newobj instance void " + callInfo.mangledClassName + "::.ctor(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
 			return;
 		}
 
@@ -749,21 +757,16 @@ public:
 			}
 			else if (callInfo.isImplicitThisCall)
 			{
-				*m_currentOut << "    ldarg.0 // implicit this\n";
+				LdArg(0);
 			}
 
 			emitArgs();
-			*m_currentOut << "    callvirt instance " << MapToCIL(callInfo.target->returnType->name)
-						  << " " << callInfo.target->paramTypes[0]->name << "::" << callInfo.asmLabel
-						  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) << ")\n";
-
+			CallVirtual(MapToCIL(callInfo.target->returnType->name) + " " + callInfo.target->paramTypes[0]->name + "::" + callInfo.asmLabel + "(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
 			return;
 		}
 
 		emitArgs();
-		const re::String retType = callInfo.target && callInfo.target->returnType
-			? MapToCIL(callInfo.target->returnType->name)
-			: TYPE_VOID;
+		const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
 
 		re::String finalAsmLabel = callInfo.asmLabel;
 		if (const std::size_t firstAt = finalAsmLabel.Find('@'); firstAt != re::String::NPos)
@@ -774,8 +777,7 @@ public:
 			}
 		}
 
-		*m_currentOut << "    call " << retType << " IgniGlobalModule::" << finalAsmLabel
-					  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) << ")\n";
+		Call(retType + " IgniGlobalModule::" + finalAsmLabel + "(" + BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) + ")");
 	}
 
 	void Visit(const ast::LambdaExpr* node) override
@@ -791,29 +793,29 @@ public:
 			if (m_globalVars.contains(capName))
 			{
 				cilType = m_globalVars.at(capName);
-				*m_currentOut << "    ldsfld " << cilType << " IgniGlobalModule::" << capName << "\n";
+				Emit("ldsfld " + cilType + " IgniGlobalModule::" + capName);
 			}
 			else if (const int locIdx = GetLocalIndex(capName); locIdx != -1)
 			{
 				cilType = m_localTypes[locIdx];
-				*m_currentOut << "    ldloc " << locIdx << "\n";
+				LdLoc(locIdx);
 			}
 			else if (const int argIdx = GetArgIndex(capName); argIdx != -1)
 			{
 				cilType = m_argTypes[argIdx];
-				*m_currentOut << "    ldarg " << argIdx << "\n";
+				LdArg(argIdx);
 			}
-
 			capTypes.push_back(cilType);
 		}
 
-		*m_currentOut << "    newobj instance void " << lambdaClassName << "::.ctor(";
+		re::String sig = "instance void " + lambdaClassName + "::.ctor(";
 		for (size_t i = 0; i < capTypes.size(); ++i)
 		{
-			*m_currentOut << capTypes[i] << (i < capTypes.size() - 1 ? ", " : "");
+			sig += capTypes[i] + (i < capTypes.size() - 1 ? ", " : "");
 		}
-		*m_currentOut << ")\n";
+		sig += ")";
 
+		Emit("newobj " + sig);
 		m_lambdas.emplace_back(node, lambdaClassName, capTypes);
 	}
 
@@ -829,7 +831,7 @@ public:
 				{
 					if (semType->name != "Unit" && semType->name != "System.Void")
 					{
-						*m_currentOut << "    pop\n";
+						Pop();
 					}
 				}
 			}
@@ -842,14 +844,14 @@ public:
 		{
 			node->expr->Accept(*this);
 		}
-		*m_currentOut << "    ret\n";
+		Ret();
 	}
 
 	void Visit(const ast::IndexExpr* node) override
 	{
 		node->array->Accept(*this);
 		node->index->Accept(*this);
-		*m_currentOut << "    conv.i4\n";
+		Emit("conv.i4");
 
 		re::String elemType = "System.Object";
 		if (const auto arrSemType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->array.get()))
@@ -862,7 +864,7 @@ public:
 				}
 			}
 		}
-		*m_currentOut << "    ldelem." << GetElemSuffix(elemType) << "\n";
+		Emit("ldelem." + GetElemSuffix(elemType));
 	}
 
 	void Visit(const ast::TypeCastExpr* node) override
@@ -871,8 +873,7 @@ public:
 
 		if (m_semanticAnalyzer.GetBindings().castTargets.contains(node))
 		{
-			const re::String targetType = m_semanticAnalyzer.GetBindings().castTargets.at(node);
-			*m_currentOut << "    castclass " << MapToCIL(targetType) << "\n";
+			Emit("castclass " + MapToCIL(m_semanticAnalyzer.GetBindings().castTargets.at(node)));
 		}
 	}
 
@@ -882,6 +883,8 @@ private:
 	std::stringstream m_methodBuffer;
 	const sem::SemanticAnalyzer& m_semanticAnalyzer;
 
+	bool m_isWritingGlobal = true;
+
 	const ast::ClassDecl* m_currentClass = nullptr;
 	std::vector<re::String> m_locals;
 	std::vector<re::String> m_localTypes;
@@ -889,7 +892,6 @@ private:
 	std::size_t m_labelCount = 0;
 
 	std::vector<re::String> m_externAssemblies;
-
 	std::unordered_map<re::String, re::String> m_globalVars;
 
 	struct LambdaData
@@ -900,12 +902,18 @@ private:
 	};
 
 	std::vector<LambdaData> m_lambdas;
-	const ast::LambdaExpr* m_currentLambda = nullptr;
 	const LambdaData* m_currentLambdaData = nullptr;
 	std::vector<re::String> m_argTypes;
 
+	void SetOutStream(std::ostream& out)
+	{
+		m_currentOut = &out;
+		SetStream(out);
+	}
+
 	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params)
 	{
+		m_isWritingGlobal = false;
 		m_locals.clear();
 		m_localTypes.clear();
 		m_args.clear();
@@ -916,15 +924,16 @@ private:
 			m_args.emplace_back("this");
 			m_argTypes.emplace_back(m_currentClass ? "class " + m_currentClass->name : "class [mscorlib]System.Object");
 		}
-		for (const auto& p : params)
+		for (const auto& [name, type] : params)
 		{
-			m_args.push_back(p.name);
-			m_argTypes.push_back(MapAstType(p.type.get()));
+			m_args.push_back(name);
+			m_argTypes.push_back(MapAstType(type.get()));
 		}
 
 		m_methodBuffer.str("");
 		m_methodBuffer.clear();
-		m_currentOut = &m_methodBuffer;
+
+		SetOutStream(m_methodBuffer);
 	}
 
 	void EmitMethodBody(const re::String& signature, const ast::Block* body, const bool isEntryPoint)
@@ -933,7 +942,8 @@ private:
 		{
 			body->Accept(*this);
 		}
-		m_currentOut = &m_out;
+
+		SetOutStream(m_out);
 
 		m_out << "  " << signature << "\n  {\n";
 		if (isEntryPoint)
@@ -953,6 +963,7 @@ private:
 		}
 
 		m_out << m_methodBuffer.str() << "    ret\n  }\n\n";
+		m_isWritingGlobal = true;
 	}
 
 	std::shared_ptr<sem::ClassType> ResolveClassType(const ast::Expr* objExpr) const
@@ -991,7 +1002,7 @@ private:
 				if (m_currentLambdaData->node->captures[i] == id->name)
 				{
 					const re::String cilType = m_currentLambdaData->captureTypes[i];
-					*m_currentOut << "    ldarg.0 // this (lambda capture)\n";
+					LdArg(0); // this (lambda capture)
 					if (assignValue)
 					{
 						assignValue->Accept(*this);
@@ -1005,7 +1016,7 @@ private:
 
 		if (m_semanticAnalyzer.GetBindings().implicitThisNames.contains(id))
 		{
-			*m_currentOut << "    ldarg.0 // this\n";
+			LdArg(0);
 			if (assignValue)
 			{
 				assignValue->Accept(*this);
@@ -1027,12 +1038,26 @@ private:
 
 		if (const int locIdx = GetLocalIndex(id->name); locIdx != -1)
 		{
-			*m_currentOut << "    " << (isStore ? "stloc " : "ldloc ") << locIdx << " // " << id->name << "\n";
+			if (isStore)
+			{
+				StLoc(locIdx);
+			}
+			else
+			{
+				LdLoc(locIdx);
+			}
 			return;
 		}
 		if (const int argIdx = GetArgIndex(id->name); argIdx != -1)
 		{
-			*m_currentOut << "    " << (isStore ? "starg " : "ldarg ") << argIdx << " // " << id->name << "\n";
+			if (isStore)
+			{
+				Emit("starg " + std::to_string(argIdx));
+			}
+			else
+			{
+				LdArg(argIdx);
+			}
 		}
 	}
 
@@ -1057,10 +1082,10 @@ private:
 		}
 		else
 		{
-			*m_currentOut << "    ldc.i8 0\n";
+			LdcI8(0);
 		}
 
-		*m_currentOut << "    stloc " << idx << " // " << name << "\n";
+		StLoc(idx);
 	}
 
 	[[nodiscard]] static re::String BuildTypeSignature(
@@ -1132,9 +1157,7 @@ private:
 	{
 		const auto it = std::ranges::find(container, value);
 
-		return it != container.end()
-			? static_cast<int>(std::distance(container.begin(), it))
-			: -1;
+		return it != container.end() ? static_cast<int>(std::distance(container.begin(), it)) : -1;
 	}
 
 	[[nodiscard]] int GetLocalIndex(const re::String& name) const
