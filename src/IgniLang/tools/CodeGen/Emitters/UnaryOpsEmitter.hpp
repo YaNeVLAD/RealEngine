@@ -18,6 +18,9 @@ public:
 
 	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
+		auto nsH = h.Namespace("igni::sem::generated");
+		auto nsCpp = cpp.Namespace("igni::sem::generated");
+
 		h.Line("re::String GetUnaryOperationResult(const re::String& op, const re::String& operand);");
 		h.EmptyLine();
 

@@ -22,6 +22,9 @@ public:
 
 	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
+		auto nsH = h.Namespace("igni::sem::generated");
+		auto nsCpp = cpp.Namespace("igni::sem::generated");
+
 		static constexpr HashedStringMap BUILD_TARGET_MAP = { {
 			{ "rvm"_hs, "BuildTarget::RVM" },
 			{ "dotnet"_hs, "BuildTarget::DotNet" },

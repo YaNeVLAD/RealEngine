@@ -47,8 +47,6 @@ int main(const int argc, char** argv)
 	headerBuilder.Include("IgniLang/BuildTarget.hpp", true);
 	headerBuilder.EmptyLine();
 
-	auto nsHeader = headerBuilder.Namespace("igni::sem::generated");
-
 	// --- CPP ---
 	std::ofstream sourceFile(sourcePath);
 	Builder<std::string> sourceBuilder(sourceFile);
@@ -57,7 +55,6 @@ int main(const int argc, char** argv)
 	sourceBuilder.Include("Core/HashedString.hpp", true);
 	sourceBuilder.EmptyLine();
 
-	auto nsSource = sourceBuilder.Namespace("igni::sem::generated");
 	sourceBuilder.Line("using namespace re::literals;");
 	sourceBuilder.EmptyLine();
 

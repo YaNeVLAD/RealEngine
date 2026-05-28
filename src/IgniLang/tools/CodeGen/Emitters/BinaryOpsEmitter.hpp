@@ -8,7 +8,6 @@
 
 namespace igni::codegen
 {
-
 using namespace re::literals;
 
 class BinaryOpsEmitter
@@ -18,6 +17,9 @@ public:
 
 	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
+		auto nsH = h.Namespace("igni::sem::generated");
+		auto nsCpp = cpp.Namespace("igni::sem::generated");
+
 		h.Line("re::String GetBinaryOperationResult(const re::String& op, const re::String& lhs, const re::String& rhs);");
 		h.EmptyLine();
 

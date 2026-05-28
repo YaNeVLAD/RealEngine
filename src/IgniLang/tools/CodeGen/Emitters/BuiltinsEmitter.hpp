@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "../Builder.hpp"
 
 #include <Core/HashedString.hpp>
@@ -19,6 +17,9 @@ public:
 
 	static void Emit(const nlohmann::json& data, Builder<std::string>& h, Builder<std::string>& cpp)
 	{
+		auto nsH = h.Namespace("igni::sem::generated");
+		auto nsCpp = cpp.Namespace("igni::sem::generated");
+
 		h.Line("bool TryMatchIntrinsic(const re::String& name, std::size_t argsCount, bool hasTypeArgs, igni::CallDispatchType& outDispatch, re::String& outRetType);");
 		h.EmptyLine();
 
