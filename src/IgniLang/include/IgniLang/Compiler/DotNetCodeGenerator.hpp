@@ -2,6 +2,9 @@
 
 #include <Core/flat_map.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/AST/Utils/AnnotationUtils.hpp>
+#include <IgniLang/Compiler/DotNet/CILEmitter.hpp>
+#include <IgniLang/Compiler/DotNet/TypeMapper.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <optional>
@@ -12,7 +15,10 @@
 namespace igni
 {
 
-class DotNetCodeGenerator final : public ast::BaseAstVisitor
+class DotNetCodeGenerator final
+	: public ast::BaseAstVisitor
+	, dotnet::TypeMapper
+	, dotnet::CILEmitter
 {
 	template <std::size_t N>
 	using HashedStringMap = re::flat_map<re::HashedString, std::string_view, N>;
@@ -23,7 +29,8 @@ class DotNetCodeGenerator final : public ast::BaseAstVisitor
 
 public:
 	DotNetCodeGenerator(std::ostream& out, const sem::SemanticAnalyzer& semantics)
-		: m_out(out)
+		: CILEmitter(out)
+		, m_out(out)
 		, m_semanticAnalyzer(semantics)
 	{
 	}
@@ -33,7 +40,7 @@ public:
 		auto scanAnnotations = [&](const std::vector<ast::Annotation>& annotations) {
 			for (const auto& anno : annotations)
 			{
-				if (const auto strArg = GetAnnotationStringArg(anno))
+				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno))
 				{
 					ExtractAssemblies(*strArg);
 				}
@@ -78,7 +85,7 @@ public:
 				{
 					if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get()))
 					{
-						cilType = MapTypeToCIL(semType->name);
+						cilType = MapToCIL(semType->name);
 					}
 				}
 				m_globalVars[varDecl->name] = cilType;
@@ -91,7 +98,7 @@ public:
 				{
 					if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get()))
 					{
-						cilType = MapTypeToCIL(semType->name);
+						cilType = MapToCIL(semType->name);
 					}
 				}
 				m_globalVars[valDecl->name] = cilType;
@@ -141,6 +148,11 @@ public:
 				classDecl->Accept(*this);
 			}
 		}
+
+		for (const auto& lambda : m_lambdas)
+		{
+			GenerateLambdaClass(lambda);
+		}
 	}
 
 	void Visit(const ast::ClassDecl* node) override
@@ -159,7 +171,7 @@ public:
 		{
 			for (const auto& [fieldName, fieldInfo] : semClass->fields)
 			{
-				m_out << "  .field public " << MapTypeToCIL(fieldInfo.type->name) << " '" << fieldName << "'\n";
+				m_out << "  .field public " << MapToCIL(fieldInfo.type->name) << " '" << fieldName << "'\n";
 			}
 		}
 
@@ -198,7 +210,7 @@ public:
 					*m_currentOut << "    ldarg.0 // this\n";
 					varDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(varDecl->initializer.get());
-					*m_currentOut << "    stfld " << MapTypeToCIL(semType->name) << " " << m_currentClass->name << "::" << varDecl->name << "\n";
+					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << varDecl->name << "\n";
 				}
 			}
 			else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
@@ -208,7 +220,7 @@ public:
 					*m_currentOut << "    ldarg.0 // this\n";
 					valDecl->initializer->Accept(*this);
 					const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(valDecl->initializer.get());
-					*m_currentOut << "    stfld " << MapTypeToCIL(semType->name) << " " << m_currentClass->name << "::" << valDecl->name << "\n";
+					*m_currentOut << "    stfld " << MapToCIL(semType->name) << " " << m_currentClass->name << "::" << valDecl->name << "\n";
 				}
 			}
 		}
@@ -480,7 +492,7 @@ public:
 					if (!classType->typeArguments.empty())
 					{
 						pureSemType = classType->typeArguments[0]->name;
-						elemCilType = MapTypeToCIL(pureSemType);
+						elemCilType = MapToCIL(pureSemType);
 					}
 				}
 			}
@@ -565,7 +577,7 @@ public:
 				*m_currentOut << "    ldc.i4 " << varargCount << "\n";
 
 				const re::String elemType = callInfo.target->paramTypes.back()->name;
-				re::String cilElemType = MapTypeToCIL(elemType);
+				re::String cilElemType = MapToCIL(elemType);
 				if (cilElemType.Find("[]") != re::String::NPos)
 				{
 					cilElemType = cilElemType.Substring(0, cilElemType.Length() - 2);
@@ -615,7 +627,7 @@ public:
 			}
 		};
 
-		if (const auto inlineOp = GetAnnotationArg(targetAnnos, "DotNetOpcode"); inlineOp)
+		if (const auto inlineOp = ast::AnnotationUtils::GetAnnotationArg(targetAnnos, "DotNetOpcode"); inlineOp)
 		{
 			if (const auto& op = *inlineOp; op == "ldlen")
 			{
@@ -682,7 +694,7 @@ public:
 				{
 					if (!classType->typeArguments.empty())
 					{
-						elemType = MapTypeToCIL(classType->typeArguments[0]->name);
+						elemType = MapToCIL(classType->typeArguments[0]->name);
 					}
 				}
 				*m_currentOut << "    newarr " << elemType << "\n";
@@ -696,21 +708,21 @@ public:
 		}
 
 		if (callInfo.dispatchMode == CallDispatchType::Indirect)
-		{ // TODO: Remove lambda dummy
-			emitArgs();
-
-			*m_currentOut << "    // [TODO] Lambda Invoke Implementation\n";
-			*m_currentOut << "    pop\n";
-			if (callInfo.target && callInfo.target->returnType && callInfo.target->returnType->name != "Unit")
+		{
+			if (node->callee)
 			{
-				*m_currentOut << "    ldc.i8 0\n";
+				node->callee->Accept(*this);
 			}
+			emitArgs();
+			const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
+			*m_currentOut << "    callvirt instance " << retType << " " << callInfo.target->name << "::Invoke(" << BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) << ")\n";
+
 			return;
 		}
 
 		if (callInfo.dispatchMode == CallDispatchType::Native)
 		{
-			if (const auto dotnetMethod = GetAnnotationArg(targetAnnos, "DotNetMethod"))
+			if (const auto dotnetMethod = ast::AnnotationUtils::GetAnnotationArg(targetAnnos, "DotNetMethod"))
 			{
 				emitArgs(true);
 				*m_currentOut << "    call " << *dotnetMethod << "\n";
@@ -741,7 +753,7 @@ public:
 			}
 
 			emitArgs();
-			*m_currentOut << "    callvirt instance " << MapTypeToCIL(callInfo.target->returnType->name)
+			*m_currentOut << "    callvirt instance " << MapToCIL(callInfo.target->returnType->name)
 						  << " " << callInfo.target->paramTypes[0]->name << "::" << callInfo.asmLabel
 						  << "(" << BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) << ")\n";
 
@@ -750,7 +762,7 @@ public:
 
 		emitArgs();
 		const re::String retType = callInfo.target && callInfo.target->returnType
-			? MapTypeToCIL(callInfo.target->returnType->name)
+			? MapToCIL(callInfo.target->returnType->name)
 			: TYPE_VOID;
 
 		re::String finalAsmLabel = callInfo.asmLabel;
@@ -768,7 +780,41 @@ public:
 
 	void Visit(const ast::LambdaExpr* node) override
 	{
-		*m_currentOut << "    ldnull // [TODO] Lambda Class Generation\n";
+		const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(node);
+		re::String lambdaClassName = semType->name;
+
+		std::vector<re::String> capTypes;
+		for (const auto& capName : node->captures)
+		{
+			re::String cilType = "class [mscorlib]System.Object";
+
+			if (m_globalVars.contains(capName))
+			{
+				cilType = m_globalVars.at(capName);
+				*m_currentOut << "    ldsfld " << cilType << " IgniGlobalModule::" << capName << "\n";
+			}
+			else if (const int locIdx = GetLocalIndex(capName); locIdx != -1)
+			{
+				cilType = m_localTypes[locIdx];
+				*m_currentOut << "    ldloc " << locIdx << "\n";
+			}
+			else if (const int argIdx = GetArgIndex(capName); argIdx != -1)
+			{
+				cilType = m_argTypes[argIdx];
+				*m_currentOut << "    ldarg " << argIdx << "\n";
+			}
+
+			capTypes.push_back(cilType);
+		}
+
+		*m_currentOut << "    newobj instance void " << lambdaClassName << "::.ctor(";
+		for (size_t i = 0; i < capTypes.size(); ++i)
+		{
+			*m_currentOut << capTypes[i] << (i < capTypes.size() - 1 ? ", " : "");
+		}
+		*m_currentOut << ")\n";
+
+		m_lambdas.emplace_back(node, lambdaClassName, capTypes);
 	}
 
 	void Visit(const ast::ExprStmt* node) override
@@ -826,7 +872,7 @@ public:
 		if (m_semanticAnalyzer.GetBindings().castTargets.contains(node))
 		{
 			const re::String targetType = m_semanticAnalyzer.GetBindings().castTargets.at(node);
-			*m_currentOut << "    castclass " << MapTypeToCIL(targetType) << "\n";
+			*m_currentOut << "    castclass " << MapToCIL(targetType) << "\n";
 		}
 	}
 
@@ -846,18 +892,34 @@ private:
 
 	std::unordered_map<re::String, re::String> m_globalVars;
 
+	struct LambdaData
+	{
+		const ast::LambdaExpr* node;
+		re::String className;
+		std::vector<re::String> captureTypes;
+	};
+
+	std::vector<LambdaData> m_lambdas;
+	const ast::LambdaExpr* m_currentLambda = nullptr;
+	const LambdaData* m_currentLambdaData = nullptr;
+	std::vector<re::String> m_argTypes;
+
 	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params)
 	{
 		m_locals.clear();
 		m_localTypes.clear();
 		m_args.clear();
+		m_argTypes.clear();
+
 		if (hasThis)
 		{
 			m_args.emplace_back("this");
+			m_argTypes.emplace_back(m_currentClass ? "class " + m_currentClass->name : "class [mscorlib]System.Object");
 		}
-		for (const auto& [name, _] : params)
+		for (const auto& p : params)
 		{
-			m_args.push_back(name);
+			m_args.push_back(p.name);
+			m_argTypes.push_back(MapAstType(p.type.get()));
 		}
 
 		m_methodBuffer.str("");
@@ -914,7 +976,7 @@ private:
 			if (classType->fields.contains(member))
 			{
 				const auto fieldType = classType->fields.at(member).type;
-				*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << MapTypeToCIL(fieldType->name)
+				*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << MapToCIL(fieldType->name)
 							  << " " << classType->name << "::" << member << "\n";
 			}
 		}
@@ -922,6 +984,25 @@ private:
 
 	void EmitIdentifierAccess(const ast::IdentifierExpr* id, const bool isStore, const ast::Expr* assignValue)
 	{
+		if (m_currentLambdaData)
+		{
+			for (size_t i = 0; i < m_currentLambdaData->node->captures.size(); ++i)
+			{
+				if (m_currentLambdaData->node->captures[i] == id->name)
+				{
+					const re::String cilType = m_currentLambdaData->captureTypes[i];
+					*m_currentOut << "    ldarg.0 // this (lambda capture)\n";
+					if (assignValue)
+					{
+						assignValue->Accept(*this);
+					}
+					*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << cilType << " " << m_currentLambdaData->className << "::" << id->name << "\n";
+
+					return;
+				}
+			}
+		}
+
 		if (m_semanticAnalyzer.GetBindings().implicitThisNames.contains(id))
 		{
 			*m_currentOut << "    ldarg.0 // this\n";
@@ -932,7 +1013,7 @@ private:
 
 			const auto classType = m_semanticAnalyzer.GetClassType(m_currentClass->name);
 			const auto fieldType = classType->fields.at(id->name).type;
-			*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << MapTypeToCIL(fieldType->name)
+			*m_currentOut << "    " << (isStore ? "stfld " : "ldfld ") << MapToCIL(fieldType->name)
 						  << " " << classType->name << "::" << id->name << "\n";
 
 			return;
@@ -957,12 +1038,12 @@ private:
 
 	void DeclareLocal(const re::String& name, const ast::Expr* initExpr)
 	{
-		re::String cilType = "int64"; // Fallback
+		re::String cilType = "int64";
 		if (initExpr)
 		{
 			if (const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(initExpr))
 			{
-				cilType = MapTypeToCIL(semType->name);
+				cilType = MapToCIL(semType->name);
 			}
 		}
 
@@ -982,104 +1063,6 @@ private:
 		*m_currentOut << "    stloc " << idx << " // " << name << "\n";
 	}
 
-	static re::String MapTypeToCIL(const re::String& semTypeName)
-	{
-		using namespace re::literals;
-
-		static constexpr HashedStringMap SemTypeMap = { {
-			{ "System.Int64"_hs, "int64" },
-			{ "System.Double"_hs, "float64" },
-			{ "System.String"_hs, "string" },
-			{ "System.Boolean"_hs, "bool" },
-			{ "Unit"_hs, TYPE_VOID },
-			{ "System.Void"_hs, TYPE_VOID },
-			{ "Null"_hs, TYPE_OBJECT },
-			{ "Any"_hs, TYPE_OBJECT },
-			{ "System.Object"_hs, TYPE_OBJECT },
-		} };
-
-		if (const auto mapped = SemTypeMap[semTypeName.Hashed()])
-		{
-			return mapped->data();
-		}
-
-		if (semTypeName.Find("Array@") != re::String::NPos)
-		{
-			const re::String innerType = semTypeName.Substring(6, semTypeName.Length() - 6);
-			return MapTypeToCIL(innerType) + "[]";
-		}
-
-		return "class " + semTypeName;
-	}
-
-	static re::String MapAstType(const ast::TypeNode* node)
-	{
-		using namespace re::literals;
-
-		if (const auto s = dynamic_cast<const ast::SimpleTypeNode*>(node))
-		{
-			if (s->name == "Array" && !s->typeArgs.empty())
-			{
-				return MapAstType(s->typeArgs[0].get()) + "[]";
-			}
-
-			static constexpr HashedStringMap AstTypeMap = { {
-				{ "Int"_hs, "int64" },
-				{ "Double"_hs, "float64" },
-				{ "String"_hs, "string" },
-				{ "Bool"_hs, "bool" },
-				{ "Unit"_hs, TYPE_VOID },
-				{ "Any"_hs, TYPE_OBJECT },
-			} };
-
-			if (const auto mapped = AstTypeMap[s->name.Hashed()])
-			{
-				return mapped->data();
-			}
-
-			return MapTypeToCIL(s->name);
-		}
-
-		return TYPE_OBJECT;
-	}
-
-	static re::String GetElemSuffix(const re::String& semTypeName)
-	{
-		using namespace re::literals;
-
-		static constexpr HashedStringMap SemTypeMap = { {
-			{ "System.Int64"_hs, "i8" },
-			{ "System.Double"_hs, "r8" },
-			{ "System.Boolean"_hs, "i4" },
-		} };
-
-		return SemTypeMap.get(semTypeName.Hashed(), "ref");
-	}
-
-	[[nodiscard]] static std::string BuildParamSignature(const std::vector<ast::Parameter>& params, const bool isVararg = false)
-	{
-		re::String sig;
-		for (std::size_t i = 0; i < params.size(); ++i)
-		{
-			auto typeSig = MapAstType(params[i].type.get());
-			if (isVararg && i == params.size() - 1)
-			{
-				if (typeSig.Find("[]") == re::String::NPos)
-				{
-					typeSig += "[]";
-				}
-			}
-
-			sig += typeSig;
-			if (i < params.size() - 1)
-			{
-				sig += ", ";
-			}
-		}
-
-		return sig;
-	}
-
 	[[nodiscard]] static re::String BuildTypeSignature(
 		const std::vector<std::shared_ptr<sem::SemanticType>>& types,
 		const std::size_t startIndex,
@@ -1088,7 +1071,7 @@ private:
 		re::String sig;
 		for (std::size_t i = startIndex; i < types.size(); ++i)
 		{
-			re::String typeSig = MapTypeToCIL(types[i]->name);
+			re::String typeSig = MapToCIL(types[i]->name);
 
 			if (isVararg && i == types.size() - 1)
 			{
@@ -1108,41 +1091,13 @@ private:
 		return sig;
 	}
 
-	[[nodiscard]] static std::optional<re::String> GetAnnotationArg(const std::vector<ast::Annotation>& annotations, const re::String& targetName)
-	{
-		for (const auto& anno : annotations)
-		{
-			if (anno.name == targetName)
-			{
-				return GetAnnotationStringArg(anno);
-			}
-		}
-		return std::nullopt;
-	}
-
-	[[nodiscard]] static std::optional<re::String> GetAnnotationStringArg(const ast::Annotation& anno)
-	{
-		if (anno.argument)
-		{
-			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
-			{
-				if (lit->token.type == TokenType::StringConst)
-				{
-					return lit->token.lexeme.substr(1, lit->token.lexeme.length() - 2);
-				}
-			}
-		}
-
-		return std::nullopt;
-	}
-
 	[[nodiscard]] static re::String GetBaseClass(const std::vector<ast::Annotation>& annotations)
 	{
 		for (const auto& anno : annotations)
 		{
 			if (anno.name == ANNO_BASE_CLASS)
 			{
-				if (const auto strArg = GetAnnotationStringArg(anno))
+				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno))
 				{
 					return *strArg;
 				}
@@ -1190,6 +1145,39 @@ private:
 	[[nodiscard]] int GetArgIndex(const re::String& name) const
 	{
 		return IndexOf(m_args, name);
+	}
+
+	void GenerateLambdaClass(const LambdaData& data)
+	{
+		m_out << ".class public auto ansi beforefieldinit " << data.className << " extends [mscorlib]System.Object\n{\n";
+
+		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
+		{
+			m_out << "  .field public " << data.captureTypes[i] << " '" << data.node->captures[i] << "'\n";
+		}
+
+		m_out << "  .method public hidebysig specialname rtspecialname instance void .ctor(";
+		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
+		{
+			m_out << data.captureTypes[i] << (i < data.captureTypes.size() - 1 ? ", " : "");
+		}
+		m_out << ") cil managed\n  {\n    .maxstack 8\n    ldarg.0\n    call instance void [mscorlib]System.Object::.ctor()\n";
+
+		for (std::size_t i = 0; i < data.captureTypes.size(); ++i)
+		{
+			m_out << "    ldarg.0\n    ldarg " << (i + 1) << "\n    stfld " << data.captureTypes[i] << " " << data.className << "::" << data.node->captures[i] << "\n";
+		}
+		m_out << "    ret\n  }\n\n";
+
+		m_currentLambdaData = &data;
+		PrepareMethodScope(true, data.node->parameters);
+
+		const re::String retType = data.node->returnType ? MapAstType(data.node->returnType.get()) : TYPE_VOID;
+		const re::String sig = ".method public hidebysig instance " + retType + " Invoke(" + BuildParamSignature(data.node->parameters, false) + ") cil managed";
+		EmitMethodBody(sig, data.node->body.get(), false);
+
+		m_currentLambdaData = nullptr;
+		m_out << "}\n\n";
 	}
 };
 
