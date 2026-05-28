@@ -84,13 +84,29 @@ inline std::shared_ptr<SemanticType> Resolve(const ast::TypeNode* node, const Se
 	}
 	else if (const auto funTypeNode = dynamic_cast<const ast::FunctionTypeNode*>(node))
 	{
-		const auto semFunType = std::make_shared<FunctionType>("<anonymous_lambda>");
+		const auto semFunType = std::make_shared<FunctionType>("");
 		for (const auto& pType : funTypeNode->paramTypes)
 		{
 			semFunType->paramTypes.emplace_back(Resolve(pType.get(), ctx));
 		}
 		semFunType->returnType = Resolve(funTypeNode->returnType.get(), ctx);
 
+		std::string sigName = "Func";
+		for (const auto& pt : semFunType->paramTypes)
+		{
+			auto pName = std::string(pt->name);
+			std::ranges::replace(pName, '.', '_');
+			std::ranges::replace(pName, '[', '_');
+			std::ranges::replace(pName, ']', '_');
+			sigName += "_" + pName;
+		}
+		auto rName = std::string(semFunType->returnType->name);
+		std::ranges::replace(rName, '.', '_');
+		std::ranges::replace(rName, '[', '_');
+		std::ranges::replace(rName, ']', '_');
+		sigName += "_Ret_" + rName;
+
+		semFunType->name = sigName;
 		resolvedBaseType = semFunType;
 	}
 	else

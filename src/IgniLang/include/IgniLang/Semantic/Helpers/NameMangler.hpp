@@ -22,7 +22,7 @@ inline re::String Mangle(const re::String& baseName, const std::vector<re::Strin
 	return mangled;
 }
 
-inline re::String MangleMethod(const re::String& className, const re::String& methodName, const std::vector<re::String>& typeNames, bool isExternal)
+inline re::String MangleMethod(const re::String& className, const re::String& methodName, const std::vector<re::String>& typeNames, const bool isExternal)
 {
 	const re::String baseName = className + "_" + methodName;
 
