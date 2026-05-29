@@ -62,7 +62,7 @@ inline std::shared_ptr<FunctionType> ResolveAndInstantiateGeneric(
 
 		for (std::size_t i = 0; i < argTypes.size() && i < funTmpl->astNode->parameters.size(); ++i)
 		{
-			const auto paramTypeAst = funTmpl->astNode->parameters[i].type.get();
+			const auto paramTypeAst = funTmpl->astNode->parameters[i]->type.get();
 			TypeResolver::InferTypeArguments(argTypes[i], paramTypeAst, funTmpl->typeParams, concreteArgs);
 		}
 

@@ -39,10 +39,10 @@ public:
 
 	void Generate(const ast::Program* program)
 	{
-		auto scanAnnotations = [&](const std::vector<ast::Annotation>& annotations) {
+		auto scanAnnotations = [&](const std::vector<std::unique_ptr<ast::AnnotationNode>>& annotations) {
 			for (const auto& anno : annotations)
 			{
-				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno))
+				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno.get()))
 				{
 					ExtractAssemblies(*strArg);
 				}
@@ -150,7 +150,7 @@ public:
 			}
 		}
 
-		m_lambdaHelper.GenerateAllClasses(m_out, [&](const re::String& sig, const ast::Block* body, const bool isEntry, const std::vector<ast::Parameter>& params) {
+		m_lambdaHelper.GenerateAllClasses(m_out, [&](const re::String& sig, const ast::Block* body, const bool isEntry, const std::vector<std::unique_ptr<ast::ParameterNode>>& params) {
 			PrepareMethodScope(true, params, body);
 			EmitMethodBody(sig, body, isEntry);
 		});
@@ -958,7 +958,7 @@ private:
 		SetStream(out);
 	}
 
-	void PrepareMethodScope(const bool hasThis, const std::vector<ast::Parameter>& params, const ast::Block* body = nullptr)
+	void PrepareMethodScope(const bool hasThis, const std::vector<std::unique_ptr<ast::ParameterNode>>& params, const ast::Block* body = nullptr)
 	{
 		m_isWritingGlobal = false;
 		m_locals.clear();
@@ -976,10 +976,10 @@ private:
 			m_args.emplace_back("this");
 			m_argTypes.emplace_back(m_currentClass ? "class " + m_currentClass->name : "class [mscorlib]System.Object");
 		}
-		for (const auto& [name, type] : params)
+		for (const auto& param : params)
 		{
-			m_args.push_back(name);
-			m_argTypes.push_back(MapAstType(type.get()));
+			m_args.push_back(param->name);
+			m_argTypes.push_back(MapAstType(param->type.get()));
 		}
 
 		m_methodBuffer.str("");
@@ -1257,13 +1257,13 @@ private:
 		return sig;
 	}
 
-	[[nodiscard]] static re::String GetBaseClass(const std::vector<ast::Annotation>& annotations)
+	[[nodiscard]] static re::String GetBaseClass(const std::vector<std::unique_ptr<ast::AnnotationNode>>& annotations)
 	{
 		for (const auto& anno : annotations)
 		{
-			if (anno.name == ANNO_BASE_CLASS)
+			if (anno->name == ANNO_BASE_CLASS)
 			{
-				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno))
+				if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno.get()))
 				{
 					return *strArg;
 				}

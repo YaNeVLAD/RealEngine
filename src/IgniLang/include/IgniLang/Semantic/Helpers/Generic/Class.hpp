@@ -43,33 +43,29 @@ inline std::shared_ptr<ClassType> Instantiate(
 
 	for (std::size_t i = 0; i < typeArgs.size(); ++i)
 	{
-		if (tmpl->typeParams[i].boundType)
+		if (tmpl->typeParams[i]->boundType)
 		{
-			auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i].boundType.get(), m_context);
+			auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i]->boundType.get(), m_context);
 			TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound");
 		}
 		auto tempNode = std::make_unique<ast::SimpleTypeNode>();
 		tempNode->name = typeArgs[i]->name;
-		typeEnv[tmpl->typeParams[i].name] = tempNode.get();
+		typeEnv[tmpl->typeParams[i]->name] = tempNode.get();
 		tempNodes.push_back(std::move(tempNode));
 	}
 
-	auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
-	const auto realClassDecl = dynamic_cast<ast::ClassDecl*>(clonedDecl.get());
+	auto clonedDecl = ast::clone::Clone(tmpl->astNode, &typeEnv);
+	const auto realClassDecl = clonedDecl.get();
 	realClassDecl->name = uniqueName;
 	realClassDecl->typeParams.clear();
-	realClassDecl->annotations = tmpl->astNode->annotations;
-	for (std::size_t i = 0; i < realClassDecl->members.size() && i < tmpl->astNode->members.size(); ++i)
-	{
-		realClassDecl->members[i]->annotations = tmpl->astNode->members[i]->annotations;
-	}
 
 	auto classType = std::make_shared<ClassType>(uniqueName, tmpl->astNode);
 	classType->classDecl = realClassDecl;
 	classType->moduleName = tmpl->moduleName;
 	classType->typeArguments = typeArgs;
-	classType->annotations = clonedDecl->annotations;
-	classType->annotations = tmpl->astNode->annotations;
+
+	classType->annotations = ast::clone::GetRawPointers(realClassDecl->annotations);
+
 	m_context.instantiatedClasses[uniqueName] = classType;
 
 	m_context.env.Define(uniqueName, classType, true);
@@ -178,14 +174,14 @@ inline std::shared_ptr<ClassType> Instantiate(
 		}
 	}
 
-	m_context.m_pendingClassInstantiations.push_back(realClassDecl);
+	m_context.m_pendingClassInstantiations.emplace_back(realClassDecl);
 	m_context.m_instantiatedNodes.insert(realClassDecl);
 	for (const auto& member : realClassDecl->members)
 	{
 		m_context.m_instantiatedNodes.insert(member.get());
 	}
 
-	m_context.pendingStatements.push_back(std::move(clonedDecl));
+	m_context.pendingStatements.emplace_back(std::move(clonedDecl));
 
 	return classType;
 }

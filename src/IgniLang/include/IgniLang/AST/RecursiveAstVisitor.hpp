@@ -108,9 +108,9 @@ public:
 
 	void Visit(const AnnotationDecl* node) override
 	{
-		for (const auto& [_, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			Dispatch(type);
+			Dispatch(param->type);
 		}
 	}
 
@@ -128,13 +128,13 @@ public:
 
 	void Visit(const FunDecl* node) override
 	{
-		for (const auto& [_, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			Dispatch(type);
+			Dispatch(param->type);
 		}
 		for (const auto& tp : node->typeParams)
 		{
-			Dispatch(tp.boundType);
+			Dispatch(tp->boundType);
 		}
 		Dispatch(node->returnType);
 		Dispatch(node->body);
@@ -144,7 +144,7 @@ public:
 	{
 		for (const auto& tp : node->typeParams)
 		{
-			Dispatch(tp.boundType);
+			Dispatch(tp->boundType);
 		}
 		if (node->baseClass)
 		{
@@ -156,9 +156,9 @@ public:
 
 	void Visit(const ConstructorDecl* node) override
 	{
-		for (const auto& [_, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			Dispatch(type);
+			Dispatch(param->type);
 		}
 		Dispatch(node->body);
 	}
@@ -178,9 +178,9 @@ public:
 
 	void Visit(const LambdaExpr* node) override
 	{
-		for (const auto& [_, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			Dispatch(type);
+			Dispatch(param->type);
 		}
 		Dispatch(node->returnType);
 		Dispatch(node->body);

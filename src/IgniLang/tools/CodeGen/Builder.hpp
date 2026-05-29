@@ -94,9 +94,9 @@ public:
 		return Scope(this, "namespace " + name);
 	}
 
-	[[nodiscard]] Scope Function(const TString& returnType, const TString& name, const TString& args)
+	[[nodiscard]] Scope Function(const TString& returnType, const TString& name, const TString& args, const TString& modifiers = {})
 	{
-		return Scope(this, returnType + " " + name + "(" + args + ")");
+		return Scope(this, returnType + " " + name + "(" + args + ")" + " " + modifiers);
 	}
 
 	[[nodiscard]] Scope If(const TString& condition)

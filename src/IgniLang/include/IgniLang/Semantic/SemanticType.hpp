@@ -18,7 +18,7 @@ struct SemanticType : re::utils::Prototype<SemanticType>
 
 	bool isNullable = false;
 
-	std::vector<ast::Annotation> annotations{};
+	std::vector<const ast::AnnotationNode*> annotations{};
 
 	virtual bool IsAssignableTo(const SemanticType* other) const
 	{
@@ -176,7 +176,7 @@ struct ClassType final : re::utils::Clonable<ClassType, SemanticType>
 struct GenericFunctionTemplate final : re::utils::Clonable<GenericFunctionTemplate, SemanticType>
 {
 	const ast::FunDecl* astNode{};
-	std::vector<ast::GenericTypeParam> typeParams;
+	std::vector<const ast::GenericTypeParamNode*> typeParams;
 	re::String moduleName;
 
 	ast::Visibility visibility = ast::Visibility::Public;
@@ -191,7 +191,7 @@ struct GenericFunctionTemplate final : re::utils::Clonable<GenericFunctionTempla
 struct GenericClassTemplate final : re::utils::Clonable<GenericClassTemplate, SemanticType>
 {
 	const ast::ClassDecl* astNode{};
-	std::vector<ast::GenericTypeParam> typeParams;
+	std::vector<const ast::GenericTypeParamNode*> typeParams;
 	re::String moduleName;
 
 	explicit GenericClassTemplate(const re::String& n) { name = n; }

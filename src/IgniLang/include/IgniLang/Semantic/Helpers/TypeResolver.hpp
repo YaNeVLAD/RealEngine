@@ -163,7 +163,7 @@ inline std::shared_ptr<SemanticType> PromoteMathTypes(const SemanticType* lhs, c
 
 inline void InferTypeArguments(const std::shared_ptr<SemanticType>& argType,
 	const ast::TypeNode* paramTypeAst,
-	const std::vector<ast::GenericTypeParam>& typeParams,
+	const std::vector<const ast::GenericTypeParamNode*>& typeParams,
 	std::vector<std::shared_ptr<SemanticType>>& outTypeArgs)
 {
 	if (!argType || !paramTypeAst)
@@ -174,7 +174,7 @@ inline void InferTypeArguments(const std::shared_ptr<SemanticType>& argType,
 	if (const auto simpleParam = dynamic_cast<const ast::SimpleTypeNode*>(paramTypeAst))
 	{
 		const auto it = std::ranges::find_if(typeParams,
-			[&](const auto& p) { return p.name == simpleParam->name; });
+			[&](const auto& p) { return p->name == simpleParam->name; });
 
 		if (it != typeParams.end())
 		{ // T = T

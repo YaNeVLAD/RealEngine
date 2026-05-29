@@ -56,7 +56,7 @@ public:
 		return m_capturedLocals.contains(name);
 	}
 
-	void GenerateAllClasses(std::ostream& out, const std::function<void(const re::String&, const ast::Block*, bool, const std::vector<ast::Parameter>&)>& methodBuilder)
+	void GenerateAllClasses(std::ostream& out, const std::function<void(const re::String&, const ast::Block*, bool, const std::vector<std::unique_ptr<ast::ParameterNode>>&)>& methodBuilder)
 	{
 		for (std::size_t i = 0; i < m_lambdas.size(); ++i)
 		{

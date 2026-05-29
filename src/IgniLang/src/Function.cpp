@@ -13,9 +13,9 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 	std::vector<std::shared_ptr<SemanticType>> paramTypes;
 	std::vector<re::String> pTypeNames;
 
-	for (const auto& [_, type] : decl->parameters)
+	for (const auto& param : decl->parameters)
 	{
-		auto pType = TypeResolver::Resolve(type.get(), ctx);
+		auto pType = TypeResolver::Resolve(param->type.get(), ctx);
 		paramTypes.push_back(pType);
 		pTypeNames.push_back(pType->name);
 	}
@@ -30,14 +30,14 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
 	funType->nativeTargetName = decl->name;
-	funType->annotations = decl->annotations;
+	funType->annotations = ast::clone::GetRawPointers(decl->annotations);
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
 	for (const auto& anno : decl->annotations)
 	{ // FFI - external function name lookup
-		if (ctx.ffiAnnotations.contains(anno.name) && anno.argument)
+		if (ctx.ffiAnnotations.contains(anno->name) && anno->argument)
 		{
-			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
+			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno->argument.get()))
 			{
 				if (lit->token.type == TokenType::StringConst)
 				{
@@ -52,7 +52,7 @@ std::shared_ptr<FunctionType> Function(const ast::FunDecl* decl, SemanticContext
 		ctx.env.PushScope();
 		for (std::size_t i = 0; i < decl->parameters.size(); ++i)
 		{
-			ctx.env.Define(decl->parameters[i].name, funType->paramTypes[i], false);
+			ctx.env.Define(decl->parameters[i]->name, funType->paramTypes[i], false);
 		}
 
 		const auto prevFun = ctx.location.currentFunction;
@@ -94,9 +94,9 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 
 	paramTypes.push_back(classType);
 
-	for (const auto& [_, type] : decl->parameters)
+	for (const auto& param : decl->parameters)
 	{
-		auto pType = TypeResolver::Resolve(type.get(), ctx);
+		auto pType = TypeResolver::Resolve(param->type.get(), ctx);
 		paramTypes.push_back(pType);
 		pTypeNames.push_back(pType->name);
 	}
@@ -110,14 +110,14 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 	funType->isExternal = decl->isExternal;
 	funType->isSuspend = decl->isSuspend;
 	funType->paramTypes = std::move(paramTypes);
-	funType->annotations = decl->annotations;
+	funType->annotations = ast::clone::GetRawPointers(decl->annotations);
 	funType->returnType = TypeResolver::Resolve(decl->returnType.get(), ctx);
 
 	for (const auto& anno : decl->annotations)
 	{ // FFI - external function name lookup
-		if (ctx.ffiAnnotations.contains(anno.name) && anno.argument)
+		if (ctx.ffiAnnotations.contains(anno->name) && anno->argument)
 		{
-			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno.argument.get()))
+			if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno->argument.get()))
 			{
 				if (lit->token.type == TokenType::StringConst)
 				{
@@ -134,7 +134,7 @@ std::shared_ptr<FunctionType> Method(const ast::FunDecl* decl, const std::shared
 
 		for (std::size_t i = 0; i < decl->parameters.size(); ++i)
 		{
-			ctx.env.Define(decl->parameters[i].name, funType->paramTypes[i + 1], false);
+			ctx.env.Define(decl->parameters[i]->name, funType->paramTypes[i + 1], false);
 		}
 
 		const auto prevFun = ctx.location.currentFunction;
@@ -175,9 +175,9 @@ std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, cons
 
 	paramTypes.push_back(classType);
 
-	for (const auto& [_, type] : decl->parameters)
+	for (const auto& param : decl->parameters)
 	{
-		auto pType = TypeResolver::Resolve(type.get(), ctx);
+		auto pType = TypeResolver::Resolve(param->type.get(), ctx);
 		paramTypes.push_back(pType);
 		pTypeNames.push_back(pType->name);
 	}
@@ -192,7 +192,7 @@ std::shared_ptr<FunctionType> Constructor(const ast::ConstructorDecl* decl, cons
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
 	funType->paramTypes = std::move(paramTypes);
-	funType->annotations = decl->annotations;
+	funType->annotations = ast::clone::GetRawPointers(decl->annotations);
 
 	ctx.allFunctionNames.insert(mangledName);
 	ctx.instantiatedFunctions[mangledName] = funType;
@@ -219,7 +219,7 @@ std::shared_ptr<FunctionType> Destructor(const ast::DestructorDecl* decl, const 
 	funType->visibility = decl->visibility;
 	funType->moduleName = classType->moduleName;
 	funType->paramTypes.push_back(classType);
-	funType->annotations = decl->annotations;
+	funType->annotations = ast::clone::GetRawPointers(decl->annotations);
 
 	ctx.instantiatedFunctions[mangledName] = funType;
 
@@ -237,7 +237,7 @@ std::shared_ptr<GenericFunctionTemplate> GenericFunction(const ast::FunDecl* dec
 {
 	auto tmpl = std::make_shared<GenericFunctionTemplate>(decl->name);
 	tmpl->astNode = decl;
-	tmpl->typeParams = decl->typeParams;
+	tmpl->typeParams = ast::clone::GetRawPointers(decl->typeParams);
 	tmpl->moduleName = moduleName;
 	tmpl->visibility = decl->visibility;
 	tmpl->isExternal = decl->isExternal;

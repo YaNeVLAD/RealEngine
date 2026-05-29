@@ -15,7 +15,7 @@ public:
 
 	static re::String GetElemSuffix(const re::String& semTypeName);
 
-	static std::string BuildParamSignature(const std::vector<ast::Parameter>& params, bool isVararg = false);
+	static std::string BuildParamSignature(const std::vector<std::unique_ptr<ast::ParameterNode>>& params, bool isVararg = false);
 };
 
 } // namespace igni::dotnet

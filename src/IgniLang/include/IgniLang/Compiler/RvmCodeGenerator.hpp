@@ -1080,7 +1080,7 @@ private:
 
 		for (auto it = ctor->parameters.rbegin(); it != ctor->parameters.rend(); ++it)
 		{
-			m_out << "SET " << DeclareLocal(it->name) << "\n";
+			m_out << "SET " << DeclareLocal((*it)->name) << "\n";
 		}
 
 		if (m_semanticAnalyzer.GetBindings().funMeta.contains(ctor) && m_semanticAnalyzer.GetBindings().funMeta.at(ctor).isMethod)
@@ -1091,9 +1091,9 @@ private:
 		const re::String thisAsmName = GetAsmName("this");
 		if (const auto classType = m_semanticAnalyzer.GetClassType(classDecl->name))
 		{ // Initialize primary ctor fields
-			for (const auto& [name, _] : ctor->parameters)
+			for (const auto& param : ctor->parameters)
 			{
-				if (classType->fields.contains(name))
+				if (const auto& name = param->name; classType->fields.contains(name))
 				{
 					m_out << "GET " << thisAsmName << "\n";
 					m_out << "GET " << GetAsmName(name) << "\n";
@@ -1208,7 +1208,7 @@ private:
 
 		for (auto it = fun->parameters.rbegin(); it != fun->parameters.rend(); ++it)
 		{
-			auto paramName = it->name;
+			auto& paramName = (*it)->name;
 			if (boxedVars.contains(paramName))
 			{
 				m_out << "BOX\n";
@@ -1252,7 +1252,7 @@ private:
 
 		for (auto it = lambda->parameters.rbegin(); it != lambda->parameters.rend(); ++it)
 		{
-			m_out << "SET " << DeclareLocal(it->name) << "\n";
+			m_out << "SET " << DeclareLocal((*it)->name) << "\n";
 		}
 
 		if (lambda->body)
@@ -1273,9 +1273,9 @@ private:
 	{
 		for (const auto& anno : decl->annotations)
 		{
-			if (anno.argument)
+			if (anno->argument)
 			{
-				anno.argument->Accept(*this);
+				anno->argument->Accept(*this);
 			}
 			else
 			{
@@ -1284,19 +1284,19 @@ private:
 
 			if (const auto hash = kind.Hashed(); hash == "GLOBAL"_hs)
 			{
-				m_out << "ANNOTATE_GLOBAL \"" << targetName << "\" \"" << anno.name << "\"\n";
+				m_out << "ANNOTATE_GLOBAL \"" << targetName << "\" \"" << anno->name << "\"\n";
 			}
 			else if (hash == "TYPE"_hs)
 			{
-				m_out << "ANNOTATE_TYPE \"" << targetName << "\" \"" << anno.name << "\"\n";
+				m_out << "ANNOTATE_TYPE \"" << targetName << "\" \"" << anno->name << "\"\n";
 			}
 			else if (hash == "FIELD"_hs)
 			{
-				m_out << "ANNOTATE_FIELD \"" << typeName << "\" \"" << targetName << "\" \"" << anno.name << "\"\n";
+				m_out << "ANNOTATE_FIELD \"" << typeName << "\" \"" << targetName << "\" \"" << anno->name << "\"\n";
 			}
 			else if (hash == "METHOD"_hs)
 			{
-				m_out << "ANNOTATE_METHOD \"" << typeName << "\" \"" << targetName << "\" \"" << anno.name << "\"\n";
+				m_out << "ANNOTATE_METHOD \"" << typeName << "\" \"" << targetName << "\" \"" << anno->name << "\"\n";
 			}
 		}
 	}

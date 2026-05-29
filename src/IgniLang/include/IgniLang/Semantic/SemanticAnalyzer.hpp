@@ -670,9 +670,9 @@ public:
 			funType->returnType = TypeResolver::Resolve(node->returnType.get(), m_context);
 			funType->isVararg = node->isVararg;
 
-			for (const auto& [_, type] : node->parameters)
+			for (const auto& param : node->parameters)
 			{
-				funType->paramTypes.emplace_back(TypeResolver::Resolve(type.get(), m_context));
+				funType->paramTypes.emplace_back(TypeResolver::Resolve(param->type.get(), m_context));
 			}
 			m_context.env.Define(node->name, funType, true);
 		}
@@ -896,9 +896,9 @@ public:
 		funType->isVararg = node->isVararg;
 
 		// Формируем типы параметров
-		for (const auto& [name, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			funType->paramTypes.push_back(TypeResolver::Resolve(type.get(), m_context));
+			funType->paramTypes.push_back(TypeResolver::Resolve(param->type.get(), m_context));
 		}
 		if (node->returnType)
 		{
@@ -1060,7 +1060,7 @@ private:
 				{ // Generic non-instantiated class
 					auto tmpl = std::make_shared<GenericClassTemplate>(classDecl->name);
 					tmpl->astNode = classDecl;
-					tmpl->typeParams = classDecl->typeParams;
+					tmpl->typeParams = ast::clone::GetRawPointers(classDecl->typeParams);
 					tmpl->moduleName = currentModule ? currentModule->name : "global";
 
 					if (isGlobal)
@@ -1303,7 +1303,7 @@ private:
 								const auto annoName = ExtractStringLiteral(call->arguments[0].get());
 								for (const auto& anno : classType->classDecl->annotations)
 								{
-									if (anno.name == annoName)
+									if (anno->name == annoName)
 									{
 										return true;
 									}
@@ -1325,7 +1325,7 @@ private:
 										{
 											for (const auto& anno : fun->annotations)
 											{
-												if (anno.name == annoName)
+												if (anno->name == annoName)
 												{
 													return true;
 												}
@@ -1352,16 +1352,16 @@ private:
 
 		for (const auto& anno : decl->annotations)
 		{
-			const Symbol* sym = m_context.env.Resolve(anno.name);
+			const Symbol* sym = m_context.env.Resolve(anno->name);
 
 			if (!sym)
 			{
-				IGNI_SEM_ERR(decl, "Undefined annotation '" + anno.name + "'");
+				IGNI_SEM_ERR(decl, "Undefined annotation '" + anno->name + "'");
 			}
 
 			if (!std::dynamic_pointer_cast<AnnotationType>(sym->type))
 			{
-				IGNI_SEM_ERR(decl, "'" + anno.name + "' is not an annotation class");
+				IGNI_SEM_ERR(decl, "'" + anno->name + "' is not an annotation class");
 			}
 
 			// TODO Validate argument types

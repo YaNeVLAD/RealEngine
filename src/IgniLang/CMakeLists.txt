@@ -5,6 +5,7 @@ target_link_libraries(IgniLang
         ReCore
 
         FSM
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_definitions(IgniLang PRIVATE IGNI_EXPORT)
@@ -45,22 +46,40 @@ add_custom_command(TARGET IgniTests PRE_BUILD
 )
 
 # CODEGEN_TOOL_TARGET
-add_executable(SemanticsCodeGen tools/CodeGen/main.cpp)
-target_link_libraries(SemanticsCodeGen PRIVATE ReCore nlohmann_json::nlohmann_json)
+add_executable(IgniCodeGen tools/CodeGen/main.cpp)
+target_link_libraries(IgniCodeGen PRIVATE ReCore nlohmann_json::nlohmann_json)
 
+# SEMANTICS GENERATION
 set(SEMANTICS_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/semantics.json")
 set(TARGETS_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/targets.json")
 
-set(GENERATED_CPP "${CMAKE_CURRENT_BINARY_DIR}/GeneratedSemantics.cpp")
-set(GENERATED_HPP "${CMAKE_CURRENT_BINARY_DIR}/GeneratedSemantics.hpp")
+set(GENERATED_SEMANTICS_CPP "${CMAKE_CURRENT_BINARY_DIR}/GeneratedSemantics.cpp")
+set(GENERATED_SEMANTICS_HPP "${CMAKE_CURRENT_BINARY_DIR}/GeneratedSemantics.hpp")
 
 add_custom_command(
-        OUTPUT ${GENERATED_CPP} ${GENERATED_HPP}
-        COMMAND SemanticsCodeGen ${GENERATED_HPP} ${GENERATED_CPP} ${SEMANTICS_CONFIG} ${TARGETS_CONFIG}
-        DEPENDS SemanticsCodeGen ${SEMANTICS_CONFIG} ${TARGETS_CONFIG}
-        COMMENT "Generating semantics logic from JSON using SemanticsCodeGen..."
+        OUTPUT ${GENERATED_SEMANTICS_CPP} ${GENERATED_SEMANTICS_HPP}
+        COMMAND IgniCodeGen ${GENERATED_SEMANTICS_HPP} ${GENERATED_SEMANTICS_CPP} ${SEMANTICS_CONFIG} ${TARGETS_CONFIG}
+        DEPENDS IgniCodeGen ${SEMANTICS_CONFIG} ${TARGETS_CONFIG}
+        COMMENT "Generating semantics logic from JSON using IgniCodeGen..."
 )
 
-target_sources(IgniLang PRIVATE ${GENERATED_CPP} ${GENERATED_HPP})
+# AST GENERATION
+set(AST_SCHEMA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/ast_schema.json")
+
+set(GENERATED_AST_CPP "${CMAKE_CURRENT_BINARY_DIR}/AstNodesGenerated.cpp")
+set(GENERATED_AST_HPP "${CMAKE_CURRENT_BINARY_DIR}/AstNodesGenerated.hpp")
+
+add_custom_command(
+        OUTPUT ${GENERATED_AST_CPP} ${GENERATED_AST_HPP}
+        COMMAND IgniCodeGen ${GENERATED_AST_HPP} ${GENERATED_AST_CPP} ${AST_SCHEMA_CONFIG}
+        DEPENDS IgniCodeGen ${AST_SCHEMA_CONFIG}
+        COMMENT "Generating AST structures and JSON serializers using IgniCodeGen..."
+)
+
+target_sources(IgniLang
+        PRIVATE
+        ${GENERATED_SEMANTICS_CPP} ${GENERATED_SEMANTICS_HPP}
+        ${GENERATED_AST_CPP} ${GENERATED_AST_HPP}
+)
 
 target_include_directories(IgniLang PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

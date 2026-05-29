@@ -3,11 +3,24 @@
 namespace igni::ast::AnnotationUtils
 {
 
-std::optional<re::String> GetAnnotationArg(const std::vector<Annotation>& annotations, const re::String& targetName)
+std::optional<re::String> GetAnnotationArg(const std::vector<std::unique_ptr<AnnotationNode>>& annotations, const re::String& targetName)
 {
 	for (const auto& anno : annotations)
 	{
-		if (anno.name == targetName)
+		if (anno && anno->name == targetName)
+		{
+			return GetAnnotationStringArg(anno.get());
+		}
+	}
+
+	return std::nullopt;
+}
+
+std::optional<re::String> GetAnnotationArg(const std::vector<const AnnotationNode*>& annotations, const re::String& targetName)
+{
+	for (const auto& anno : annotations)
+	{
+		if (anno && anno->name == targetName)
 		{
 			return GetAnnotationStringArg(anno);
 		}
@@ -16,11 +29,16 @@ std::optional<re::String> GetAnnotationArg(const std::vector<Annotation>& annota
 	return std::nullopt;
 }
 
-std::optional<re::String> GetAnnotationStringArg(const Annotation& anno)
+std::optional<re::String> GetAnnotationStringArg(const AnnotationNode* anno)
 {
-	if (anno.argument)
+	if (!anno)
 	{
-		if (const auto lit = dynamic_cast<const LiteralExpr*>(anno.argument.get()))
+		return std::nullopt;
+	}
+
+	if (anno->argument)
+	{
+		if (const auto lit = dynamic_cast<const LiteralExpr*>(anno->argument.get()))
 		{
 			if (lit->token.type == TokenType::StringConst)
 			{

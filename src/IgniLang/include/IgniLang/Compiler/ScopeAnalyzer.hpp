@@ -230,9 +230,9 @@ public:
 		m_scopeStack.emplace_back(m_scopeStack.back());
 		m_scopeStack.back().insert("this");
 
-		for (const auto& [name, _] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			m_scopeStack.back().insert(name);
+			m_scopeStack.back().insert(param->name);
 		}
 
 		if (node->body)
@@ -276,9 +276,9 @@ public:
 
 		std::unordered_set<re::String> funLocals;
 		funLocals.insert(node->name);
-		for (const auto& [name, type] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			funLocals.insert(name);
+			funLocals.insert(param->name);
 		}
 
 		bool isMethod = m_isInsideClass;
@@ -356,9 +356,9 @@ public:
 			m_scopeStack.back().insert(cap);
 		}
 
-		for (const auto& [name, _] : node->parameters)
+		for (const auto& param : node->parameters)
 		{
-			m_scopeStack.back().insert(name);
+			m_scopeStack.back().insert(param->name);
 		}
 
 		if (node->body)

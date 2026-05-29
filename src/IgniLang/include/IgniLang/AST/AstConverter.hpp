@@ -24,19 +24,16 @@ public:
 
 		auto program = std::make_unique<ast::Program>();
 
-		// Program -> OptPackageDecl ImportDeclList TopLevelDeclList
 		const auto& optPkg = root->children[0];
 		const auto& importsList = root->children[1];
 		const auto& decls = root->children[2];
 
 		if (!optPkg->children.empty() && optPkg->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 		{
-			// PackageDecl -> package PackagePath ;
 			program->packageName = ExtractPathString(optPkg->children[0]->children[1].get());
 		}
 
 		ExtractImports(importsList.get(), program->imports);
-
 		FlattenTopLevelDecls(decls.get(), program->statements);
 
 		return program;
@@ -59,9 +56,8 @@ private:
 			return mods;
 		}
 
-		// OptModifierList -> OptModifierList [0] Modifier [1]
 		if (modListNode->children.size() == 2)
-		{
+		{ // OptModifierList -> OptModifierList [0] Modifier [1]
 			mods = ExtractModifiers(modListNode->children[0].get());
 
 			if (const auto modHash = modListNode->children[1]->children[0]->symbol.Hashed(); modHash == "external"_hs)
@@ -107,12 +103,11 @@ private:
 
 	static re::String ExtractPathString(const CstNode* pathNode)
 	{
-		// Path -> ident
 		if (pathNode->children.size() == 1)
 		{
 			return pathNode->children[0]->token->lexeme;
 		}
-		// Path -> Path . ident
+
 		if (pathNode->children.size() == 3)
 		{
 			const re::String leftPath = ExtractPathString(pathNode->children[0].get());
@@ -130,21 +125,15 @@ private:
 			return;
 		}
 
-		// ImportDeclList -> ImportDeclList ImportDecl
 		if (listNode->children.size() == 2)
 		{
 			ExtractImports(listNode->children[0].get(), outImports);
 
 			const auto& declNode = listNode->children[1];
-
 			auto importDecl = std::make_unique<ast::ImportDecl>();
-
 			importDecl->token = *declNode->children[0]->token;
-
-			// declNode->children[1] = ImportPath
 			importDecl->path = ExtractPathString(declNode->children[1].get());
 
-			// declNode->children[2] = OptDotStar
 			const auto& optStar = declNode->children[2];
 			importDecl->isStar = (!optStar->children.empty() && optStar->children[0]->symbol.Hashed() == "."_hs);
 
@@ -162,7 +151,6 @@ private:
 		if (listNode->children.size() == 2)
 		{
 			FlattenTopLevelDecls(listNode->children[0].get(), outStmts);
-
 			if (auto decl = ConvertTopLevelDecl(listNode->children[1].get()))
 			{
 				outStmts.push_back(std::move(decl));
@@ -171,8 +159,7 @@ private:
 	}
 
 	static std::unique_ptr<ast::Decl> ConvertTopLevelDecl(const CstNode* topLevelDecl)
-	{
-		// TopLevelDecl -> AnnotationList [0] OptVisibility [1] Decl [2]
+	{ // TopLevelDecl -> AnnotationList [0] OptVisibility [1] Decl [2]
 		const auto& annListNode = topLevelDecl->children[0];
 		const auto& optVisNode = topLevelDecl->children[1];
 		const auto& declNode = topLevelDecl->children[2];
@@ -194,10 +181,8 @@ private:
 		switch (actualDecl->symbol.Hashed())
 		{
 		case "ValDecl"_hs:
-		case "VarDecl"_hs: {
-			// VarDecl/ValDecl -> OptMod [0] var/val [1] ident [2] OptColonType [3] OptInit [4] ; [5]
+		case "VarDecl"_hs: { // VarDecl/ValDecl -> OptMod [0] var/val [1] ident [2] OptColonType [3] OptInit [4] ; [5]
 			auto mods = ExtractModifiers(actualDecl->children[0].get());
-
 			const re::String name = actualDecl->children[2]->token->lexeme;
 
 			std::unique_ptr<ast::TypeNode> explicitType = nullptr;
@@ -255,7 +240,7 @@ private:
 			ExtractTypeParams(actualDecl->children[2].get(), funDecl->typeParams);
 
 			if (const auto& optColon = actualDecl->children[7]; optColon->children.size() == 2)
-			{ // Return type [7]
+			{
 				funDecl->returnType = ConvertType(optColon->children[1].get());
 			}
 
@@ -269,9 +254,7 @@ private:
 			else if (funBody->children[0]->symbol.Hashed() == "="_hs)
 			{ // Desugaring: fun ident(args) = expr; => fun ident(args) { return expr; }
 				funDecl->isExprBody = true;
-
 				auto expr = ConvertExpr(funBody->children[1].get());
-
 				auto returnStatement = std::make_unique<ast::ReturnStmt>();
 				returnStatement->token = *funBody->children[0]->token;
 				returnStatement->expr = std::move(expr);
@@ -291,20 +274,16 @@ private:
 
 			auto mods = ExtractModifiers(actualDecl->children[0].get());
 			classDecl->isExternal = mods.isExternal;
-
 			classDecl->name = actualDecl->children[3]->token->lexeme;
 
 			if (const auto& optBaseClass = actualDecl->children[5];
 				!optBaseClass->children.empty() && optBaseClass->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
-			{
-				classDecl->baseClass = std::make_unique<ast::BaseClassInit>();
-
-				// OptBaseClass -> : [0] Type [1]
+			{ // OptBaseClass -> : [0] Type [1]
+				classDecl->baseClass = std::make_unique<ast::BaseClassInitNode>();
 				classDecl->baseClass->type = ConvertType(optBaseClass->children[1].get());
 
-				// OptBaseClass -> : [0] Type [1] ( [2] OptActPars [3] ) [4]
 				if (optBaseClass->children.size() == 5)
-				{
+				{ // OptBaseClass -> : [0] Type [1] ( [2] OptActPars [3] ) [4]
 					ExtractArguments(optBaseClass->children[3].get(), classDecl->baseClass->arguments);
 				}
 			}
@@ -339,6 +318,7 @@ private:
 			{
 				auto superCall = std::make_unique<ast::CallExpr>();
 				superCall->token = classDecl->token;
+
 				auto superId = std::make_unique<ast::IdentifierExpr>();
 				superId->token = classDecl->token;
 				superId->name = "super";
@@ -346,7 +326,8 @@ private:
 
 				for (const auto& arg : classDecl->baseClass->arguments)
 				{
-					superCall->arguments.push_back(arg->CloneExpr());
+					auto clonedNode = ast::clone::CloneAst(arg.get());
+					superCall->arguments.push_back(std::unique_ptr<ast::Expr>(static_cast<ast::Expr*>(clonedNode.release())));
 				}
 
 				auto exprStmt = std::make_unique<ast::ExprStmt>();
@@ -395,7 +376,6 @@ private:
 			// Reuse FunDecl for temporary storage
 			ast::FunDecl tempFun;
 			ExtractParameters(actualDecl->children[3].get(), &tempFun);
-
 			ctorDecl->parameters = std::move(tempFun.parameters);
 			ctorDecl->isVararg = tempFun.isVararg;
 
@@ -430,8 +410,7 @@ private:
 
 			return dtorDecl;
 		}
-		case "AnnotationDecl"_hs: {
-			// AnnotationDecl -> OptModifierList [0] annotation [1] class [2] ident [3] OptPrimaryCtor [4] ; [5]
+		case "AnnotationDecl"_hs: { // AnnotationDecl -> OptModifierList [0] annotation [1] class [2] ident [3] OptPrimaryCtor [4] ; [5]
 			auto annoDecl = std::make_unique<ast::AnnotationDecl>();
 			annoDecl->token = *actualDecl->children[1]->token;
 			annoDecl->name = actualDecl->children[3]->token->lexeme;
@@ -441,10 +420,8 @@ private:
 
 			if (const auto& optPrimaryCtor = actualDecl->children[4];
 				!optPrimaryCtor->children.empty() && optPrimaryCtor->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
-			{
-				// OptPrimaryCtor -> ( [0] PrimaryCtorPars [1] ) [2]
+			{ // OptPrimaryCtor -> ( [0] PrimaryCtorPars [1] ) [2]
 				const auto& parsNode = optPrimaryCtor->children[1];
-
 				ExtractAnnotationParams(parsNode.get(), annoDecl->parameters);
 			}
 
@@ -528,8 +505,7 @@ private:
 
 		switch (exprNode->symbol.Hashed())
 		{
-		case "CastExpr"_hs: {
-			// CastExpr -> CastExpr [0] as [1] Type [2]
+		case "CastExpr"_hs: { // CastExpr -> CastExpr [0] as [1] Type [2]
 			if (exprNode->children.size() == 3 && exprNode->children[1]->symbol.Hashed() == "as"_hs)
 			{
 				auto castExpr = std::make_unique<ast::TypeCastExpr>();
@@ -540,8 +516,7 @@ private:
 			}
 			break;
 		}
-		case "Designator"_hs: {
-			// Designator -> ident [0] OptExprTypeArgs [1]
+		case "Designator"_hs: { // Designator -> ident [0] OptExprTypeArgs [1]
 			if (exprNode->children.size() == 2 && exprNode->children[0]->symbol.Hashed() == "ident"_hs)
 			{
 				auto id = std::make_unique<ast::IdentifierExpr>();
@@ -563,10 +538,8 @@ private:
 				call->token = *exprNode->children[1]->token;
 				call->callee = ConvertExpr(exprNode->children[0].get());
 				ExtractArguments(exprNode->children[2].get(), call->arguments);
-
 				return call;
 			}
-			// Designator -> Designator [0] [ [1] Expr [2] ] [3]
 			if (exprNode->children.size() == 4 && exprNode->children[1]->symbol.Hashed() == "["_hs)
 			{
 				auto idx = std::make_unique<ast::IndexExpr>();
@@ -579,14 +552,12 @@ private:
 			// Designator -> Designator [0] . [1] ident [2] OptExprTypeArgs [3]
 			// Designator -> Designator [0] ?. [1] ident [2] OptExprTypeArgs [3]
 			if (exprNode->children.size() == 4
-				&& (exprNode->children[1]->symbol.Hashed() == "."_hs
-					|| exprNode->children[1]->symbol.Hashed() == "?."_hs))
+				&& (exprNode->children[1]->symbol.Hashed() == "."_hs || exprNode->children[1]->symbol.Hashed() == "?."_hs))
 			{
 				auto memberAccess = std::make_unique<ast::MemberAccessExpr>();
 				memberAccess->token = *exprNode->children[1]->token;
 				memberAccess->object = ConvertExpr(exprNode->children[0].get());
 				memberAccess->member = exprNode->children[2]->token->lexeme;
-
 				memberAccess->isSafe = (exprNode->children[1]->symbol.Hashed() == "?."_hs);
 
 				if (const auto& optTypeArgs = exprNode->children[3];
@@ -597,7 +568,6 @@ private:
 
 				return memberAccess;
 			}
-
 			break;
 		}
 		case "PrimaryExpr"_hs: {
@@ -620,7 +590,7 @@ private:
 				return ConvertExpr(child.get());
 			case "LambdaExpr"_hs: {
 				auto lambda = std::make_unique<ast::LambdaExpr>();
-				lambda->token = *child->children[0]->token; // Токен 'fun'
+				lambda->token = *child->children[0]->token;
 
 				int paramsIndex = 2;
 				int bodyIndex = 5;
@@ -643,8 +613,7 @@ private:
 					lambda->returnType = ConvertType(optColon->children[1].get());
 				}
 
-				if (const auto& funBody = child->children[bodyIndex];
-					funBody->children[0]->symbol.Hashed() == "Block"_hs)
+				if (const auto& funBody = child->children[bodyIndex]; funBody->children[0]->symbol.Hashed() == "Block"_hs)
 				{
 					lambda->body = ConvertBlock(funBody->children[0].get());
 				}
@@ -682,7 +651,6 @@ private:
 			if (exprNode->children.size() == 2)
 			{
 				const auto opHash = exprNode->children[0]->symbol.Hashed();
-
 				if (opHash == "await"_hs)
 				{
 					auto awaitExpr = std::make_unique<ast::AwaitExpr>();
@@ -711,7 +679,6 @@ private:
 			break;
 		}
 
-		// Узел-обёртка: просто проваливаемся вниз
 		if (exprNode->children.size() == 1)
 		{
 			if (exprNode->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
@@ -721,7 +688,6 @@ private:
 			return ConvertExpr(exprNode->children[0].get());
 		}
 
-		// Бинарные операторы (включая Assign)
 		if (exprNode->children.size() == 3)
 		{
 			if (exprNode->children[1]->symbol.Hashed() == "="_hs)
@@ -793,7 +759,7 @@ private:
 	static std::unique_ptr<ast::ForStmt> ConvertForStmt(const CstNode* forNode)
 	{
 		auto stmt = std::make_unique<ast::ForStmt>();
-		stmt->token = *forNode->children[0]->token; // Токен 'for'
+		stmt->token = *forNode->children[0]->token;
 		stmt->iteratorName = forNode->children[2]->token->lexeme;
 		stmt->startExpr = ConvertExpr(forNode->children[4].get());
 
@@ -840,11 +806,7 @@ private:
 		case "OptSuspend"_hs:
 		case "("_hs: { // Type -> OptSuspend [0] ( [1] OptTypeList [2] ) [3] -> [4] Type [5] OptQuestion [6]
 			auto funType = std::make_unique<ast::FunctionTypeNode>();
-
-			const bool isSuspend = !typeNode->children[0]->children.empty()
-				&& typeNode->children[0]->children[0]->symbol.Hashed() == "suspend"_hs;
-
-			funType->isSuspend = isSuspend;
+			funType->isSuspend = !typeNode->children[0]->children.empty() && typeNode->children[0]->children[0]->symbol.Hashed() == "suspend"_hs;
 			funType->token = *typeNode->children[1]->token;
 
 			if (const auto& optTypeList = typeNode->children[2];
@@ -878,7 +840,7 @@ private:
 		}
 	}
 
-	static void ExtractTypeParams(const CstNode* optTypeParams, std::vector<ast::GenericTypeParam>& outParams)
+	static void ExtractTypeParams(const CstNode* optTypeParams, std::vector<std::unique_ptr<ast::GenericTypeParamNode>>& outParams)
 	{
 		if (!optTypeParams || optTypeParams->children.empty() || optTypeParams->children[0]->symbol.Hashed() == "<EPSILON>"_hs)
 		{
@@ -888,7 +850,7 @@ private:
 		ExtractTypeParamList(optTypeParams->children[1].get(), outParams);
 	}
 
-	static void ExtractTypeParamList(const CstNode* typeParamsNode, std::vector<ast::GenericTypeParam>& outParams)
+	static void ExtractTypeParamList(const CstNode* typeParamsNode, std::vector<std::unique_ptr<ast::GenericTypeParamNode>>& outParams)
 	{
 		if (typeParamsNode->children.size() == 3)
 		{
@@ -901,53 +863,56 @@ private:
 		}
 	}
 
-	static ast::GenericTypeParam ParseTypeParam(const CstNode* typeParamNode)
+	static std::unique_ptr<ast::GenericTypeParamNode> ParseTypeParam(const CstNode* typeParamNode)
 	{
 		// TypeParam -> ident [0] OptColonType [1]
-		ast::GenericTypeParam param;
-		param.name = typeParamNode->children[0]->token->lexeme;
+		auto param = std::make_unique<ast::GenericTypeParamNode>();
+		param->name = typeParamNode->children[0]->token->lexeme;
+		param->token = *typeParamNode->children[0]->token;
 
 		if (const auto& optColon = typeParamNode->children[1]; optColon->children.size() == 2)
 		{ // OptColonType -> : [0] Type [1]
-			param.boundType = ConvertType(optColon->children[1].get());
+			param->boundType = ConvertType(optColon->children[1].get());
 		}
 		else
 		{
-			param.boundType = nullptr;
+			param->boundType = nullptr;
 		}
 
 		return param;
 	}
 
-	static ast::Parameter ParseFormPar(const CstNode* node)
+	static std::unique_ptr<ast::ParameterNode> ParseFormPar(const CstNode* node)
 	{
-		ast::Parameter p;
-		p.name = node->children[0]->token->lexeme;
-		p.type = ConvertType(node->children[2].get());
+		auto p = std::make_unique<ast::ParameterNode>();
+		p->name = node->children[0]->token->lexeme;
+		p->type = ConvertType(node->children[2].get());
+
 		return p;
 	}
 
-	static ast::Parameter ParseVarargPar(const CstNode* node)
+	static std::unique_ptr<ast::ParameterNode> ParseVarargPar(const CstNode* node)
 	{
-		ast::Parameter p;
-		p.name = node->children[0]->token->lexeme;
-		p.type = ConvertType(node->children[2].get());
+		auto p = std::make_unique<ast::ParameterNode>();
+		p->name = node->children[0]->token->lexeme;
+		p->type = ConvertType(node->children[2].get());
+
 		return p;
 	}
 
-	static void ExtractNormalPars(const CstNode* node, std::vector<ast::Parameter>& outParams)
+	static void ExtractNormalPars(const CstNode* node, std::vector<std::unique_ptr<ast::ParameterNode>>& outParams)
 	{
 		if (node->children.size() != 1)
 		{
 			if (node->children.size() == 3)
 			{ // NormalPars , FormPar
 				ExtractNormalPars(node->children[0].get(), outParams);
-				outParams.emplace_back(ParseFormPar(node->children[2].get()));
+				outParams.push_back(ParseFormPar(node->children[2].get()));
 			}
 		}
 		else
 		{ // FormPar
-			outParams.emplace_back(ParseFormPar(node->children[0].get()));
+			outParams.push_back(ParseFormPar(node->children[0].get()));
 		}
 	}
 
@@ -1058,19 +1023,23 @@ private:
 
 		const auto typeNode = ConvertType(parNode->children[3].get());
 
-		ast::Parameter param;
-		param.name = name;
-		param.type = typeNode->Clone();
+		auto param = std::make_unique<ast::ParameterNode>();
+		param->name = name;
+
+		auto paramTypeClone = ast::clone::CloneAst(typeNode.get());
+		param->type = std::unique_ptr<ast::TypeNode>(static_cast<ast::TypeNode*>(paramTypeClone.release()));
+
 		ctorDecl->parameters.push_back(std::move(param));
 
 		if (!optValVarNode->children.empty() && optValVarNode->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
-		{ // Adding class field if parameter is val/var
+		{
 			if (const re::String valVar = optValVarNode->children[0]->token->lexeme; valVar.Hashed() == "val"_hs)
-			{ // val
+			{
 				auto valDecl = std::make_unique<ast::ValDecl>();
 				valDecl->token = *optValVarNode->children[0]->token;
 				valDecl->name = name;
-				valDecl->type = typeNode->Clone();
+				auto declTypeClone = ast::clone::CloneAst(typeNode.get());
+				valDecl->type = std::unique_ptr<ast::TypeNode>(static_cast<ast::TypeNode*>(declTypeClone.release()));
 				valDecl->visibility = ast::Visibility::Public;
 				classDecl->members.push_back(std::move(valDecl));
 			}
@@ -1079,7 +1048,10 @@ private:
 				auto varDecl = std::make_unique<ast::VarDecl>();
 				varDecl->token = *optValVarNode->children[0]->token;
 				varDecl->name = name;
-				varDecl->type = typeNode->Clone();
+
+				auto declTypeClone = ast::clone::CloneAst(typeNode.get());
+				varDecl->type = std::unique_ptr<ast::TypeNode>(static_cast<ast::TypeNode*>(declTypeClone.release()));
+
 				varDecl->visibility = ast::Visibility::Public;
 				classDecl->members.push_back(std::move(varDecl));
 			}
@@ -1123,7 +1095,7 @@ private:
 		}
 	}
 
-	static void ExtractAnnotations(const CstNode* listNode, std::vector<ast::Annotation>& outAnnotations)
+	static void ExtractAnnotations(const CstNode* listNode, std::vector<std::unique_ptr<ast::AnnotationNode>>& outAnnotations)
 	{
 		// AnnotationList -> AnnotationList [0] Annotation [1] | \e
 		if (!listNode || listNode->symbol.Hashed() == "<EPSILON>"_hs || listNode->children.empty())
@@ -1136,23 +1108,22 @@ private:
 			ExtractAnnotations(listNode->children[0].get(), outAnnotations);
 
 			const auto& annotationNode = listNode->children[1];
-			// Annotation -> @ [0] ident [1] OptParenExpr [2]
-			ast::Annotation anno;
-			anno.token = *annotationNode->children[0]->token;
-			anno.name = annotationNode->children[1]->token->lexeme;
+			auto anno = std::make_unique<ast::AnnotationNode>();
+			anno->token = *annotationNode->children[0]->token;
+			anno->name = annotationNode->children[1]->token->lexeme;
 
 			// OptParenExpr -> ( [0] Expr [1] ) [2] | \e
 			if (const auto& optParen = annotationNode->children[2];
 				!optParen->children.empty() && optParen->children[0]->symbol.Hashed() != "<EPSILON>"_hs)
 			{
-				anno.argument = ConvertExpr(optParen->children[1].get());
+				anno->argument = ConvertExpr(optParen->children[1].get());
 			}
 
 			outAnnotations.push_back(std::move(anno));
 		}
 	}
 
-	static void ExtractAnnotationParams(const CstNode* listNode, std::vector<ast::Parameter>& outParams)
+	static void ExtractAnnotationParams(const CstNode* listNode, std::vector<std::unique_ptr<ast::ParameterNode>>& outParams)
 	{
 		// PrimaryCtorPars -> PrimaryCtorPars [0] , [1] PrimaryCtorPar [2] | PrimaryCtorPar [0] | \e [0]
 		if (!listNode || listNode->children.empty() || listNode->symbol.Hashed() == "<EPSILON>"_hs)
@@ -1175,15 +1146,15 @@ private:
 		}
 	}
 
-	static void ParseAnnotationParam(const CstNode* parNode, std::vector<ast::Parameter>& outParams)
+	static void ParseAnnotationParam(const CstNode* parNode, std::vector<std::unique_ptr<ast::ParameterNode>>& outParams)
 	{
 		// PrimaryCtorPar -> OptValVar [0] ident [1] : [2] Type [3]
 		const re::String name = parNode->children[1]->token->lexeme;
 		auto typeNode = ConvertType(parNode->children[3].get());
 
-		ast::Parameter param;
-		param.name = name;
-		param.type = std::move(typeNode);
+		auto param = std::make_unique<ast::ParameterNode>();
+		param->name = name;
+		param->type = std::move(typeNode);
 
 		outParams.push_back(std::move(param));
 	}

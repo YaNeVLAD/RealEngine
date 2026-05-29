@@ -43,22 +43,21 @@ inline std::shared_ptr<FunctionType> Instantiate(
 
 	for (std::size_t i = 0; i < typeArgs.size(); ++i)
 	{
-		if (tmpl->typeParams[i].boundType)
+		if (tmpl->typeParams[i]->boundType)
 		{
-			auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i].boundType.get(), m_context);
+			auto boundSemType = TypeResolver::Resolve(tmpl->typeParams[i]->boundType.get(), m_context);
 			TypeResolver::ExpectAssignable(typeArgs[i].get(), boundSemType.get(), "type parameter bound", tmpl->astNode);
 		}
 		auto tempNode = std::make_unique<ast::SimpleTypeNode>();
 		tempNode->name = typeArgs[i]->name;
-		typeEnv[tmpl->typeParams[i].name] = tempNode.get();
+		typeEnv[tmpl->typeParams[i]->name] = tempNode.get();
 		tempNodes.emplace_back(std::move(tempNode));
 	}
 
-	auto clonedDecl = tmpl->astNode->CloneDecl(&typeEnv);
-	const auto realFunDecl = dynamic_cast<ast::FunDecl*>(clonedDecl.get());
+	auto clonedDecl = ast::clone::Clone(tmpl->astNode, &typeEnv);
+	const auto realFunDecl = clonedDecl.get();
 	realFunDecl->name = uniqueName;
 	realFunDecl->typeParams.clear();
-	realFunDecl->annotations = tmpl->astNode->annotations;
 
 	std::shared_ptr<FunctionType> funType;
 	if (tmpl->isMethod)
@@ -69,7 +68,7 @@ inline std::shared_ptr<FunctionType> Instantiate(
 	{
 		funType = Declaration::Function(realFunDecl, m_context, tmpl->moduleName);
 	}
-	funType->annotations = tmpl->astNode->annotations;
+	funType->annotations = ast::clone::GetRawPointers(tmpl->astNode->annotations);
 
 	if (funType->isExternal && funType->nativeTargetName == uniqueName)
 	{

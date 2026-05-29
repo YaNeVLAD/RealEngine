@@ -2,7 +2,11 @@
 #include <iostream>
 
 #include "Builder.hpp"
+#include "GeneratorEngine.hpp"
 
+#include "Emitters/AstClonerEmitter.hpp"
+#include "Emitters/AstNodesEmitter.hpp"
+#include "Emitters/AstSerializerEmitter.hpp"
 #include "Emitters/BinaryOpsEmitter.hpp"
 #include "Emitters/BuiltinsEmitter.hpp"
 #include "Emitters/CastRulesEmitter.hpp"
@@ -10,8 +14,6 @@
 #include "Emitters/ImplicitPromotionsEmitter.hpp"
 #include "Emitters/TargetConfigEmitter.hpp"
 #include "Emitters/UnaryOpsEmitter.hpp"
-
-#include "GeneratorEngine.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -40,11 +42,6 @@ int main(const int argc, char** argv)
 	std::ofstream headerFile(headerPath);
 	Builder<std::string> headerBuilder(headerFile);
 	headerBuilder.Line("#pragma once");
-	headerBuilder.Include("Core/String.hpp", true);
-	headerBuilder.Include("unordered_map", true);
-	headerBuilder.Include("unordered_set", true);
-	headerBuilder.Include("IgniLang/BindingContext.hpp", true);
-	headerBuilder.Include("IgniLang/BuildTarget.hpp", true);
 	headerBuilder.EmptyLine();
 
 	// --- CPP ---
@@ -58,17 +55,40 @@ int main(const int argc, char** argv)
 	sourceBuilder.Line("using namespace re::literals;");
 	sourceBuilder.EmptyLine();
 
-	GeneratorEngine<
-		BinaryOpsEmitter,
-		UnaryOpsEmitter,
-		CastRulesEmitter,
-		ImplicitPromotionsEmitter,
-		DesugaringEmitter,
-		BuiltinsEmitter,
-		TargetConfigEmitter>
-		engine;
+	if (combinedData.contains("ast_nodes"))
+	{
+		headerBuilder.Include("Core/String.hpp", true);
+		headerBuilder.Include("IgniLang/AST/Base.hpp", true);
+		headerBuilder.Include("memory", true);
+		headerBuilder.Include("nlohmann/json.hpp", true);
+		headerBuilder.EmptyLine();
 
-	engine.Run(combinedData, headerBuilder, sourceBuilder);
+		GeneratorEngine<AstNodesEmitter, AstSerializerEmitter, AstClonerEmitter> astEngine;
+		astEngine.Run(combinedData, headerBuilder, sourceBuilder);
+	}
+	else
+	{
+		headerBuilder.Include("Core/String.hpp", true);
+		headerBuilder.Include("unordered_map", true);
+		headerBuilder.Include("unordered_set", true);
+		headerBuilder.Include("IgniLang/BindingContext.hpp", true);
+		headerBuilder.Include("IgniLang/BuildTarget.hpp", true);
+		headerBuilder.EmptyLine();
+
+		sourceBuilder.Line("using namespace re::literals;");
+		sourceBuilder.EmptyLine();
+
+		GeneratorEngine<
+			BinaryOpsEmitter,
+			UnaryOpsEmitter,
+			CastRulesEmitter,
+			ImplicitPromotionsEmitter,
+			DesugaringEmitter,
+			BuiltinsEmitter,
+			TargetConfigEmitter>
+			semEngine;
+		semEngine.Run(combinedData, headerBuilder, sourceBuilder);
+	}
 
 	return 0;
 }

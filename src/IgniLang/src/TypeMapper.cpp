@@ -94,12 +94,12 @@ re::String TypeMapper::GetElemSuffix(const re::String& semTypeName)
 	return SemTypeMap.get(semTypeName.Hashed(), "ref");
 }
 
-std::string TypeMapper::BuildParamSignature(const std::vector<ast::Parameter>& params, const bool isVararg)
+std::string TypeMapper::BuildParamSignature(const std::vector<std::unique_ptr<ast::ParameterNode>>& params, const bool isVararg)
 {
 	re::String sig;
 	for (std::size_t i = 0; i < params.size(); ++i)
 	{
-		auto typeSig = MapAstType(params[i].type.get());
+		auto typeSig = MapAstType(params[i]->type.get());
 		if (isVararg && i == params.size() - 1)
 		{
 			if (typeSig.Find("[]") == re::String::NPos)

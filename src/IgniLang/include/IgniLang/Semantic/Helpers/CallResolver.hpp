@@ -115,7 +115,7 @@ inline TargetResolution ResolveTarget(
 				explicitTypeArgs.resize(classTmpl->typeParams.size(), nullptr);
 				for (std::size_t i = 0; i < argTypes.size() && i < ctorAst->parameters.size(); ++i)
 				{
-					TypeResolver::InferTypeArguments(argTypes[i], ctorAst->parameters[i].type.get(), classTmpl->typeParams, explicitTypeArgs);
+					TypeResolver::InferTypeArguments(argTypes[i], ctorAst->parameters[i]->type.get(), classTmpl->typeParams, explicitTypeArgs);
 				}
 				for (const auto& arg : explicitTypeArgs)
 				{

@@ -12,7 +12,7 @@ inline void AnalyzeBody(
 	ast::IAstVisitor& visitor,
 	SemanticContext& ctx,
 	const std::shared_ptr<FunctionType>& funType,
-	const std::vector<ast::Parameter>& astParams,
+	const std::vector<std::unique_ptr<ast::ParameterNode>>& astParams,
 	const ast::Block* body,
 	const bool isMethod,
 	const std::shared_ptr<ClassType>& parentClass = nullptr,
@@ -54,7 +54,7 @@ inline void AnalyzeBody(
 			}
 		}
 
-		ctx.env.Define(astParams[i].name, paramType, false);
+		ctx.env.Define(astParams[i]->name, paramType, false);
 	}
 
 	const auto previousReturnType = ctx.location.currentReturnType;

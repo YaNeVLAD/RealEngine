@@ -46,4 +46,13 @@ struct Clonable : TBase
 	}
 };
 
+template <typename TVisitor, typename TDerived, typename TBase>
+struct Visitable : TBase
+{
+	void Accept(TVisitor& visitor) const override
+	{
+		visitor.Visit(static_cast<const TDerived*>(this));
+	}
+};
+
 } // namespace re::utils

@@ -2,7 +2,6 @@
 
 #include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
-#include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -14,7 +13,7 @@ namespace igni::opt
 class DeadCodeEliminator final : public ast::BaseAstVisitor
 {
 public:
-	void Eliminate(ast::Program* program, const BindingContext& bindings, bool isDll, bool disableDCE)
+	void Eliminate(ast::Program* program, const BindingContext& bindings, const bool isDll, const bool disableDCE)
 	{
 		if (disableDCE)
 		{
@@ -27,9 +26,9 @@ public:
 		m_allBodies.clear();
 		m_dynamicMethods.clear();
 
-		auto hasKeepAnnotation = [](const std::vector<ast::Annotation>& annos) {
+		auto hasKeepAnnotation = [](const std::vector<std::unique_ptr<ast::AnnotationNode>>& annos) {
 			return std::ranges::any_of(annos, [&](const auto& annotation) {
-				return annotation.name == "Keep" || annotation.name == "Export";
+				return annotation->name == "Keep" || annotation->name == "Export";
 			});
 		};
 
