@@ -169,7 +169,13 @@ inline std::vector<fs::path> GetDotNetCompatibleScripts()
 		if (std::string name = path.stem().string();
 			name == "01_primitives_math"
 			|| name == "02_control_flow"
+			|| name == "03_functions"
 			|| name == "04_classes_oop"
+			|| name == "05_generics"
+			|| name == "06_deep_closures"
+			|| name == "07_complex_generics"
+			|| name == "08_virtual_dispatch"
+			|| name == "09_varargs_packing"
 			|| name == "15_type_casting"
 			|| name == "math")
 		{
