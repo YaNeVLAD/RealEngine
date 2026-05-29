@@ -17,7 +17,7 @@ public:
 
 	void Assembly(const re::String& name) const;
 	void AssemblyExtern(const re::String& name) const;
-	void BeginClass(const re::String& name, const re::String& baseClass) const;
+	void BeginClass(const re::String& name, const re::String& baseClass, const re::String& modifiers = "public auto ansi beforefieldinit") const;
 	void EndClass() const;
 	void Field(const re::String& type, const re::String& name, bool isStatic = false) const;
 

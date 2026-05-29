@@ -24,6 +24,14 @@ struct LambdaData
 class LambdaHelper
 {
 public:
+	struct DelegateInfo
+	{
+		re::String className;
+		re::String returnType;
+		std::vector<re::String> paramTypes;
+	};
+
+public:
 	LambdaHelper(CILEmitter& emitter, const sem::SemanticAnalyzer& semantics)
 		: m_emitter(emitter)
 		, m_semanticAnalyzer(semantics)
@@ -107,12 +115,43 @@ public:
 		}
 	}
 
+	void RegisterDelegate(const DelegateInfo& info)
+	{
+		if (!m_delegates.contains(info.className))
+		{
+			m_delegates[info.className] = info;
+		}
+	}
+
+	void GenerateDelegates(std::ostream& out)
+	{
+		m_emitter.SetStream(out);
+		for (const auto& [name, info] : m_delegates)
+		{
+			m_emitter.BeginClass(name, "[mscorlib]System.MulticastDelegate", "public auto ansi sealed");
+
+			m_emitter.Emit("  .method public hidebysig specialname rtspecialname instance void .ctor(object 'object', native int 'method') runtime managed {}");
+
+			re::String sig = "  .method public hidebysig newslot virtual instance " + info.returnType + " Invoke(";
+			for (size_t i = 0; i < info.paramTypes.size(); ++i)
+			{
+				sig += info.paramTypes[i] + (i < info.paramTypes.size() - 1 ? ", " : "");
+			}
+			sig += ") runtime managed {}";
+			m_emitter.Emit(sig);
+
+			m_emitter.EndClass();
+		}
+	}
+
 private:
 	CILEmitter& m_emitter;
 	const sem::SemanticAnalyzer& m_semanticAnalyzer;
 	std::vector<LambdaData> m_lambdas;
 	const LambdaData* m_currentLambdaData = nullptr;
 	std::unordered_set<re::String> m_capturedLocals;
+
+	std::unordered_map<re::String, DelegateInfo> m_delegates;
 
 	class CaptureScanner : public ast::RecursiveAstVisitor
 	{

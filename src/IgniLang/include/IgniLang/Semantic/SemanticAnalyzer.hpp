@@ -51,6 +51,11 @@ public:
 		InitBuiltins();
 	}
 
+	Environment const& Env() const
+	{
+		return m_context.env;
+	}
+
 	void Analyze(const std::vector<std::unique_ptr<ast::Program>>& programs)
 	{
 		for (const auto& prog : programs)

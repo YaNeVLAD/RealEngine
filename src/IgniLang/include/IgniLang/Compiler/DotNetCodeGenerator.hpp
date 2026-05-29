@@ -6,8 +6,10 @@
 #include <IgniLang/Compiler/DotNet/CILEmitter.hpp>
 #include <IgniLang/Compiler/DotNet/LambdaHelper.hpp>
 #include <IgniLang/Compiler/DotNet/TypeMapper.hpp>
+#include <IgniLang/Semantic/Helpers/NameMangler.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
+#include <algorithm>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -150,6 +152,8 @@ public:
 			}
 		}
 
+		m_lambdaHelper.GenerateDelegates(m_out);
+
 		m_lambdaHelper.GenerateAllClasses(m_out, [&](const re::String& sig, const ast::Block* body, const bool isEntry, const std::vector<std::unique_ptr<ast::ParameterNode>>& params) {
 			PrepareMethodScope(true, params, body);
 			EmitMethodBody(sig, body, isEntry);
@@ -238,26 +242,101 @@ public:
 			return;
 		}
 
-		PrepareMethodScope(m_currentClass != nullptr, node->parameters, node->body.get());
+		std::shared_ptr<sem::FunctionType> funType = nullptr;
+		re::String methodName = (node->name == "main" && !m_currentClass) ? "main" : m_semanticAnalyzer.GetBindings().GetMangledName(node);
 
-		const re::String retType = node->returnType ? MapAstType(node->returnType.get()) : TYPE_VOID;
-		const re::String instanceKw = m_currentClass ? "instance " : "static ";
-
-		re::String methodName;
-		if (node->name == "main" && !m_currentClass)
-		{
-			methodName = "main";
-		}
-		else if (m_currentClass)
+		if (m_currentClass)
 		{
 			methodName = node->name;
+			if (const auto semClass = m_semanticAnalyzer.GetClassType(m_currentClass->name))
+			{
+				if (semClass->methods.contains(node->name))
+				{
+					if (const auto fg = std::dynamic_pointer_cast<sem::FunctionGroup>(semClass->methods.at(node->name)))
+					{
+						for (const auto& overload : fg->overloads)
+						{
+							if (overload->paramTypes.size() == node->parameters.size() + 1)
+							{
+								funType = overload;
+								break;
+							}
+						}
+					}
+					else
+					{
+						funType = std::dynamic_pointer_cast<sem::FunctionType>(semClass->methods.at(node->name));
+					}
+				}
+			}
 		}
 		else
 		{
-			methodName = m_semanticAnalyzer.GetBindings().GetMangledName(node);
+			auto environment = m_semanticAnalyzer.Env();
+			if (const auto* sym = environment.Resolve(node->name))
+			{
+				if (const auto fg = std::dynamic_pointer_cast<sem::FunctionGroup>(sym->type))
+				{
+					for (const auto& overload : fg->overloads)
+					{
+						if (overload->paramTypes.size() == node->parameters.size())
+						{
+							funType = overload;
+							break;
+						}
+					}
+				}
+				else
+				{
+					funType = std::dynamic_pointer_cast<sem::FunctionType>(sym->type);
+				}
+			}
+
+			if (!funType)
+			{
+				for (const auto& [callExpr, info] : m_semanticAnalyzer.GetBindings().callInfo)
+				{
+					if (info.asmLabel == methodName)
+					{
+						funType = info.target;
+						break;
+					}
+				}
+			}
 		}
 
-		const re::String sig = ".method public hidebysig " + instanceKw + retType + " " + methodName + "(" + BuildParamSignature(node->parameters, node->isVararg) + ") cil managed";
+		const bool isInstanceMethod = (m_currentClass != nullptr);
+		bool hasImplicitThis = false;
+
+		if (funType && funType->paramTypes.size() > node->parameters.size() && !isInstanceMethod)
+		{
+			hasImplicitThis = true;
+		}
+
+		PrepareMethodScope(isInstanceMethod, node->parameters, node->body.get());
+
+		if (hasImplicitThis)
+		{
+			m_args.insert(m_args.begin(), "this");
+			m_argTypes.insert(m_argTypes.begin(), MapToCIL(funType->paramTypes[0]->name));
+		}
+
+		re::String sig;
+		if (funType)
+		{
+			sig = BuildCilSignature(funType.get(), "", methodName, isInstanceMethod, isInstanceMethod);
+			if (!isInstanceMethod)
+			{
+				sig = "static " + sig;
+			}
+		}
+		else
+		{
+			const re::String retType = node->returnType ? MapAstType(node->returnType.get()) : TYPE_VOID;
+			sig = (isInstanceMethod ? "instance " : "static ") + retType + " " + methodName + "(" + BuildParamSignature(node->parameters, node->isVararg) + ")";
+		}
+
+		sig = ".method public hidebysig " + sig + " cil managed";
 		EmitMethodBody(sig, node->body.get(), node->name == "main" && !m_currentClass);
 	}
 
@@ -341,6 +420,31 @@ public:
 
 	void Visit(const ast::IdentifierExpr* node) override
 	{
+		const auto exprType = m_semanticAnalyzer.GetBindings().GetExpressionType(node);
+
+		if (const auto funType = std::dynamic_pointer_cast<sem::FunctionType>(exprType))
+		{
+			if (!m_globalVars.contains(node->name) && GetLocalIndex(node->name) == -1 && GetArgIndex(node->name) == -1)
+			{
+				RegisterDelegateFromType(funType);
+				const re::String delegateName = GetDelegateName(funType.get());
+
+				std::vector<re::String> typeNames;
+				for (const auto& pt : funType->paramTypes)
+				{
+					typeNames.push_back(pt->name);
+				}
+
+				re::String mangledName = sem::NameMangler::Mangle(node->name, typeNames, false);
+				const re::String targetMethodSig = BuildCilSignature(funType.get(), "IgniGlobalModule", mangledName, false, false);
+
+				LdNull();
+				Emit("ldftn " + targetMethodSig);
+				NewObj(delegateName + "::.ctor(object, native int)");
+				return;
+			}
+		}
+
 		EmitIdentifierAccess(node, false, nullptr);
 	}
 
@@ -581,6 +685,29 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
+		if (!m_semanticAnalyzer.GetBindings().callInfo.contains(node))
+		{
+			auto calleeType = m_semanticAnalyzer.GetBindings().GetExpressionType(node->callee.get());
+			if (auto funType = std::dynamic_pointer_cast<sem::FunctionType>(calleeType))
+			{
+				node->callee->Accept(*this);
+
+				for (const auto& arg : node->arguments)
+				{
+					if (arg)
+					{
+						arg->Accept(*this);
+					}
+				}
+
+				const re::String delegateName = GetDelegateName(funType.get());
+				re::String invokeSig = BuildCilSignature(funType.get(), delegateName, "Invoke", false, false);
+
+				CallVirtual(invokeSig);
+				return;
+			}
+		}
+
 		const auto& callInfo = m_semanticAnalyzer.GetBindings().callInfo.at(node);
 		const auto& targetAnnos = callInfo.target->annotations;
 
@@ -735,8 +862,8 @@ public:
 				node->callee->Accept(*this);
 			}
 			emitArgs();
-			const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
-			CallVirtual(retType + " " + callInfo.target->name + "::Invoke(" + BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) + ")");
+			const re::String invokeSig = BuildCilSignature(callInfo.target.get(), callInfo.target->name, "Invoke", false, false);
+			CallVirtual(invokeSig);
 			return;
 		}
 
@@ -772,7 +899,8 @@ public:
 			}
 
 			emitArgs();
-			CallVirtual(MapToCIL(callInfo.target->returnType->name) + " " + callInfo.target->paramTypes[0]->name + "::" + callInfo.asmLabel + "(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
+			const re::String virtSig = BuildCilSignature(callInfo.target.get(), callInfo.target->paramTypes[0]->name, callInfo.asmLabel, false, true);
+			CallVirtual(virtSig);
 			return;
 		}
 
@@ -795,20 +923,30 @@ public:
 				{
 					LdArg(0);
 					emitArgs();
-					Call("instance void " + prefix + "::.ctor(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
+					Emit("call instance void " + prefix + "::.ctor(" + BuildTypeSignature(callInfo.target->paramTypes, 1, callInfo.target->isVararg) + ")");
 					return;
 				}
 			}
 		}
 
+		if (const auto memAccess = dynamic_cast<const ast::MemberAccessExpr*>(node->callee.get()))
+		{
+			memAccess->object->Accept(*this);
+		}
+		else if (callInfo.isImplicitThisCall)
+		{
+			LdArg(0);
+		}
+
 		emitArgs();
-		const re::String retType = callInfo.target && callInfo.target->returnType ? MapToCIL(callInfo.target->returnType->name) : TYPE_VOID;
-		Call(retType + " IgniGlobalModule::" + finalAsmLabel + "(" + BuildTypeSignature(callInfo.target->paramTypes, 0, callInfo.target->isVararg) + ")");
+		const re::String globalSig = BuildCilSignature(callInfo.target.get(), "IgniGlobalModule", finalAsmLabel, false, false);
+		Call(globalSig);
 	}
 
 	void Visit(const ast::LambdaExpr* node) override
 	{
 		const auto semType = m_semanticAnalyzer.GetBindings().GetExpressionType(node);
+		const auto funType = std::dynamic_pointer_cast<sem::FunctionType>(semType);
 		const re::String lambdaClassName = semType->name;
 
 		std::vector<re::String> capTypes;
@@ -826,7 +964,7 @@ public:
 					if (currentLambda->node->captures[i] == capName)
 					{
 						cilType = currentLambda->captureTypes[i];
-						LdArg(0); // 'this'
+						LdArg(0);
 						LdFld(cilType + (currentLambda->isByRef[i] ? "[]" : ""), currentLambda->className, capName);
 
 						refFlag = currentLambda->isByRef[i];
@@ -1112,6 +1250,7 @@ private:
 			{
 				LdFld(MapToCIL(fieldType->name), classType->name, id->name);
 			}
+
 			return;
 		}
 
@@ -1130,7 +1269,6 @@ private:
 			{
 				LdSFld(m_globalVars.at(id->name), "IgniGlobalModule", id->name);
 			}
-
 			return;
 		}
 
@@ -1168,8 +1306,10 @@ private:
 					LdLoc(locIdx);
 				}
 			}
+
 			return;
 		}
+
 		if (const int argIdx = GetArgIndex(id->name); argIdx != -1)
 		{
 			if (isStore)
@@ -1229,6 +1369,22 @@ private:
 		}
 	}
 
+	[[nodiscard]] static re::String BuildCilSignature(
+		const sem::FunctionType* funType,
+		const re::String& ownerClass,
+		const re::String& methodName,
+		const bool isInstance = false,
+		const bool skipFirstParam = false)
+	{
+		const re::String retCilType = funType->returnType ? MapToCIL(funType->returnType->name) : TYPE_VOID;
+		const re::String prefix = ownerClass.Empty() ? re::String("") : ownerClass + "::";
+		re::String sig = (isInstance ? "instance " : "") + retCilType + " " + prefix + methodName + "(";
+		sig += BuildTypeSignature(funType->paramTypes, skipFirstParam ? 1 : 0, funType->isVararg);
+		sig += ")";
+
+		return sig;
+	}
+
 	[[nodiscard]] static re::String BuildTypeSignature(
 		const std::vector<std::shared_ptr<sem::SemanticType>>& types,
 		const std::size_t startIndex,
@@ -1269,8 +1425,28 @@ private:
 				}
 			}
 		}
-
 		return "[mscorlib]System.Object";
+	}
+
+	[[nodiscard]] static re::String GetDelegateName(const sem::FunctionType* funType)
+	{
+		std::string sigName = "Func";
+		for (const auto& pt : funType->paramTypes)
+		{
+			auto pName = std::string(pt->name);
+			std::ranges::replace(pName, '.', '_');
+			std::ranges::replace(pName, '[', '_');
+			std::ranges::replace(pName, ']', '_');
+			sigName += "_" + pName;
+		}
+
+		auto rName = std::string(funType->returnType ? funType->returnType->name : "Unit");
+		std::ranges::replace(rName, '.', '_');
+		std::ranges::replace(rName, '[', '_');
+		std::ranges::replace(rName, ']', '_');
+		sigName += "_Ret_" + rName;
+
+		return sigName;
 	}
 
 	void ExtractAssemblies(const re::String& signature)
@@ -1290,6 +1466,22 @@ private:
 				m_externAssemblies.push_back(asmName);
 			}
 			start = end + 1;
+		}
+	}
+
+	void RegisterDelegateFromType(const std::shared_ptr<sem::SemanticType>& type)
+	{
+		if (const auto funType = std::dynamic_pointer_cast<sem::FunctionType>(type))
+		{
+			dotnet::LambdaHelper::DelegateInfo info;
+			info.className = GetDelegateName(funType.get());
+			info.returnType = funType->returnType ? MapToCIL(funType->returnType->name) : TYPE_VOID;
+
+			for (const auto& pt : funType->paramTypes)
+			{
+				info.paramTypes.push_back(MapToCIL(pt->name));
+			}
+			m_lambdaHelper.RegisterDelegate(info);
 		}
 	}
 

@@ -23,9 +23,9 @@ void CILEmitter::AssemblyExtern(const re::String& name) const
 	*m_out << ".assembly extern " << name << " { }\n";
 }
 
-void CILEmitter::BeginClass(const re::String& name, const re::String& baseClass) const
+void CILEmitter::BeginClass(const re::String& name, const re::String& baseClass, const re::String& modifiers) const
 {
-	*m_out << ".class public auto ansi beforefieldinit " << name << " extends " << baseClass << "\n{\n";
+	*m_out << ".class " << modifiers << " " << name << " extends " << baseClass << "\n{\n";
 }
 
 void CILEmitter::EndClass() const
