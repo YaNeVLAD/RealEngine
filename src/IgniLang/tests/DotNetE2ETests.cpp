@@ -4,10 +4,8 @@
 #include <IgniLang/Compiler/DotNetBackend.hpp>
 #include <IgniLang/Compiler/Pipeline.hpp>
 
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 
 #ifdef _WIN32
 #define popen _popen
