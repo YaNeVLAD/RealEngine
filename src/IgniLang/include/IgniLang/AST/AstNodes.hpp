@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/String.hpp>
+#include <Core/Utils.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
 #include <iostream>
@@ -88,14 +89,8 @@ protected:
 	}
 };
 
-template <typename Derived, typename Base = Node>
-struct Visitable : Base
-{
-	void Accept(IAstVisitor& visitor) const override
-	{
-		visitor.Visit(static_cast<const Derived*>(this));
-	}
-};
+template <typename TDerived, typename TBase = Node>
+using AstVisitable = re::utils::Visitable<IAstVisitor, TDerived, TBase>;
 
 enum class Visibility
 {
@@ -150,7 +145,7 @@ struct Parameter
 // TYPES
 // ==========================================
 
-struct SimpleTypeNode final : Visitable<SimpleTypeNode, TypeNode>
+struct SimpleTypeNode final : AstVisitable<SimpleTypeNode, TypeNode>
 {
 	re::String name;
 	std::vector<std::unique_ptr<TypeNode>> typeArgs;
@@ -192,7 +187,7 @@ struct SimpleTypeNode final : Visitable<SimpleTypeNode, TypeNode>
 	}
 };
 
-struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
+struct FunctionTypeNode final : AstVisitable<FunctionTypeNode, TypeNode>
 {
 	bool isSuspend = false;
 
@@ -245,7 +240,7 @@ struct FunctionTypeNode final : Visitable<FunctionTypeNode, TypeNode>
 // EXPRESSIONS
 // ==========================================
 
-struct BinaryExpr final : Visitable<BinaryExpr, Expr>
+struct BinaryExpr final : AstVisitable<BinaryExpr, Expr>
 {
 	std::unique_ptr<Expr> left;
 	re::String op;
@@ -282,7 +277,7 @@ struct BinaryExpr final : Visitable<BinaryExpr, Expr>
 	}
 };
 
-struct LiteralExpr final : Visitable<LiteralExpr, Expr>
+struct LiteralExpr final : AstVisitable<LiteralExpr, Expr>
 {
 	void Print(int depth = 0) const override
 	{
@@ -296,7 +291,7 @@ struct LiteralExpr final : Visitable<LiteralExpr, Expr>
 	}
 };
 
-struct IdentifierExpr final : Visitable<IdentifierExpr, Expr>
+struct IdentifierExpr final : AstVisitable<IdentifierExpr, Expr>
 {
 	re::String name;
 	std::vector<std::unique_ptr<TypeNode>> typeArgs;
@@ -320,7 +315,7 @@ struct IdentifierExpr final : Visitable<IdentifierExpr, Expr>
 	}
 };
 
-struct CallExpr final : Visitable<CallExpr, Expr>
+struct CallExpr final : AstVisitable<CallExpr, Expr>
 {
 	std::unique_ptr<Expr> callee;
 	std::vector<std::unique_ptr<Expr>> arguments;
@@ -365,7 +360,7 @@ struct CallExpr final : Visitable<CallExpr, Expr>
 	}
 };
 
-struct IndexExpr final : Visitable<IndexExpr, Expr>
+struct IndexExpr final : AstVisitable<IndexExpr, Expr>
 {
 	std::unique_ptr<Expr> array;
 	std::unique_ptr<Expr> index;
@@ -388,7 +383,7 @@ struct IndexExpr final : Visitable<IndexExpr, Expr>
 	}
 };
 
-struct AssignExpr final : Visitable<AssignExpr, Expr>
+struct AssignExpr final : AstVisitable<AssignExpr, Expr>
 {
 	std::unique_ptr<Expr> target;
 	std::unique_ptr<Expr> value;
@@ -423,7 +418,7 @@ struct AssignExpr final : Visitable<AssignExpr, Expr>
 	}
 };
 
-struct UnaryExpr final : Visitable<UnaryExpr, Expr>
+struct UnaryExpr final : AstVisitable<UnaryExpr, Expr>
 {
 	re::String op;
 	std::unique_ptr<Expr> operand;
@@ -453,7 +448,7 @@ struct UnaryExpr final : Visitable<UnaryExpr, Expr>
 	}
 };
 
-struct MemberAccessExpr final : Visitable<MemberAccessExpr, Expr>
+struct MemberAccessExpr final : AstVisitable<MemberAccessExpr, Expr>
 {
 	std::unique_ptr<Expr> object;
 	re::String member;
@@ -488,7 +483,7 @@ struct MemberAccessExpr final : Visitable<MemberAccessExpr, Expr>
 	}
 };
 
-struct AwaitExpr final : Visitable<AwaitExpr, Expr>
+struct AwaitExpr final : AstVisitable<AwaitExpr, Expr>
 {
 	std::unique_ptr<Expr> expression;
 
@@ -505,7 +500,7 @@ struct AwaitExpr final : Visitable<AwaitExpr, Expr>
 	}
 };
 
-struct LaunchExpr final : Visitable<LaunchExpr, Expr>
+struct LaunchExpr final : AstVisitable<LaunchExpr, Expr>
 {
 	std::unique_ptr<Expr> callable;
 
@@ -526,7 +521,7 @@ struct LaunchExpr final : Visitable<LaunchExpr, Expr>
 // STATEMENTS
 // ==========================================
 
-struct ExprStmt final : Visitable<ExprStmt, Statement>
+struct ExprStmt final : AstVisitable<ExprStmt, Statement>
 {
 	std::unique_ptr<Expr> expr;
 
@@ -552,7 +547,7 @@ struct ExprStmt final : Visitable<ExprStmt, Statement>
 	}
 };
 
-struct ReturnStmt final : Visitable<ReturnStmt, Statement>
+struct ReturnStmt final : AstVisitable<ReturnStmt, Statement>
 {
 	std::unique_ptr<Expr> expr;
 
@@ -578,7 +573,7 @@ struct ReturnStmt final : Visitable<ReturnStmt, Statement>
 	}
 };
 
-struct Block final : Visitable<Block, Statement>
+struct Block final : AstVisitable<Block, Statement>
 {
 	std::vector<std::unique_ptr<Statement>> statements;
 
@@ -607,7 +602,7 @@ struct Block final : Visitable<Block, Statement>
 	}
 };
 
-struct IfStmt final : Visitable<IfStmt, Statement>
+struct IfStmt final : AstVisitable<IfStmt, Statement>
 {
 	std::unique_ptr<Expr> condition;
 	std::unique_ptr<Block> thenBranch;
@@ -662,7 +657,7 @@ struct IfStmt final : Visitable<IfStmt, Statement>
 	}
 };
 
-struct WhileStmt final : Visitable<WhileStmt, Statement>
+struct WhileStmt final : AstVisitable<WhileStmt, Statement>
 {
 	std::unique_ptr<Expr> condition;
 	std::unique_ptr<Block> body;
@@ -703,7 +698,7 @@ struct WhileStmt final : Visitable<WhileStmt, Statement>
 	}
 };
 
-struct ForStmt final : Visitable<ForStmt, Statement>
+struct ForStmt final : AstVisitable<ForStmt, Statement>
 {
 	re::String iteratorName;
 	std::unique_ptr<Expr> startExpr;
@@ -792,7 +787,7 @@ struct GenericTypeParam
 	}
 };
 
-struct AnnotationDecl : Visitable<AnnotationDecl, Decl>
+struct AnnotationDecl : AstVisitable<AnnotationDecl, Decl>
 {
 	re::String name;
 	std::vector<Parameter> parameters;
@@ -824,7 +819,7 @@ struct AnnotationDecl : Visitable<AnnotationDecl, Decl>
 	}
 };
 
-struct ValDecl final : Visitable<ValDecl, Decl>
+struct ValDecl final : AstVisitable<ValDecl, Decl>
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
@@ -864,7 +859,7 @@ struct ValDecl final : Visitable<ValDecl, Decl>
 	}
 };
 
-struct VarDecl final : Visitable<VarDecl, Decl>
+struct VarDecl final : AstVisitable<VarDecl, Decl>
 {
 	re::String name;
 	std::unique_ptr<Expr> initializer;
@@ -903,7 +898,7 @@ struct VarDecl final : Visitable<VarDecl, Decl>
 	}
 };
 
-struct FunDecl final : Visitable<FunDecl, Decl>
+struct FunDecl final : AstVisitable<FunDecl, Decl>
 {
 	re::String name;
 	std::vector<Parameter> parameters;
@@ -986,7 +981,7 @@ struct BaseClassInit
 	std::vector<std::unique_ptr<Expr>> arguments;
 };
 
-struct ClassDecl final : Visitable<ClassDecl, Decl>
+struct ClassDecl final : AstVisitable<ClassDecl, Decl>
 {
 	re::String name;
 	bool isExternal = false;
@@ -1041,7 +1036,7 @@ struct ClassDecl final : Visitable<ClassDecl, Decl>
 	}
 };
 
-struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
+struct ConstructorDecl final : AstVisitable<ConstructorDecl, Decl>
 {
 	re::String name;
 	std::vector<Parameter> parameters;
@@ -1092,7 +1087,7 @@ struct ConstructorDecl final : Visitable<ConstructorDecl, Decl>
 	}
 };
 
-struct DestructorDecl final : Visitable<DestructorDecl, Decl>
+struct DestructorDecl final : AstVisitable<DestructorDecl, Decl>
 {
 	re::String name;
 	std::unique_ptr<Block> body;
@@ -1124,7 +1119,7 @@ struct DestructorDecl final : Visitable<DestructorDecl, Decl>
 // ==========================================
 // IMPORTS
 // ==========================================
-struct ImportDecl final : Visitable<ImportDecl>
+struct ImportDecl final : AstVisitable<ImportDecl>
 {
 	re::String path;
 	bool isStar = false;
@@ -1146,7 +1141,7 @@ struct ImportDecl final : Visitable<ImportDecl>
 	}
 };
 
-struct TypeCastExpr : Visitable<TypeCastExpr, Expr>
+struct TypeCastExpr : AstVisitable<TypeCastExpr, Expr>
 {
 	std::unique_ptr<Expr> expr;
 	std::unique_ptr<TypeNode> targetType;
@@ -1165,7 +1160,7 @@ struct TypeCastExpr : Visitable<TypeCastExpr, Expr>
 	}
 };
 
-struct LambdaExpr : Visitable<LambdaExpr, Expr>
+struct LambdaExpr : AstVisitable<LambdaExpr, Expr>
 {
 	std::vector<re::String> captures;
 
@@ -1195,7 +1190,7 @@ struct LambdaExpr : Visitable<LambdaExpr, Expr>
 // ==========================================
 // PROGRAM ROOT
 // ==========================================
-struct Program final : Visitable<Program>
+struct Program final : AstVisitable<Program>
 {
 	re::String packageName;
 	std::vector<std::unique_ptr<ImportDecl>> imports;
