@@ -1,19 +1,21 @@
 #pragma once
 
+#include <Core/FileCache.hpp>
 #include <GeneratedSemantics.hpp>
 #include <IgniLang/AST/AstConverter.hpp>
 #include <IgniLang/BuildType.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
 #include <IgniLang/Compiler/IBackend.hpp>
 #include <IgniLang/Diagnostic/Diagnostic.hpp>
+#include <IgniLang/Internal/GrammarCachePolicy.hpp>
 #include <IgniLang/LexerFactory.hpp>
 #include <IgniLang/Optimization/DeadCodeEliminator.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
-#include <fsm/cfg.hpp>
 #include <fsm/lr/parser.hpp>
-#include <fsm/slr/table_builder.hpp>
+#include <fsm/lr/table_io.hpp>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -32,21 +34,13 @@ struct CompilationResult
 
 class Pipeline
 {
+
 public:
 	explicit Pipeline(const std::string& grammarPath)
 	{
-		std::ifstream file(grammarPath);
-		if (!file.is_open())
-		{
-			throw std::runtime_error("Failed to open grammar file: " + grammarPath);
-		}
+		const std::string cachePath = grammarPath + ".bin";
 
-		const auto grammar = fsm::cfg_load<re::String>(file);
-		fsm::slr::table_builder builder(grammar);
-		m_table = builder
-					  .with_epsilon("<EPSILON>")
-					  .with_end_marker("<EOF>")
-					  .build(fsm::slr::collision_policy::prefer_shift);
+		m_table = re::FileCache::Execute(grammarPath, cachePath, detail::GrammarCachePolicy{});
 	}
 
 	CompilationResult Compile(

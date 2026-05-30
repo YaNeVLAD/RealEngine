@@ -13,7 +13,7 @@
 namespace re
 {
 
-class RE_CORE_API String
+class [[nodiscard]] RE_CORE_API String
 {
 public:
 	using value_type = std::u32string::value_type;
@@ -60,6 +60,14 @@ public:
 	[[nodiscard]] std::u32string ToU32String() const;
 
 	[[nodiscard]] const char32_t* Data() const;
+
+	[[nodiscard]] const char32_t* data() const;
+
+	[[nodiscard]] char32_t* data();
+
+	[[nodiscard]] size_type size() const;
+
+	void resize(size_type capacity);
 
 	[[nodiscard]] iterator begin();
 	[[nodiscard]] const_iterator begin() const;

@@ -1,14 +1,15 @@
 #pragma once
 
+#include "IgniLang/Internal/GrammarCachePolicy.hpp"
+
 #include <gtest/gtest.h>
 
+#include <Core/FileCache.hpp>
 #include <IgniLang/AST/AstConverter.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
-#include <fsm/cfg/cfg_load.hpp>
 #include <fsm/lr/parser.hpp>
-#include <fsm/slr/table_builder.hpp>
 
 #include <filesystem>
 
@@ -99,18 +100,17 @@ protected:
 
 	static void SetUpTestSuite()
 	{
-		std::ifstream file("assets/igni_grammar.txt");
-		if (!file.is_open())
+		using namespace std::literals;
+
+		const auto grammarPath = "assets/igni_grammar.txt"s;
+		const std::string cachePath = grammarPath + ".bin";
+
+		if (const std::ifstream file(grammarPath); !file.is_open())
 		{
 			throw std::runtime_error("Failed to open grammar file: assets/igni_grammar.txt");
 		}
 
-		const auto grammar = fsm::cfg_load<re::String>(file);
-		fsm::slr::table_builder builder(grammar);
-		auto table = builder
-						 .with_epsilon("<EPSILON>")
-						 .with_end_marker("$")
-						 .build(fsm::slr::collision_policy::prefer_shift);
+		auto table = re::FileCache::Execute(grammarPath, cachePath, igni::detail::GrammarCachePolicy{});
 
 		auto* tablePtr = new auto(std::move(table));
 		s_tablePtr = tablePtr;

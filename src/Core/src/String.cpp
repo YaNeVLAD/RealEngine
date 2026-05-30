@@ -99,6 +99,26 @@ const char32_t* String::Data() const
 	return m_string.data();
 }
 
+const char32_t* String::data() const
+{
+	return m_string.data();
+}
+
+char32_t* String::data()
+{
+	return m_string.data();
+}
+
+String::size_type String::size() const
+{
+	return m_string.size();
+}
+
+void String::resize(const size_type capacity)
+{
+	m_string.resize(capacity);
+}
+
 String::iterator String::begin()
 {
 	return m_string.begin();
