@@ -114,22 +114,22 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		if (const auto& arg = *argOpt; arg.type == TokenType::Integer)
+		if (const auto& arg = *argOpt; arg->type == TokenType::Integer)
 		{
-			std::int64_t val = std::stoll(std::string(arg.lexeme));
+			std::int64_t val = std::stoll(std::string(arg->lexeme));
 			outChunk.Write(outChunk.AddConstant(val));
 		}
-		else if (arg.type == TokenType::Double)
+		else if (arg->type == TokenType::Double)
 		{
-			double val = std::stod(std::string(arg.lexeme));
+			double val = std::stod(std::string(arg->lexeme));
 			outChunk.Write(outChunk.AddConstant(val));
 		}
-		else if (arg.type == TokenType::String)
+		else if (arg->type == TokenType::String)
 		{
-			const auto rawStr = arg.lexeme.substr(1, arg.lexeme.size() - 2);
+			const auto rawStr = arg->lexeme.substr(1, arg->lexeme.size() - 2);
 			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
-		else if (arg.type == TokenType::Identifier && arg.lexeme == "null")
+		else if (arg->type == TokenType::Identifier && arg->lexeme == "null")
 		{
 			outChunk.Write(outChunk.AddConstant(Null));
 		}
@@ -149,13 +149,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		if (argOpt->type != TokenType::Identifier)
+		if ((*argOpt)->type != TokenType::Identifier)
 		{
 			std::cerr << "Expected variable name after SET\n";
 			return false;
 		}
 
-		const std::string varName(argOpt->lexeme);
+		const std::string varName((*argOpt)->lexeme);
 		outChunk.Write(static_cast<uint8_t>(OpCode::SetLocal));
 		outChunk.Write(DeclareVariable(varName));
 
@@ -169,13 +169,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		if (argOpt->type != TokenType::Identifier)
+		if ((*argOpt)->type != TokenType::Identifier)
 		{
 			std::cerr << "Expected variable name after GET\n";
 			return false;
 		}
 
-		const std::string varName(argOpt->lexeme);
+		const std::string varName((*argOpt)->lexeme);
 		const auto slotOpt = ResolveVariable(varName);
 		if (!slotOpt)
 		{
@@ -196,13 +196,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		if (argOpt->type != TokenType::String)
+		if ((*argOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected string literal after SET_GLOBAL\n";
 			return false;
 		}
 
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::SetGlobal));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -215,13 +215,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		if (!argOpt)
 			return false;
 
-		if (argOpt->type != TokenType::String)
+		if ((*argOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected string literal after GET_GLOBAL\n";
 			return false;
 		}
 
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::GetGlobal));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -239,7 +239,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		m_locals.clear();
 		m_localsCount = 0;
 
-		labels[String(funcNameOpt->lexeme)] = outChunk.Size();
+		labels[String((*funcNameOpt)->lexeme)] = outChunk.Size();
 
 		return true;
 	};
@@ -252,14 +252,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 
 		const auto argCountOpt = lexer.next();
-		if (!argCountOpt || argCountOpt->type != TokenType::Integer)
+		if (!argCountOpt || (*argCountOpt)->type != TokenType::Integer)
 		{
 			return false;
 		}
-		const std::uint8_t argCount = static_cast<std::uint8_t>(std::stoul(std::string(argCountOpt->lexeme)));
+		const std::uint8_t argCount = static_cast<std::uint8_t>(std::stoul(std::string((*argCountOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::Call));
-		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*funcNameOpt)->lexeme) });
 		outChunk.Write(PATCH_VALUE);
 		outChunk.Write(argCount);
 
@@ -278,9 +278,9 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto rawStr = (*funcNameOpt)->lexeme.substr(1, (*funcNameOpt)->lexeme.size() - 2);
 		const auto funcName = String(ProcessEscapeSequences(rawStr));
-		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string((*argsOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::Native));
 		outChunk.Write(outChunk.AddConstant(funcName));
@@ -295,7 +295,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		{
 			return false;
 		}
-		labels[String(nameOpt->lexeme)] = static_cast<std::int64_t>(outChunk.Size());
+		labels[String((*nameOpt)->lexeme)] = static_cast<std::int64_t>(outChunk.Size());
 
 		return true;
 	};
@@ -307,7 +307,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 		outChunk.Write(static_cast<std::uint8_t>(op));
-		fixups.push_back({ outChunk.Size(), String(nameOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*nameOpt)->lexeme) });
 		outChunk.Write(PATCH_VALUE);
 
 		return true;
@@ -320,7 +320,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 		outChunk.Write(static_cast<uint8_t>(OpCode::CallIndirect));
-		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string((*argOpt)->lexeme))));
 
 		return true;
 	};
@@ -337,9 +337,9 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto rawStr = (*funcNameOpt)->lexeme.substr(1, (*funcNameOpt)->lexeme.size() - 2);
 		const auto funcName = String(ProcessEscapeSequences(rawStr));
-		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string((*argsOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::CallMethod));
 		outChunk.Write(outChunk.AddConstant(funcName));
@@ -355,7 +355,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<uint8_t>(OpCode::New));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -369,7 +369,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		{
 			return false;
 		}
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<uint8_t>(OpCode::GetProperty));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -382,7 +382,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		{
 			return false;
 		}
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<uint8_t>(OpCode::SetProperty));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -391,37 +391,37 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	auto parseType = [&]() -> bool {
 		const auto classNameOpt = lexer.next();
-		if (!classNameOpt || classNameOpt->type != TokenType::String)
+		if (!classNameOpt || (*classNameOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected string literal for class name\n";
 			return false;
 		}
 
-		const auto rawClassStr = classNameOpt->lexeme.substr(1, classNameOpt->lexeme.size() - 2);
+		const auto rawClassStr = (*classNameOpt)->lexeme.substr(1, (*classNameOpt)->lexeme.size() - 2);
 		String className(ProcessEscapeSequences(rawClassStr));
 
 		std::vector<String> fields;
 		while (const auto tokenOpt = lexer.next())
 		{
 			const auto& token = *tokenOpt;
-			if (auto hash = HashedString(token.lexeme); hash == "END_TYPE"_hs)
+			if (auto hash = HashedString(token->lexeme); hash == "END_TYPE"_hs)
 			{
 				break;
 			}
 			else if (hash == "FIELD"_hs)
 			{
 				const auto fieldNameOpt = lexer.next();
-				if (!fieldNameOpt || fieldNameOpt->type != TokenType::String)
+				if (!fieldNameOpt || (*fieldNameOpt)->type != TokenType::String)
 				{
 					std::cerr << "Expected string literal for field name\n";
 					return false;
 				}
-				const auto rawFieldStr = fieldNameOpt->lexeme.substr(1, fieldNameOpt->lexeme.size() - 2);
+				const auto rawFieldStr = (*fieldNameOpt)->lexeme.substr(1, (*fieldNameOpt)->lexeme.size() - 2);
 				fields.emplace_back(ProcessEscapeSequences(rawFieldStr));
 			}
 			else
 			{
-				std::cerr << "Unexpected token inside TYPE definition: " << token.lexeme << "\n";
+				std::cerr << "Unexpected token inside TYPE definition: " << token->lexeme << "\n";
 				return false;
 			}
 		}
@@ -450,15 +450,15 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 		const auto argCountOpt = lexer.next();
-		if (!argCountOpt || argCountOpt->type != TokenType::Integer)
+		if (!argCountOpt || (*argCountOpt)->type != TokenType::Integer)
 		{
 			return false;
 		}
 
-		const std::uint8_t upvCount = static_cast<std::uint8_t>(std::stoul(std::string(argCountOpt->lexeme)));
+		const std::uint8_t upvCount = static_cast<std::uint8_t>(std::stoul(std::string((*argCountOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeClosure));
-		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*funcNameOpt)->lexeme) });
 		outChunk.Write(0);
 		outChunk.Write(upvCount);
 
@@ -468,14 +468,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 	auto parseLoadNative = [&]() -> bool {
 		const auto funcNameOpt = lexer.next();
 		const auto argsOpt = lexer.next();
-		if (!funcNameOpt || !argsOpt || funcNameOpt->type != TokenType::String)
+		if (!funcNameOpt || !argsOpt || (*funcNameOpt)->type != TokenType::String)
 		{
 			return false;
 		}
 
-		const auto rawStr = funcNameOpt->lexeme.substr(1, funcNameOpt->lexeme.size() - 2);
+		const auto rawStr = (*funcNameOpt)->lexeme.substr(1, (*funcNameOpt)->lexeme.size() - 2);
 		const auto funcName = String(ProcessEscapeSequences(rawStr));
-		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string(argsOpt->lexeme)));
+		const auto argCount = static_cast<std::uint8_t>(std::stoul(std::string((*argsOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::LoadNative));
 		outChunk.Write(outChunk.AddConstant(funcName));
@@ -486,14 +486,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 	auto parseGetUpValue = [&]() -> bool {
 		const auto argOpt = lexer.next();
 		outChunk.Write(static_cast<uint8_t>(OpCode::GetUpvalue));
-		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string((*argOpt)->lexeme))));
 		return true;
 	};
 
 	auto parseSetUpValue = [&]() -> bool {
 		const auto argOpt = lexer.next();
 		outChunk.Write(static_cast<uint8_t>(OpCode::SetUpvalue));
-		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		outChunk.Write(static_cast<uint8_t>(std::stoul(std::string((*argOpt)->lexeme))));
 		return true;
 	};
 	auto parseLoadFun = [&]() -> bool {
@@ -504,7 +504,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::MakeClosure));
-		fixups.push_back({ outChunk.Size(), String(funcNameOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*funcNameOpt)->lexeme) });
 		outChunk.Write(0);
 		outChunk.Write(0);
 
@@ -513,13 +513,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	auto parsePackArray = [&]() -> bool {
 		const auto countOpt = lexer.next();
-		if (!countOpt || countOpt->type != TokenType::Integer)
+		if (!countOpt || (*countOpt)->type != TokenType::Integer)
 		{
 			std::cerr << "Expected integer count after PACK_ARRAY\n";
 			return false;
 		}
 
-		const std::uint8_t count = static_cast<std::uint8_t>(std::stoul(std::string(countOpt->lexeme)));
+		const std::uint8_t count = static_cast<std::uint8_t>(std::stoul(std::string((*countOpt)->lexeme)));
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::PackArray));
 		outChunk.Write(count);
@@ -531,14 +531,14 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		const auto classNameOpt = lexer.next();
 		const auto methodNameOpt = lexer.next();
 
-		if (!classNameOpt || !methodNameOpt || classNameOpt->type != TokenType::String || methodNameOpt->type != TokenType::String)
+		if (!classNameOpt || !methodNameOpt || (*classNameOpt)->type != TokenType::String || (*methodNameOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected class name and method name strings after BIND_METHOD\n";
 			return false;
 		}
 
-		const auto classStr = classNameOpt->lexeme.substr(1, classNameOpt->lexeme.size() - 2);
-		const auto methodStr = methodNameOpt->lexeme.substr(1, methodNameOpt->lexeme.size() - 2);
+		const auto classStr = (*classNameOpt)->lexeme.substr(1, (*classNameOpt)->lexeme.size() - 2);
+		const auto methodStr = (*methodNameOpt)->lexeme.substr(1, (*methodNameOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::BindMethod));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(classStr))));
@@ -554,7 +554,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 			return false;
 		}
 
-		const std::string varName(argOpt->lexeme);
+		const std::string varName((*argOpt)->lexeme);
 		const auto slotOpt = ResolveVariable(varName);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::IncLocal));
@@ -573,10 +573,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::JmpIfGreaterEqualLocal));
-		outChunk.Write(ResolveVariable(std::string(varIOpt->lexeme)).value());
-		outChunk.Write(ResolveVariable(std::string(varLimitOpt->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string((*varIOpt)->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string((*varLimitOpt)->lexeme)).value());
 
-		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*labelOpt)->lexeme) });
 		outChunk.Write(PATCH_VALUE);
 
 		return true;
@@ -592,10 +592,10 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		}
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::JmpIfGreaterLocal));
-		outChunk.Write(ResolveVariable(std::string(varIOpt->lexeme)).value());
-		outChunk.Write(ResolveVariable(std::string(varLimitOpt->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string((*varIOpt)->lexeme)).value());
+		outChunk.Write(ResolveVariable(std::string((*varLimitOpt)->lexeme)).value());
 
-		fixups.push_back({ outChunk.Size(), String(labelOpt->lexeme) });
+		fixups.push_back({ outChunk.Size(), String((*labelOpt)->lexeme) });
 		outChunk.Write(PATCH_VALUE);
 
 		return true;
@@ -603,26 +603,26 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	auto parseLaunch = [&]() -> bool {
 		const auto argOpt = lexer.next();
-		if (!argOpt || argOpt->type != TokenType::Integer)
+		if (!argOpt || (*argOpt)->type != TokenType::Integer)
 		{
 			std::cerr << "Expected integer argument count after CO_LAUNCH\n";
 			return false;
 		}
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::CoroutineLaunch));
-		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string(argOpt->lexeme))));
+		outChunk.Write(static_cast<std::uint8_t>(std::stoul(std::string((*argOpt)->lexeme))));
 
 		return true;
 	};
 
 	auto parseCast = [&]() -> bool {
 		const auto typeNameOpt = lexer.next();
-		if (!typeNameOpt || typeNameOpt->type != TokenType::String)
+		if (!typeNameOpt || (*typeNameOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected string literal after CAST\n";
 			return false;
 		}
 
-		const auto rawStr = typeNameOpt->lexeme.substr(1, typeNameOpt->lexeme.size() - 2);
+		const auto rawStr = (*typeNameOpt)->lexeme.substr(1, (*typeNameOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::Cast));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -635,12 +635,12 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		for (int i = 0; i < stringArgsCount; ++i)
 		{
 			const auto opt = lexer.next();
-			if (!opt || opt->type != TokenType::String)
+			if (!opt || (*opt)->type != TokenType::String)
 			{
 				std::cerr << "Expected string literal in ANNOTATE instruction\n";
 				return false;
 			}
-			const auto rawStr = opt->lexeme.substr(1, opt->lexeme.size() - 2);
+			const auto rawStr = (*opt)->lexeme.substr(1, (*opt)->lexeme.size() - 2);
 			outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
 		}
 
@@ -649,13 +649,13 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 
 	auto parseLoadType = [&]() -> bool {
 		const auto argOpt = lexer.next();
-		if (!argOpt || argOpt->type != TokenType::String)
+		if (!argOpt || (*argOpt)->type != TokenType::String)
 		{
 			std::cerr << "Expected string literal after LOAD_TYPE\n";
 			return false;
 		}
 
-		const auto rawStr = argOpt->lexeme.substr(1, argOpt->lexeme.size() - 2);
+		const auto rawStr = (*argOpt)->lexeme.substr(1, (*argOpt)->lexeme.size() - 2);
 
 		outChunk.Write(static_cast<std::uint8_t>(OpCode::LoadType));
 		outChunk.Write(outChunk.AddConstant(String(ProcessEscapeSequences(rawStr))));
@@ -667,20 +667,20 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 	{
 		const auto& token = *tokenOpt;
 
-		if (token.type == TokenType::Label)
+		if (token->type == TokenType::Label)
 		{
-			std::string labelName(token.lexeme.substr(0, token.lexeme.size() - 1));
+			std::string labelName(token->lexeme.substr(0, token->lexeme.size() - 1));
 			labels[String(labelName)] = static_cast<std::int64_t>(outChunk.Size());
 			continue;
 		}
 
-		if (token.type != TokenType::Identifier)
+		if (token->type != TokenType::Identifier)
 		{
-			std::cerr << "Unexpected token: " << token.lexeme << "\n";
+			std::cerr << "Unexpected token: " << token->lexeme << "\n";
 			return false;
 		}
 
-		switch (HashedString(token.lexeme))
+		switch (HashedString(token->lexeme))
 		{
 			// clang-format off
           case "ADD"_hs:    	     outChunk.Write(static_cast<std::uint8_t>(OpCode::Add)); break;
@@ -760,7 +760,7 @@ bool Assembler::Compile(const std::string& source, Chunk& outChunk)
 		  case "CALL_INDIRECT"_hs:   if (!parseCallIndirect()) return false; break;
 			// clang-format on
 		default:
-			std::cerr << "Unknown instruction: " << token.lexeme << "\n";
+			std::cerr << "Unknown instruction: " << token->lexeme << "\n";
 			return false;
 		}
 	}

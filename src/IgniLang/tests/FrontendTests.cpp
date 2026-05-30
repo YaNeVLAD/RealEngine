@@ -6,7 +6,7 @@
 using namespace igni;
 
 void* FrontendTestFixture::s_tablePtr = nullptr;
-fsm::slr::parser<re::String>* FrontendTestFixture::s_parser = nullptr;
+fsm::lr::parser<re::String>* FrontendTestFixture::s_parser = nullptr;
 
 struct LexerTestCase
 {
@@ -61,7 +61,7 @@ INSTANTIATE_TEST_SUITE_P(
 		LexerTestCase{
 			"ErrorOnInvalidChar",
 			"val $invalid = 1",
-			{ TokenType::KwVal, TokenType::Error },
+			{ TokenType::KwVal },
 		}),
 	[](const ::testing::TestParamInfo<LexerTestCase>& info) {
 		return info.param.name;

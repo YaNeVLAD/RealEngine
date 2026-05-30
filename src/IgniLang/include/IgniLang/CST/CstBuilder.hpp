@@ -3,7 +3,7 @@
 #include <IgniLang/CST/CstNode.hpp>
 #include <IgniLang/LexerFactory.hpp>
 
-#include <fsm/slr/parser.hpp>
+#include <fsm/lr/parser.hpp>
 
 #include <iostream>
 #include <memory>
@@ -16,7 +16,7 @@ namespace igni
 class CstBuilder
 {
 public:
-	CstBuilder(fsm::slr::parser<re::String>& parser, re::String epsilonSymbol)
+	CstBuilder(fsm::lr::parser<re::String>& parser, re::String epsilonSymbol)
 		: m_parser(parser)
 		, m_epsilon(std::move(epsilonSymbol))
 	{
@@ -42,7 +42,7 @@ public:
 
 			fsm::utility::overloaded_visitor(
 				*event,
-				[&](const fsm::slr::event_shift<re::String>& e) {
+				[&](const fsm::lr::event_shift<re::String>& e) {
 					auto leaf = std::make_unique<CstNode>(e.token);
 
 					if (tokenIndex < tokens.size())
@@ -53,7 +53,7 @@ public:
 
 					nodeStack.push_back(std::move(leaf));
 				},
-				[&](const fsm::slr::event_reduce<re::String>& e) {
+				[&](const fsm::lr::event_reduce<re::String>& e) {
 					auto parent = std::make_unique<CstNode>(e.rule.lhs);
 
 					std::size_t popCount = e.rule.rhs.size();
@@ -76,12 +76,12 @@ public:
 
 					nodeStack.push_back(std::move(parent));
 				},
-				[&](const fsm::slr::event_accept&) {
+				[&](const fsm::lr::event_accept&) {
 					std::cout << "CST generation completed successfully" << std::endl;
 					finished = true;
 				},
-				[&](const fsm::slr::event_error<re::String>& e) {
-					const auto errToken = (tokenIndex < tokens.size()) ? tokens[tokenIndex] : fsm::token<TokenType>{};
+				[&](const fsm::lr::event_error<re::String>& e) {
+					const auto errToken = tokenIndex < tokens.size() ? tokens[tokenIndex] : fsm::token<TokenType>{};
 					std::cerr << "[Syntax Error] Unexpected token '" << e.unexpected_token.ToString()
 							  << "' at line " << errToken.line;
 					std::cerr << ". Expected: ";
@@ -105,7 +105,7 @@ public:
 	}
 
 private:
-	fsm::slr::parser<re::String>& m_parser;
+	fsm::lr::parser<re::String>& m_parser;
 	re::String m_epsilon;
 };
 

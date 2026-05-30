@@ -7,7 +7,7 @@
 #include <IgniLang/LexerFactory.hpp>
 
 #include <fsm/cfg/cfg_load.hpp>
-#include <fsm/slr/parser.hpp>
+#include <fsm/lr/parser.hpp>
 #include <fsm/slr/table_builder.hpp>
 
 #include <filesystem>
@@ -25,8 +25,13 @@ inline std::vector<fsm::token<igni::TokenType>> Tokenize(const std::string& sour
 		{
 			break;
 		}
-		tokens.push_back(*token);
-		if (token->type == TokenType::EndOfFile || token->type == TokenType::Error)
+		if (!*token)
+		{
+			break;
+		}
+
+		tokens.push_back(**token);
+		if ((*token)->type == TokenType::EndOfFile || (*token)->type == TokenType::Error)
 		{
 			break;
 		}
@@ -90,7 +95,7 @@ class FrontendTestFixture : public ::testing::Test
 {
 protected:
 	static void* s_tablePtr;
-	static fsm::slr::parser<re::String>* s_parser;
+	static fsm::lr::parser<re::String>* s_parser;
 
 	static void SetUpTestSuite()
 	{
@@ -110,7 +115,7 @@ protected:
 		auto* tablePtr = new auto(std::move(table));
 		s_tablePtr = tablePtr;
 
-		s_parser = new fsm::slr::parser(*tablePtr, "<EPSILON>");
+		s_parser = new fsm::lr::parser(*tablePtr, "<EPSILON>");
 
 		std::cout << "[Test Setup] SLR Parser table generated successfully.\n";
 	}

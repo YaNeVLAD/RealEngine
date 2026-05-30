@@ -11,7 +11,7 @@
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <fsm/cfg.hpp>
-#include <fsm/slr/parser.hpp>
+#include <fsm/lr/parser.hpp>
 #include <fsm/slr/table_builder.hpp>
 
 #include <fstream>
@@ -116,14 +116,14 @@ public:
 	}
 
 private:
-	fsm::slr::table<re::String> m_table;
+	fsm::lr::table<re::String> m_table;
 
 	std::vector<std::unique_ptr<ast::Program>> RunFrontend(
 		const std::vector<re::String>& filePaths,
 		DiagnosticEngine& diagnostics,
 		std::list<std::string>& sourceBuffers) const
 	{
-		fsm::slr::parser parser(m_table, "<EPSILON>");
+		fsm::lr::parser parser(m_table, "<EPSILON>");
 		AstConverter astConverter;
 		std::vector<std::unique_ptr<ast::Program>> programs;
 
@@ -133,9 +133,14 @@ private:
 			sourceBuffers.emplace_back(ReadFile(path));
 			const std::string& source = sourceBuffers.back();
 			auto tokens = CreateLexer(source).tokenize();
+			if (!tokens)
+			{
+				std::cerr << "Failed to tokenize file " << path;
+				continue;
+			}
 
 			std::vector<fsm::token<TokenType>> validTokens;
-			for (const auto& token : tokens)
+			for (const auto& token : *tokens)
 			{
 				if (token.type == TokenType::Error)
 				{
