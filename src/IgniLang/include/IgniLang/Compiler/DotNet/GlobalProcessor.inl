@@ -108,6 +108,7 @@ inline void GlobalProcessor::ProcessGlobalConstructor(const ast::Program* progra
 		}
 	}
 	m_gen.Ret();
+	m_gen.EndMethodBody();
 }
 
 } // namespace igni::dotnet

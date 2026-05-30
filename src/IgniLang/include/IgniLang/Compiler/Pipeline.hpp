@@ -13,7 +13,6 @@
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
 
 #include <fsm/lr/parser.hpp>
-#include <fsm/lr/table_io.hpp>
 
 #include <filesystem>
 #include <fstream>
