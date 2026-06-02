@@ -191,7 +191,21 @@ public:
 			m_state.argTypes.insert(m_state.argTypes.begin(), MapToCIL(funType->paramTypes[0]->name));
 		}
 
-		re::String methodName = (node->name == "main" && !m_state.currentClass) ? "main" : m_state.analyzer.GetBindings().GetMangledName(node);
+		bool hasDllExport = false;
+		for (const auto& anno : node->annotations)
+		{
+			if (anno->name == "DllExport")
+			{
+				hasDllExport = true;
+				break;
+			}
+		}
+
+		re::String methodName = node->name;
+		if (!isInstanceMethod && node->name != "main" && !hasDllExport)
+		{
+			methodName = m_state.analyzer.GetBindings().GetMangledName(node);
+		}
 
 		if (m_state.currentClass)
 		{

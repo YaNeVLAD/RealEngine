@@ -22,7 +22,7 @@
         "Null": "System.Object",
         "Any": "System.Object"
       },
-      "ffi_annotations": [ "DotNetMethod", "DotNetBaseClass", "DotNetOpcode" ]
+      "ffi_annotations": [ "DotNetMethod", "DotNetBaseClass", "DotNetOpcode", "DllExport" ]
     }
   }
 }

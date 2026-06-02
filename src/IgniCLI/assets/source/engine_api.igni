@@ -22,9 +22,9 @@ external fun __getY(entityId: Int): Double;
 @RvmNative("Engine_SetPosition")
 external fun __setPosition(entityId: Int, x: Double, y: Double): Unit;
 
-@DotNetMethod("void ['IgniEngine']IgniBridge::ApplyImpulse(int64, float64, float64, float64)")
-@RvmNative("Engine_ApplyImpulse")
-external fun __applyImpulse(entityId: Int, dirX: Double, dirY: Double, force: Double): Unit;
+@DotNetMethod("void ['IgniEngine']IgniBridge::SetVelocity(int64, float64, float64)")
+@RvmNative("Engine_SetVelocity")
+external fun __setVelocity(entityId: Int, velX: Double, velY: Double): Unit;
 
 @DotNetMethod("float64 ['IgniEngine']IgniBridge::GetAxis(string)")
 @RvmNative("Engine_GetAxis")
@@ -38,7 +38,7 @@ external fun __isActionPressed(actionName: String): Bool;
 // ============================================================================
 
 
-class Vector2(val x: Double, val y: Double) {}
+class Vec2(val x: Double, val y: Double) {}
 
 class Entity(val id: Int) {
 
@@ -46,23 +46,23 @@ class Entity(val id: Int) {
         __destroyEntity(id);
     }
 
-    fun getPosition(): Vector2 {
-        return Vector2(__getX(id), __getY(id));
+    fun getPosition(): Vec2 {
+        return Vec2(__getX(id), __getY(id));
     }
 
-    fun setPosition(pos: Vector2): Unit {
+    fun setPosition(pos: Vec2): Unit {
         __setPosition(id, pos.x, pos.y);
     }
 
-    fun applyImpulse(direction: Vector2, force: Double): Unit {
-        __applyImpulse(id, direction.x, direction.y, force);
+    fun setVelocity(velocity: Vec2): Unit {
+        __setVelocity(this.id, velocity.x, velocity.y);
     }
 
 }
 
 // --- Scene API ---
 
-fun spawn(prefabName: String, pos: Vector2): Entity {
+fun spawn(prefabName: String, pos: Vec2): Entity {
     val id = __spawnEntity(prefabName, pos.x, pos.y);
     return Entity(id);
 }
