@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <complex>
+#include <utility>
 
 namespace igni::sem
 {
@@ -31,8 +32,8 @@ using namespace re::literals;
 class SemanticAnalyzer final : public ast::BaseAstVisitor
 {
 public:
-	explicit SemanticAnalyzer(const generated::TargetConfig& config)
-		: m_targetConfig(config)
+	explicit SemanticAnalyzer(generated::TargetConfig config)
+		: m_targetConfig(std::move(config))
 	{
 		m_context.evaluateFunctionCallback = [this](const auto& node) {
 			return this->Evaluate(node);
@@ -1040,6 +1041,15 @@ private:
 		}
 
 		m_context.location.currentPackage = currentModule;
+
+		for (const auto& imp : node->imports)
+		{
+			if (imp)
+			{
+				imp->Accept(*this);
+			}
+		}
+
 		const std::size_t originalStmtCount = node->statements.size();
 
 		for (std::size_t i = 0; i < originalStmtCount; ++i)
@@ -1194,7 +1204,7 @@ private:
 
 				if (!fun->typeParams.empty())
 				{ // Generic non-instantiated function
-					auto tmpl = Declaration::GenericFunction(const_cast<ast::FunDecl*>(fun), currentModule ? currentModule->name : "global");
+					auto tmpl = Declaration::GenericFunction(fun, currentModule ? currentModule->name : "global");
 					if (fun->isExternal)
 					{
 						m_context.externalFunctions.insert(originalName);
@@ -1205,7 +1215,7 @@ private:
 				}
 
 				// Non-generic or instantiated function
-				auto funType = Declaration::Function(const_cast<ast::FunDecl*>(fun), m_context, currentModule ? currentModule->name : "global");
+				auto funType = Declaration::Function(fun, m_context, currentModule ? currentModule->name : "global");
 				Declaration::Overload::Global(originalName, funType, m_context, currentModule);
 			}
 		}
@@ -1302,21 +1312,16 @@ private:
 								return false;
 							}
 
-							// Обработка Type::<T>().hasAnnotation("Name")
+							// Type::<T>().hasAnnotation("Name")
 							if (memAccess->member == "hasAnnotation" && call->arguments.size() == 1)
 							{
 								const auto annoName = ExtractStringLiteral(call->arguments[0].get());
-								for (const auto& anno : classType->classDecl->annotations)
-								{
-									if (anno->name == annoName)
-									{
-										return true;
-									}
-								}
-								return false;
+								return std::ranges::any_of(classType->classDecl->annotations, [annoName](const auto& anno) {
+									return anno->name == annoName;
+								});
 							}
 
-							// Обработка Type::<T>().hasMethodAnnotation("Method", "Name")
+							// Type::<T>().hasMethodAnnotation("Method", "Name")
 							if (memAccess->member == "hasMethodAnnotation" && call->arguments.size() == 2)
 							{
 								const auto methodName = ExtractStringLiteral(call->arguments[0].get());

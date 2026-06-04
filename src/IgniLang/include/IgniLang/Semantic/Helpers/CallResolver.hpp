@@ -337,7 +337,7 @@ inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, Semantic
 	{
 		if (!ctx.location.currentFunction || !ctx.location.currentFunction->isSuspend)
 		{
-			IGNI_SEM_ERR(node, "Suspend function '" + resolution.target->name + "' can only be called from a coroutine.");
+			IGNI_SEM_ERR("Suspend function '" + resolution.target->name + "' can only be called from a coroutine.");
 		}
 	}
 
@@ -346,7 +346,7 @@ inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, Semantic
 		const Symbol* sym = ctx.env.Resolve("this");
 		if (!sym)
 		{
-			IGNI_SEM_ERR(node, "Undefined variable 'this'");
+			IGNI_SEM_ERR("Undefined variable 'this'");
 		}
 
 		argTypes.insert(argTypes.begin(), sym->type);
@@ -366,7 +366,7 @@ inline std::shared_ptr<SemanticType> Process(const ast::CallExpr* node, Semantic
 
 	if (!resolution.target->returnType)
 	{
-		IGNI_SEM_ERR(node, "Cannot infer return type for forward call");
+		IGNI_SEM_ERR("Cannot infer return type for forward call");
 	}
 
 	return resolution.target->returnType;

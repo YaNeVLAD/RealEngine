@@ -40,6 +40,8 @@ external fun __isActionPressed(actionName: String): Bool;
 
 class Vec2(val x: Double, val y: Double) {}
 
+class Vec3(val x: Double, val y: Double, val z: Double) {}
+
 class Entity(val id: Int) {
 
     fun destroy() {
