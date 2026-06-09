@@ -1,6 +1,7 @@
 #pragma once
 
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Backend/TargetConfig.hpp>
 #include <IgniLang/Semantic/Context.hpp>
 #include <IgniLang/Semantic/Enviroment.hpp>
 #include <IgniLang/Semantic/Helpers/CallResolver.hpp>
@@ -32,7 +33,7 @@ using namespace re::literals;
 class SemanticAnalyzer final : public ast::BaseAstVisitor
 {
 public:
-	explicit SemanticAnalyzer(generated::TargetConfig config)
+	explicit SemanticAnalyzer(TargetConfig config)
 		: m_targetConfig(std::move(config))
 	{
 		m_context.evaluateFunctionCallback = [this](const auto& node) {
@@ -960,7 +961,7 @@ private:
 	std::unordered_map<const ast::Program*, FileData> m_fileData;
 
 	SemanticContext m_context;
-	generated::TargetConfig m_targetConfig;
+	TargetConfig m_targetConfig;
 
 	std::shared_ptr<SemanticType> m_currentExprType = nullptr;
 	ast::Program* m_currentProgram = nullptr;

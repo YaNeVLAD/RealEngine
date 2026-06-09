@@ -1,7 +1,9 @@
 #include <Core/flat_map.hpp>
+#include <IgniCLI/BackendRegistry.hpp>
 #include <IgniCLI/CLArguments.hpp>
 #include <IgniCLI/Runners/DotNetRunner.hpp>
 #include <IgniCLI/Runners/RvmRunner.hpp>
+#include <IgniLang/Backend/TargetConfig.hpp>
 #include <IgniLang/Compiler/DotNetBackend.hpp>
 #include <IgniLang/Compiler/Pipeline.hpp>
 #include <IgniLang/Compiler/RvmBackend.hpp>
@@ -49,6 +51,27 @@ int main(const int argc, char** argv)
 
 	try
 	{
+		re::String targetFlag = target == igni::BuildTarget::DotNet ? "--dotnet" : "--rvm";
+		re::String backendExe;
+
+		for (const auto& b : igni::backend::BackendRegistry::Load(argv[0]))
+		{
+			if (b.flag == targetFlag)
+			{
+				backendExe = b.executablePath;
+				break;
+			}
+		}
+
+		if (backendExe.Empty())
+		{
+			std::cerr << "[Error] Target backend executable not found for flag " << targetFlag << " in backends.json\n";
+			return 1;
+		}
+
+		std::cout << "[Info] Fetching config from backend process: " << backendExe << "...\n";
+		igni::TargetConfig targetConfig = igni::TargetConfig::LoadFromBackend(backendExe);
+
 		std::unique_ptr<igni::compiler::IBackend> backend;
 		if (target == igni::BuildTarget::RVM)
 		{
@@ -60,7 +83,7 @@ int main(const int argc, char** argv)
 		}
 
 		const igni::compiler::Pipeline pipeline("assets/igni_grammar.txt");
-		const auto result = pipeline.Compile(sourceFiles, target, args.BuildType(), args.DisableDCE(), *backend);
+		const auto result = pipeline.Compile(sourceFiles, targetConfig, args.BuildType(), args.DisableDCE(), *backend);
 
 		if (!result.success)
 		{

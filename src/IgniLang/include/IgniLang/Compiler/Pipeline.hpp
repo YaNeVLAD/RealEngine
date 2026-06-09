@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/FileCache.hpp>
-#include <GeneratedSemantics.hpp>
 #include <IgniLang/AST/AstConverter.hpp>
+#include <IgniLang/Backend/TargetConfig.hpp>
 #include <IgniLang/BuildType.hpp>
 #include <IgniLang/CST/CstBuilder.hpp>
 #include <IgniLang/Compiler/IBackend.hpp>
@@ -44,7 +44,7 @@ public:
 
 	CompilationResult Compile(
 		const std::vector<re::String>& filePaths,
-		BuildTarget target,
+		const TargetConfig& config,
 		BuildType buildType,
 		bool disableDCE,
 		IBackend& backend) const
@@ -63,8 +63,7 @@ public:
 		}
 
 		// --- PHASE 2: SEMANTICS ---
-		std::cout << "[Info] Running Semantic Analysis for target: " << static_cast<int>(target) << "...\n";
-		auto config = sem::generated::GetTargetConfig(target);
+		std::cout << "[Info] Running Semantic Analysis for target: " << config.prettyName << "...\n";
 		auto semanticAnalyzer = std::make_shared<sem::SemanticAnalyzer>(config);
 
 		sem::g_Diagnostics = &diagnostics;
