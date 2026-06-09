@@ -41,7 +41,33 @@ inline std::shared_ptr<SemanticType> ResolveAccess(
 
 	if (vis == ast::Visibility::Private)
 	{
-		if (!ctx.location.currentClass || ctx.location.currentClass->name != classType->name)
+		auto getBaseName = [](const re::String& name) {
+			const std::size_t pos = name.Find('@');
+			return pos != re::String::NPos ? name.Substring(0, pos) : name;
+		};
+
+		bool isInsideClass = false;
+
+		if (ctx.location.currentClass && getBaseName(ctx.location.currentClass->name) == getBaseName(classType->name))
+		{
+			isInsideClass = true;
+		}
+
+		if (!isInsideClass)
+		{
+			if (const Symbol* thisSym = ctx.env.Resolve("this"))
+			{
+				if (const auto thisType = std::dynamic_pointer_cast<ClassType>(thisSym->type))
+				{
+					if (getBaseName(thisType->name) == getBaseName(classType->name))
+					{
+						isInsideClass = true;
+					}
+				}
+			}
+		}
+
+		if (!isInsideClass)
 		{
 			IGNI_SEM_ERR("Cannot access private member '" + memberName + "' of class '" + classType->name + "'");
 		}

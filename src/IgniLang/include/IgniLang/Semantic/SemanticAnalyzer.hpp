@@ -1170,16 +1170,36 @@ private:
 				{
 					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
 					{
+						std::shared_ptr<SemanticType> fieldType = nullptr;
 						if (varDecl->type)
 						{
-							classType->fields[varDecl->name] = { TypeResolver::Resolve(varDecl->type.get(), m_context), false, varDecl->visibility };
+							fieldType = TypeResolver::Resolve(varDecl->type.get(), m_context);
+						}
+						else if (varDecl->initializer)
+						{
+							fieldType = Evaluate(varDecl->initializer.get());
+						}
+
+						if (fieldType)
+						{
+							classType->fields[varDecl->name] = { fieldType, false, varDecl->visibility };
 						}
 					}
 					else if (const auto valDecl = dynamic_cast<const ast::ValDecl*>(member.get()))
 					{
+						std::shared_ptr<SemanticType> fieldType = nullptr;
 						if (valDecl->type)
 						{
-							classType->fields[valDecl->name] = { TypeResolver::Resolve(valDecl->type.get(), m_context), true, valDecl->visibility };
+							fieldType = TypeResolver::Resolve(valDecl->type.get(), m_context);
+						}
+						else if (valDecl->initializer)
+						{
+							fieldType = Evaluate(valDecl->initializer.get());
+						}
+
+						if (fieldType)
+						{
+							classType->fields[valDecl->name] = { fieldType, true, valDecl->visibility };
 						}
 					}
 				}
