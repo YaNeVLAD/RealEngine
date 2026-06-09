@@ -3,8 +3,8 @@
 #include <Core/String.hpp>
 
 #include <fsm/cfg.hpp>
-#include <fsm/lalr/table_builder.hpp>
 #include <fsm/lr/table_io.hpp>
+#include <fsm/slr/table_builder.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -30,18 +30,13 @@ struct GrammarCachePolicy
 		}
 
 		const auto grammar = fsm::cfg_load<re::String>(file);
-		fsm::lalr::table_builder builder(grammar);
-		auto expected = builder
-							.with_epsilon("<EPSILON>")
-							.with_end_marker("<EOF>")
-							.build(fsm::lr::collision_policy::prefer_shift);
+		fsm::slr::table_builder builder(grammar);
+		auto table = builder
+						 .with_epsilon("<EPSILON>")
+						 .with_end_marker("<EOF>")
+						 .build(fsm::slr::collision_policy::prefer_shift);
 
-		if (!expected)
-		{
-			throw std::runtime_error("Failed to parse grammar file: " + sourcePath.string());
-		}
-
-		return std::move(*expected);
+		return std::move(table);
 	}
 
 	template <typename TableType>
