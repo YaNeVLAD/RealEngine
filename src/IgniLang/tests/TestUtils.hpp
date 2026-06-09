@@ -83,7 +83,7 @@ inline std::vector<std::filesystem::path> GetTestScripts()
 	{
 		for (const auto& entry : fs::directory_iterator("tests/scripts"))
 		{
-			if (entry.path().extension() == ".igni")
+			if (entry.path().extension() == ".igni" && entry.path().string().find("_dotnet") == std::string::npos)
 			{
 				scripts.emplace_back(entry.path());
 			}

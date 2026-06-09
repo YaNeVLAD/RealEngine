@@ -135,6 +135,8 @@ TEST_P(DotNetE2ETestFixture, ExecutesCorrectlyOnDotNet)
 	out << cilCode;
 	out.close();
 
+	std::cout << cilCode;
+
 	int compileExitCode = 0;
 	std::string compileCmd = s_ilasmPath + " /quiet /exe /output=" + tempExeName + " " + tempIlName;
 #ifndef _WIN32
@@ -165,7 +167,7 @@ inline std::vector<fs::path> GetDotNetCompatibleScripts()
 	for (const auto& path : allScripts)
 	{
 		if (std::string name = path.stem().string();
-			name == "01_primitives_math"
+			name == "01_primitives_math_dotnet"
 			|| name == "02_control_flow"
 			|| name == "03_functions"
 			|| name == "04_classes_oop"
@@ -173,8 +175,8 @@ inline std::vector<fs::path> GetDotNetCompatibleScripts()
 			|| name == "06_deep_closures"
 			|| name == "07_complex_generics"
 			|| name == "08_virtual_dispatch"
-			|| name == "09_varargs_packing"
-			|| name == "15_type_casting"
+			|| name == "09_varargs_packing_dotnet"
+			|| name == "15_type_casting_dotnet"
 			|| name == "math")
 		{
 			compatible.push_back(path);

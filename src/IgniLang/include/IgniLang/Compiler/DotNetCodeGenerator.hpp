@@ -103,16 +103,68 @@ public:
 		}
 
 		m_state.currentClass = node;
-		const re::String baseClass = GetBaseClass(node->annotations);
-
-		m_state.out << ".class public auto ansi beforefieldinit " << node->name << " extends " << baseClass << "\n{\n";
-
+		re::String baseClass = "[mscorlib]System.Object";
 		if (const auto semClass = m_state.analyzer.GetClassType(node->name))
 		{
+			if (semClass->baseClass && semClass->baseClass->name != "Any")
+			{
+				if (semClass->baseClass->name == "System.Object")
+				{
+					baseClass = "[mscorlib]System.Object";
+				}
+				else
+				{
+					if (const re::String mappedBase = MapToCIL(semClass->baseClass->name); mappedBase.Find("class ") == 0)
+					{
+						baseClass = mappedBase;
+						if (baseClass.Find("class ") == 0)
+						{
+							baseClass = baseClass.Substring(6);
+						}
+					}
+					else
+					{
+						baseClass = mappedBase;
+					}
+				}
+			}
+
+			for (const auto& anno : node->annotations)
+			{
+				if (anno->name == "DotNetBaseClass")
+				{
+					if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno.get()))
+					{
+						baseClass = *strArg;
+					}
+				}
+			}
+
+			m_state.out << ".class public auto ansi beforefieldinit " << node->name << " extends " << baseClass << "\n{\n";
+
 			for (const auto& [fieldName, fieldInfo] : semClass->fields)
 			{
-				m_state.out << "  .field public " << MapToCIL(fieldInfo.type->name) << " '" << fieldName << "'\n";
+				bool isInherited = false;
+				auto currBase = semClass->baseClass;
+				while (currBase)
+				{
+					if (currBase->fields.contains(fieldName))
+					{
+						isInherited = true;
+						break;
+					}
+					currBase = currBase->baseClass;
+				}
+
+				if (!isInherited)
+				{
+					m_state.out << "  .field public " << MapToCIL(fieldInfo.type->name) << " '" << fieldName << "'\n";
+				}
 			}
+		}
+		else
+		{
+			m_state.out << ".class public auto ansi beforefieldinit " << node->name << " extends " << baseClass << "\n{\n";
 		}
 
 		for (const auto& member : node->members)
@@ -237,6 +289,18 @@ public:
 		}
 
 		re::String finalSig = ".method public hidebysig ";
+		if (isInstanceMethod)
+		{
+			if (node->isOverride)
+			{
+				finalSig += "virtual ";
+			}
+			else
+			{
+				finalSig += "newslot virtual ";
+			}
+		}
+
 		finalSig += sig;
 		finalSig += " cil managed";
 		EmitMethodBody(finalSig, node->body.get(), node->name == "main" && !m_state.currentClass);
@@ -667,8 +731,82 @@ public:
 
 		if (m_state.analyzer.GetBindings().castTargets.contains(node))
 		{
-			CastClass(MapToCIL(m_state.analyzer.GetBindings().castTargets.at(node)));
+			const re::String dstTypeName = m_state.analyzer.GetBindings().castTargets.at(node);
+			const re::String cilDstType = MapToCIL(dstTypeName);
+
+			const auto srcSemType = m_state.analyzer.GetBindings().GetExpressionType(node->expr.get());
+			const re::String cilSrcType = srcSemType ? MapToCIL(srcSemType->name) : "";
+
+			if (cilSrcType == cilDstType)
+			{
+				return;
+			}
+
+			auto isPrimitive = [](const re::String& t) {
+				return t == "int64" || t == "float64" || t == "bool";
+			};
+
+			const bool isSrcPrim = isPrimitive(cilSrcType);
+			const bool isDstPrim = isPrimitive(cilDstType);
+			if (!isSrcPrim && isDstPrim)
+			{
+				Emit("unbox.any " + cilDstType);
+			}
+			else if (isSrcPrim && !isDstPrim)
+			{
+				Emit("box " + cilSrcType);
+				if (cilDstType != TYPE_OBJECT && cilDstType != "object")
+				{
+					CastClass(cilDstType);
+				}
+			}
+			else if (isSrcPrim && isDstPrim)
+			{
+				if (cilDstType == "int64")
+				{
+					Emit("conv.i8");
+				}
+				else if (cilDstType == "float64")
+				{
+					Emit("conv.r8");
+				}
+				else if (cilDstType == "bool")
+				{
+					Emit("conv.i4");
+				}
+			}
+			else
+			{
+				CastClass(cilDstType);
+			}
 		}
+	}
+
+	void Visit(const ast::IndexExpr* node) override
+	{
+		if (node->array)
+		{
+			node->array->Accept(*this);
+		}
+		if (node->index)
+		{
+			node->index->Accept(*this);
+		}
+		ConvI4();
+
+		re::String elemType = "System.Object";
+		if (const auto arrSemType = m_state.analyzer.GetBindings().GetExpressionType(node->array.get()))
+		{
+			if (const auto classType = std::dynamic_pointer_cast<sem::ClassType>(arrSemType))
+			{
+				if (!classType->typeArguments.empty())
+				{
+					elemType = classType->typeArguments[0]->name;
+				}
+			}
+		}
+
+		LdElem(GetElemSuffix(elemType));
 	}
 
 	void SetOutStream(std::ostream& out)
