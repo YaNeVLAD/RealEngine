@@ -3,7 +3,6 @@
 #include <IgniLang/Semantic/SemanticError.hpp>
 #include <IgniLang/Semantic/SemanticType.hpp>
 
-#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -56,6 +55,24 @@ public:
 			{
 				return &(*it)[name];
 			}
+		}
+
+		return nullptr;
+	}
+
+	template <typename TSelf>
+	[[nodiscard]] auto ResolveLocal(this TSelf&& self, const re::String& name) -> std::conditional_t<std::is_const_v<TSelf>, const Symbol*, Symbol*>
+	{
+		auto&& instance = std::forward<TSelf>(self);
+
+		if (instance.m_scopes.empty())
+		{
+			return nullptr;
+		}
+
+		if (instance.m_scopes.back().contains(name))
+		{
+			return &instance.m_scopes.back().at(name);
 		}
 
 		return nullptr;

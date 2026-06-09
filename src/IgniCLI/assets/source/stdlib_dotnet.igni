@@ -6,6 +6,8 @@ annotation class DotNetBaseClass(val signature: String);
 
 annotation class DotNetOpcode(val operation: String);
 
+annotation class RvmNative(val name: String);
+
 annotation class DllExport;
 
 @DotNetMethod("void [mscorlib]System.Console::Write(object)")

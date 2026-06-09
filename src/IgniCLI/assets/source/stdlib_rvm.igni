@@ -2,6 +2,8 @@ package global;
 
 annotation class NativeName(val name: String);
 
+annotation class RvmNative(val name: String);
+
 fun less(lhs: Any, rhs: Any) = lhs < rhs;
 
 fun greater(lhs: Any, rhs: Any) = lhs > rhs;

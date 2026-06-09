@@ -1,7 +1,5 @@
 package engine;
 
-annotation class RvmNative(val name: String);
-
 @DotNetMethod("int64 ['IgniEngine']IgniBridge::Spawn(string, float64, float64)")
 @RvmNative("Engine_Spawn")
 external fun __spawnEntity(prefabName: String, x: Double, y: Double): Int;

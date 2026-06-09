@@ -52,7 +52,7 @@ public:
 		InitBuiltins();
 	}
 
-	Environment const& Env() const
+	[[nodiscard]] Environment const& Env() const
 	{
 		return m_context.env;
 	}
@@ -68,20 +68,33 @@ public:
 		for (const auto& prog : programs)
 		{
 			m_currentProgram = prog.get();
+			const re::String pkgName = prog->packageName.Empty() ? "global" : prog->packageName;
+			auto& [moduleType, internals] = m_packages[pkgName];
+			auto& filePrivates = m_fileData[prog.get()].privates;
+
 			m_context.env.PushScope();
 
-			if (const bool isGlobal = prog->packageName.Empty() || prog->packageName == "global"; !isGlobal)
+			if (pkgName != "global" && m_packages.contains("global"))
 			{
-				if (const Symbol* modSym = m_context.env.Resolve(prog->packageName))
+				if (const auto& globalPkg = m_packages.at("global").moduleType)
 				{
-					if (const auto modType = std::dynamic_pointer_cast<ModuleType>(modSym->type))
+					for (const auto& [name, type] : globalPkg->exports)
 					{
-						for (const auto& [name, type] : modType->exports)
+						if (!m_context.env.ResolveLocal(name))
 						{
-							m_context.env.Define(name, type, true);
+							m_context.env.Define(name, type, false);
 						}
 					}
 				}
+			}
+
+			for (const auto& [name, type] : internals)
+			{
+				m_context.env.Define(name, type, false);
+			}
+			for (const auto& [name, type] : filePrivates)
+			{
+				m_context.env.Define(name, type, false);
 			}
 
 			for (const auto& imp : prog->imports)
@@ -114,7 +127,6 @@ public:
 				for (auto& stmt : pending)
 				{
 					prog->statements.push_back(std::move(stmt));
-
 					prog->statements.back()->Accept(*this);
 				}
 			}
@@ -934,6 +946,19 @@ public:
 	}
 
 private:
+	struct PackageData
+	{
+		std::shared_ptr<ModuleType> moduleType;
+		std::unordered_map<re::String, std::shared_ptr<SemanticType>> internals;
+	};
+	std::unordered_map<re::String, PackageData> m_packages;
+
+	struct FileData
+	{
+		std::unordered_map<re::String, std::shared_ptr<SemanticType>> privates;
+	};
+	std::unordered_map<const ast::Program*, FileData> m_fileData;
+
 	SemanticContext m_context;
 	generated::TargetConfig m_targetConfig;
 
@@ -1023,25 +1048,38 @@ private:
 
 	void RegisterProgramDeclarations(const ast::Program* node)
 	{
-		const bool isGlobal = node->packageName.Empty() || node->packageName == "global";
-		std::shared_ptr<ModuleType> currentModule = nullptr;
+		const re::String pkgName = node->packageName.Empty() ? "global" : node->packageName;
+		auto& [moduleType, internals] = m_packages[pkgName];
 
-		if (!isGlobal)
+		if (!moduleType)
 		{
-			if (const Symbol* sym = m_context.env.Resolve(node->packageName))
-			{
-				currentModule = std::dynamic_pointer_cast<ModuleType>(sym->type);
-			}
+			moduleType = std::make_shared<ModuleType>(pkgName);
+			m_context.env.Define(pkgName, moduleType, true);
+		}
 
-			if (!currentModule)
+		m_context.location.currentPackage = moduleType;
+		auto& filePrivates = m_fileData[node].privates;
+
+		m_context.env.PushScope();
+
+		if (pkgName != "global" && m_packages.contains("global"))
+		{
+			if (const auto& globalPkg = m_packages.at("global").moduleType)
 			{
-				currentModule = std::make_shared<ModuleType>(node->packageName);
-				m_context.env.Define(node->packageName, currentModule, true);
+				for (const auto& [name, type] : globalPkg->exports)
+				{
+					if (!m_context.env.ResolveLocal(name))
+					{
+						m_context.env.Define(name, type, false);
+					}
+				}
 			}
 		}
 
-		m_context.location.currentPackage = currentModule;
-
+		for (const auto& [name, type] : internals)
+		{
+			m_context.env.Define(name, type, false);
+		}
 		for (const auto& imp : node->imports)
 		{
 			if (imp)
@@ -1055,61 +1093,63 @@ private:
 		for (std::size_t i = 0; i < originalStmtCount; ++i)
 		{
 			const ast::Statement* stmt = node->statements[i].get();
-			if (const auto annoDecl = dynamic_cast<const ast::AnnotationDecl*>(stmt))
+			const auto decl = dynamic_cast<const ast::Decl*>(stmt);
+			if (!decl)
 			{
-				auto annoType = std::make_shared<AnnotationType>(annoDecl->name);
-
-				if (isGlobal)
-				{
-					m_context.env.Define(annoDecl->name, annoType, true);
-				}
-				else if (currentModule)
-				{
-					currentModule->exports[annoDecl->name] = annoType;
-				}
 				continue;
 			}
-			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt))
+
+			const ast::Visibility vis = decl->visibility;
+			const bool isPrivate = vis == ast::Visibility::Private;
+			const bool isInternal = vis == ast::Visibility::Internal;
+			const bool isPublic = !isPrivate && !isInternal;
+
+			auto registerSymbol = [&](const re::String& name, const std::shared_ptr<SemanticType>& type) {
+				if (isPrivate)
+				{
+					filePrivates[name] = type;
+				}
+				else if (isInternal)
+				{
+					internals[name] = type;
+				}
+				else if (isPublic)
+				{
+					internals[name] = type;
+					moduleType->exports[name] = type;
+				}
+				m_context.env.Define(name, type, false);
+			};
+
+			if (const auto annoDecl = dynamic_cast<const ast::AnnotationDecl*>(decl))
+			{
+				auto annoType = std::make_shared<AnnotationType>(annoDecl->name);
+				registerSymbol(annoDecl->name, annoType);
+				continue;
+			}
+
+			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(decl))
 			{
 				if (!classDecl->typeParams.empty())
-				{ // Generic non-instantiated class
+				{
 					auto tmpl = std::make_shared<GenericClassTemplate>(classDecl->name);
 					tmpl->astNode = classDecl;
 					tmpl->typeParams = ast::clone::GetRawPointers(classDecl->typeParams);
-					tmpl->moduleName = currentModule ? currentModule->name : "global";
+					tmpl->moduleName = pkgName;
 
-					if (isGlobal)
-					{
-						m_context.env.Define(classDecl->name, tmpl, true);
-					}
-					else
-					{
-						currentModule->exports[classDecl->name] = tmpl;
-					}
-
+					registerSymbol(classDecl->name, tmpl);
 					continue;
 				}
 
-				// Non-generic or instantiated class
 				std::shared_ptr<ClassType> classType = nullptr;
-				bool isNewClass = false;
-
-				if (isGlobal)
+				if (const Symbol* existingSym = m_context.env.ResolveLocal(classDecl->name))
 				{
-					if (const Symbol* existingSym = m_context.env.Resolve(classDecl->name))
-					{
-						classType = std::dynamic_pointer_cast<ClassType>(existingSym->type);
-					}
+					classType = std::dynamic_pointer_cast<ClassType>(existingSym->type);
 				}
 
 				if (!classType)
-				{ // New previously undefined class
+				{
 					classType = std::make_shared<ClassType>(classDecl->name, classDecl);
-					isNewClass = true;
-				}
-				else
-				{ // Extending already defined class
-					isNewClass = false;
 				}
 
 				// clang-format off
@@ -1124,17 +1164,8 @@ private:
 				}
 				// clang-format on
 
-				classType->moduleName = currentModule ? currentModule->name : "global";
-
-				if (isGlobal && isNewClass)
-				{
-					m_context.env.Define(classDecl->name, classType, true);
-				}
-				else if (!isGlobal)
-				{
-					currentModule->exports[classDecl->name] = classType;
-				}
-
+				classType->moduleName = pkgName;
+				registerSymbol(classDecl->name, classType);
 				for (const auto& member : classDecl->members)
 				{
 					if (const auto varDecl = dynamic_cast<const ast::VarDecl*>(member.get()))
@@ -1154,18 +1185,6 @@ private:
 				}
 
 				m_context.allClassTypes[classDecl->name] = classType;
-
-				classType->moduleName = currentModule ? currentModule->name : "global";
-
-				if (isGlobal && isNewClass)
-				{
-					m_context.env.Define(classDecl->name, classType, true);
-				}
-				else if (!isGlobal)
-				{
-					currentModule->exports[classDecl->name] = classType;
-				}
-
 				for (const auto& member : classDecl->members)
 				{
 					if (const auto fun = dynamic_cast<const ast::FunDecl*>(member.get()))
@@ -1176,12 +1195,10 @@ private:
 							{
 								IGNI_SEM_ERR(fun, "Generic methods cannot be marked 'override'");
 							}
-
-							auto tmpl = Declaration::GenericFunction(fun, currentModule ? currentModule->name : "global");
+							auto tmpl = Declaration::GenericFunction(fun, pkgName);
 							Declaration::Overload::GenericMethod(classType, fun->name, tmpl);
 							continue;
 						}
-
 						auto funType = Declaration::Method(fun, classType, m_context);
 						Declaration::Overload::Method(classType, fun->name, funType);
 					}
@@ -1198,28 +1215,51 @@ private:
 				}
 			}
 
-			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt))
+			if (const auto fun = dynamic_cast<const ast::FunDecl*>(decl))
 			{
 				const re::String originalName = fun->name;
 
 				if (!fun->typeParams.empty())
-				{ // Generic non-instantiated function
-					auto tmpl = Declaration::GenericFunction(fun, currentModule ? currentModule->name : "global");
+				{
+					auto tmpl = Declaration::GenericFunction(fun, pkgName);
 					if (fun->isExternal)
 					{
 						m_context.externalFunctions.insert(originalName);
 					}
 
-					Declaration::Overload::GenericGlobal(originalName, tmpl, m_context, currentModule);
+					std::shared_ptr<FunctionGroup> fg;
+					if (const Symbol* sym = m_context.env.ResolveLocal(originalName))
+					{
+						fg = std::dynamic_pointer_cast<FunctionGroup>(sym->type);
+					}
+					if (!fg)
+					{
+						fg = std::make_shared<FunctionGroup>(originalName);
+					}
+					fg->templates.push_back(tmpl);
+
+					registerSymbol(originalName, fg);
 					continue;
 				}
 
-				// Non-generic or instantiated function
-				auto funType = Declaration::Function(fun, m_context, currentModule ? currentModule->name : "global");
-				Declaration::Overload::Global(originalName, funType, m_context, currentModule);
+				auto funType = Declaration::Function(fun, m_context, pkgName);
+
+				std::shared_ptr<FunctionGroup> fg;
+				if (const Symbol* sym = m_context.env.ResolveLocal(originalName))
+				{
+					fg = std::dynamic_pointer_cast<FunctionGroup>(sym->type);
+				}
+				if (!fg)
+				{
+					fg = std::make_shared<FunctionGroup>(originalName);
+				}
+				fg->overloads.push_back(funType);
+
+				registerSymbol(originalName, fg);
 			}
 		}
 
+		m_context.env.PopScope();
 		m_context.location.currentPackage = nullptr;
 	}
 

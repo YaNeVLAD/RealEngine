@@ -29,7 +29,10 @@ inline void Process(const ast::ImportDecl* node, SemanticContext& m_context)
 
 		for (const auto& [exportName, exportType] : modType->exports)
 		{
-			m_context.env.Define(exportName, exportType, true);
+			if (!m_context.env.ResolveLocal(exportName))
+			{
+				m_context.env.Define(exportName, exportType, false);
+			}
 			m_context.importAliases[exportName] = fullPath;
 		}
 	}
@@ -58,7 +61,10 @@ inline void Process(const ast::ImportDecl* node, SemanticContext& m_context)
 
 		if (const auto it = modType->exports.find(memberName); it != modType->exports.end())
 		{
-			m_context.env.Define(memberName, it->second, true);
+			if (!m_context.env.ResolveLocal(memberName))
+			{
+				m_context.env.Define(memberName, it->second, false);
+			}
 			m_context.importAliases[memberName] = modName;
 		}
 		else
