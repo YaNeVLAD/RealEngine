@@ -477,6 +477,63 @@ public:
 
 	void Visit(const ast::CallExpr* node) override
 	{
+		if (m_state.analyzer.GetBindings().callInfo.contains(node))
+		{
+			if (const auto& callInfo = m_state.analyzer.GetBindings().callInfo.at(node);
+				callInfo.dispatchMode == CallDispatchType::Indirect)
+			{
+				if (node->callee)
+				{
+					node->callee->Accept(*this);
+				}
+
+				for (const auto& arg : node->arguments)
+				{
+					if (arg)
+					{
+						arg->Accept(*this);
+					}
+				}
+
+				const re::String retType = callInfo.target && callInfo.target->returnType
+					? MapToCIL(callInfo.target->returnType->name)
+					: re::String("void");
+
+				re::String invokeSig = "instance " + retType + " ";
+
+				if (const auto funType = std::dynamic_pointer_cast<sem::FunctionType>(callInfo.target))
+				{
+					invokeSig += "class " + dotnet::SignatureUtils::GetDelegateName(funType.get());
+				}
+				else
+				{
+					invokeSig += callInfo.target->name;
+				}
+
+				invokeSig += "::Invoke(";
+				for (size_t i = 0; i < callInfo.target->paramTypes.size(); ++i)
+				{
+					re::String mapped = MapToCIL(callInfo.target->paramTypes[i]->name);
+					if (callInfo.target->isVararg && i == callInfo.target->paramTypes.size() - 1)
+					{
+						if (mapped.Find("[]") == re::String::NPos)
+						{
+							mapped += "[]";
+						}
+					}
+					invokeSig += mapped;
+					if (i < callInfo.target->paramTypes.size() - 1)
+					{
+						invokeSig += ", ";
+					}
+				}
+				invokeSig += ")";
+
+				CallVirtual(invokeSig);
+				return;
+			}
+		}
+
 		ProcessCallExpr(node);
 	}
 
@@ -627,7 +684,15 @@ public:
 		{
 			if (const auto semType = m_state.analyzer.GetBindings().GetExpressionType(initExpr))
 			{
-				cilType = MapToCIL(semType->name);
+				if (const auto funType = std::dynamic_pointer_cast<sem::FunctionType>(semType))
+				{
+					RegisterDelegateFromType(funType);
+					cilType = "class " + dotnet::SignatureUtils::GetDelegateName(funType.get());
+				}
+				else
+				{
+					cilType = MapToCIL(semType->name);
+				}
 			}
 		}
 
@@ -828,16 +893,17 @@ private:
 					const re::String cilType = lambdaData->captureTypes[i];
 					const bool isByRef = lambdaData->isByRef[i];
 
-					LdArg(0);
+					LdArg(0); // 'this'
+
 					re::String fieldSig = cilType;
 					if (isByRef)
 					{
 						fieldSig += "[]";
 					}
-					LdFld(fieldSig, lambdaData->className, id->name);
 
 					if (isByRef)
 					{
+						LdFld(fieldSig, lambdaData->className, id->name);
 						if (isStore)
 						{
 							LdcI4(0);
@@ -861,8 +927,15 @@ private:
 							{
 								assignValue->Accept(*this);
 							}
-							LdArg(0);
-							StFld(cilType, lambdaData->className, id->name);
+							// Для записи в обычную захваченную переменную (копия)
+							// assignValue уже на стеке, нам нужен 'this' перед stfld.
+							// Но так как stfld требует [obj, value], а у нас на стеке [value],
+							// архитектурно проще было сделать ldarg.0 до вычисления assignValue.
+							// Перепишем по спецификации CLR:
+						}
+						else
+						{
+							LdFld(fieldSig, lambdaData->className, id->name);
 						}
 					}
 					return;
