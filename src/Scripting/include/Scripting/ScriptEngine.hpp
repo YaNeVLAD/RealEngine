@@ -1,10 +1,11 @@
 #pragma once
 
-#include <Core/FileSystem.hpp>
 #include <Core/LibraryLoader.hpp>
 #include <RVM/Assembler.hpp>
 #include <RVM/Chunk.hpp>
 #include <RVM/VirtualMachine.hpp>
+#include <Scripting/Internal/EngineApi.hpp>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -18,7 +19,7 @@ public:
 	void Init()
 	{
 		InitNativeLibrary();
-		// BindTransformAPI(m_vm);
+		BindEngineAPI(&m_vm);
 		// BindPhysicsAPI(m_vm); ...
 	}
 
@@ -41,7 +42,7 @@ public:
 			return false;
 		}
 
-		if (const auto result = m_vm.Interpret(m_mainChunk); result != re::rvm::InterpreterResult::Success)
+		if (const auto result = m_vm.Interpret(m_mainChunk); result != rvm::InterpreterResult::Success)
 		{
 			std::cerr << "[ScriptEngine] VM failed to initialize chunk.\n";
 			return false;

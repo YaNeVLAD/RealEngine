@@ -1381,6 +1381,53 @@ InterpreterResult VirtualMachine::InvokeMethod(Value const& instance, String con
 	return InterpreterResult::RuntimeError;
 }
 
+InterpreterResult VirtualMachine::InvokeGlobal(String const& funcName, std::vector<Value> const& args)
+{
+	const auto it = m_globals.find(funcName);
+	if (it == m_globals.end())
+	{
+		return InterpreterResult::Success;
+	}
+
+	const Value callableVal = it->second;
+	if (const auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
+	{
+		const auto closure = *closurePtr;
+
+		if (!m_activeCoro)
+		{
+			m_activeCoro = Allocate<Coroutine>();
+			m_activeCoro->state = CoroutineState::Running;
+		}
+
+		for (const auto& arg : args)
+		{
+			Push(arg);
+		}
+
+		CallFrame frame;
+		frame.returnAddress = nullptr;
+		frame.stackBase = m_stack.size() - args.size();
+		frame.localsBase = m_currentLocalsBase;
+		frame.closure = closure;
+
+		m_callStack.push_back(frame);
+		m_currentLocalsBase = m_variables.size();
+		m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+		return Run();
+	}
+
+	if (const auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
+	{
+		std::ignore = (*nativePtr)->function(args);
+		return InterpreterResult::Success;
+	}
+
+	std::cerr << "[RVM Error] Global '" << funcName << "' is not a function\n";
+	return InterpreterResult::RuntimeError;
+}
+
 void VirtualMachine::SetUserData(void* data)
 {
 	m_userData = data;

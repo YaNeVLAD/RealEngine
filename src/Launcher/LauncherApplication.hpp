@@ -49,7 +49,12 @@ struct EditorLayout final : re::Layout
 	void OnCreate() override
 	{
 		m_scriptEngine.Init();
-		m_scriptEngine.LoadScript(re::file_system::ScriptsPath("bin/test.rbc").Str().ToString());
+		m_scriptEngine.LoadScript(re::file_system::ScriptsPath("bin/game_scripts.rbc").Str().ToString());
+
+		auto* vm = m_scriptEngine.GetVM();
+		vm->SetUserData(&GetScene());
+		vm->InvokeGlobal("onGameStart");
+		vm->SetUserData(nullptr);
 
 		auto& scene = GetScene();
 
@@ -104,6 +109,22 @@ struct EditorLayout final : re::Layout
 		}
 
 		ReplaceModel("model/Fox.glb");
+	}
+
+	void OnUpdate(const re::core::TimeDelta dt) override
+	{
+		auto* vm = m_scriptEngine.GetVM();
+		auto& scene = GetScene();
+
+		vm->SetUserData(&scene);
+
+		vm->InvokeGlobal("onUpdate",
+			{
+				static_cast<re::rvm::Double>(dt),
+				static_cast<re::rvm::Double>(dt),
+			});
+
+		vm->SetUserData(nullptr);
 	}
 
 	void OnAttach() override

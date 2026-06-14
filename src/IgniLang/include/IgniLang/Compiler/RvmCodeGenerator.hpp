@@ -47,7 +47,7 @@ public:
 		m_out << "// ==========================================\n";
 		m_out << "// Auto-generated RVM Assembly\n";
 		m_out << "// Package: " << program->packageName << "\n";
-		m_out << "// ==========================================\n\n";
+		m_out << "// ==========================================\n";
 
 		m_funcAsmNames.clear();
 		std::size_t funcId = 0;
@@ -105,7 +105,7 @@ public:
 			m_funcAsmNames[fun] = mangledName;
 		}
 
-		m_out << "// --- Type Definitions ---\n";
+		m_out << "\n// --- Type Definitions ---\n";
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
@@ -129,7 +129,7 @@ public:
 			}
 		}
 
-		m_out << "// --- Global Initialization ---\n";
+		m_out << "\n// --- Global Initialization ---\n";
 		m_currentFunction = nullptr;
 		for (const auto& stmt : program->statements)
 		{
@@ -139,7 +139,7 @@ public:
 			}
 		}
 
-		m_out << "// --- VTable Binding ---\n";
+		m_out << "\n// --- VTable Binding ---\n";
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
@@ -173,7 +173,7 @@ public:
 			}
 		}
 
-		m_out << "// --- Annotations ---\n";
+		m_out << "\n// --- Annotations ---\n";
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
@@ -219,18 +219,37 @@ public:
 			}
 		}
 
+		if (m_isDll)
+		{
+			for (const auto& stmt : program->statements)
+			{
+				if (const auto fun = dynamic_cast<const ast::FunDecl*>(stmt.get()))
+				{
+					if (fun->isExternal || !fun->typeParams.empty())
+					{
+						continue;
+					}
+
+					const re::String& mangledName = m_funcAsmNames.at(fun);
+
+					m_out << "MAKE_CLOSURE " << mangledName << " 0\n";
+					m_out << "SET_GLOBAL \"" << fun->name << "\"\n";
+				}
+			}
+		}
+
 		if (!m_isDll)
 		{
-			m_out << "// --- Entry Point ---\n";
+			m_out << "\n// --- Entry Point ---\n";
 			m_out << "CALL main 0\nRETURN\n\n";
 		}
 		else
 		{
-			m_out << "// --- End of Global Scope ---\n";
+			m_out << "\n// --- End of Global Scope ---\n";
 			m_out << "CONST 0\nRETURN\n\n";
 		}
 
-		m_out << "// --- Function Definitions ---\n";
+		m_out << "\n// --- Function Definitions ---\n";
 		for (const ast::FunDecl* fun : m_flatFunctions)
 		{
 			if (ignoredFuncs.contains(fun))
@@ -241,7 +260,7 @@ public:
 			GenerateFunction(fun);
 		}
 
-		m_out << "// --- Constructor/Destructor Definitions ---\n";
+		m_out << "\n// --- Constructor/Destructor Definitions ---\n";
 		for (const auto& stmt : program->statements)
 		{
 			if (const auto classDecl = dynamic_cast<const ast::ClassDecl*>(stmt.get()))
@@ -267,7 +286,7 @@ public:
 
 		if (!m_nativeWrappers.empty())
 		{
-			m_out << "// --- Native Wrappers (Auto-generated for launch) ---\n";
+			m_out << "\n// --- Native Wrappers (Auto-generated for launch) ---\n";
 			for (const auto& [nativeName, argCount] : m_nativeWrappers)
 			{
 				m_out << "FUN __native_wrapper_" << nativeName << "\n";
@@ -290,7 +309,7 @@ public:
 			}
 		}
 
-		m_out << "// --- Lambda Definitions ---\n";
+		m_out << "\n// --- Lambda Definitions ---\n";
 		for (const auto* lambda : m_semanticAnalyzer.GetLambdas())
 		{
 			GenerateLambdaBody(lambda);
@@ -538,9 +557,34 @@ public:
 		case CallDispatchType::Virtual:
 			m_out << "CALL_METHOD \"" << callInfo.asmLabel << "\" " << passedArgs << "\n";
 			break;
-		case CallDispatchType::Native:
-			m_out << "NATIVE \"" << callInfo.asmLabel << "\" " << totalArgs << "\n";
+		case CallDispatchType::Native: {
+			re::String targetName = callInfo.asmLabel;
+
+			if (callInfo.target && !callInfo.target->annotations.empty())
+			{
+				for (const auto& anno : callInfo.target->annotations)
+				{
+					if (anno->name == "RvmNative" && anno->argument)
+					{
+						if (const auto lit = dynamic_cast<const ast::LiteralExpr*>(anno->argument.get()))
+						{
+							auto val = std::string(lit->token.lexeme);
+							if (val.size() >= 2 && val.front() == '"' && val.back() == '"')
+							{
+								targetName = val.substr(1, val.size() - 2).c_str();
+							}
+							else
+							{
+								targetName = val.c_str();
+							}
+						}
+					}
+				}
+			}
+
+			m_out << "NATIVE \"" << targetName << "\" " << totalArgs << "\n";
 			break;
+		}
 		case CallDispatchType::Indirect:
 			m_out << "CALL_INDIRECT " << passedArgs << "\n";
 			break;

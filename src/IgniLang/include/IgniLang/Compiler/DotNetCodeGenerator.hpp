@@ -131,7 +131,7 @@ public:
 
 			for (const auto& anno : node->annotations)
 			{
-				if (anno->name == "DotNetBaseClass")
+				if (anno->name == ANNO_BASE_CLASS)
 				{
 					if (const auto strArg = ast::AnnotationUtils::GetAnnotationStringArg(anno.get()))
 					{

@@ -69,7 +69,9 @@ public:
 
 	Value Instantiate(String const& className);
 
-	InterpreterResult InvokeMethod(Value const& instance, String const& methodName, std::vector<Value> const& args);
+	InterpreterResult InvokeMethod(Value const& instance, String const& methodName, std::vector<Value> const& args = {});
+
+	InterpreterResult InvokeGlobal(String const& funcName, std::vector<Value> const& args = {});
 
 	void SetUserData(void* data);
 
