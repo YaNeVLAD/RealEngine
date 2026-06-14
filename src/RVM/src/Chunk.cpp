@@ -107,7 +107,7 @@ bool Chunk::SaveToFile(String const& filepath) const
 	return out.good();
 }
 
-bool Chunk::LoadFromFile(String const& filepath)
+bool Chunk::LoadFromFile(String const& filepath, const AssetManager*)
 {
 	std::ifstream in(filepath.ToString(), std::ios::binary);
 	if (!in.is_open())

@@ -1,24 +1,43 @@
 #pragma once
 
 #include <Core/Math/Vector3.hpp>
-#include <RVM/EventLoop.hpp>
-#include <RVM/VirtualMachine.hpp>
+#include <Core/Revertible.hpp>
+#include <Render3D/Renderer3D.hpp>
+#include <RenderCore/AnimatedModel.hpp>
+#include <RenderCore/Assets/AssetManager.hpp>
+#include <RenderCore/Model.hpp>
 #include <Runtime/Application.hpp>
-#include <Runtime/Assets/AssetManager.hpp>
 #include <Runtime/Components.hpp>
+#include <Runtime/Internal/PrimitiveBuilder.hpp>
 
-#include "Lab1/Circle/CircleLayout.hpp"
-#include "Lab1/Hangman/HangmanLayout.hpp"
-#include "Lab1/House/HouseLayout.hpp"
-#include "Lab1/Letters/LettersLayout.hpp"
-
-#include "Lab2/Alchemy/AlchemyLayout.hpp"
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
+#include "Lab4/Arcanoid/ArcanoidLayout.hpp"
+#include "Lab4/Maze/MazeLayout.hpp"
+#include "Lab4/Piano/PianoLayout.hpp"
 
-struct MenuLayout final : re::Layout
+#include <imgui.h>
+
+#include "CameraControlSystem.hpp"
+#include "Lab6/BattleCityLayout.hpp"
+
+#include <deque>
+
+struct EditorLayout final : re::Layout
 {
-	MenuLayout(re::Application& app, re::render::IWindow& window)
+	struct LightGizmoTag
+	{
+		bool dummy = false;
+	};
+
+	static constexpr re::Vector3f DEFAULT_LIGHT_POS = { 0.f, 2.f, 1.f };
+	static constexpr re::Vector3f DEFAULT_MODEL_POS = { 0.f, 0.f, 0.f };
+
+	EditorLayout(re::Application& app, re::render::IWindow& window)
 		: Layout(app)
+		, m_modelPos(DEFAULT_MODEL_POS)
+		, m_modelRot(re::Vector3f(0.f))
+		, m_modelScale(re::Vector3f(1.f))
+		, m_lightPos(DEFAULT_LIGHT_POS)
 		, m_window(window)
 	{
 	}
@@ -27,78 +46,329 @@ struct MenuLayout final : re::Layout
 	{
 		auto& scene = GetScene();
 
-		const auto cube = scene
-							  .CreateEntity()
-							  .Add<re::TransformComponent3D>(
-								  { .position = { 0.f, 0.f, -3.f },
-									  .rotation = { 45.f, 45.f, 0.f } })
-							  .Add<re::CubeComponent>(re::Color::Red);
+		scene
+			.AddSystem<CameraControlSystem>()
+			.WithRead<re::CameraComponent, re::TransformComponent>()
+			.WithWrite<re::CameraComponent>()
+			.RunOnMainThread();
 
-		m_cube = cube.GetEntity();
+		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
+		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
 
-		using namespace re::rvm;
-		EventLoop eventLoop;
+		const auto lightEntity
+			= scene.CreateEntity()
+				  .Add<re::Dirty<re::TransformComponent>>()
+				  .Add<re::LightComponent>(re::LightComponent::CreatePoint(re::Color::White))
+				  .Add<re::TransformComponent>({
+					  .position = DEFAULT_LIGHT_POS,
+					  .rotation = { 37.f, 107.f, 3.f },
+				  });
 
-		vm.RegisterNative("println", [](const std::vector<Value>& args) -> Value {
-			if (!args.empty() && std::holds_alternative<ArrayInstancePtr>(args[0]))
-			{
-				for (const auto arr = std::get<ArrayInstancePtr>(args[0]); const auto& arg : arr->elements)
-				{
-					std::cout << arg;
-				}
-			}
-			else
-			{
-				for (const auto& arg : args)
-				{
-					std::cout << arg;
-				}
-			}
-			std::cout << std::endl;
+		// auto skyboxTexture = m_manager.Get<re::Texture>("model/citrus_orchard_road_puresky_4k.hdr");
+		auto skyboxTexture = m_manager.Get<re::Texture>("model/grasslands_sunset_4k.hdr");
+		scene.CreateEntity()
+			.Add<re::SkyboxComponent>(skyboxTexture);
 
-			return Null;
-		});
+		scene.CreateEntity()
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({
+				.position = DEFAULT_LIGHT_POS,
+				.scale = re::Vector3f(0.25f),
+			})
+			.Add<re::detail::OpaqueTag>()
+			.Add<re::StaticMeshComponent3D>(sphereMesh)
+			.Add<re::MaterialComponent>(re::Material{ .emissionColor = re::Color::White })
+			.Add<LightGizmoTag>();
 
-		vm.RegisterNative("delay", [&](const std::vector<Value>& args) -> Value {
-			if (args.empty() || !std::holds_alternative<Int>(args[0]))
-			{
-				return Null;
-			}
+		m_lightEntity = lightEntity.GetEntity();
 
-			const std::uint64_t ms = std::get<Int>(args[0]);
-
-			vm.RequestDelay(ms);
-
-			return Null;
-		});
-
-		vm.SetDelayHandler([&eventLoop](const CoroutinePtr& coro, const std::uint64_t ms) {
-			eventLoop.Delay(coro, ms);
-		});
-
-		if (const auto script = m_manager.Get<Chunk>("scripts/coroutine_async_tests.rbc"))
+		if (auto camera = scene.FindFirstWith<re::CameraComponent>(); camera.IsValid())
 		{
-			vm.Interpret(*script);
-			eventLoop.Run(vm);
+			camera.Get<re::CameraComponent>().farClip = 100'000.f;
+			auto& transform = camera.Get<re::TransformComponent>();
+			transform.position = { 0.f, 1.5f, 3.f };
+		}
+
+		ReplaceModel("model/Fox.glb");
+	}
+
+	void OnAttach() override
+	{
+		GetApplication().SetUIOverlayActive(false);
+		m_window.SetBackgroundColor(re::Color(63, 63, 63));
+	}
+
+	void OnUIDraw() override
+	{
+		ImGui::Begin("Scene Settings");
+
+		if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			static char modelPathBuffer[256] = "model/Fox.glb";
+			ImGui::InputText("File Path##Model", modelPathBuffer, sizeof(modelPathBuffer));
+
+			if (ImGui::Button("Load Model", ImVec2(-1, 0)))
+			{
+				ReplaceModel(modelPathBuffer);
+			}
+		}
+
+		if (!m_modelEntities.empty())
+		{
+			if (ImGui::CollapsingHeader("Model Transform", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				bool changed = false;
+
+				changed |= ImGui::DragFloat3("Position", &m_modelPos.RawRef().x, 0.1f);
+				changed |= ImGui::DragFloat3("Rotation", &m_modelRot.RawRef().x, 1.0f);
+				changed |= ImGui::DragFloat3("Scale", &m_modelScale.RawRef().x, 0.05f);
+
+				if (changed)
+				{
+					UpdateModelTransforms();
+				}
+
+				ImGui::BeginDisabled(!m_modelPos.Modified() && !m_modelRot.Modified() && !m_modelScale.Modified());
+				if (ImGui::Button("Reset Transform", ImVec2(-1, 0)))
+				{
+					m_modelPos.Reset();
+					m_modelRot.Reset();
+					m_modelScale.Reset();
+					UpdateModelTransforms();
+				}
+				ImGui::EndDisabled();
+			}
+		}
+
+		ImGui::Separator();
+
+		const auto lightView = GetScene().CreateView<re::LightComponent, re::TransformComponent>();
+		const auto gizmoView = GetScene().CreateView<LightGizmoTag, re::TransformComponent>();
+		for (auto&& [entity, light, transform] : *lightView)
+		{
+			if (ImGui::CollapsingHeader("Light Editor"))
+			{
+				bool changed = false;
+				changed |= ImGui::DragFloat3("Light Pos", &m_lightPos.RawRef().x, 0.1f);
+
+				if (changed)
+				{
+					UpdateLightTransforms(transform, gizmoView);
+				}
+
+				ImGui::BeginDisabled(!m_lightPos.Modified());
+				if (ImGui::Button("Reset Light Position", ImVec2(-1, 0)))
+				{
+					m_lightPos.Reset();
+					UpdateLightTransforms(transform, gizmoView);
+				}
+				ImGui::EndDisabled();
+
+				if (auto color = light.diffuse.ToFloat(); ImGui::ColorEdit3("Color", color.Data()))
+				{
+					light.diffuse = re::Color::FromFloat(color);
+				}
+
+				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
+				ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Renderer Settings", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Reload Shaders", ImVec2(-1, 0)))
+			{
+				re::render::Renderer3D::ReloadShaders();
+			}
+
+			static char skyboxPathBuffer[256] = "model/grasslands_sunset_4k.hdr";
+			ImGui::InputText("File Path##Skybox", skyboxPathBuffer, sizeof(skyboxPathBuffer));
+
+			if (ImGui::Button("Load Skybox", ImVec2(-1, 0)))
+			{
+				UpdateSkybox(skyboxPathBuffer);
+			}
+		}
+
+		ImGui::End();
+
+		ImGui::SetNextWindowPos(ImVec2(10, 10));
+		ImGui::Begin("FPS Overlay", nullptr,
+			ImGuiWindowFlags_NoDecoration
+				| ImGuiWindowFlags_AlwaysAutoResize
+				| ImGuiWindowFlags_NoSavedSettings
+				| ImGuiWindowFlags_NoFocusOnAppearing
+				| ImGuiWindowFlags_NoNav
+				| ImGuiWindowFlags_NoMove);
+
+		ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+		ImGui::End();
+	}
+
+	void OnEvent(re::Event const& event) override
+	{
+		if (const auto* keyEvent = event.GetIf<re::Event::KeyPressed>())
+		{
+			if (keyEvent->key == re::Keyboard::Key::Grave && !keyEvent->alt && !keyEvent->ctrl && !keyEvent->shift)
+			{
+				GetApplication().SetUIOverlayActive(!GetApplication().IsUIOverlayActive());
+			}
+		}
+
+		if (GetApplication().IsUIOverlayActive())
+		{
+			m_firstMouse = true;
+			return;
+		}
+
+		if (const auto* mouseMoved = event.GetIf<re::Event::MouseMoved>())
+		{
+			const auto currentX = static_cast<float>(mouseMoved->position.x);
+			const auto currentY = static_cast<float>(mouseMoved->position.y);
+
+			if (m_firstMouse)
+			{
+				m_lastMouseX = currentX;
+				m_lastMouseY = currentY;
+				m_firstMouse = false;
+			}
+
+			const float xOffset = currentX - m_lastMouseX;
+			const float yOffset = m_lastMouseY - currentY;
+
+			m_lastMouseX = currentX;
+			m_lastMouseY = currentY;
+
+			for (auto&& [entity, transform, camera] : *GetScene().CreateView<re::TransformComponent, re::CameraComponent>())
+			{
+				if (camera.isPrimal)
+				{
+					camera.mouseDelta.x += xOffset;
+					camera.mouseDelta.y += yOffset;
+					break;
+				}
+			}
 		}
 	}
 
-	void OnUpdate(const re::core::TimeDelta dt) override
+private:
+	void UpdateSkybox(const re::String& texturePath)
+	{
+		const auto skyboxTexture = m_manager.Get<re::Texture>(texturePath);
+		if (auto entity = GetScene().FindFirstWith<re::SkyboxComponent>(); entity.IsValid())
+		{
+			auto& component = entity.Get<re::SkyboxComponent>();
+			component.ChangeTexture(skyboxTexture);
+		}
+	}
+
+	void UpdateLightTransforms(re::TransformComponent& lightTransform, auto& gizmoView)
+	{
+		lightTransform.position = *m_lightPos;
+		GetScene().MakeDirty<re::TransformComponent>(m_lightEntity);
+
+		for (auto&& [gEntity, tag, gTransform] : *gizmoView)
+		{
+			gTransform.position = *m_lightPos;
+			GetScene().MakeDirty<re::TransformComponent>(gEntity);
+		}
+	}
+
+	void UpdateModelTransforms()
+	{
+		auto& scene = GetScene();
+		for (const auto entity : m_modelEntities)
+		{
+			if (scene.IsValid(entity))
+			{
+				auto& transform = scene.GetComponent<re::TransformComponent>(entity);
+				transform.position = *m_modelPos;
+				transform.rotation = *m_modelRot;
+				transform.scale = *m_modelScale;
+
+				scene.MakeDirty<re::TransformComponent>(entity);
+			}
+		}
+	}
+
+	void ReplaceModel(const re::String& path)
 	{
 		auto& scene = GetScene();
 
-		auto& transform = scene.GetComponent<re::TransformComponent3D>(m_cube);
-		transform.rotation.x += 45.0f * dt;
-		transform.rotation.y += 45.0f * dt;
+		for (const auto entity : m_modelEntities)
+		{
+			if (scene.IsValid(entity))
+			{
+				scene.DestroyEntity(entity);
+			}
+		}
+		m_modelEntities.clear();
+
+		std::vector<re::render::MeshPart> meshParts;
+		if (path.Find(".obj") != re::String::NPos)
+		{
+			const auto model = m_manager.Get<re::Model>(path);
+			if (model)
+			{
+				meshParts = model->GetParts();
+			}
+		}
+		else if (path.Find(".glb") != re::String::NPos || path.Find(".gltf") != re::String::NPos)
+		{
+			const auto model = m_manager.Get<re::AnimatedModel>(path);
+			if (model)
+			{
+				meshParts = model->Parts();
+			}
+		}
+
+		for (auto&& [vertices, indices, material, _, _1, _2] : meshParts)
+		{
+			material.metallicFactor = 0.f;
+			auto entity = scene.CreateEntity()
+							  .Add<re::Dirty<re::TransformComponent>>()
+							  .Add<re::TransformComponent>({
+								  .position = *m_modelPos,
+								  .rotation = *m_modelRot,
+								  .scale = *m_modelScale,
+							  })
+							  .Add<re::detail::OpaqueTag>()
+							  .Add<re::MaterialComponent>(material);
+
+			if (path.Find(".glb") != re::String::NPos)
+			{
+				const auto animModel = m_manager.Get<re::AnimatedModel>(path);
+				const auto animator = std::make_shared<re::Animator>(animModel.get());
+				animator->PlayAnimation(0);
+
+				entity.Add<re::AnimatedMeshComponent3D>(animModel, animator);
+			}
+			else
+			{
+				entity.Add<re::StaticMeshComponent3D>(vertices, indices);
+			}
+
+			m_modelEntities.push_back(entity.GetEntity());
+		}
 	}
 
-private:
-	re::rvm::VirtualMachine vm;
+	std::vector<re::ecs::Entity> m_modelEntities;
+	re::Revertible<re::Vector3f> m_modelPos;
+	re::Revertible<re::Vector3f> m_modelRot;
+	re::Revertible<re::Vector3f> m_modelScale;
 
-	re::ecs::Entity m_cube = re::ecs::Entity::INVALID_ID;
+	re::Revertible<re::Vector3f> m_lightPos;
+
+	re::ecs::Entity m_lightEntity = re::ecs::Entity::INVALID_ID;
 	re::AssetManager m_manager;
 
 	re::render::IWindow& m_window;
+
+	bool m_firstMouse = true;
+	float m_lastMouseX = 0.0f;
+	float m_lastMouseY = 0.0f;
+
+	std::deque<std::vector<re::Vector3f>> m_tempCollisionMeshes;
 };
 
 class LauncherApplication final : public re::Application
@@ -111,15 +381,16 @@ public:
 
 	void OnStart() override
 	{
-		AddLayout<MenuLayout>(Window());
-		AddLayout<LettersLayout>();
-		AddLayout<HouseLayout>(Window());
-		AddLayout<CircleLayout>(Window());
-		AddLayout<HangmanLayout>(Window());
-		AddLayout<AlchemyLayout>(Window());
-		AddLayout<AsteroidsLayout>(Window());
+		Window().SetVSyncEnabled(true);
 
-		SwitchLayout<MenuLayout>();
+		// AddLayout<EditorLayout>(Window());
+		// AddLayout<AsteroidsLayout>(Window());
+		// AddLayout<MazeLayout>(Window());
+		// AddLayout<PianoLayout>(Window());
+		// AddLayout<ArcanoidLayout>(Window());
+		AddLayout<battle_city::BattleCityLayout>(Window());
+
+		SwitchLayout<battle_city::BattleCityLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
@@ -136,7 +407,7 @@ public:
 				frames,
 				timeAccumulator / static_cast<float>(frames) * 1000.0f);
 
-			Window().SetTitle(fps);
+			// Window().SetTitle(fps);
 
 			frames = 0;
 			timeAccumulator = 0.0f;
@@ -147,42 +418,25 @@ public:
 	{
 		if (const auto* e = event.GetIf<re::Event::KeyPressed>())
 		{
-			if (e->key == re::Keyboard::Key::Num1)
+			if (e->key == re::Keyboard::Key::F1)
 			{
-				SwitchLayout<MenuLayout>();
+				SwitchLayout<EditorLayout>();
 			}
-			if (e->key == re::Keyboard::Key::Num2)
-			{
-				SwitchLayout<LettersLayout>();
-			}
-			if (e->key == re::Keyboard::Key::Num3)
-			{
-				SwitchLayout<HouseLayout>();
-			}
-			if (e->key == re::Keyboard::Key::Num4)
-			{
-				SwitchLayout<CircleLayout>();
-			}
-			if (e->key == re::Keyboard::Key::Num5)
-			{
-				SwitchLayout<HangmanLayout>();
-			}
-			if (e->key == re::Keyboard::Key::Num6)
-			{
-				SwitchLayout<AlchemyLayout>();
-			}
-			if (e->key == re::Keyboard::Key::Num7)
+			if (e->key == re::Keyboard::Key::F2)
 			{
 				SwitchLayout<AsteroidsLayout>();
 			}
-		}
-
-		if (const auto* e = event.GetIf<re::Event::MouseWheelScrolled>())
-		{
-			for (auto&& [entity, camera] : *CurrentScene().CreateView<re::CameraComponent>())
+			if (e->key == re::Keyboard::Key::F3)
 			{
-				const auto newZoom = camera.zoom + e->delta * 0.1f;
-				camera.zoom = std::max(newZoom, 0.1f);
+				SwitchLayout<MazeLayout>();
+			}
+			if (e->key == re::Keyboard::Key::F4)
+			{
+				SwitchLayout<PianoLayout>();
+			}
+			if (e->key == re::Keyboard::Key::F5)
+			{
+				SwitchLayout<ArcanoidLayout>();
 			}
 		}
 	}

@@ -2,7 +2,7 @@
 
 #include <RVM/Export.hpp>
 
-#include <Core/Assets/IAsset.hpp>
+#include <RenderCore/Assets/IAsset.hpp>
 #include <Core/String.hpp>
 #include <RVM/Types.hpp>
 
@@ -27,7 +27,7 @@ public:
 
 	bool SaveToFile(String const& filepath) const;
 
-	bool LoadFromFile(String const& filepath) override;
+	bool LoadFromFile(String const& filepath, const AssetManager*) override;
 
 private:
 	std::vector<std::uint8_t> m_code;
