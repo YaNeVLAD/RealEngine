@@ -1,0 +1,16 @@
+{
+  "backends": [
+    {
+      "name": ".NET CLR",
+      "flag": "--dotnet",
+      "executable": "igni-backend-dotnet.exe",
+      "description": "Generates .NET CIL binary"
+    },
+    {
+      "name": "RVM",
+      "flag": "--rvm",
+      "executable": "igni-backend-rvm.exe",
+      "description": "Generates RealEngine Virtual Machine bytecode"
+    }
+  ]
+}

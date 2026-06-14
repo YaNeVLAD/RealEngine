@@ -1,0 +1,30 @@
+// EXPECT_OUTPUT:
+// 15
+// 3.5
+// 1
+// 0
+// END_EXPECT
+
+package program;
+
+fun main() {
+    val a = 10;
+    var b = 5;
+    println(a + b);
+
+    val f1 = 1.0;
+    val f2 = 2.5;
+    println(f1 + f2);
+
+    val isGreater = a > b;
+    if (isGreater) {
+        println(1);
+    } else {
+        println(0);
+    }
+
+    b = 20;
+    if (b == 20) {
+        println(0);
+    }
+}

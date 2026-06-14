@@ -1,0 +1,34 @@
+// EXPECT_OUTPUT:
+// 3
+// 42.255
+// Success!
+// END_EXPECT
+
+package program;
+
+class Base {}
+
+class Derived : Base {
+    fun printSuccess() {
+        println("Success!");
+    }
+}
+
+fun main() {
+    // Double -> Int
+    val pi = 3.14;
+    val asInt = pi as Int;
+    println(asInt);
+
+    // Int -> Double
+    val num = 42;
+    var asDouble = num as Double;
+    asDouble = asDouble + 0.255;
+    println(asDouble);
+
+    // Downcasting
+    val obj: Base = Derived();
+
+    val derivedObj = obj as Derived;
+    derivedObj.printSuccess();
+}

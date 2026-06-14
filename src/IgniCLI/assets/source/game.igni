@@ -1,0 +1,30 @@
+package engine;
+
+class Player(val entity: Entity) {
+    var speed: Double = 5.0;
+}
+
+var player: Player? = null;
+
+@DllExport
+fun onGameStart() {
+    val playerEntity = spawn("PlayerPrefab", Vec2(0.0, 0.0));
+    player = Player(playerEntity);
+
+    spawn("EnemyPrefab", Vec2(4.0, 3.0));
+}
+
+@DllExport
+fun onUpdate(deltaTime: Double, time: Double) {
+    if (player != null) {
+        val p = player as Player;
+
+        // Вызываем getAxis напрямую
+        val moveX = getAxis("Horizontal");
+        val moveY = getAxis("Vertical");
+
+        val velocity = Vec2(moveX * p.speed, moveY * p.speed);
+
+        p.entity.setVelocity(velocity);
+    }
+}

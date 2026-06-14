@@ -1,0 +1,78 @@
+package engine;
+
+@DotNetMethod("int64 ['IgniEngine']IgniBridge::Spawn(string, float64, float64)")
+@RvmNative("Engine_Spawn")
+external fun __spawnEntity(prefabName: String, x: Double, y: Double): Int;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::Destroy(int64)")
+@RvmNative("Engine_Destroy")
+external fun __destroyEntity(entityId: Int): Unit;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetX(int64)")
+@RvmNative("Engine_GetX")
+external fun __getX(entityId: Int): Double;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetY(int64)")
+@RvmNative("Engine_GetY")
+external fun __getY(entityId: Int): Double;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::SetPosition(int64, float64, float64)")
+@RvmNative("Engine_SetPosition")
+external fun __setPosition(entityId: Int, x: Double, y: Double): Unit;
+
+@DotNetMethod("void ['IgniEngine']IgniBridge::SetVelocity(int64, float64, float64)")
+@RvmNative("Engine_SetVelocity")
+external fun __setVelocity(entityId: Int, velX: Double, velY: Double): Unit;
+
+@DotNetMethod("float64 ['IgniEngine']IgniBridge::GetAxis(string)")
+@RvmNative("Engine_GetAxis")
+external fun __getAxis(axisName: String): Double;
+
+@DotNetMethod("bool ['IgniEngine']IgniBridge::IsActionPressed(string)")
+@RvmNative("Engine_IsActionPressed")
+external fun __isActionPressed(actionName: String): Bool;
+
+
+// ============================================================================
+
+
+class Vec2(val x: Double, val y: Double) {}
+
+class Vec3(val x: Double, val y: Double, val z: Double) {}
+
+class Entity(val id: Int) {
+
+    fun destroy() {
+        __destroyEntity(id);
+    }
+
+    fun getPosition(): Vec2 {
+        return Vec2(__getX(id), __getY(id));
+    }
+
+    fun setPosition(pos: Vec2): Unit {
+        __setPosition(id, pos.x, pos.y);
+    }
+
+    fun setVelocity(velocity: Vec2): Unit {
+        __setVelocity(this.id, velocity.x, velocity.y);
+    }
+
+}
+
+// --- Scene API ---
+
+fun spawn(prefabName: String, pos: Vec2): Entity {
+    val id = __spawnEntity(prefabName, pos.x, pos.y);
+    return Entity(id);
+}
+
+// --- Input API ---
+
+fun getAxis(axisName: String): Double {
+    return __getAxis(axisName);
+}
+
+fun isActionPressed(actionName: String): Bool {
+    return __isActionPressed(actionName);
+}

@@ -1,0 +1,32 @@
+// EXPECT_OUTPUT:
+// 42
+// Hello
+// END_EXPECT
+
+package program;
+
+class <T> Container(val item: T) {
+    fun <U> transform(mapper: (T) -> U): U {
+        return mapper(this.item);
+    }
+}
+
+fun intToStr(i: Int): String {
+    if (i == 42) { return "42"; }
+
+    return "unknown";
+}
+
+fun strToHello(s: String): String {
+    return "Hello";
+}
+
+fun main() {
+    val c1 = Container::<Int>(42);
+    val str = c1.transform(intToStr); // T = Int, U = String
+    println(str);
+
+    val c2 = Container::<String>("test");
+    val hello = c2.transform(strToHello); // T = String, U = String
+    println(hello);
+}

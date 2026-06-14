@@ -54,6 +54,12 @@ public:
 
 	void Clear() override;
 
+	void DrawCube(const glm::mat4& transform, const Color& color) override;
+
+	void SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix) override;
+
+	void SetDepthTest(bool enabled) override;
+
 private:
 	static constexpr std::size_t MAX_QUAD_COUNT = 1024;
 

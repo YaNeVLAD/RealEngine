@@ -17,6 +17,7 @@ add_executable(ReLauncher main.cpp
         Lab6/BattleCityLayout.hpp
         Lab6/EntityFactory.hpp
 
+        ScriptCompiler.hpp
         LauncherApplication.hpp
 )
 
@@ -30,7 +31,7 @@ target_compile_definitions(ReLauncher
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:Dist>>:RE_DIST>"
 )
 
-target_link_libraries(ReLauncher PRIVATE ReAudio ReRuntime)
+target_link_libraries(ReLauncher PRIVATE ReAudio ReRuntime ReRVM IgniLang)
 
 if (WIN32 AND RENDER_LIBS)
     foreach (lib ${RENDER_LIBS})
@@ -49,3 +50,10 @@ if (WIN32 AND RENDER_LIBS)
         endif ()
     endforeach ()
 endif ()
+
+add_custom_command(TARGET ReLauncher POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:ReLauncher>/assets"
+        COMMENT "Copying assets directory to build output..."
+)

@@ -1,0 +1,16 @@
+// EXPECT_OUTPUT:
+// 15
+// 42
+// END_EXPECT
+
+package global;
+
+fun main() {
+    val a = 5;
+    val b = 10;
+    println(a + b);
+
+    val c = 6;
+    val d = 7;
+    println(c * d);
+}

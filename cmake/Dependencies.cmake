@@ -143,6 +143,14 @@ FetchContent_MakeAvailable(tinygltf)
 
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
 
+# NLOHMANN_JSON
+FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # STB_IMAGE
 set(STB_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
 if (NOT EXISTS "${STB_IMAGE_PATH}/stb_image_impl.cpp")

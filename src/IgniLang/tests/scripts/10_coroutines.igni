@@ -1,0 +1,33 @@
+// EXPECT_OUTPUT:
+// Start
+// Suspend 1
+// Suspend 2
+// Sum: 30
+// End
+// END_EXPECT
+
+package program;
+
+suspend fun calcA(): Int {
+    println("Suspend 1");
+    return 10;
+}
+
+suspend fun calcB(): Int {
+    println("Suspend 2");
+    return 20;
+}
+
+suspend fun asyncMain() {
+    println("Start");
+    val a = await calcA();
+    val b = await calcB();
+
+    val sum = a + b;
+    println("Sum: ", sum);
+    println("End");
+}
+
+fun main() {
+    launch asyncMain();
+}

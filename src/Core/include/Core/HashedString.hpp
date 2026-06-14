@@ -53,14 +53,14 @@ public:
 	{
 	}
 
-	constexpr BaseHashedString(const ValueType* str, const SizeType length) noexcept
+	constexpr BaseHashedString(const TChar* str, const SizeType length) noexcept
 		: Base{ hasher({ str, length }) }
 	{
 	}
 
 	template <std::size_t N>
-	consteval BaseHashedString(const ValueType (&str)[N]) noexcept
-		: Base{ hasher({ static_cast<const ValueType*>(str) }) }
+	consteval BaseHashedString(const TChar (&str)[N]) noexcept
+		: Base{ hasher({ static_cast<const TChar*>(str) }) }
 	{
 	}
 
@@ -69,7 +69,7 @@ public:
 	{
 	}
 
-	[[nodiscard]] static constexpr HashType Value(const ValueType* str, const SizeType length) noexcept
+	[[nodiscard]] static constexpr HashType Value(const TChar* str, const SizeType length) noexcept
 	{
 		return BaseHashedString{ str, length }.hash;
 	}
@@ -135,22 +135,22 @@ namespace literals
 	return HashedString{ str, size };
 }
 
-[[nodiscard]] consteval HashedWString operator"" _hws(const wchar_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedWString operator"" _hs(const wchar_t* str, const std::size_t size) noexcept
 {
 	return HashedWString{ str, size };
 }
 
-[[nodiscard]] consteval HashedU8String operator"" _h8s(const char8_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU8String operator"" _hs(const char8_t* str, const std::size_t size) noexcept
 {
 	return HashedU8String{ str, size };
 }
 
-[[nodiscard]] consteval HashedU16String operator"" _h16s(const char16_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU16String operator"" _hs(const char16_t* str, const std::size_t size) noexcept
 {
 	return HashedU16String{ str, size };
 }
 
-[[nodiscard]] consteval HashedU32String operator"" _h32s(const char32_t* str, const std::size_t size) noexcept
+[[nodiscard]] consteval HashedU32String operator"" _hs(const char32_t* str, const std::size_t size) noexcept
 {
 	return HashedU32String{ str, size };
 }

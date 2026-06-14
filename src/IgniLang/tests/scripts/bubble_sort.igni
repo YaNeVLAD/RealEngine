@@ -1,0 +1,40 @@
+// EXPECT_OUTPUT:
+// Unsorted array: [5, 8, 3, 2, 1, 12]
+// Sorted array (less): [1, 2, 3, 5, 8, 12]
+// Sorted array (greater): [12, 8, 5, 3, 2, 1]
+// END_EXPECT
+
+package program;
+
+fun <T> bubbleSort(arr: Array<T>, comp: (T, T) -> Bool): Array<T> {
+	val size = arr.size;
+
+	val result = MutableArray::<T>(arr);
+
+    var i = 0;
+    while (i < size - 1) {
+        var j = 0;
+        while (j < size - i - 1) {
+            if (comp(result[j + 1], result[j])) {
+                var temp = result[j];
+                result[j] = result[j + 1];
+                result[j + 1] = temp;
+            }
+            j++;
+        }
+        i++;
+    }
+
+	return result.toArray();
+}
+
+fun main() {
+    val arr = arrayOf(5, 8, 3, 2, 1, 12);
+    println("Unsorted array: ", arr);
+
+    val lessSorted = bubbleSort(arr, less);
+    println("Sorted array (less): ", lessSorted);
+
+    val greaterSorted = bubbleSort(arr, greater);
+    println("Sorted array (greater): ", greaterSorted);
+}

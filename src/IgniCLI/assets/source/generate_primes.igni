@@ -1,0 +1,38 @@
+package program;
+
+fun sieve(n: Int) {
+    val is_prime = MutableArray::<Bool>(n + 1);
+
+    var i = 0;
+	for (i in 0..n) {
+		is_prime[i] = true;
+	}
+
+    is_prime[0] = false;
+    is_prime[1] = false;
+
+    var p = 2;
+    // Используем p * p <= n вместо вычисления квадратного корня!
+    while (p * p <= n) {
+        // Если p осталось true, значит это простое число
+        if (is_prime[p] == true) {
+            // Вычеркиваем все кратные p, начиная с p^2
+            var j = p * p;
+            while (j <= n) {
+                is_prime[j] = false;
+                j = j + p; // Шагаем на p!
+            }
+        }
+        p++;
+    }
+
+    print("Prime numbers up to ", n, ": ");
+    var k = 2;
+    while (k <= n) {
+        if (is_prime[k] == true) {
+            print(k, " ");
+        }
+        k++;
+    }
+	println();
+}

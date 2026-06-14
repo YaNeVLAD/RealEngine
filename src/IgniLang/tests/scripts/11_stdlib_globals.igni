@@ -1,0 +1,32 @@
+// EXPECT_OUTPUT:
+// 1
+// 0
+// 0
+// 1
+// 0
+// 1
+// [1, 2, 3]
+// [42, 99]
+// END_EXPECT
+
+package program;
+
+fun main() {
+    // less
+    println(less(1, 2));
+    println(less(2, 1));
+
+    // greater
+    println(greater(1, 2));
+    println(greater(2, 1));
+
+    // equal
+    println(equal(42, 43));
+    println(equal(42, 42));
+
+    val arr = arrayOf(1, 2, 3);
+    println(arr);
+
+    val mutArr = mutableArrayOf(42, 99);
+    println(mutArr);
+}

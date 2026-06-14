@@ -1,0 +1,132 @@
+Program -> OptPackageDecl ImportDeclList TopLevelDeclList
+
+OptPackageDecl -> PackageDecl | \e
+PackageDecl -> package PackagePath ;
+PackagePath -> PackagePath . ident | ident
+
+ImportDeclList -> ImportDeclList ImportDecl | \e
+ImportDecl -> import ImportPath OptDotStar ;
+ImportPath -> ImportPath . ident | ident
+OptDotStar -> . * | \e
+
+TopLevelDeclList -> TopLevelDeclList TopLevelDecl | \e
+TopLevelDecl -> AnnotationList OptVisibility Decl
+Decl -> VarDecl | ValDecl | ClassDecl | FunDecl | AnnotationDecl
+
+AnnotationDecl -> OptModifierList annotation class ident OptPrimaryCtor ;
+AnnotationList -> AnnotationList Annotation | \e
+Annotation -> @ ident OptParenExpr
+OptParenExpr -> ( Expr ) | \e
+
+OptVisibility -> public | private | internal | \e
+
+OptModifierList -> OptModifierList Modifier | \e
+Modifier -> external | comptime | override | suspend
+
+OptMod -> external | \e
+OptInit -> = Expr | \e
+
+VarDecl -> OptModifierList var ident OptColonType OptInit ;
+ValDecl -> OptModifierList val ident OptColonType OptInit ;
+OptColonType -> : Type | \e
+
+ClassDecl -> OptModifierList class OptTypeParams ident OptPrimaryCtor OptBaseClass { ClassMemberList }
+OptBaseClass -> : Type ( OptActPars ) | : Type | \e
+OptClassMod -> external | \e
+
+OptTypeParams -> < TypeParams > | \e
+TypeParams -> TypeParams , TypeParam | TypeParam
+TypeParam -> ident OptColonType
+
+OptPrimaryCtor -> ( PrimaryCtorPars ) | \e
+PrimaryCtorPars -> PrimaryCtorPars , PrimaryCtorPar | PrimaryCtorPar | \e
+PrimaryCtorPar -> OptValVar ident : Type
+OptValVar -> val | var | \e
+
+ClassMemberList -> ClassMemberList ClassMember | \e
+ClassMember -> AnnotationList OptVisibility ClassMemberDecl
+ClassMemberDecl -> VarDecl | ValDecl | FunDecl | ConstructorDecl | DestructorDecl
+
+ConstructorDecl -> OptModifierList ident ( OptFormPars ) FunBody
+DestructorDecl -> OptModifierList ~ ident ( ) FunBody
+
+FunDecl -> OptModifierList fun OptTypeParams FunName ( OptFormPars ) OptColonType FunBody
+OptFunModList -> OptFunModList FunMod | \e
+FunMod -> external | comptime | override | suspend
+FunName -> ident | ident . ident
+OptFormPars -> FormPars | \e
+FormPars -> NormalPars | VarargPar | NormalPars , VarargPar
+NormalPars -> NormalPars , FormPar | FormPar
+FormPar -> ident : Type
+VarargPar -> ident : Type ...
+FunBody -> Block | = Expr ; | ;
+
+Type -> ident OptTypeArgs OptQuestion | OptSuspend ( OptTypeList ) -> Type OptQuestion
+OptSuspend -> suspend | \e
+OptTypeList -> TypeList | \e
+TypeList -> TypeList , Type | Type
+
+OptTypeArgs -> < TypeList > | \e
+OptQuestion -> ? | \e
+
+Block -> { StatementList }
+StatementList -> StatementList Statement | \e
+
+Statement -> VarDecl
+           | ValDecl
+           | FunDecl
+           | Expr ;
+           | IfStmt
+           | WhileStmt
+           | ForStmt
+           | return OptExpr ;
+           | break ;
+           | Block
+OptExpr -> Expr | \e
+
+IfStmt -> OptCompileTime if ( Expr ) Block OptElse
+OptCompileTime -> comptime | \e
+OptElse -> else ElseBody | \e
+ElseBody -> IfStmt | Block
+
+WhileStmt -> while ( Expr ) Block
+ForStmt -> for ( ident in Expr .. Expr ) Block | for ( ident in Expr ) Block
+
+Expr -> LogOrExpr = Expr | LogOrExpr
+
+LogOrExpr -> LogOrExpr or LogAndExpr | LogAndExpr
+LogAndExpr -> LogAndExpr and EqExpr | EqExpr
+EqExpr -> EqExpr == RelExpr | EqExpr != RelExpr | RelExpr
+RelExpr -> RelExpr < CastExpr | RelExpr <= CastExpr | RelExpr > CastExpr | RelExpr >= CastExpr | CastExpr
+CastExpr -> CastExpr as Type | AddExpr
+AddExpr -> AddExpr + MulExpr | AddExpr - MulExpr | MulExpr
+MulExpr -> MulExpr * UnaryExpr | MulExpr / UnaryExpr | MulExpr % UnaryExpr | UnaryExpr
+
+UnaryExpr -> + UnaryExpr | - UnaryExpr | ! UnaryExpr | ~ UnaryExpr
+           | await UnaryExpr | launch UnaryExpr
+           | ++ Designator | -- Designator
+           | PostfixExpr
+
+PostfixExpr -> Designator ++
+             | Designator --
+             | Designator
+
+Designator -> ident OptExprTypeArgs
+            | PrimaryExpr
+            | Designator . ident OptExprTypeArgs
+            | Designator [ Expr ]
+            | Designator ?. ident OptExprTypeArgs
+            | Designator ( OptActPars )
+
+PrimaryExpr -> true | false | null | intCon | floatCon | stringCon | ( Expr ) | LambdaExpr
+
+LambdaExpr -> fun ( OptFormPars ) OptColonType LambdaBody
+            | fun [ CaptureList ] ( OptFormPars ) OptColonType LambdaBody
+
+CaptureList -> CaptureList , ident | ident
+LambdaBody -> Block | = Expr
+
+OptExprTypeArgs -> :: < TypeList > | \e
+
+OptActPars -> ActPars | \e
+ActPars -> ActPars , Expr | Expr

@@ -211,4 +211,16 @@ void SFMLRenderAPI::Clear()
 	m_window.clear();
 }
 
+void SFMLRenderAPI::DrawCube(const glm::mat4& transform, const Color& color)
+{
+}
+
+void SFMLRenderAPI::SetCameraPerspective(float fov, float aspectRatio, float nearClip, float farClip, const glm::mat4& viewMatrix)
+{
+}
+
+void SFMLRenderAPI::SetDepthTest(bool enabled)
+{
+}
+
 } // namespace re::render

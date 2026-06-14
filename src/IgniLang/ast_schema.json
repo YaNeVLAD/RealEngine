@@ -1,0 +1,250 @@
+{
+  "ast_nodes": [
+    {
+      "name": "SimpleTypeNode", "base": "TypeNode",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "typeArgs", "type": "TypeNode", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "FunctionTypeNode", "base": "TypeNode",
+      "fields": [
+        { "name": "isSuspend", "type": "bool", "default_val": "false" },
+        { "name": "paramTypes", "type": "TypeNode", "is_ptr": true, "is_vector": true },
+        { "name": "returnType", "type": "TypeNode", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "BinaryExpr", "base": "Expr",
+      "fields": [
+        { "name": "left", "type": "Expr", "is_ptr": true },
+        { "name": "op", "type": "re::String" },
+        { "name": "right", "type": "Expr", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "LiteralExpr", "base": "Expr", "fields": []
+    },
+    {
+      "name": "IdentifierExpr", "base": "Expr",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "typeArgs", "type": "TypeNode", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "CallExpr", "base": "Expr",
+      "fields": [
+        { "name": "callee", "type": "Expr", "is_ptr": true },
+        { "name": "arguments", "type": "Expr", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "IndexExpr", "base": "Expr",
+      "fields": [
+        { "name": "array", "type": "Expr", "is_ptr": true },
+        { "name": "index", "type": "Expr", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "AssignExpr", "base": "Expr",
+      "fields": [
+        { "name": "target", "type": "Expr", "is_ptr": true },
+        { "name": "value", "type": "Expr", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "UnaryExpr", "base": "Expr",
+      "fields": [
+        { "name": "op", "type": "re::String" },
+        { "name": "operand", "type": "Expr", "is_ptr": true },
+        { "name": "isPostfix", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "MemberAccessExpr", "base": "Expr",
+      "fields": [
+        { "name": "object", "type": "Expr", "is_ptr": true },
+        { "name": "member", "type": "re::String" },
+        { "name": "typeArgs", "type": "TypeNode", "is_ptr": true, "is_vector": true },
+        { "name": "isSafe", "type": "bool", "default_val": "true" }
+      ]
+    },
+    {
+      "name": "AwaitExpr", "base": "Expr",
+      "fields": [ { "name": "expression", "type": "Expr", "is_ptr": true } ]
+    },
+    {
+      "name": "LaunchExpr", "base": "Expr",
+      "fields": [ { "name": "callable", "type": "Expr", "is_ptr": true } ]
+    },
+    {
+      "name": "ExprStmt", "base": "Statement",
+      "fields": [ { "name": "expr", "type": "Expr", "is_ptr": true } ]
+    },
+    {
+      "name": "ReturnStmt", "base": "Statement",
+      "fields": [ { "name": "expr", "type": "Expr", "is_ptr": true } ]
+    },
+    {
+      "name": "Block", "base": "Statement",
+      "fields": [ { "name": "statements", "type": "Statement", "is_ptr": true, "is_vector": true } ]
+    },
+    {
+      "name": "IfStmt", "base": "Statement",
+      "fields": [
+        { "name": "condition", "type": "Expr", "is_ptr": true },
+        { "name": "thenBranch", "type": "Block", "is_ptr": true },
+        { "name": "elseBranch", "type": "Statement", "is_ptr": true },
+        { "name": "isCompileTime", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "WhileStmt", "base": "Statement",
+      "fields": [
+        { "name": "condition", "type": "Expr", "is_ptr": true },
+        { "name": "body", "type": "Block", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "ForStmt", "base": "Statement",
+      "fields": [
+        { "name": "iteratorName", "type": "re::String" },
+        { "name": "startExpr", "type": "Expr", "is_ptr": true },
+        { "name": "endExpr", "type": "Expr", "is_ptr": true },
+        { "name": "body", "type": "Block", "is_ptr": true },
+        { "name": "isForEach", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "AnnotationNode", "base": "Node",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "argument", "type": "Expr", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "ParameterNode", "base": "Node",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "type", "type": "TypeNode", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "GenericTypeParamNode", "base": "Node",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "boundType", "type": "TypeNode", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "BaseClassInitNode", "base": "Node",
+      "fields": [
+        { "name": "type", "type": "TypeNode", "is_ptr": true },
+        { "name": "arguments", "type": "Expr", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "AnnotationDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "parameters", "type": "ParameterNode", "is_ptr": true, "is_vector": true },
+        { "name": "isExternal", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "ValDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "initializer", "type": "Expr", "is_ptr": true },
+        { "name": "type", "type": "TypeNode", "is_ptr": true },
+        { "name": "isExternal", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "VarDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "initializer", "type": "Expr", "is_ptr": true },
+        { "name": "type", "type": "TypeNode", "is_ptr": true },
+        { "name": "isExternal", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "FunDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "parameters", "type": "ParameterNode", "is_ptr": true, "is_vector": true },
+        { "name": "isVararg", "type": "bool", "default_val": "false" },
+        { "name": "isExternal", "type": "bool", "default_val": "false" },
+        { "name": "isExprBody", "type": "bool", "default_val": "false" },
+        { "name": "isOverride", "type": "bool", "default_val": "false" },
+        { "name": "isSuspend", "type": "bool", "default_val": "false" },
+        { "name": "body", "type": "Block", "is_ptr": true },
+        { "name": "returnType", "type": "TypeNode", "is_ptr": true },
+        { "name": "typeParams", "type": "GenericTypeParamNode", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "ClassDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "isExternal", "type": "bool", "default_val": "false" },
+        { "name": "typeParams", "type": "GenericTypeParamNode", "is_ptr": true, "is_vector": true },
+        { "name": "baseClass", "type": "BaseClassInitNode", "is_ptr": true },
+        { "name": "members", "type": "Decl", "is_ptr": true, "is_vector": true }
+      ]
+    },
+    {
+      "name": "ConstructorDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "parameters", "type": "ParameterNode", "is_ptr": true, "is_vector": true },
+        { "name": "body", "type": "Block", "is_ptr": true },
+        { "name": "isVararg", "type": "bool", "default_val": "false" },
+        { "name": "isExternal", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "DestructorDecl", "base": "Decl",
+      "fields": [
+        { "name": "name", "type": "re::String" },
+        { "name": "body", "type": "Block", "is_ptr": true },
+        { "name": "isExternal", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "ImportDecl", "base": "Node",
+      "fields": [
+        { "name": "path", "type": "re::String" },
+        { "name": "isStar", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "TypeCastExpr", "base": "Expr",
+      "fields": [
+        { "name": "expr", "type": "Expr", "is_ptr": true },
+        { "name": "targetType", "type": "TypeNode", "is_ptr": true }
+      ]
+    },
+    {
+      "name": "LambdaExpr", "base": "Expr",
+      "fields": [
+        { "name": "captures", "type": "re::String", "is_ptr": false, "is_vector": true },
+        { "name": "parameters", "type": "ParameterNode", "is_ptr": true, "is_vector": true },
+        { "name": "returnType", "type": "TypeNode", "is_ptr": true },
+        { "name": "body", "type": "Block", "is_ptr": true },
+        { "name": "isVararg", "type": "bool", "default_val": "false" }
+      ]
+    },
+    {
+      "name": "Program", "base": "Node",
+      "fields": [
+        { "name": "packageName", "type": "re::String" },
+        { "name": "imports", "type": "ImportDecl", "is_ptr": true, "is_vector": true },
+        { "name": "statements", "type": "Statement", "is_ptr": true, "is_vector": true }
+      ]
+    }
+  ]
+}

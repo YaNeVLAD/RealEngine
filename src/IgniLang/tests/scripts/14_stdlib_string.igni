@@ -1,0 +1,44 @@
+// EXPECT_OUTPUT:
+// 5
+// 0
+// 1
+// e
+// ell
+// 2
+// -1
+// clean
+// 42
+// 3.14
+// 1
+// 0
+// 1
+// 0
+// END_EXPECT
+
+package program;
+
+fun main() {
+    val s = "hello";
+
+    println(s.size);
+    println(s.isEmpty());
+    println(s.isNotEmpty());
+
+    println(s[1]);
+    println(s.substring(1, 4));
+
+    println(s.indexOf("ll"));
+    println(s.indexOf("xyz"));
+
+    val dirty = "   clean \n ";
+    println(dirty.trim());
+
+    println("42".toInt());
+    println("3.14".toDouble());
+
+    println(s.startsWith("hel"));
+    println(s.startsWith("lo"));
+
+    println(s.endsWith("lo"));
+    println(s.endsWith("hel"));
+}

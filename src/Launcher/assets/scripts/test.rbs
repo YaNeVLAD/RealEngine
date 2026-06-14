@@ -1,0 +1,45 @@
+FUN main
+    CONST "Hello"
+    SET hello_str            // Локальная hello_str (слот 0 в main)
+
+    CONST ", World!"
+    SET world_str
+
+    GET hello_str
+    GET world_str
+    ADD
+    SET message
+
+    // Готовим аргументы для функции
+    CONST 10
+    CONST 5
+
+    // Вызываем функцию и передаем 2 аргумента
+    CALL subtract_nums 2
+
+    SET result            // Забираем результат со стека
+
+    // В m_variables сейчас лежат:
+    // [0] = "Hello" (my_str)
+    // [1] = 5 (result)
+
+    GET message
+    GET result
+    NATIVE "print" 2
+
+    RETURN
+
+// Вызываемая функция.
+// При входе аргументы (10 и 5) лежат на вершине стека
+FUN subtract_nums
+    SET b    // Забираем 5 в локальную b (слот 0 в subtract_nums)
+    SET a    // Забираем 10 в локальную a (слот 1 в subtract_nums)
+
+    GET a
+    GET b
+    SUB      // 10 - 5 = 5
+
+    // На стеке сейчас 5. Команда RETURN заберет её,
+    // очистит стек от мусора, удалит локальные a и b,
+    // и положит 5 обратно вызывающей стороне.
+    RETURN

@@ -1,0 +1,29 @@
+package program;
+
+class Vector2(val x: Int, val y: Int) {
+	fun printSum() {
+		val sum = x + y;
+        println(sum);
+	}
+}
+
+fun compare(comp: (Int, Int) -> Bool): Bool {
+	return comp(42, 24);
+}
+
+fun main() {
+	val a = 42;
+	val function = fun [a] (x: Int) {
+		println(a);
+		val a = 24;
+		println(a);
+	};
+
+	println(compare(fun (x: Int, y: Int): Bool { return true; }));
+
+	val l1 = fun (x: Int): Int { return x; };
+	val sum = l1(42) + l1(24);
+	println(sum);
+
+	function(88);
+}

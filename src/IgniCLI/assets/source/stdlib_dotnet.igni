@@ -1,0 +1,64 @@
+package global;
+
+annotation class DotNetMethod(val signature: String);
+
+annotation class DotNetBaseClass(val signature: String);
+
+annotation class DotNetOpcode(val operation: String);
+
+annotation class RvmNative(val name: String);
+
+annotation class DllExport;
+
+@DotNetMethod("void [mscorlib]System.Console::Write(object)")
+external fun __dotnet_print_obj(obj: Any): Unit;
+
+@DotNetMethod("void [mscorlib]System.Console::WriteLine()")
+external fun __dotnet_println_empty(): Unit;
+
+fun print(args: Any...) {
+    for (arg in args) {
+        __dotnet_print_obj(arg);
+    }
+}
+
+fun println(args: Any...) {
+    for (arg in args) {
+        __dotnet_print_obj(arg);
+    }
+    __dotnet_println_empty();
+}
+
+external class <T> Array {
+
+    @DotNetOpcode("ldlen")
+    external fun size(): Int;
+
+    @DotNetOpcode("ldelem")
+    external fun get(index: Int): T;
+
+    @DotNetOpcode("stelem")
+    external fun set(index: Int, value: T): Unit;
+
+}
+
+@DotNetOpcode("newarr")
+external fun <T> makeArray(size: Int): Array<T>;
+
+fun <T> arrayOf(elements: T...): Array<T> {
+	val size = elements.size();
+	val result = makeArray::<T>(size);
+	for (i in 0..size - 1) {
+		result[i] = elements[i];
+	}
+
+	return result;
+}
+
+external class Type {
+    external fun hasAnnotation(annoName: String): Bool;
+    external fun hasFieldAnnotation(fieldName: String, annoName: String): Bool;
+    external fun hasMethodAnnotation(methodName: String, annoName: String): Bool;
+}
+
+external fun typeof(obj: Any): Type;

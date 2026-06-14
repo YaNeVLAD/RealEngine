@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <variant>
 
 namespace re::utils
@@ -21,6 +22,37 @@ template <typename... Ts>
 struct overloaded : Ts...
 {
 	using Ts::operator()...;
+};
+
+template <typename T, typename TPtr = std::shared_ptr<T>>
+struct Prototype
+{
+	using ReturnType = TPtr;
+
+	virtual ~Prototype() = default;
+
+	virtual ReturnType Clone() const = 0;
+};
+
+template <typename TDerived, typename TBase>
+	requires std::derived_from<TBase, Prototype<TBase>>
+struct Clonable : TBase
+{
+	using TBase::TBase;
+
+	TBase::ReturnType Clone() const override
+	{
+		return std::make_shared<TDerived>(static_cast<const TDerived&>(*this));
+	}
+};
+
+template <typename TVisitor, typename TDerived, typename TBase>
+struct Visitable : TBase
+{
+	void Accept(TVisitor& visitor) const override
+	{
+		visitor.Visit(static_cast<const TDerived*>(this));
+	}
 };
 
 } // namespace re::utils

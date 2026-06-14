@@ -1,0 +1,51 @@
+FUN main
+    // 1. Упаковываем локальную переменную, которая "убежит" в замыкание
+    CONST 0
+    BOX
+    SET count        // Слот 0: Ячейка Upvalue(0)
+
+    // 2. Подготавливаем стек для MAKE_CLOSURE
+    GET count        // Кладем Ячейку на стек
+    MAKE_CLOSURE increment 1  // Забирает 1 ячейку, создает Замыкание
+    SET my_inc
+
+    // 3. Вызываем my_inc() в первый раз
+    GET my_inc
+    CALL_INDIRECT 0
+
+    // 4. Вызываем my_inc() во второй раз
+    GET my_inc
+    CALL_INDIRECT 0
+
+    RETURN
+
+// ==========================================
+// Функция замыкания
+// ==========================================
+FUN increment
+    // Считаем: count = count + 1
+    GET_UPVALUE 0    // Достает 0
+    CONST 1
+    ADD              // 1
+
+    SET_UPVALUE 0    // Сохраняет 1 обратно в ячейку
+
+    // Печатаем результат
+    CONST "Counter is: "
+    GET_UPVALUE 0
+    ADD
+
+    // Демонстрируем LOAD_NATIVE
+    LOAD_NATIVE "print" 1
+    // Чтобы сделать CALL_INDIRECT, нужно [Функция][Аргумент], поэтому применяем swap trick
+    // (Поскольку у нас нет SWAP, просто перепишем):
+
+    POP              // Убираем результат сложения со стека
+
+    LOAD_NATIVE "print" 1
+    CONST "Counter is: "
+    GET_UPVALUE 0
+    ADD
+    CALL_INDIRECT 1
+
+    RETURN

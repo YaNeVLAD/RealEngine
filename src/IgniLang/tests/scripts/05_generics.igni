@@ -1,0 +1,22 @@
+// EXPECT_OUTPUT:
+// 100
+// Hello Igni
+// END_EXPECT
+
+class <T> Box(var item: T) {
+    fun get(): T = this.item;
+
+    fun set(newItem: T) {
+        this.item = newItem;
+    }
+}
+
+fun main() {
+    val intBox = Box::<Int>(42);
+    intBox.set(100);
+    println(intBox.get());
+
+    val strBox = Box::<String>("Hello");
+    strBox.set("Hello Igni");
+    println(strBox.get());
+}

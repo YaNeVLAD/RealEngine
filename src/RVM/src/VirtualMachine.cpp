@@ -1,0 +1,1301 @@
+#include "Core/Utils.hpp"
+
+#include <RVM/VirtualMachine.hpp>
+
+#include <Core/Assert.hpp>
+#include <Core/Meta/TypeInfo.hpp>
+
+#include <iostream>
+#include <ranges>
+
+#define READ_BYTE() (*m_ip++)
+#define READ_CONSTANT() (m_chunk->GetConstants()[READ_BYTE()])
+
+#define EXIT_WITH_ERROR(expr)       \
+	std::cerr << expr << std::endl; \
+	return InterpreterResult::RuntimeError
+
+#define BINARY_OP(op_func, op_name)                                           \
+	do                                                                        \
+	{                                                                         \
+		Value _b = Pop();                                                     \
+		Value _a = Pop();                                                     \
+		Value res = op_func(_a, _b);                                          \
+		if (std::holds_alternative<Null_t>(res))                              \
+		{                                                                     \
+			EXIT_WITH_ERROR("Runtime Error: Invalid operands for " #op_name); \
+		}                                                                     \
+		Push(res);                                                            \
+	} while (false)
+
+#define JUMP_IF_LOCAL(operation)                                                             \
+	do                                                                                       \
+	{                                                                                        \
+		const std::uint8_t slotI = READ_BYTE();                                              \
+		const std::uint8_t slotLimit = READ_BYTE();                                          \
+		Value offsetVal = READ_CONSTANT();                                                   \
+		const std::size_t idxI = m_currentLocalsBase + slotI;                                \
+		const std::size_t idxLimit = m_currentLocalsBase + slotLimit;                        \
+		if (std::get<Int>(m_variables[idxI]) operation std::get<Int>(m_variables[idxLimit])) \
+		{                                                                                    \
+			m_ip = m_chunk->GetCode().data() + std::get<std::int64_t>(offsetVal);            \
+		}                                                                                    \
+	} while (false)
+
+namespace re::rvm
+{
+
+VirtualMachine::VirtualMachine(const Config config)
+	: m_config(config)
+{
+	m_stack.reserve(256);
+	InitBuiltinTypes();
+}
+
+InterpreterResult VirtualMachine::Interpret(Chunk const& chunk)
+{
+	m_chunk = &chunk;
+	m_ip = m_chunk->GetCode().data();
+	m_stack.clear();
+	m_variables.clear();
+	m_callStack.clear();
+	m_currentLocalsBase = 0;
+
+	m_activeCoro = Allocate<Coroutine>();
+	m_activeCoro->state = CoroutineState::Running;
+
+	return Run();
+}
+
+InterpreterResult VirtualMachine::Resume()
+{
+	if (SwitchToNextMicrotask())
+	{
+		LoadContext();
+
+		return Run();
+	}
+
+	return InterpreterResult::Suspended;
+}
+
+void VirtualMachine::RegisterNative(String const& name, NativeFn fn)
+{
+	m_natives[name] = std::move(fn);
+}
+
+void VirtualMachine::RegisterType(TypeInfoPtr typeInfo)
+{
+	m_types[typeInfo->name] = std::move(typeInfo);
+}
+
+void VirtualMachine::RegisterGlobal(const String& name, Value value)
+{
+	m_globals[name] = std::move(value);
+}
+
+InterpreterResult VirtualMachine::ResumeCoroutine(CoroutinePtr const& coro, Value const& arg)
+{
+	if (coro->state == CoroutineState::Dead)
+	{
+		return InterpreterResult::RuntimeError;
+	}
+
+	SaveContext();
+
+	coro->caller = nullptr;
+	coro->state = CoroutineState::Running;
+	m_activeCoro = coro;
+
+	LoadContext();
+
+	Push(arg);
+
+	return Run();
+}
+
+InterpreterResult VirtualMachine::Run()
+{
+	for (;;)
+	{
+		if (m_config.autoProcessDestructors && !m_pendingDestructors.empty() && !m_isProcessingDestructors)
+		{
+			m_isProcessingDestructors = true;
+			ProcessDestructors();
+			m_isProcessingDestructors = false;
+		}
+
+		const std::uint8_t instruction = READ_BYTE();
+		// std::cout << "Instruction: " << (int)instruction << " Stack size: " << m_stack.size() << std::endl;
+		switch (static_cast<OpCode>(instruction))
+		{
+		case OpCode::Const: {
+			Value constant = READ_CONSTANT();
+			Push(constant);
+			break;
+		}
+		case OpCode::Dup: {
+			Push(Peek());
+			break;
+		}
+
+			// clang-format off
+		case OpCode::Add:          BINARY_OP([](const Value& a, const Value& b) { return a + b; }, ADD); break;
+		case OpCode::Sub:          BINARY_OP([](const Value& a, const Value& b) { return a - b; }, SUB); break;
+		case OpCode::Mul:          BINARY_OP([](const Value& a, const Value& b) { return a * b; }, MUL); break;
+		case OpCode::Div:          BINARY_OP([](const Value& a, const Value& b) { return a / b; }, DIV); break;
+		case OpCode::Equal:        BINARY_OP([](const Value& a, const Value& b) { return OpEqual(a, b); }, EQUAL); break;
+		case OpCode::Less:         BINARY_OP([](const Value& a, const Value& b) { return OpLess(a, b); }, LESS); break;
+		case OpCode::Greater:      BINARY_OP([](const Value& a, const Value& b) { return OpLess(b, a); }, GREATER); break;
+		case OpCode::Mod:          BINARY_OP([](const Value& a, const Value& b) { return a % b; }, MOD); break;
+		case OpCode::NotEqual:     BINARY_OP([](const Value& a, const Value& b) { return IsTruthy(OpEqual(a, b)) ? Value(static_cast<Int>(0)) : Value(static_cast<Int>(1)); }, NOT_EQUAL); break;
+		case OpCode::LessEqual:    BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(a, b); }, LESS_EQUAL); break;
+		case OpCode::GreaterEqual: BINARY_OP([](const Value& a, const Value& b) { Value eq = OpEqual(a, b); if (IsTruthy(eq)) return eq; return OpLess(b, a); }, GREATER_EQUAL); break;
+		case OpCode::And:          BINARY_OP([](const Value& a, const Value& b) { return OpAnd(a, b); }, AND); break;
+		case OpCode::Or:           BINARY_OP([](const Value& a, const Value& b) { return OpOr(a, b);  }, OR);  break;
+			// clang-format on
+
+		case OpCode::Inc: {
+			Value a = Pop();
+			bool result = std::visit(
+				utils::overloaded{
+					[this](const Int i) { Push(i + 1); return true; },
+					[this](const Double d) { Push(d + 1.0); return true; },
+					[this](auto&) { return false; },
+				},
+				a);
+			if (!result)
+			{
+				EXIT_WITH_ERROR("Runtime Error (INC): Expected a number, but got type index " << a.index());
+			}
+			break;
+		}
+		case OpCode::Dec: {
+			Value a = Pop();
+			if (auto* i = std::get_if<Int>(&a))
+			{
+				Push(*i - 1);
+			}
+			else if (auto* d = std::get_if<Double>(&a))
+			{
+				Push(*d - 1.0);
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error (DEC): Expected a number, but got type index " << a.index());
+			}
+			break;
+		}
+		case OpCode::BitNot: {
+			Value a = Pop();
+			if (auto* i = std::get_if<Int>(&a))
+			{
+				Push(~(*i));
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error (BIT_NOT): Expected a number, but got type index " << a.index());
+			}
+			break;
+		}
+
+		case OpCode::Pop: {
+			Pop();
+			break;
+		}
+
+		case OpCode::GetLocal: {
+			const std::uint8_t slot = READ_BYTE();
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+			if (actualIndex >= m_variables.size())
+			{
+				Push(Null);
+			}
+			else [[likely]]
+			{
+				Push(m_variables[actualIndex]);
+			}
+			break;
+		}
+
+		case OpCode::SetLocal: {
+			const std::uint8_t slot = READ_BYTE();
+			Value val = Pop();
+
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+			if (m_variables.size() <= actualIndex)
+			{
+				m_variables.resize(actualIndex + 1);
+			}
+			m_variables[actualIndex] = std::move(val);
+			break;
+		}
+
+		case OpCode::GetGlobal: {
+			Value nameVal = READ_CONSTANT();
+			auto it = m_globals.find(std::get<String>(nameVal));
+			if (it == m_globals.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Undefined global variable/module." + nameVal);
+			}
+			Push(it->second);
+			break;
+		}
+
+		case OpCode::SetGlobal: {
+			Value nameVal = READ_CONSTANT();
+			m_globals[std::get<String>(nameVal)] = Pop();
+			break;
+		}
+
+		case OpCode::Call: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+
+			std::uint8_t argCount = READ_BYTE();
+
+			CallFrame frame{};
+			frame.returnAddress = m_ip;
+
+			frame.stackBase = m_stack.size() - argCount;
+			frame.localsBase = m_currentLocalsBase;
+
+			m_callStack.push_back(frame);
+
+			m_currentLocalsBase = m_variables.size();
+
+			m_ip = m_chunk->GetCode().data() + offset;
+			break;
+		}
+
+		case OpCode::Native: {
+			Value nameVal = READ_CONSTANT();
+			auto funcName = std::get<String>(nameVal);
+
+			std::uint8_t argCount = READ_BYTE();
+			const auto it = m_natives.find(funcName);
+			if (it == m_natives.end())
+			{
+				EXIT_WITH_ERROR("Unknown native function " + funcName);
+			}
+
+			std::vector<Value> args(argCount);
+			for (int i = argCount - 1; i >= 0; --i)
+			{
+				args[i] = Pop();
+			}
+
+			Value result = it->second(args);
+			Push(result);
+			break;
+		}
+
+		case OpCode::JmpIfFalse: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+			if (!IsTruthy(Pop()))
+			{
+				m_ip = m_chunk->GetCode().data() + offset;
+			}
+			break;
+		}
+
+		case OpCode::Jmp: {
+			Value offsetVal = READ_CONSTANT();
+			m_ip = m_chunk->GetCode().data() + std::get<std::int64_t>(offsetVal);
+			break;
+		}
+
+		case OpCode::CallIndirect: {
+			std::uint8_t argCount = READ_BYTE();
+
+			Value callableVal = m_stack[m_stack.size() - 1 - argCount];
+			if (auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
+			{
+				auto closure = *closurePtr;
+				CallFrame frame;
+				frame.returnAddress = m_ip;
+				frame.stackBase = m_stack.size() - argCount - 1;
+				frame.localsBase = m_currentLocalsBase;
+				frame.closure = closure;
+
+				m_callStack.push_back(frame);
+				m_currentLocalsBase = m_variables.size();
+				m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+			}
+			else if (auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
+			{
+				auto native = *nativePtr;
+				if (native->argCount != argCount)
+				{
+					return InterpreterResult::RuntimeError;
+				}
+
+				std::vector<Value> args(argCount);
+				for (int i = argCount - 1; i >= 0; --i)
+				{
+					args[i] = Pop();
+				}
+				Pop();
+
+				Value result = native->function(args);
+				Push(result);
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error: Attempt to call a non-callable object" << callableVal);
+			}
+			break;
+		}
+
+		case OpCode::CallMethod: {
+			Value nameVal = READ_CONSTANT();
+			auto methodName = std::get<String>(nameVal);
+
+			std::uint8_t argCount = READ_BYTE();
+
+			// Stack layout: [Self] [Arg1] ... [ArgN] (Top)
+			// We need to look at the 'Self' object without popping everything yet
+			Value selfVal = m_stack[m_stack.size() - 1 - argCount];
+
+			auto typeInfo = GetType(selfVal);
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Value has no type info");
+			}
+
+			auto methodIt = typeInfo->methods.find(methodName);
+			if (methodIt == typeInfo->methods.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Undefined method '" << methodName << "'" << "in type '" << typeInfo->name << "'");
+			}
+
+			Value callableVal = methodIt->second;
+
+			// Now execute the callable (Closure or NativeObject)
+			if (auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
+			{
+				auto closure = *closurePtr;
+				CallFrame frame;
+				frame.returnAddress = m_ip;
+
+				// The stack base starts AT 'Self', so local variable 0 will be 'this'
+				frame.stackBase = m_stack.size() - argCount - 1;
+				frame.localsBase = m_currentLocalsBase;
+				frame.closure = closure;
+
+				m_callStack.push_back(frame);
+				m_currentLocalsBase = m_variables.size();
+				m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+			}
+			else if (auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
+			{
+				auto native = *nativePtr;
+				if (native->argCount != static_cast<std::int8_t>(-1) && native->argCount != argCount)
+				{
+					EXIT_WITH_ERROR("Runtime Error: Method '" << methodName << "' expects " << native->argCount << " arguments");
+				}
+
+				// Collect arguments INCLUDING 'self' as the first argument
+				std::vector<Value> args(argCount + 1);
+				for (int i = argCount; i > 0; --i)
+				{
+					args[i] = Pop();
+				}
+				args[0] = Pop(); // Pop 'self'
+
+				Value result = native->function(args);
+				Push(result);
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error: Method is not callable");
+			}
+			break;
+		}
+
+		case OpCode::New: {
+			Value classNameVal = READ_CONSTANT();
+			auto className = std::get<String>(classNameVal);
+
+			const auto it = m_types.find(className);
+			if (it == m_types.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown class '" << className);
+			}
+
+			auto instance = it->second->allocator(it->second);
+			if (auto* instPtr = std::get_if<InstancePtr>(&instance))
+			{
+				(*instPtr)->SetVM(this);
+			}
+
+			Push(instance);
+			break;
+		}
+
+		case OpCode::GetProperty: {
+			Value propNameVal = READ_CONSTANT();
+			auto propName = std::get<String>(propNameVal);
+
+			Value objVal = Pop();
+			auto typeInfo = GetType(objVal);
+
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Value has no type info");
+			}
+
+			if (auto it = typeInfo->getters.find(propName); it != typeInfo->getters.end())
+			{
+				Push(it->second(objVal));
+				break;
+			}
+
+			if (auto it = typeInfo->methods.find(propName); it != typeInfo->methods.end())
+			{
+				Push(it->second);
+				break;
+			}
+
+			if (auto* instPtr = std::get_if<InstancePtr>(&objVal))
+			{
+				auto& instance = *instPtr;
+				if (const auto it = instance->typeInfo->fieldIndexes.find(propName);
+					it != instance->typeInfo->fieldIndexes.end())
+				{
+					Push(instance->fields[it->second]);
+					break;
+				}
+			}
+
+			EXIT_WITH_ERROR("Runtime Error: Undefined property '" << propName << "' on type '" << typeInfo->name << "'");
+		}
+
+		case OpCode::SetProperty: {
+			auto& propName = std::get<String>(READ_CONSTANT());
+
+			Value valueToSet = Pop();
+			Value objVal = Pop();
+
+			if (!std::holds_alternative<InstancePtr>(objVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: Only instances have properties");
+			}
+
+			auto instance = std::get<InstancePtr>(objVal);
+			auto it = instance->typeInfo->fieldIndexes.find(propName);
+
+			if (it == instance->typeInfo->fieldIndexes.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Undefined property '" << propName << "'");
+			}
+
+			instance->fields[it->second] = std::move(valueToSet);
+			break;
+		}
+
+		case OpCode::TypeOf: {
+			Value objVal = Pop();
+			if (auto typeInfo = GetType(objVal))
+			{
+				Push(typeInfo);
+			}
+			else
+			{ // Undefined type
+				Push(Null);
+			}
+			break;
+		}
+
+		case OpCode::DefType: {
+			Value countVal = Pop();
+			Value nameVal = Pop();
+
+			if (!std::holds_alternative<Int>(countVal) || !std::holds_alternative<String>(nameVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: Invalid arguments for DefType");
+			}
+
+			auto fieldCount = std::get<Int>(countVal);
+			auto className = std::get<String>(nameVal);
+
+			auto classInfo = Allocate<TypeInfo>(className);
+
+			for (Int i = 0; i < fieldCount; ++i)
+			{
+				if (Value fieldVal = Pop(); std::holds_alternative<String>(fieldVal))
+				{
+					classInfo->AddField(std::get<String>(fieldVal));
+				}
+				else
+				{
+					EXIT_WITH_ERROR("Runtime Error: Field name must be a string");
+				}
+			}
+
+			m_types[className] = classInfo;
+			break;
+		}
+
+		case OpCode::Box: {
+			Value val = Pop();
+			auto upvalue = Allocate<Upvalue>();
+			upvalue->value = std::move(val);
+			Push(upvalue);
+			break;
+		}
+
+		case OpCode::Unbox: {
+			Value boxVal = Pop();
+			if (auto* ptr = std::get_if<UpvaluePtr>(&boxVal))
+			{
+				Push((*ptr)->value);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
+		case OpCode::StoreBox: {
+			Value val = Pop();
+			Value boxVal = Pop();
+			if (auto* ptr = std::get_if<UpvaluePtr>(&boxVal))
+			{
+				(*ptr)->value = std::move(val);
+			}
+			else
+			{
+				return InterpreterResult::RuntimeError;
+			}
+			break;
+		}
+
+		case OpCode::GetUpvalue: {
+			std::uint8_t index = READ_BYTE();
+			const auto& closure = m_callStack.back().closure;
+			Push(closure->captured[index]);
+			break;
+		}
+
+		case OpCode::SetUpvalue: {
+			std::uint8_t index = READ_BYTE();
+			Value val = Pop();
+			const auto& closure = m_callStack.back().closure;
+			closure->captured[index]->value = std::move(val);
+			break;
+		}
+
+		case OpCode::MakeClosure: {
+			Value offsetVal = READ_CONSTANT();
+			auto offset = std::get<std::int64_t>(offsetVal);
+			std::uint8_t upvalueCount = READ_BYTE();
+
+			auto closure = Allocate<Closure>();
+			closure->ipOffset = offset;
+			closure->captured.resize(upvalueCount);
+
+			for (int i = upvalueCount - 1; i >= 0; --i)
+			{
+				Value val = Pop();
+				closure->captured[i] = std::get<UpvaluePtr>(val);
+			}
+
+			Push(closure);
+			break;
+		}
+
+		case OpCode::LoadNative: {
+			Value nameVal = READ_CONSTANT();
+			auto funcName = std::get<String>(nameVal);
+			std::int8_t argCount = READ_BYTE();
+
+			const auto it = m_natives.find(funcName);
+			if (it == m_natives.end())
+			{
+				EXIT_WITH_ERROR("Unknown native function " + funcName);
+			}
+
+			auto nativeObj = Allocate<NativeObject>();
+			nativeObj->name = funcName;
+			nativeObj->argCount = argCount;
+			nativeObj->function = it->second;
+
+			Push(nativeObj);
+			break;
+		}
+
+		case OpCode::PackArray: {
+			std::uint8_t count = READ_BYTE();
+
+			auto arr = Allocate<ArrayInstance>();
+			arr->typeInfo = m_typeArray;
+			arr->elements.resize(count);
+
+			for (int i = count - 1; i >= 0; --i)
+			{
+				arr->elements[i] = Pop();
+			}
+
+			Push(arr);
+			break;
+		}
+
+		case OpCode::BindMethod: {
+			Value classNameVal = READ_CONSTANT();
+			Value methodNameVal = READ_CONSTANT();
+			Value closureVal = Pop();
+
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: BIND_METHOD expects a closure on the stack");
+			}
+
+			auto className = std::get<String>(classNameVal);
+			auto methodName = std::get<String>(methodNameVal);
+
+			auto it = m_types.find(className);
+			if (it == m_types.end())
+			{
+				EXIT_WITH_ERROR("Runtime Error: Cannot bind method to unknown class '" << className);
+			}
+
+			it->second->methods[methodName] = std::move(closureVal);
+			break;
+		}
+
+		case OpCode::IncLocal: {
+			const std::uint8_t slot = READ_BYTE();
+			const std::size_t actualIndex = m_currentLocalsBase + slot;
+
+			if (auto* i = std::get_if<Int>(&m_variables[actualIndex]))
+			{
+				(*i)++;
+			}
+			else
+			{
+				EXIT_WITH_ERROR("Runtime Error: INC_LOCAL expected Int");
+			}
+			break;
+		}
+
+			// clang-format off
+		case OpCode::JmpIfGreaterEqualLocal: JUMP_IF_LOCAL(>=); break;
+		case OpCode::JmpIfGreaterLocal:      JUMP_IF_LOCAL(>); break;
+			// clang-format on
+
+		case OpCode::CoroutineMake: {
+			Value closureVal = Pop();
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: CoroutineMake expects a Closure");
+			}
+
+			auto closure = std::get<ClosurePtr>(closureVal);
+			auto coro = Allocate<Coroutine>();
+			coro->state = CoroutineState::Suspended;
+			coro->ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+			CallFrame initialFrame;
+			initialFrame.returnAddress = nullptr;
+			initialFrame.stackBase = 0;
+			initialFrame.localsBase = 0;
+			initialFrame.closure = closure;
+
+			coro->callFrames.push_back(initialFrame);
+
+			Push(coro);
+			break;
+		}
+
+		case OpCode::CoroutineResume: {
+			Value arg = Pop();
+			Value coroVal = Pop();
+			auto coro = std::get<CoroutinePtr>(coroVal);
+
+			if (coro->state == CoroutineState::Dead)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Cannot resume a dead coroutine");
+			}
+
+			SaveContext();
+
+			coro->caller = m_activeCoro;
+			coro->state = CoroutineState::Running;
+			m_activeCoro = coro;
+
+			LoadContext();
+
+			Push(arg);
+			break;
+		}
+
+		case OpCode::CoroutineYield:
+		case OpCode::CoroutineAwait: {
+			Value yieldedVal = Pop();
+
+			SaveContext();
+			m_activeCoro->state = CoroutineState::Suspended;
+
+			if (static_cast<OpCode>(instruction) != OpCode::CoroutineAwait)
+			{
+				if (auto caller = m_activeCoro->caller; caller != nullptr)
+				{
+					m_activeCoro->caller = nullptr;
+					m_activeCoro = caller;
+					LoadContext();
+
+					Push(yieldedVal);
+					break;
+				}
+
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
+
+				return InterpreterResult::Suspended;
+			}
+
+			if (!m_activeCoro->isAwaitedByHost)
+			{
+				m_activeCoro->stack.push_back(yieldedVal);
+				m_microtasks.emplace(m_activeCoro);
+			}
+			m_activeCoro->isAwaitedByHost = false;
+
+			if (auto caller = m_activeCoro->caller; caller == nullptr)
+			{
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
+
+				return InterpreterResult::Suspended;
+			}
+			else
+			{
+				m_activeCoro->caller = nullptr;
+				m_activeCoro = caller;
+				LoadContext();
+				break;
+			}
+		}
+
+		case OpCode::CoroutineLaunch: {
+			std::uint8_t argCount = READ_BYTE();
+
+			Value closureVal = m_stack[m_stack.size() - 1 - argCount];
+
+			if (!std::holds_alternative<ClosurePtr>(closureVal))
+			{
+				EXIT_WITH_ERROR("Runtime Error: CO_LAUNCH expects a Closure");
+			}
+
+			auto closure = std::get<ClosurePtr>(closureVal);
+			auto coroutine = Allocate<Coroutine>();
+			coroutine->state = CoroutineState::Suspended;
+			coroutine->ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+			CallFrame initialFrame;
+			initialFrame.returnAddress = nullptr;
+			initialFrame.stackBase = 0;
+			initialFrame.localsBase = 0;
+			initialFrame.closure = closure;
+			coroutine->callFrames.push_back(initialFrame);
+
+			coroutine->stack.resize(argCount);
+			for (int i = argCount - 1; i >= 0; --i)
+			{
+				coroutine->stack[i] = Pop();
+			}
+			Pop();
+
+			m_microtasks.push(coroutine);
+
+			Push(coroutine);
+
+			break;
+		}
+
+		case OpCode::Cast: {
+			Value typeNameVal = READ_CONSTANT();
+			auto targetName = std::get<String>(typeNameVal);
+
+			Value val = Pop();
+
+			if (targetName == "Int")
+			{
+				if (auto* d = std::get_if<Double>(&val))
+				{
+					Push(static_cast<Int>(*d));
+				}
+				else if (std::holds_alternative<Int>(val))
+				{
+					Push(val);
+				}
+				else
+				{
+					EXIT_WITH_ERROR("Runtime Error: Cannot cast to Int");
+				}
+			}
+			else if (targetName == "Double")
+			{
+				if (auto* i = std::get_if<Int>(&val))
+				{
+					Push(static_cast<Double>(*i));
+				}
+				else if (std::holds_alternative<Double>(val))
+				{
+					Push(val);
+				}
+				else
+				{
+					EXIT_WITH_ERROR("Runtime Error: Cannot cast to Double");
+				}
+			}
+			else
+			{ // No need to convert InstancePtr to other type
+				Push(val);
+			}
+			break;
+		}
+
+		case OpCode::AnnotateType: {
+			Value typeNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_TYPE");
+			}
+
+			typeInfo->annotations[std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateField: {
+			Value typeNameVal = READ_CONSTANT();
+			Value fieldNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_FIELD");
+			}
+
+			typeInfo->fieldAnnotations[std::get<String>(fieldNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateMethod: {
+			Value typeNameVal = READ_CONSTANT();
+			Value methodNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in ANNOTATE_METHOD");
+			}
+
+			typeInfo->methodAnnotations[std::get<String>(methodNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::AnnotateGlobal: {
+			Value globalNameVal = READ_CONSTANT();
+			Value annoNameVal = READ_CONSTANT();
+			Value argVal = Pop();
+
+			m_globalAnnotations[std::get<String>(globalNameVal)][std::get<String>(annoNameVal)] = std::move(argVal);
+			break;
+		}
+
+		case OpCode::LoadType: {
+			Value typeNameVal = READ_CONSTANT();
+			auto typeInfo = GetTypeByName(std::get<String>(typeNameVal));
+			if (!typeInfo)
+			{
+				EXIT_WITH_ERROR("Runtime Error: Unknown type in LOAD_TYPE");
+			}
+			Push(typeInfo);
+			break;
+		}
+
+		case OpCode::Return: {
+			Value retVal = Null;
+			if (!m_stack.empty())
+			{
+				retVal = Pop();
+			}
+
+			if (!m_callStack.empty())
+			{
+				if (const auto& frame = m_callStack.back(); frame.returnAddress == nullptr)
+				{
+					SaveContext();
+					m_activeCoro->state = CoroutineState::Dead;
+
+					auto caller = m_activeCoro->caller;
+
+					if (caller == nullptr)
+					{
+						if (SwitchToNextMicrotask())
+						{
+							LoadContext();
+							break;
+						}
+
+						return InterpreterResult::Success;
+					}
+
+					m_activeCoro->caller = nullptr;
+					m_activeCoro = caller;
+					LoadContext();
+					Push(retVal);
+				}
+				else
+				{
+					m_ip = frame.returnAddress;
+					m_stack.resize(frame.stackBase);
+					m_variables.resize(m_currentLocalsBase);
+					m_currentLocalsBase = frame.localsBase;
+					m_callStack.pop_back();
+
+					Push(retVal);
+				}
+			}
+			else
+			{
+				SaveContext();
+				m_activeCoro->state = CoroutineState::Dead;
+
+				if (SwitchToNextMicrotask())
+				{
+					LoadContext();
+					break;
+				}
+
+				return InterpreterResult::Success;
+			}
+			break;
+		}
+
+		default:
+			EXIT_WITH_ERROR("Unsupported Opcode" << instruction);
+		}
+	}
+}
+
+Value VirtualMachine::Pop()
+{
+	RE_ASSERT(!m_stack.empty(), "You should not call VirtualMachine::Pop on empty stack");
+
+	const Value val = m_stack.back();
+	m_stack.pop_back();
+
+	return val;
+}
+
+Value const& VirtualMachine::Peek()
+{
+	return m_stack.back();
+}
+
+void VirtualMachine::Push(Value const& value)
+{
+	m_stack.push_back(value);
+}
+
+TypeInfoPtr VirtualMachine::GetType(Value const& value) const
+{
+	return std::visit(utils::overloaded{
+						  [this](Null_t) { return m_typeNull; },
+						  [this](const Int) { return m_typeInt; },
+						  [this](const Double) { return m_typeDouble; },
+						  [this](String const&) { return m_typeString; },
+						  [](InstancePtr const& inst) { return inst ? inst->typeInfo : nullptr; },
+						  [](ArrayInstancePtr const& arr) { return arr ? arr->typeInfo : nullptr; },
+						  [](const auto&) -> TypeInfoPtr { return nullptr; } },
+		value);
+}
+
+TypeInfoPtr VirtualMachine::GetTypeByName(String const& name) const
+{
+	if (const auto it = m_types.find(name); it != m_types.end())
+	{
+		return it->second;
+	}
+
+	return nullptr;
+}
+
+CoroutinePtr VirtualMachine::GetActiveCoroutine() const
+{
+	return m_activeCoro;
+}
+
+void VirtualMachine::EnqueueMacrotask(CoroutinePtr const& coro, Value const& arg)
+{
+	coro->stack.push_back(arg);
+	m_microtasks.push(coro);
+}
+
+void VirtualMachine::SetDelayHandler(DelayHandler handler)
+{
+	m_delayHandler = std::move(handler);
+}
+
+void VirtualMachine::RequestDelay(const std::uint64_t ms) const
+{
+	if (m_delayHandler)
+	{
+		m_activeCoro->isAwaitedByHost = true;
+		m_delayHandler(m_activeCoro, ms);
+	}
+}
+
+void VirtualMachine::EnqueueForDestruction(Object* obj)
+{
+	m_pendingDestructors.emplace_back(obj);
+}
+
+void VirtualMachine::ProcessDestructors()
+{
+	if (m_pendingDestructors.empty())
+	{
+		return;
+	}
+
+	const auto pending = std::move(m_pendingDestructors);
+	m_pendingDestructors.clear();
+
+	for (Object* obj : pending)
+	{
+		if (auto* inst = dynamic_cast<Instance*>(obj))
+		{
+			String dtorName = "~" + inst->typeInfo->name;
+			if (auto it = inst->typeInfo->methods.find(dtorName); it != inst->typeInfo->methods.end())
+			{
+				if (const auto* closurePtr = std::get_if<ClosurePtr>(&it->second))
+				{
+					const auto dtorCoro = Allocate<Coroutine>();
+					dtorCoro->state = CoroutineState::Running;
+
+					CallFrame frame;
+					frame.returnAddress = nullptr;
+					frame.stackBase = 0;
+					frame.localsBase = 0;
+					frame.closure = *closurePtr;
+
+					dtorCoro->callFrames.push_back(frame);
+					dtorCoro->ip = m_chunk->GetCode().data() + (*closurePtr)->ipOffset;
+
+					dtorCoro->stack.emplace_back(ObjectPtr(inst));
+
+					auto previousCoro = m_activeCoro;
+					SaveContext();
+
+					m_activeCoro = dtorCoro;
+					LoadContext();
+
+					Run();
+
+					m_activeCoro = previousCoro;
+					LoadContext();
+
+					dtorCoro->stack.clear();
+					dtorCoro->variables.clear();
+					dtorCoro->callFrames.clear();
+				}
+			}
+		}
+
+		RemoveFromAllObjects(obj);
+
+		delete obj;
+	}
+}
+
+void VirtualMachine::InitBuiltinTypes()
+{
+	m_typeInt = Allocate<TypeInfo>(String("Int"));
+	m_typeDouble = Allocate<TypeInfo>(String("Double"));
+	m_typeString = Allocate<TypeInfo>(String("String"));
+	m_typeNull = Allocate<TypeInfo>(String("Null"));
+	m_typeArray = Allocate<TypeInfo>(String("Array"));
+	m_typeTypeInfo = Allocate<TypeInfo>(String("Type"));
+
+	m_types[m_typeInt->name] = m_typeInt;
+	m_types[m_typeDouble->name] = m_typeDouble;
+	m_types[m_typeString->name] = m_typeString;
+	m_types[m_typeArray->name] = m_typeArray;
+	m_types[m_typeTypeInfo->name] = m_typeTypeInfo;
+}
+
+void VirtualMachine::SaveContext()
+{
+	m_activeCoro->ip = m_ip;
+	m_activeCoro->currentLocalsBase = m_currentLocalsBase;
+	std::swap(m_activeCoro->stack, m_stack);
+	std::swap(m_activeCoro->variables, m_variables);
+	std::swap(m_activeCoro->callFrames, m_callStack);
+}
+
+void VirtualMachine::LoadContext()
+{
+	m_ip = m_activeCoro->ip;
+	m_currentLocalsBase = m_activeCoro->currentLocalsBase;
+	std::swap(m_stack, m_activeCoro->stack);
+	std::swap(m_variables, m_activeCoro->variables);
+	std::swap(m_callStack, m_activeCoro->callFrames);
+}
+
+bool VirtualMachine::SwitchToNextMicrotask()
+{
+	if (m_microtasks.empty())
+	{
+		return false;
+	}
+
+	const auto nextCoro = m_microtasks.front();
+	m_microtasks.pop();
+
+	nextCoro->caller = nullptr;
+	nextCoro->state = CoroutineState::Running;
+	m_activeCoro = nextCoro;
+
+	return true;
+}
+
+void VirtualMachine::CollectCycles()
+{
+	MarkObject(m_activeCoro.Get());
+	for (const auto& val : m_globals | std::views::values)
+	{
+		MarkValue(val);
+	}
+	for (const auto& type : m_types | std::views::values)
+	{
+		MarkObject(type.Get());
+	}
+	auto tempQueue = m_microtasks;
+	while (!tempQueue.empty())
+	{
+		MarkObject(tempQueue.front().Get());
+		tempQueue.pop();
+	}
+
+	Object** curr = AllocatedObjects();
+	while (*curr)
+	{
+		if (!(*curr)->m_isMarked)
+		{
+			Object* unreached = *curr;
+			*curr = unreached->m_next;
+
+			EnqueueForDestruction(unreached);
+		}
+		else
+		{
+			(*curr)->m_isMarked = false;
+			curr = &(*curr)->m_next;
+		}
+	}
+}
+
+void VirtualMachine::RemoveFromAllObjects(const Object* obj)
+{
+	Object** curr = AllocatedObjects();
+	while (*curr)
+	{
+		if (*curr == obj)
+		{
+			*curr = obj->m_next;
+			return;
+		}
+		curr = &(*curr)->m_next;
+	}
+}
+
+void VirtualMachine::MarkObject(Object* obj)
+{
+	if (!obj || obj->m_isMarked)
+	{
+		return;
+	}
+
+	obj->m_isMarked = true;
+	obj->Trace(this);
+}
+
+void VirtualMachine::MarkValue(Value const& val)
+{
+	// clang-format off
+	std::visit(utils::overloaded{
+		[this](InstancePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](ArrayInstancePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](ClosurePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](UpvaluePtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](NativeObjectPtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](TypeInfoPtr const& ptr) { MarkObject(ptr.Get()); },
+		[this](CoroutinePtr const& ptr) { MarkObject(ptr.Get()); },
+		[](const auto&) {}
+	}, val);
+	// clang-format on
+}
+
+void VirtualMachine::SetConfig(const Config& config)
+{
+	m_config = config;
+}
+
+const Config& VirtualMachine::GetConfig() const
+{
+	return m_config;
+}
+
+void VirtualMachine::OnObjectAllocated() noexcept
+{
+	++m_allocationCount;
+	if (m_config.autoCollectCycles && m_allocationCount >= m_config.gcThreshold)
+	{
+		m_allocationCount = 0;
+		CollectCycles();
+	}
+}
+
+bool VirtualMachine::HasGlobalAnnotation(const String& globalName, const String& annoName) const noexcept
+{
+	if (const auto it = m_globalAnnotations.find(globalName); it != m_globalAnnotations.end())
+	{
+		return it->second.contains(annoName);
+	}
+
+	return false;
+}
+
+Value VirtualMachine::GetGlobalAnnotation(const String& globalName, const String& annoName) const noexcept
+{
+	if (const auto it = m_globalAnnotations.find(globalName); it != m_globalAnnotations.end())
+	{
+		if (const auto annoIt = it->second.find(annoName); annoIt != it->second.end())
+		{
+			return annoIt->second;
+		}
+	}
+
+	return Null;
+}
+
+} // namespace re::rvm

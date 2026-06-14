@@ -1,0 +1,28 @@
+// EXPECT_OUTPUT:
+// 3
+// 6
+// 1
+// END_EXPECT
+
+package program;
+
+fun countArgs(args: Any...): Int {
+    return args.size;
+}
+
+fun sumArgs(args: Int...): Int {
+    var s = 0;
+    for (item in args) {
+        s = s + item;
+    }
+    return s;
+}
+
+fun main() {
+    // Array<Any>
+    println(countArgs(1, "two", 3.0));
+
+    // Array<Int>
+    println(sumArgs(1, 2, 3));
+    println(sumArgs(1));
+}

@@ -1,0 +1,41 @@
+FUN main
+    // 1. Загружаем функцию и создаем из нее корутину
+    LOAD_FUN myGenerator
+    CO_MAKE
+    SET coro
+
+    // 2. Первый запуск (должен вернуть 10)
+    GET coro
+    CONST null       // Аргумент для передачи внутрь корутины
+    CO_RESUME
+    NATIVE "println" 1
+    POP              // Очищаем результат println
+
+    // 3. Второй запуск (должен вернуть 20)
+    GET coro
+    CONST null
+    CO_RESUME
+    NATIVE "println" 1
+    POP
+
+    // 4. Третий запуск (завершение, вернет 30)
+    GET coro
+    CONST null
+    CO_RESUME
+    NATIVE "println" 1
+    POP
+
+    CONST null
+    RETURN
+
+FUN myGenerator
+    CONST 10
+    CO_YIELD
+    POP     // Удаляем аргумент, который нам передал RESUME
+
+    CONST 20
+    CO_YIELD
+    POP
+
+    CONST 30
+    RETURN

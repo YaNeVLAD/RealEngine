@@ -1,0 +1,22 @@
+// EXPECT_OUTPUT:
+// 0
+// 1
+// 2
+// done
+// 0
+// 1
+// 2
+// END_EXPECT
+
+fun main() {
+    var i = 0;
+    while (i < 3) {
+        println(i);
+        i++;
+    }
+    println("done");
+
+    for (j in 0..2) {
+        println(j);
+    }
+}

@@ -1,0 +1,112 @@
+// Динамически объявляем структуру Vector2
+TYPE "Vector2"
+    FIELD "x"
+    FIELD "y"
+END_TYPE
+
+// Динамически объявляем структуру Player
+TYPE "Player"
+    FIELD "name"
+    FIELD "hp"
+    FIELD "position"
+END_TYPE
+
+// Запускаем главную функцию скрипта
+CALL main 0
+RETURN // Завершаем выполнение всего скрипта
+
+FUN main
+    // --- 1. Создание Vector2 ---
+    NEW "Vector2"           // Стек: [Instance(Vector2)]
+    SET pos                 // Сохраняем в локальную переменную 'pos'. Стек:[]
+
+    // pos.x = 10.5
+    GET pos                 // Кладем объект (кому присваиваем)
+    CONST 10.5              // Кладем значение
+    SET_PROPERTY "x"        // Снимает 10.5, снимает pos, записывает. Стек:[]
+
+    // pos.y = 20.0
+    GET pos
+    CONST 20.0
+    SET_PROPERTY "y"
+
+
+    // --- 2. Создание Player ---
+    NEW "Player"
+    SET player
+
+    // player.name = "Hero"
+    GET player
+    CONST "Hero"
+    SET_PROPERTY "name"
+
+    // player.hp = 100
+    GET player
+    CONST 100
+    SET_PROPERTY "hp"
+
+    // player.position = pos
+    GET player
+    GET pos
+    SET_PROPERTY "position" // Записываем ссылку на объект Vector2 в поле Player!
+
+
+    // --- 3. Вызов метода: player.Move(15.0, -5.0) ---
+    // Компилятор переводит это в вызов функции Player_Move(this, dx, dy)
+
+    GET player              // Аргумент 0: this
+    CONST 15.0              // Аргумент 1: dx
+    CONST -5.0              // Аргумент 2: dy
+    CALL Player_Move 3      // Вызываем функцию с 3 аргументами.
+
+
+    // --- 4. Проверка: Вывод player.position.x ---
+    CONST "Player new X position is: "
+
+    // Цепочка вызовов (Chaining): player.position.x
+    GET player
+    GET_PROPERTY "position" // Снимает player, кладет player.position (Vector2)
+    GET_PROPERTY "x"        // Снимает Vector2, кладет поле 'x' (25.5)
+
+    ADD                     // Складываем строку и число (Конкатенация)
+    NATIVE "print" 1        // Печатаем результат
+
+    RETURN
+
+
+// =========================================================
+// void Player_Move(Player this, double dx, double dy)
+// =========================================================
+FUN Player_Move
+    // Забираем аргументы со стека в обратном порядке (так как они клались 0->1->2)
+    SET dy
+    SET dx
+    SET this
+
+    // 1. Получаем ссылку на this.position
+    GET this
+    GET_PROPERTY "position"
+    SET p                   // Сохраняем во временную переменную 'p' для удобства
+
+    // 2. p.x = p.x + dx
+    GET p                   // Кладем 'p' (объект для SET_PROPERTY)
+
+    GET p
+    GET_PROPERTY "x"        // Кладем p.x
+    GET dx                  // Кладем dx
+    ADD                     // Складываем (p.x + dx)
+
+    SET_PROPERTY "x"        // Записываем результат обратно в p.x
+
+    // 3. p.y = p.y + dy
+    GET p
+
+    GET p
+    GET_PROPERTY "y"
+    GET dy
+    ADD
+
+    SET_PROPERTY "y"
+
+    // Void функция (ничего не кладем на стек перед выходом)
+    RETURN

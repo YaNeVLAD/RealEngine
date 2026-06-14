@@ -1,0 +1,43 @@
+#pragma once
+
+#include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/Compiler/IBackend.hpp>
+#include <IgniLang/Compiler/RvmCodeGenerator.hpp>
+#include <IgniLang/Compiler/ScopeAnalyzer.hpp>
+
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+namespace igni::compiler
+{
+
+class RvmBackend : public IBackend
+{
+public:
+	std::string Generate(
+		const ast::Program* program,
+		const std::unordered_set<re::String>& globalNames,
+		const std::unordered_map<re::String, re::String>& importAliases,
+		const std::unordered_set<re::String>& externals,
+		const sem::SemanticAnalyzer& semanticAnalyzer) override
+	{
+		std::vector<const ast::FunDecl*> flatFunctions;
+		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;
+		std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>> functionBoxedVars;
+
+		ScopeAnalyzer analyzer(flatFunctions, functionUpvalues, functionBoxedVars, globalNames, semanticAnalyzer);
+		analyzer.Analyze(program);
+
+		std::stringstream out;
+		RvmCodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals, semanticAnalyzer);
+		generator.Generate(program);
+
+		return out.str();
+	}
+};
+
+} // namespace igni::compiler
