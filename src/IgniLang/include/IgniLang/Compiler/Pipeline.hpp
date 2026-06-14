@@ -99,7 +99,8 @@ public:
 			semanticAnalyzer->GetGlobalNames(),
 			semanticAnalyzer->GetImportAliases(),
 			semanticAnalyzer->GetExternalFunctions(),
-			*semanticAnalyzer);
+			*semanticAnalyzer,
+			buildType);
 
 		result.success = true;
 		result.semantics = semanticAnalyzer;

@@ -1,8 +1,10 @@
 package global;
 
 annotation class NativeName(val name: String);
-
 annotation class RvmNative(val name: String);
+annotation class Keep;
+annotation class Export;
+annotation class DllExport;
 
 fun less(lhs: Any, rhs: Any) = lhs < rhs;
 

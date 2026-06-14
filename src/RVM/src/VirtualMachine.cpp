@@ -1298,4 +1298,97 @@ Value VirtualMachine::GetGlobalAnnotation(const String& globalName, const String
 	return Null;
 }
 
+Value VirtualMachine::Instantiate(String const& className)
+{
+	const auto it = m_types.find(className);
+	if (it == m_types.end())
+	{
+		std::cerr << "[RVM Error] Cannot instantiate unknown class: " << className << "\n";
+		return Null;
+	}
+
+	auto instance = it->second->allocator(it->second);
+	if (const auto* instPtr = std::get_if<InstancePtr>(&instance))
+	{
+		(*instPtr)->SetVM(this);
+	}
+
+	return instance;
+}
+
+InterpreterResult VirtualMachine::InvokeMethod(Value const& instance, String const& methodName, std::vector<Value> const& args)
+{
+	const auto typeInfo = GetType(instance);
+	if (!typeInfo)
+	{
+		std::cerr << "[RVM Error] InvokeMethod: Value has no type info\n";
+		return InterpreterResult::RuntimeError;
+	}
+
+	const auto methodIt = typeInfo->methods.find(methodName);
+	if (methodIt == typeInfo->methods.end())
+	{
+		return InterpreterResult::Success;
+	}
+
+	Value callableVal = methodIt->second;
+
+	if (const auto* closurePtr = std::get_if<ClosurePtr>(&callableVal))
+	{
+		const auto closure = *closurePtr;
+
+		if (!m_activeCoro)
+		{
+			m_activeCoro = Allocate<Coroutine>();
+			m_activeCoro->state = CoroutineState::Running;
+		}
+
+		Push(instance);
+
+		for (const auto& arg : args)
+		{
+			Push(arg);
+		}
+
+		CallFrame frame;
+		frame.returnAddress = nullptr;
+		frame.stackBase = m_stack.size() - args.size() - 1;
+		frame.localsBase = m_currentLocalsBase;
+		frame.closure = closure;
+
+		m_callStack.push_back(frame);
+		m_currentLocalsBase = m_variables.size();
+
+		m_ip = m_chunk->GetCode().data() + closure->ipOffset;
+
+		return Run();
+	}
+
+	if (const auto* nativePtr = std::get_if<NativeObjectPtr>(&callableVal))
+	{
+		std::vector<Value> callArgs;
+		callArgs.reserve(args.size() + 1);
+		callArgs.push_back(instance);
+		callArgs.insert(callArgs.end(), args.begin(), args.end());
+
+		std::ignore = (*nativePtr)->function(callArgs);
+
+		return InterpreterResult::Success;
+	}
+
+	std::cerr << "[RVM Error] Method '" << methodName << "' is not callable\n";
+
+	return InterpreterResult::RuntimeError;
+}
+
+void VirtualMachine::SetUserData(void* data)
+{
+	m_userData = data;
+}
+
+void* VirtualMachine::GetUserData() const
+{
+	return m_userData;
+}
+
 } // namespace re::rvm

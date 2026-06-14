@@ -1,11 +1,12 @@
 #include <Runtime/Main.hpp>
 
-#include "LauncherApplication.hpp"
-#include "ScriptCompiler.hpp"
+#include <Scripting/ScriptCompiler.hpp>
 
-re::Application* CreateApplication(int argc, char** argv)
+#include "LauncherApplication.hpp"
+
+re::Application* CreateApplication(int /*argc*/, char** /*argv*/)
 {
-	launcher::CompileScripts();
+	re::scripting::ScriptCompiler::CompileAllModified();
 
 	return new LauncherApplication();
 }

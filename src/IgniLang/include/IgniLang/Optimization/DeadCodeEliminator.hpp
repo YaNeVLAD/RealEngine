@@ -28,7 +28,7 @@ public:
 
 		auto hasKeepAnnotation = [](const std::vector<std::unique_ptr<ast::AnnotationNode>>& annos) {
 			return std::ranges::any_of(annos, [&](const auto& annotation) {
-				return annotation->name == "Keep" || annotation->name == "Export";
+				return annotation->name == "Keep" || annotation->name == "Export" || annotation->name == "DllExport";
 			});
 		};
 

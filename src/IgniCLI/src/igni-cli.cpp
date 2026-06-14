@@ -1,3 +1,5 @@
+#include "IgniCLI/BackendRegistry.hpp"
+
 #include <Core/flat_map.hpp>
 #include <IgniCLI/BackendRegistry.hpp>
 #include <IgniCLI/CLArguments.hpp>
@@ -9,6 +11,7 @@
 #include <IgniLang/Compiler/RvmBackend.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -91,22 +94,45 @@ int main(const int argc, char** argv)
 			return 1;
 		}
 
-		std::cout << "[Info] Code generated successfully.\n";
-		std::cout << "------- GENERATED CODE -------\n"
-				  << result.generatedCode
-				  << "\n------------------------------\n";
-
-		std::unique_ptr<igni::cli::IRunner> runner;
-		if (target == igni::BuildTarget::RVM)
+		if (std::string outputPath = args.OutputPath(); !outputPath.empty())
 		{
-			runner = std::make_unique<igni::cli::RvmRunner>();
+			if (std::ofstream outFile(outputPath, std::ios::binary); outFile.is_open())
+			{
+				outFile << result.generatedCode;
+				std::cout << "[Info] Output successfully saved to: " << outputPath << "\n";
+			}
+			else
+			{
+				std::cerr << "[Error] Failed to open output file for writing: " << outputPath << "\n";
+				return 1;
+			}
 		}
-		else if (target == igni::BuildTarget::DotNet)
+		else
 		{
-			runner = std::make_unique<igni::cli::DotNetRunner>(args.BuildType());
+			// Если файл не указан, просто выводим в консоль, чтобы ничего не сломать в текущих тестах
+			std::cout << "[Info] Code generated successfully.\n";
+			std::cout << "------- GENERATED CODE -------\n"
+					  << result.generatedCode
+					  << "\n------------------------------\n";
 		}
 
-		return runner->Run(result.generatedCode);
+		if (args.ShouldRun())
+		{
+			std::unique_ptr<igni::cli::IRunner> runner;
+			if (target == igni::BuildTarget::RVM)
+			{
+				runner = std::make_unique<igni::cli::RvmRunner>();
+			}
+			else if (target == igni::BuildTarget::DotNet)
+			{
+				runner = std::make_unique<igni::cli::DotNetRunner>(args.BuildType());
+			}
+
+			std::cout << "[Info] Running generated code...\n";
+			return runner->Run(result.generatedCode);
+		}
+
+		return 0;
 	}
 	catch (const std::exception& e)
 	{

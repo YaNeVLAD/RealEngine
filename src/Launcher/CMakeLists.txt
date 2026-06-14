@@ -17,7 +17,7 @@ add_executable(ReLauncher main.cpp
         Lab6/BattleCityLayout.hpp
         Lab6/EntityFactory.hpp
 
-        ScriptCompiler.hpp
+        ../Scripting/include/Scripting/ScriptCompiler.hpp
         LauncherApplication.hpp
 )
 

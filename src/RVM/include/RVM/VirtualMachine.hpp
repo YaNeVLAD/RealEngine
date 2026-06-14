@@ -67,6 +67,14 @@ public:
 	bool HasGlobalAnnotation(const String& globalName, const String& annoName) const noexcept;
 	Value GetGlobalAnnotation(const String& globalName, const String& annoName) const noexcept;
 
+	Value Instantiate(String const& className);
+
+	InterpreterResult InvokeMethod(Value const& instance, String const& methodName, std::vector<Value> const& args);
+
+	void SetUserData(void* data);
+
+	[[nodiscard]] void* GetUserData() const;
+
 private:
 	InterpreterResult Run();
 
@@ -89,6 +97,8 @@ private:
 	void RemoveFromAllObjects(const Object* obj);
 
 private:
+	void* m_userData = nullptr;
+
 	Config m_config;
 	std::size_t m_allocationCount = 0;
 	bool m_isProcessingDestructors = false;

@@ -18,20 +18,23 @@ class CLArguments final
 	{
 		BuildTarget buildTarget = BuildTarget::Unknown;
 		BuildType buildType = BuildType::Unknown;
+		re::String outputPath = "main";
 		std::vector<re::String> sourceFiles;
+		bool shouldRun = false;
 		bool disableDCE = false;
 	};
 
 	static constexpr auto USAGE_HINT = "Usage: igni-cli [options] <file1.igni> <file2.igni> ...\n"
 									   "Options:\n"
-									   "  --rvm      Compile for RVM\n"
-									   "  --dotnet   Compile for .NET CIL\n"
 									   "  --dll      Build as dynamic library\n"
 									   "  --exe      Build as executable\n"
+									   "  -o         Set output file\n"
+									   "  --run      Run program immediately after compilation"
 									   "  --no-dce   Disable Dead Code Elimination\n";
 
 	static constexpr auto NO_TARGET_ERROR = "[Error] No target provided.\n";
 	static constexpr auto NO_SOURCE_ERROR = "[Error] No source files provided.\n";
+	static constexpr auto NO_OUTPUT_ERROR = "[Error] No output path provided after '-o' option.\n";
 	static constexpr auto NO_BUILD_TYPE_ERROR = "[Error] No build type provided.\n";
 
 public:
@@ -53,6 +56,16 @@ public:
 	BuildType BuildType() const
 	{
 		return m_options->buildType;
+	}
+
+	re::String OutputPath() const
+	{
+		return m_options->outputPath;
+	}
+
+	bool ShouldRun() const
+	{
+		return m_options->shouldRun;
 	}
 
 	bool DisableDCE() const
@@ -105,6 +118,24 @@ private:
 			if (hashed == "--no-dce"_hs)
 			{
 				options.disableDCE = true;
+				continue;
+			}
+
+			if (hashed == "-o"_hs)
+			{
+				if (argc < i + 1)
+				{
+					errors.emplace_back(NO_OUTPUT_ERROR);
+					continue;
+				}
+				options.outputPath = argv[i + 1];
+				i++;
+				continue;
+			}
+
+			if (hashed == "--run"_hs)
+			{
+				options.shouldRun = true;
 				continue;
 			}
 

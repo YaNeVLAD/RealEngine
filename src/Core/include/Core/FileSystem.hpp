@@ -22,6 +22,7 @@ namespace raw
 
 inline constexpr char ASSETS_DIR[] = "assets";
 inline constexpr char SHADERS_DIR[] = "shaders";
+inline constexpr char SCRIPTS_DIR[] = "scripts";
 inline constexpr char BIN_DIR[] = "bin";
 
 template <const char* PARENT_DIR>
@@ -51,6 +52,7 @@ private:
 
 using AssetsPath = raw::ResourcePath<raw::ASSETS_DIR>;
 using BinaryPath = raw::ResourcePath<raw::BIN_DIR>;
+using ScriptsPath = raw::ResourcePath<raw::SCRIPTS_DIR>;
 using ShadersPath = raw::ResourcePath<raw::SHADERS_DIR>;
 
 namespace literals
@@ -64,6 +66,11 @@ inline AssetsPath operator""_asset(const char* str, std::size_t /*len*/)
 inline BinaryPath operator""_binary(const char* str, std::size_t /*len*/)
 {
 	return BinaryPath(String(str));
+}
+
+inline ScriptsPath operator""_script(const char* str, std::size_t /*len*/)
+{
+	return ScriptsPath(String(str));
 }
 
 inline ShadersPath operator""_shader(const char* str, std::size_t /*len*/)

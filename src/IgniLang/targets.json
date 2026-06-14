@@ -10,7 +10,7 @@
         "Null": "Null",
         "Any": "Any"
       },
-      "ffi_annotations": [ "NativeName", "RvmNative" ]
+      "ffi_annotations": [ "NativeName", "RvmNative", "DllExport" ]
     },
     "dotnet": {
       "primitive_mapping": {

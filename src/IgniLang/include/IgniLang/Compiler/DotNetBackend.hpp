@@ -16,7 +16,8 @@ public:
 		const std::unordered_set<re::String>& globalNames,
 		const std::unordered_map<re::String, re::String>& importAliases,
 		const std::unordered_set<re::String>& externals,
-		const sem::SemanticAnalyzer& semanticAnalyzer) override
+		const sem::SemanticAnalyzer& semanticAnalyzer,
+		const BuildType buildType) override
 	{
 		std::stringstream out;
 

@@ -23,7 +23,8 @@ public:
 		const std::unordered_set<re::String>& globalNames,
 		const std::unordered_map<re::String, re::String>& importAliases,
 		const std::unordered_set<re::String>& externals,
-		const sem::SemanticAnalyzer& semanticAnalyzer) override
+		const sem::SemanticAnalyzer& semanticAnalyzer,
+		const BuildType buildType) override
 	{
 		std::vector<const ast::FunDecl*> flatFunctions;
 		std::unordered_map<const ast::FunDecl*, std::vector<re::String>> functionUpvalues;
@@ -33,7 +34,12 @@ public:
 		analyzer.Analyze(program);
 
 		std::stringstream out;
-		RvmCodeGenerator generator(out, flatFunctions, functionUpvalues, functionBoxedVars, importAliases, externals, semanticAnalyzer);
+		RvmCodeGenerator generator(
+			out, flatFunctions, functionUpvalues, functionBoxedVars,
+			importAliases,
+			externals,
+			semanticAnalyzer,
+			buildType == BuildType::DynamicLibrary);
 		generator.Generate(program);
 
 		return out.str();

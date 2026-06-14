@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Core/String.hpp>
 #include <IgniLang/AST/AstNodes.hpp>
+#include <IgniLang/BuildType.hpp>
 #include <IgniLang/Semantic/SemanticAnalyzer.hpp>
-#include <string>
 
 namespace igni::compiler
 {
@@ -17,7 +18,8 @@ public:
 		const std::unordered_set<re::String>& globalNames,
 		const std::unordered_map<re::String, re::String>& importAliases,
 		const std::unordered_set<re::String>& externals,
-		const sem::SemanticAnalyzer& semanticAnalyzer) = 0;
+		const sem::SemanticAnalyzer& semanticAnalyzer,
+		BuildType buildType) = 0;
 };
 
 } // namespace igni::compiler

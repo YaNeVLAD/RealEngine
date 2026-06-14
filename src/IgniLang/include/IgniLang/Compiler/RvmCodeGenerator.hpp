@@ -29,8 +29,10 @@ public:
 		const std::unordered_map<const ast::FunDecl*, std::unordered_set<re::String>>& funcBoxedVars,
 		const std::unordered_map<re::String, re::String>& importAliases,
 		const std::unordered_set<re::String>& externals,
-		const sem::SemanticAnalyzer& semantics)
+		const sem::SemanticAnalyzer& semantics,
+		const bool isDll)
 		: m_out(out)
+		, m_isDll(isDll)
 		, m_flatFunctions(flatFuncs)
 		, m_functionUpvalues(funcUpvals)
 		, m_functionBoxedVars(funcBoxedVars)
@@ -217,8 +219,16 @@ public:
 			}
 		}
 
-		m_out << "// --- Entry Point ---\n";
-		m_out << "CALL main 0\nRETURN\n\n";
+		if (!m_isDll)
+		{
+			m_out << "// --- Entry Point ---\n";
+			m_out << "CALL main 0\nRETURN\n\n";
+		}
+		else
+		{
+			m_out << "// --- End of Global Scope ---\n";
+			m_out << "CONST 0\nRETURN\n\n";
+		}
 
 		m_out << "// --- Function Definitions ---\n";
 		for (const ast::FunDecl* fun : m_flatFunctions)
@@ -1050,6 +1060,8 @@ public:
 
 private:
 	std::ostream& m_out;
+	bool m_isDll;
+
 	std::size_t m_labelCount = 0;
 	std::size_t m_varCounter = 0;
 

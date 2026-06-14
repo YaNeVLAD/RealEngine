@@ -10,6 +10,10 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
+#include <Scripting/ScriptComponent.hpp>
+#include <Scripting/ScriptEngine.hpp>
+#include <Scripting/ScriptSystem.hpp>
+
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 #include "Lab4/Arcanoid/ArcanoidLayout.hpp"
 #include "Lab4/Maze/MazeLayout.hpp"
@@ -44,6 +48,9 @@ struct EditorLayout final : re::Layout
 
 	void OnCreate() override
 	{
+		m_scriptEngine.Init();
+		m_scriptEngine.LoadScript(re::file_system::ScriptsPath("bin/test.rbc").Str().ToString());
+
 		auto& scene = GetScene();
 
 		scene
@@ -51,6 +58,13 @@ struct EditorLayout final : re::Layout
 			.WithRead<re::CameraComponent, re::TransformComponent>()
 			.WithWrite<re::CameraComponent>()
 			.RunOnMainThread();
+
+		scene.AddSystem<re::ScriptSystem>(m_scriptEngine.GetVM())
+			.WithRead<re::ScriptComponent>()
+			.RunOnMainThread();
+
+		scene.CreateEntity()
+			.Add<re::ScriptComponent>({ "TestScript" });
 
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
@@ -352,6 +366,9 @@ private:
 		}
 	}
 
+private:
+	re::scripting::ScriptEngine m_scriptEngine;
+
 	std::vector<re::ecs::Entity> m_modelEntities;
 	re::Revertible<re::Vector3f> m_modelPos;
 	re::Revertible<re::Vector3f> m_modelRot;
@@ -383,14 +400,14 @@ public:
 	{
 		Window().SetVSyncEnabled(true);
 
-		// AddLayout<EditorLayout>(Window());
+		AddLayout<EditorLayout>(Window());
 		// AddLayout<AsteroidsLayout>(Window());
 		// AddLayout<MazeLayout>(Window());
 		// AddLayout<PianoLayout>(Window());
 		// AddLayout<ArcanoidLayout>(Window());
-		AddLayout<battle_city::BattleCityLayout>(Window());
+		// AddLayout<battle_city::BattleCityLayout>(Window());
 
-		SwitchLayout<battle_city::BattleCityLayout>();
+		SwitchLayout<EditorLayout>();
 	}
 
 	void OnUpdate(const re::core::TimeDelta deltaTime) override
