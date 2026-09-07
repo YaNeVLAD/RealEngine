@@ -228,8 +228,6 @@ if (WIN32)
     )
     
     if (NETHOST_DLL)
-        # file(COPY ...) отрабатывает при генерации кэша CMake.
-        # Он скопирует nethost.dll прямо в вашу папку bin.
         file(COPY "${NETHOST_DLL}" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
         message(STATUS "Copied nethost.dll to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
     else()

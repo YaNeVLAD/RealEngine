@@ -10,9 +10,8 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
-#include <Scripting/ScriptComponent.hpp>
 #include <Scripting/ScriptEngine.hpp>
-#include <Scripting/ScriptSystem.hpp>
+#include <Runtime/System/ScriptSystem.hpp>
 
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 #include "Lab4/Arcanoid/ArcanoidLayout.hpp"

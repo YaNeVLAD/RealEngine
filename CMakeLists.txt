@@ -29,6 +29,10 @@ if (RE_USE_ENTT)
     add_compile_definitions(RE_USE_ENTT)
 endif ()
 
+if (MSVC)
+    add_compile_options(/utf-8)
+endif ()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Dependencies)
 include(AddModule)
