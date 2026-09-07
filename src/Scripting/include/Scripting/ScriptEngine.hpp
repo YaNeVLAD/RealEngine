@@ -1,26 +1,41 @@
 #pragma once
 
+#include <Scripting/Export.hpp>
+
 #include <Core/LibraryLoader.hpp>
 #include <RVM/Assembler.hpp>
 #include <RVM/Chunk.hpp>
 #include <RVM/VirtualMachine.hpp>
-#include <Scripting/Internal/EngineApi.hpp>
 
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace re::scripting
 {
 
-class ScriptEngine
+enum class RuntimeBackend : std::uint8_t
+{
+	RVM,
+	CoreCLR,
+};
+
+class RE_SCRIPTING_API ScriptEngine
 {
 public:
-	void Init()
+	void Init(RuntimeBackend backend)
 	{
-		InitNativeLibrary();
-		BindEngineAPI(&m_vm);
-		// BindPhysicsAPI(m_vm); ...
+		m_currentBackend = backend;
+
+		switch (backend)
+		{ // clang-format off
+		case re::scripting::RuntimeBackend::RVM:     InitRVM();     break;
+		case re::scripting::RuntimeBackend::CoreCLR: InitCoreCLR(); break;
+		default: throw std::runtime_error("Unsupported scripting RuntimeBackend value: " + std::to_string((std::uint8_t)backend));
+		} // clang-format on
 	}
 
 	bool LoadScript(const std::string& filepath)
@@ -79,11 +94,20 @@ private:
 		}
 	}
 
+	void InitRVM();
+
+	void InitCoreCLR();
+
 private:
+	RuntimeBackend m_currentBackend;
+
 	rvm::VirtualMachine m_vm;
 	rvm::Chunk m_mainChunk;
 
 	std::unique_ptr<LibraryLoader> m_stdLibLoader;
+
+	std::unique_ptr<LibraryLoader> m_coreClrLoader;
+	void* m_loadAssemblyFn = nullptr;
 };
 
 } // namespace re::scripting

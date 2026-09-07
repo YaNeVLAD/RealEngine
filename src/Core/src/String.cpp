@@ -405,6 +405,10 @@ std::u32string String::DecodeWide(std::wstring_view wStr)
 				result.push_back(wc);
 			}
 		}
+		else
+		{
+			result.push_back(wc);
+		}
 	}
 
 	return result;

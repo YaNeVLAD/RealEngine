@@ -1,6 +1,8 @@
 #pragma once
 
 #include <concepts>
+#include <type_traits>
+#include <utility>
 
 namespace re
 {
@@ -9,8 +11,8 @@ template <std::copyable T>
 class Revertible
 {
 public:
-	constexpr explicit Revertible(T default_value)
-		: m_default(std::move(default_value))
+	constexpr explicit Revertible(T defaultValue)
+		: m_default(std::move(defaultValue))
 		, m_current(m_default)
 	{
 	}

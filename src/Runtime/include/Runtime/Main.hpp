@@ -47,7 +47,7 @@ inline int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, PSTR cmdline, int sh
 
 #else
 
-inline int main(const int argc, char** argv)
+int main(const int argc, char** argv)
 {
 	return re::runtime::Main(argc, argv);
 }

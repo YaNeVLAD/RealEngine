@@ -44,18 +44,11 @@ struct EditorLayout final : re::Layout
 		, m_lightPos(DEFAULT_LIGHT_POS)
 		, m_window(window)
 	{
+		m_scriptEngine.Init(re::scripting::RuntimeBackend::CoreCLR);
 	}
 
 	void OnCreate() override
 	{
-		m_scriptEngine.Init();
-		m_scriptEngine.LoadScript(re::file_system::ScriptsPath("bin/game_scripts.rbc").Str().ToString());
-
-		auto* vm = m_scriptEngine.GetVM();
-		vm->SetUserData(&GetScene());
-		vm->InvokeGlobal("onGameStart");
-		vm->SetUserData(nullptr);
-
 		auto& scene = GetScene();
 
 		scene
@@ -63,13 +56,6 @@ struct EditorLayout final : re::Layout
 			.WithRead<re::CameraComponent, re::TransformComponent>()
 			.WithWrite<re::CameraComponent>()
 			.RunOnMainThread();
-
-		scene.AddSystem<re::ScriptSystem>(m_scriptEngine.GetVM())
-			.WithRead<re::ScriptComponent>()
-			.RunOnMainThread();
-
-		scene.CreateEntity()
-			.Add<re::ScriptComponent>({ "TestScript" });
 
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
@@ -108,23 +94,11 @@ struct EditorLayout final : re::Layout
 			transform.position = { 0.f, 1.5f, 3.f };
 		}
 
-		ReplaceModel("model/Fox.glb");
+		// ReplaceModel("model/Fox.glb");
 	}
 
 	void OnUpdate(const re::core::TimeDelta dt) override
 	{
-		auto* vm = m_scriptEngine.GetVM();
-		auto& scene = GetScene();
-
-		vm->SetUserData(&scene);
-
-		vm->InvokeGlobal("onUpdate",
-			{
-				static_cast<re::rvm::Double>(dt),
-				static_cast<re::rvm::Double>(dt),
-			});
-
-		vm->SetUserData(nullptr);
 	}
 
 	void OnAttach() override

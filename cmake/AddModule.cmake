@@ -1,4 +1,4 @@
-# add a new target which is Real Engine module
+# adds a new Real Engine module target
 # for this function to work properly you need to organize module folders like this:
 # <module_name>/
 #   include/

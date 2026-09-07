@@ -15,6 +15,8 @@
 #include <RenderCore/StaticMesh.hpp>
 #include <RenderCore/Texture.hpp>
 #include <RenderCore/Vertex.hpp>
+#include <Scripting/Interface/IScriptClass.hpp>
+#include <Scripting/Interface/IScriptInstance.hpp>
 
 #include <compare>
 #include <utility>
@@ -255,5 +257,15 @@ using RigidBodyComponent = physics::RigidBody;
 
 template <typename T>
 using Dirty = detail::DirtyTag<T>;
+
+struct ScriptComponent
+{
+	String Class;
+	String Namespace;
+
+	scripting::IScriptClass* ScriptClass = nullptr;
+
+	std::shared_ptr<scripting::IScriptInstance> Instance = nullptr;
+};
 
 } // namespace re

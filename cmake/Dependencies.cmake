@@ -177,3 +177,72 @@ if (NOT EXISTS "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 endif ()
 add_library(miniaudio STATIC "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 target_include_directories(miniaudio PUBLIC "${MINIAUDIO_PATH}")
+
+# .NET CORE HOST (nethost)
+find_program(DOTNET_CLI dotnet)
+if (NOT DOTNET_CLI)
+    message(FATAL_ERROR "dotnet CLI not found. Install .NET 10 SDK (or higher).")
+endif()
+
+if (WIN32)
+    set(NETHOST_RID "win-x64")
+    set(NETHOST_LIB_NAME "nethost")
+    set(DEFAULT_DOTNET_ROOT "C:/Program Files/dotnet")
+endif()
+
+if (DEFINED ENV{DOTNET_ROOT})
+    set(DOTNET_ROOT "$ENV{DOTNET_ROOT}")
+else()
+    set(DOTNET_ROOT ${DEFAULT_DOTNET_ROOT})
+endif()
+
+set(DOTNET_TARGET_VERSION "10.0")
+
+file(GLOB NETHOST_SEARCH_PATHS "${DOTNET_ROOT}/packs/Microsoft.NETCore.App.Host.${NETHOST_RID}/${DOTNET_TARGET_VERSION}*/runtimes/${NETHOST_RID}/native")
+
+if (NOT NETHOST_SEARCH_PATHS)
+    message(FATAL_ERROR "Can't find nethost packets for .NET ${DOTNET_TARGET_VERSION}.\n Make sure that installed .NET SDK match your architecture (x64/arm64).")
+endif()
+
+list(SORT NETHOST_SEARCH_PATHS COMPARE NATURAL ORDER DESCENDING)
+list(GET NETHOST_SEARCH_PATHS 0 NETHOST_PATH)
+message(STATUS "Found .NET Host (nethost): ${NETHOST_PATH}")
+
+find_path(NETHOST_INCLUDE_DIR
+        NAMES nethost.h hostfxr.h coreclr_delegates.h
+        PATHS ${NETHOST_PATH}
+        NO_DEFAULT_PATH
+)
+
+find_library(NETHOST_LIBRARY
+        NAMES ${NETHOST_LIB_NAME} libnethost.a nethost.lib
+        PATHS ${NETHOST_PATH}
+        NO_DEFAULT_PATH
+)
+
+if (WIN32)
+    find_file(NETHOST_DLL
+            NAMES nethost.dll
+            PATHS ${NETHOST_PATH}
+            NO_DEFAULT_PATH
+    )
+    
+    if (NETHOST_DLL)
+        # file(COPY ...) отрабатывает при генерации кэша CMake.
+        # Он скопирует nethost.dll прямо в вашу папку bin.
+        file(COPY "${NETHOST_DLL}" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        message(STATUS "Copied nethost.dll to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    else()
+        message(WARNING "nethost.dll not found in ${NETHOST_PATH}")
+    endif()
+endif()
+
+if (NETHOST_INCLUDE_DIR AND NETHOST_LIBRARY)
+    add_library(dotnet_host STATIC IMPORTED)
+    set_target_properties(dotnet_host PROPERTIES
+            IMPORTED_LOCATION "${NETHOST_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${NETHOST_INCLUDE_DIR}"
+    )
+else()
+    message(FATAL_ERROR "nethost headers not found in path: ${NETHOST_PATH}")
+endif()
