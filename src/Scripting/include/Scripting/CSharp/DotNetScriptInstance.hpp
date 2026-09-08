@@ -19,14 +19,18 @@ public:
 
 	void InvokeMethod(String const& methodName, void** args) override
 	{
-		// Обращение к кэшированному C# делегату для вызова метода у объекта по m_GCHandle
+		if (scripting::DotNetInterop::InvokeMethodByName)
+		{
+			const std::string nameU8 = methodName.ToString();
+			scripting::DotNetInterop::InvokeMethodByName(m_GCHandle, nameU8.c_str());
+		}
 	}
 
 	void GetFieldValue(String const& Field, void* outValue) override
 	{
 	}
 
-	void OnCreate() const
+	void OnCreate() override
 	{
 		if (scripting::DotNetInterop::InvokeOnCreate)
 		{
@@ -34,7 +38,7 @@ public:
 		}
 	}
 
-	void OnUpdate(const float deltaTime) const
+	void OnUpdate(const float deltaTime) override
 	{
 		if (scripting::DotNetInterop::InvokeOnUpdate)
 		{

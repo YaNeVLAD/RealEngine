@@ -14,8 +14,8 @@ class IScriptClass
 public:
 	virtual ~IScriptClass() = default;
 
-	virtual String const& Name() const = 0;
-	virtual String const& Namespace() const = 0;
+	[[nodiscard]] virtual String const& Name() const = 0;
+	[[nodiscard]] virtual String const& Namespace() const = 0;
 
 	virtual std::shared_ptr<IScriptInstance> Instantiate(std::uint64_t entityID) = 0;
 };

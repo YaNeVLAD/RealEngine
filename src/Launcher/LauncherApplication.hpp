@@ -10,8 +10,9 @@
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
 
+#include <Runtime/Internal/ScriptBinder.hpp>
 #include <Runtime/System/ScriptSystem.hpp>
-#include <Scripting/LegacyScriptEngine.hpp>
+#include <Scripting/CSharp/DotNetScriptEngine.hpp>
 
 #include "Lab3/Asteroids/AsteroidsLayout.hpp"
 #include "Lab4/Arcanoid/ArcanoidLayout.hpp"
@@ -22,7 +23,6 @@
 
 #include "CameraControlSystem.hpp"
 #include "Lab6/BattleCityLayout.hpp"
-#include "Scripting/CSharp/DotNetScriptEngine.hpp"
 
 #include <deque>
 
@@ -38,32 +38,18 @@ struct EditorLayout final : re::Layout
 
 	EditorLayout(re::Application& app, re::render::IWindow& window)
 		: Layout(app)
+		, m_csharpEngine(re::runtime::ScriptBinder::CreateApiPointers())
 		, m_modelPos(DEFAULT_MODEL_POS)
 		, m_modelRot(re::Vector3f(0.f))
 		, m_modelScale(re::Vector3f(1.f))
 		, m_lightPos(DEFAULT_LIGHT_POS)
 		, m_window(window)
 	{
-		m_scriptEngine.Init(re::scripting::RuntimeBackend::CoreCLR);
-
 		using namespace re::file_system::literals;
 
-		re::DotNetScriptEngine csharpEngine;
-		if (csharpEngine.LoadAssembly("RealEngineTestProj.dll"_script))
+		if (m_csharpEngine.LoadAssembly("RealEngineTestProj.dll"_script))
 		{
-			std::cout << "Game assembly loaded!\n";
-
-			// Создаем скрипт для Entity с ID = 100
-			const auto scriptInstance = csharpEngine.InstantiateTest("RealEngineTestProj.Player", 100);
-
-			if (scriptInstance)
-			{
-				scriptInstance->OnCreate();
-
-				scriptInstance->OnUpdate(0.016f);
-				scriptInstance->OnUpdate(0.016f);
-				scriptInstance->OnUpdate(0.016f);
-			}
+			std::cout << "[EditorLayout] Game assembly loaded!\n";
 		}
 	}
 
@@ -77,8 +63,22 @@ struct EditorLayout final : re::Layout
 			.WithWrite<re::CameraComponent>()
 			.RunOnMainThread();
 
+		scene
+			.AddSystem<re::ScriptSystem>(&m_csharpEngine)
+			.WithRead<re::ScriptComponent>()
+			.WithWrite<re::ScriptComponent>()
+			.RunOnMainThread();
+
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
+
+		scene
+			.CreateEntity()
+			.Add<re::ScriptComponent>({
+				.Class = "Player",
+				.Namespace = "RealEngineTestProj",
+			})
+			.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
 
 		const auto lightEntity
 			= scene.CreateEntity()
@@ -114,7 +114,7 @@ struct EditorLayout final : re::Layout
 			transform.position = { 0.f, 1.5f, 3.f };
 		}
 
-		// ReplaceModel("model/Fox.glb");
+		ReplaceModel("model/Fox.glb");
 	}
 
 	void OnUpdate(const re::core::TimeDelta dt) override
@@ -382,7 +382,7 @@ private:
 	}
 
 private:
-	re::scripting::LegacyScriptEngine m_scriptEngine;
+	re::DotNetScriptEngine m_csharpEngine;
 
 	std::vector<re::ecs::Entity> m_modelEntities;
 	re::Revertible<re::Vector3f> m_modelPos;

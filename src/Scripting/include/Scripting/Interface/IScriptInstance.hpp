@@ -13,6 +13,10 @@ public:
 	virtual void InvokeMethod(String const& Method, void** args = nullptr) = 0;
 
 	virtual void GetFieldValue(String const& Field, void* outValue) = 0;
+
+	virtual void OnCreate() = 0;
+
+	virtual void OnUpdate(float deltaTime) = 0;
 };
 
 } // namespace re::scripting

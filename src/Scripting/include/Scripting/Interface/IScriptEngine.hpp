@@ -3,6 +3,7 @@
 #include <Core/FileSystem.hpp>
 #include <Core/String.hpp>
 #include <Scripting/Interface/IScriptClass.hpp>
+#include <Scripting/Interface/EngineApiPointers.hpp>
 
 namespace re::scripting
 {
@@ -12,7 +13,7 @@ class IScriptEngine
 public:
 	virtual ~IScriptEngine() = default;
 
-	virtual void Init() = 0;
+	virtual void Init(const EngineApiPointers& apiPointers) = 0;
 	virtual void Shutdown() = 0;
 
 	virtual bool LoadAssembly(String const& filepath) = 0;

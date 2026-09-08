@@ -1,67 +1,51 @@
 #pragma once
 
+#include <Scripting/Export.hpp>
+
+#include <Core/LibraryLoader.hpp>
 #include <Core/String.hpp>
-#include <Scripting/CSharp/DotNetInterop.hpp>
-#include <Scripting/CSharp/DotNetScriptInstance.hpp>
-#include <Scripting/Interface/IScriptClass.hpp>
+#include <Scripting/CSharp/DotNetScriptClass.hpp>
 #include <Scripting/Interface/IScriptEngine.hpp>
 
-#include <iostream>
 #include <memory>
+#include <unordered_map>
 
 namespace re
 {
 
-class DotNetScriptEngine : public scripting::IScriptEngine
+class RE_SCRIPTING_API DotNetScriptEngine final : public scripting::IScriptEngine
 {
 public:
 	using IScriptEngine::LoadAssembly;
 
-	void Init() override
-	{
-	}
+	DotNetScriptEngine() = default;
+	explicit DotNetScriptEngine(const scripting::EngineApiPointers& apiPointers);
 
-	void Shutdown() override
-	{
-	}
+	DotNetScriptEngine(const DotNetScriptEngine&) = delete;
+	DotNetScriptEngine& operator=(const DotNetScriptEngine&) = delete;
 
-	bool LoadAssembly(String const& filepath) override
-	{
-		if (!scripting::DotNetInterop::LoadUserAssembly)
-		{
-			return false;
-		}
+	DotNetScriptEngine(DotNetScriptEngine&&) noexcept = default;
+	DotNetScriptEngine& operator=(DotNetScriptEngine&&) noexcept = default;
 
-		const std::string pathU8 = filepath.ToString();
-		const int result = scripting::DotNetInterop::LoadUserAssembly(pathU8.c_str());
+	~DotNetScriptEngine() override;
 
-		return result != 0;
-	}
+	void Init(const scripting::EngineApiPointers& apiPointers) override;
 
-	scripting::IScriptClass* GetClass(String const& Namespace, String const& Class) override
-	{
-		return nullptr;
-	}
+	void Shutdown() override;
 
-	// Временный прямой метод для тестирования инстанцирования
-	std::shared_ptr<DotNetScriptInstance> InstantiateTest(String const& fullClassName, std::uint64_t entityID)
-	{
-		if (!scripting::DotNetInterop::CreateInstance)
-		{
-			return nullptr;
-		}
+	bool LoadAssembly(String const& filepath) override;
 
-		const std::string nameU8 = fullClassName.ToString();
-		void* handle = scripting::DotNetInterop::CreateInstance(nameU8.c_str(), entityID);
+	scripting::IScriptClass* GetClass(String const& Namespace, String const& Class) override;
 
-		if (!handle)
-		{
-			std::cerr << "[ScriptEngine] Failed to instantiate C# class: " << nameU8 << "\n";
-			return nullptr;
-		}
+private:
+	void InitImpl(const scripting::EngineApiPointers& apiPointers);
+	void ShutdownImpl();
 
-		return std::make_shared<DotNetScriptInstance>(handle);
-	}
+private:
+	std::unordered_map<String, std::unique_ptr<DotNetScriptClass>> m_classes;
+
+	std::unique_ptr<LibraryLoader> m_coreClrLoader;
+	void* m_loadAssemblyFn = nullptr;
 };
 
 } // namespace re
