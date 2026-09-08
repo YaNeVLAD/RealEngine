@@ -1,5 +1,7 @@
 #include <Runtime/Internal/ScriptBinder.hpp>
 
+#include <RenderCore/Keyboard.hpp>
+#include <RenderCore/Mouse.hpp>
 #include <Runtime/Components.hpp>
 
 namespace re::runtime
@@ -16,6 +18,8 @@ scripting::EngineApiPointers ScriptBinder::CreateApiPointers()
 		.NativeLog = &NativeLog_Impl,
 		.Transform_GetPosition = &Transform_GetPosition_Impl,
 		.Transform_SetPosition = &Transform_SetPosition_Impl,
+		.Input_IsKeyDown = &Input_IsKeyDown_Impl,
+		.Input_IsMouseButtonDown = &Input_IsMouseButtonDown_Impl,
 	};
 }
 
@@ -40,6 +44,16 @@ void ScriptBinder::Transform_SetPosition_Impl(const std::uint64_t entityID, cons
 		transform.position = *inPosition;
 		s_ActiveScene->MakeDirty<TransformComponent>(entity);
 	}
+}
+
+bool ScriptBinder::Input_IsKeyDown_Impl(int key)
+{
+	return Keyboard::IsKeyPressed(static_cast<Keyboard::Key>(key));
+}
+
+bool ScriptBinder::Input_IsMouseButtonDown_Impl(int button)
+{
+	return Mouse::IsButtonPressed(static_cast<Mouse::Button>(button));
 }
 
 } // namespace re::runtime

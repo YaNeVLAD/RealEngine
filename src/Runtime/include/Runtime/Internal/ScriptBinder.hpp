@@ -19,6 +19,9 @@ private:
 	static void NativeLog_Impl(const char* message);
 	static void Transform_GetPosition_Impl(std::uint64_t entityID, Vector3f* outPosition);
 	static void Transform_SetPosition_Impl(std::uint64_t entityID, const Vector3f* inPosition);
+
+	static bool Input_IsKeyDown_Impl(int key);
+	static bool Input_IsMouseButtonDown_Impl(int button);
 };
 
 } // namespace re::runtime
