@@ -85,7 +85,7 @@ public:
 		{
 		}
 
-		const_iterator(const ImmutableArray* array, const std::size_t index)
+		const_iterator(const ImmutableArray* array, const size_type index)
 			: m_array(array)
 			, m_index(index)
 		{
@@ -109,6 +109,7 @@ public:
 
 			return *this;
 		}
+
 		const_iterator operator++(int) noexcept
 		{
 			const_iterator tmp = *this;
@@ -123,6 +124,7 @@ public:
 
 			return *this;
 		}
+
 		const_iterator operator--(int) noexcept
 		{
 			const_iterator tmp = *this;
@@ -137,6 +139,7 @@ public:
 
 			return *this;
 		}
+
 		const_iterator operator+(const difference_type offset) const noexcept
 		{
 			const_iterator tmp = *this;
@@ -155,6 +158,7 @@ public:
 
 			return *this;
 		}
+
 		const_iterator operator-(const difference_type offset) const noexcept
 		{
 			const_iterator tmp = *this;
@@ -194,16 +198,18 @@ public:
 		friend class ImmutableArray;
 
 	public:
-		Transient& set(const std::size_t index, T value)
+		Transient& set(const size_type index, T value)
 		{
 			RE_ASSERT(index < N, "Out of bounds access");
 			m_root = set_transient_impl<HEIGHT - 1>(m_root, index, std::move(value));
+
 			return *this;
 		}
 
-		T const& get(const std::size_t index) const
+		const_reference get(const size_type index) const
 		{
 			RE_ASSERT(index < N, "Out of bounds access");
+
 			return ImmutableArray::get_impl<HEIGHT - 1>(m_root.get(), index);
 		}
 
@@ -223,11 +229,11 @@ public:
 		template <std::size_t H>
 		static std::shared_ptr<const Node<H>> set_transient_impl(
 			std::shared_ptr<const Node<H>> const& current_node,
-			const std::size_t index,
+			const size_type index,
 			T value)
 		{
-			constexpr std::size_t child_span = detail::static_pow(B, H);
-			std::size_t child_idx = (index / child_span) % B;
+			constexpr size_type child_span = detail::static_pow(B, H);
+			size_type child_idx = (index / child_span) % B;
 
 			std::shared_ptr<Node<H>> mutable_node;
 
@@ -348,10 +354,10 @@ public:
 	[[nodiscard]] ImmutableArray set(const size_type index, T value) &&
 	{
 		RE_ASSERT(index < N, "Out of bounds access");
-		auto t = std::move(*this).transient();
-		t.set(index, std::move(value));
+		auto tmp = std::move(*this).transient();
+		tmp.set(index, std::move(value));
 
-		return std::move(t).persistent();
+		return std::move(tmp).persistent();
 	}
 
 	[[nodiscard]] constexpr std::size_t size() const noexcept

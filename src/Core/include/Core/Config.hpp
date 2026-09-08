@@ -4,13 +4,23 @@
 #error "Enable C++23 or newer for your compiler (e.g. -std=c++23 for GCC/Clang or /std:c++23 for MSVC)"
 #endif
 
-#if defined(_DEBUG)
+#if defined(_DEBUG) || !defined(NDEBUG)
 #define RE_DEBUG
 #endif
 
 #if defined(_WIN32)
 
 #define RE_SYSTEM_WINDOWS
+
+#elif defined(__linux__)
+
+#define RE_SYSTEM_LINUX
+#define RE_SYSTEM_POSIX
+
+#elif defined(__APPLE__)
+
+#define RE_SYSTEM_MACOS
+#define RE_SYSTEM_POSIX
 
 #else
 

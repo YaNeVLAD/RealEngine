@@ -11,33 +11,14 @@ ResourcePath<PARENT_DIR>::ResourcePath(const char* path)
 
 template <const char* PARENT_DIR>
 ResourcePath<PARENT_DIR>::ResourcePath(String const& path)
-	: m_path(MakeAbsolute(std::filesystem::path(PARENT_DIR) / path.Data()))
+	: m_path(MakeAbsolute(std::filesystem::path(PARENT_DIR) / path.ToWString()))
 {
 }
 
 template <const char* PARENT_DIR>
 String ResourcePath<PARENT_DIR>::Str() const
 {
-	return m_path.string();
-}
-
-template <const char* PARENT_DIR>
-std::filesystem::path ResourcePath<PARENT_DIR>::FetchExecutablePath()
-{
-#ifdef RE_SYSTEM_WINDOWS
-	wchar_t buffer[MAX_PATH];
-	GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-
-	return { buffer };
-#endif
-}
-
-template <const char* PARENT_DIR>
-std::filesystem::path ResourcePath<PARENT_DIR>::GetBasePath()
-{
-	static std::filesystem::path path = FetchExecutablePath().parent_path();
-
-	return path;
+	return String(m_path.native().c_str());
 }
 
 template <const char* PARENT_DIR>

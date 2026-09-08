@@ -6,14 +6,6 @@
 
 #include <filesystem>
 
-#ifdef RE_SYSTEM_WINDOWS
-#define NOUSER
-#define NODRAWTEXT
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#endif
-
 namespace re::file_system
 {
 
@@ -24,6 +16,9 @@ inline constexpr char ASSETS_DIR[] = "assets";
 inline constexpr char SHADERS_DIR[] = "shaders";
 inline constexpr char SCRIPTS_DIR[] = "scripts";
 inline constexpr char BIN_DIR[] = "bin";
+
+[[nodiscard]] RE_CORE_API std::filesystem::path GetExecutablePath();
+[[nodiscard]] RE_CORE_API std::filesystem::path GetBasePath();
 
 template <const char* PARENT_DIR>
 class ResourcePath
@@ -38,10 +33,6 @@ public:
 	[[nodiscard]] String Str() const;
 
 private:
-	static std::filesystem::path FetchExecutablePath();
-
-	static std::filesystem::path GetBasePath();
-
 	static std::filesystem::path MakeAbsolute(std::filesystem::path const& path);
 
 private:

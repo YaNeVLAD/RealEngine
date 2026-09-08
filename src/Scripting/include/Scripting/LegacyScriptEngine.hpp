@@ -23,7 +23,7 @@ enum class RuntimeBackend : std::uint8_t
 	CoreCLR,
 };
 
-class RE_SCRIPTING_API ScriptEngine
+class RE_SCRIPTING_API LegacyScriptEngine
 {
 public:
 	void Init(RuntimeBackend backend)
@@ -32,9 +32,9 @@ public:
 
 		switch (backend)
 		{ // clang-format off
-		case re::scripting::RuntimeBackend::RVM:     InitRVM();     break;
-		case re::scripting::RuntimeBackend::CoreCLR: InitCoreCLR(); break;
-		default: throw std::runtime_error("Unsupported scripting RuntimeBackend value: " + std::to_string((std::uint8_t)backend));
+		case RuntimeBackend::RVM:     InitRVM();     break;
+		case RuntimeBackend::CoreCLR: InitCoreCLR(); break;
+		default: throw std::runtime_error("Unsupported scripting RuntimeBackend value: " + std::to_string(static_cast<std::uint8_t>(backend)));
 		} // clang-format on
 	}
 
@@ -99,7 +99,7 @@ private:
 	void InitCoreCLR();
 
 private:
-	RuntimeBackend m_currentBackend;
+	RuntimeBackend m_currentBackend = RuntimeBackend::CoreCLR;
 
 	rvm::VirtualMachine m_vm;
 	rvm::Chunk m_mainChunk;

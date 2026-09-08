@@ -5,18 +5,44 @@ namespace re
 
 LibraryLoader::LibraryLoader(String const& path)
 {
-	if (m_handle = LoadLibraryA(path.ToString().c_str()); !m_handle)
+	auto expected = Open(path);
+	if (!expected)
 	{
-		throw std::runtime_error("Failed to load library: " + path);
+		throw std::runtime_error{ "Cannot open library: " + path };
 	}
+
+	m_handle = std::exchange(expected->m_handle, nullptr);
+}
+
+LibraryLoader::LibraryLoader(LibraryLoader&& other) noexcept
+	: m_handle(std::exchange(other.m_handle, nullptr))
+{
+}
+
+LibraryLoader& LibraryLoader::operator=(LibraryLoader&& other) noexcept
+{
+	if (this != &other)
+	{
+		Unload();
+		m_handle = std::exchange(other.m_handle, nullptr);
+	}
+
+	return *this;
 }
 
 LibraryLoader::~LibraryLoader()
 {
-	if (m_handle)
-	{
-		FreeLibrary(m_handle);
-	}
+	Unload();
+}
+
+bool LibraryLoader::IsLoaded() const noexcept
+{
+	return m_handle != nullptr;
+}
+
+LibraryLoader::LibraryLoader(void* handle) noexcept
+	: m_handle(handle)
+{
 }
 
 } // namespace re

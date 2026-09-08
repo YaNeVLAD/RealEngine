@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Runtime/Application.hpp>
+#include <Core/Console.hpp>
 
 #if defined(RE_SYSTEM_WINDOWS)
 
@@ -49,6 +50,8 @@ inline int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, PSTR cmdline, int sh
 
 int main(const int argc, char** argv)
 {
+	Console::SetupUTF8();
+
 	return re::runtime::Main(argc, argv);
 }
 

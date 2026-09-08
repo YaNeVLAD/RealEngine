@@ -5,8 +5,21 @@
 // #include <RVM/VirtualMachine.hpp>
 // #include <Runtime/Components.hpp>
 
+#include <iostream>
+
 namespace re::scripting
 {
+
+namespace internal
+{
+
+inline void NativeLog_Impl(const char* message)
+{
+	std::cout << message << std::endl;
+}
+
+} // namespace internal
+
 inline void BindEngineAPI(rvm::VirtualMachine* vm)
 {
 	// using namespace re::rvm;
