@@ -1,8 +1,8 @@
 #include <Scripting/CSharp/DotNetScriptEngine.hpp>
 
-#include <../include/Scripting/Interface/EngineApiPointers.hpp>
 #include <Core/Logger.hpp>
 #include <Scripting/CSharp/DotNetInterop.hpp>
+#include <Scripting/Interface/EngineApiPointers.hpp>
 
 #include <coreclr_delegates.h>
 #include <hostfxr.h>
