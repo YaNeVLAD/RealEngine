@@ -1,5 +1,6 @@
 #include <Runtime/Internal/ScriptBinder.hpp>
 
+#include <Core/Logger.hpp>
 #include <RenderCore/Keyboard.hpp>
 #include <RenderCore/Mouse.hpp>
 #include <Runtime/Components.hpp>
@@ -25,7 +26,8 @@ scripting::EngineApiPointers ScriptBinder::CreateApiPointers()
 
 void ScriptBinder::NativeLog_Impl(const char* message)
 {
-	std::cout << "[C#] " << message << std::endl;
+	using namespace re::literals;
+	RE_LOG_INFO("C#"_logcat, "{}", message);
 }
 
 void ScriptBinder::Transform_GetPosition_Impl(const std::uint64_t entityID, Vector3f* outPosition)
