@@ -603,40 +603,6 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 
 	PrintSkeleton(m_skeleton);
 
-	BufferLayout layout;
-	layout.Push<Vector3f>("a_Position");
-	layout.Push<Vector3f>("a_Normal");
-	layout.Push<Color>("a_Color", true);
-	layout.Push<Vector2f>("a_TexCoord");
-	layout.Push<float>("a_TexIndex");
-	layout.Push<Vector4i>("a_BoneIDs");
-	layout.Push<Vector4f>("a_BoneWeights");
-	layout.Push<Vector4f>("a_Tangent");
-
-	for (auto& part : m_parts)
-	{
-		if (part.vertices.empty() || part.indices.empty())
-		{
-			continue;
-		}
-
-		// Создаем VAO
-		part.vao = std::make_shared<VertexArray>();
-
-		// Создаем и заливаем VBO
-		part.vbo = std::make_shared<VertexBuffer>(part.vertices.size() * sizeof(Vertex));
-		part.vbo->SetData(part.vertices.data(), part.vertices.size() * sizeof(Vertex));
-		part.vao->AddVertexBuffer(part.vbo, layout);
-
-		// Создаем и заливаем EBO
-		part.ebo = std::make_shared<IndexBuffer>(part.indices.data(), part.indices.size());
-		part.vao->SetIndexBuffer(part.ebo);
-
-		// Опционально: можно очистить part.vertices и part.indices из оперативки
-		part.vertices.clear();
-		part.indices.clear();
-	}
-
 	return true;
 }
 

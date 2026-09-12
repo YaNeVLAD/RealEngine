@@ -354,7 +354,7 @@ private:
 			}
 		}
 
-		for (auto&& [vertices, indices, material, _, _1, _2] : meshParts)
+		for (auto&& [vertices, indices, material] : meshParts)
 		{
 			material.metallicFactor = 0.f;
 			auto entity = scene.CreateEntity()

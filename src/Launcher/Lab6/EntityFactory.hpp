@@ -87,7 +87,7 @@ public:
 					  .scale = { TANK_SIZE, TANK_SIZE, TANK_SIZE },
 				  });
 
-		for (auto&& [vertices, indices, material, vao, vbo, ebo] : assetsOpt->enemyModel->GetParts())
+		for (auto&& [vertices, indices, material] : assetsOpt->enemyModel->GetParts())
 		{
 			m_scene.CreateEntity()
 				.Add<re::Dirty<re::TransformComponent>>()
@@ -126,7 +126,7 @@ public:
 				  });
 
 		int partIndex = 0;
-		for (auto&& [vertices, indices, material, vao, vbo, ebo] : assetsOpt->playerModel->GetParts())
+		for (auto&& [vertices, indices, material] : assetsOpt->playerModel->GetParts())
 		{
 			auto child = m_scene.CreateEntity()
 							 .Add<re::Dirty<re::TransformComponent>>()
