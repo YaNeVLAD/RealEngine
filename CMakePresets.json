@@ -60,20 +60,11 @@
       }
     },
     {
-      "name": "render-glfw",
+      "name": "render-filament",
       "hidden": true,
       "cacheVariables": {
-        "RE_RENDER_BACKEND": "GLFW"
+        "RE_RENDER_BACKEND": "FILAMENT"
       }
-    },
-    {
-      "name": "windows-debug-static-glfw",
-      "displayName": "Windows Debug (Static + GLFW)",
-      "description": "Static libraries build (Single executable) with OpenGL/GLFW backend",
-      "inherits": [
-        "base-debug-static",
-        "render-glfw"
-      ]
     },
     {
       "name": "windows-debug-static-sfml",
@@ -85,15 +76,6 @@
       ]
     },
     {
-      "name": "windows-debug-shared-glfw",
-      "displayName": "Windows Debug (DLL + GLFW)",
-      "description": "Static libraries build (Single executable) with OpenGL/GLFW backend",
-      "inherits": [
-        "base-debug-shared",
-        "render-glfw"
-      ]
-    },
-    {
       "name": "windows-debug-shared-sfml",
       "displayName": "Windows Debug (DLL + SFML)",
       "description": "Static libraries build (Single executable) with SFML backend",
@@ -101,22 +83,6 @@
         "base-debug-shared",
         "render-sfml"
       ]
-    },
-    {
-      "name": "windows-release-shared-glfw",
-      "displayName": "Windows Release (DLL + GLFW)",
-      "inherits": "windows-debug-shared-glfw",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "windows-release-static-glfw",
-      "displayName": "Windows Release (Static + GLFW)",
-      "inherits": "windows-debug-static-glfw",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
     },
     {
       "name": "windows-release-shared-sfml",
@@ -132,13 +98,6 @@
       "inherits": "windows-debug-static-sfml",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "render-filament",
-      "hidden": true,
-      "cacheVariables": {
-        "RE_RENDER_BACKEND": "FILAMENT"
       }
     },
     {

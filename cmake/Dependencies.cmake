@@ -70,8 +70,8 @@ if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     )
     add_compile_definitions(RE_USE_SFML_RENDER)
 
-elseif (RE_RENDER_BACKEND STREQUAL "GLFW" OR RE_RENDER_BACKEND STREQUAL "FILAMENT") # GLFW || Filament
-    # GLFW
+elseif (RE_RENDER_BACKEND STREQUAL "FILAMENT") # Filament
+    # GLFW (for windowing)
     FetchContent_Declare(
             glfw
             GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -84,22 +84,13 @@ elseif (RE_RENDER_BACKEND STREQUAL "GLFW" OR RE_RENDER_BACKEND STREQUAL "FILAMEN
     add_library(GLAD STATIC "${GLAD_PATH}/glad.c")
     target_include_directories(GLAD PUBLIC "${GLAD_PATH}")
 
-    if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
-        set(RENDER_LIBS
-                glfw
-                GLAD
-                Filament::Filament
-                glm::glm
-        )
-        add_compile_definitions(RE_USE_FILAMENT_RENDER)
-    else ()
-        set(RENDER_LIBS
-                glfw
-                GLAD
-                glm::glm
-        )
-        add_compile_definitions(RE_USE_GLFW_RENDER)
-    endif ()
+    set(RENDER_LIBS
+            glfw
+            GLAD
+            Filament::Filament
+            glm::glm
+    )
+    add_compile_definitions(RE_USE_FILAMENT_RENDER)
 endif ()
 
 # FSM
@@ -130,7 +121,7 @@ target_include_directories(imgui PUBLIC
         "${imgui_repo_SOURCE_DIR}"
         "${imgui_repo_SOURCE_DIR}/backends"
 )
-if (RE_RENDER_BACKEND STREQUAL "GLFW" OR RE_RENDER_BACKEND STREQUAL "FILAMENT")
+if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
     target_link_libraries(imgui PRIVATE glfw)
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
 endif ()

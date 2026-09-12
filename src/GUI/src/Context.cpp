@@ -2,14 +2,12 @@
 
 #include <imgui.h>
 
-#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
+#if defined(RE_USE_FILAMENT_RENDER)
 #include <backends/imgui_impl_glfw.h>
 struct GLFWwindow;
 #endif
 
-#if defined(RE_USE_GLFW_RENDER)
-#include <backends/imgui_impl_opengl3.h>
-#elif defined(RE_USE_SFML_RENDER)
+#if defined(RE_USE_SFML_RENDER)
 // TODO: Add support for SFML
 #endif
 
@@ -34,20 +32,12 @@ void Init(void* nativeWindowHandle)
 	unsigned char* pixels;
 	int width, height;
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-
-#elif defined(RE_USE_GLFW_RENDER)
-	ImGui_ImplGlfw_InitForOpenGL(static_cast<GLFWwindow*>(nativeWindowHandle), true);
-	ImGui_ImplOpenGL3_Init("#version 450 core");
 #endif
 }
 
 void Shutdown()
 {
-#if defined(RE_USE_GLFW_RENDER)
-	ImGui_ImplOpenGL3_Shutdown();
-#endif
-
-#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
+#if defined(RE_USE_FILAMENT_RENDER)
 	ImGui_ImplGlfw_Shutdown();
 #endif
 
@@ -56,11 +46,7 @@ void Shutdown()
 
 void BeginFrame()
 {
-#if defined(RE_USE_GLFW_RENDER)
-	ImGui_ImplOpenGL3_NewFrame();
-#endif
-
-#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
+#if defined(RE_USE_FILAMENT_RENDER)
 	ImGui_ImplGlfw_NewFrame();
 #endif
 
@@ -70,10 +56,6 @@ void BeginFrame()
 void EndFrame()
 {
 	ImGui::Render();
-
-#if defined(RE_USE_GLFW_RENDER)
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-#endif
 }
 
 bool ProcessEvent(const Event& event)

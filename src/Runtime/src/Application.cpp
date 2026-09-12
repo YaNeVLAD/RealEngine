@@ -23,11 +23,6 @@
 #include <RenderCore/SFML/SFMLWindow.hpp>
 #endif
 
-#if defined(RE_USE_GLFW_RENDER)
-#include <RenderCore/GLFW/GLFWWindow.hpp>
-#include <RenderCore/GLFW/OpenGLRenderAPI.hpp>
-#endif
-
 #include <chrono>
 
 namespace
@@ -52,22 +47,6 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	window->SetWorldPosCallback([](re::Vector2i const& pos) {
 		return re::render::Renderer2D::ScreenToWorld(pos);
 	});
-#elif defined(RE_USE_GLFW_RENDER)
-	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
-	if (window->GetNativeHandle())
-	{
-		re::render::Renderer3D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
-		re::render::Renderer3D::SetViewport(window->Size());
-		re::render::Renderer2D::Init(std::make_unique<re::render::OpenGLRenderAPI>());
-		re::render::Renderer2D::SetViewport(window->Size());
-		window->SetWorldPosCallback([](re::Vector2i const& pos) {
-			return re::render::Renderer2D::ScreenToWorld(pos);
-		});
-	}
-	else
-	{
-		throw std::runtime_error("Created window and render api are not compatible");
-	}
 #elif defined(RE_USE_SFML_RENDER)
 	auto window = std::make_unique<re::render::SFMLWindow>(title, width, height);
 	if (auto* sfWindow = window->GetSFMLWindow())
@@ -320,7 +299,7 @@ void Application::SetupScene(Layout& layout) const
 			SkyboxComponent,
 			detail::DirtyTag<TransformComponent>>()
 		.RunOnMainThread();
-#elif defined(RE_USE_GLFW_RENDER) || defined(RE_USE_SFML_RENDER)
+#elif defined(RE_USE_SFML_RENDER)
 	scene
 		.AddSystem<detail::LegacyRenderSystem3D>(*m_window)
 		.WithRead<

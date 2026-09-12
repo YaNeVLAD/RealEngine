@@ -9,15 +9,7 @@ set(COMMON_SOURCES
         src/Animator.cpp
 )
 
-if (RE_RENDER_BACKEND STREQUAL "GLFW")
-    message(STATUS "RenderCore: Building with OpenGL/GLFW backend")
-    file(GLOB_RECURSE BACKEND_SOURCES
-            "src/GLFW/*.cpp"
-            "include/RenderCore/GLFW/*.hpp"
-    )
-    set(BACKEND_DEFINES RE_RENDER_PLATFORM_OPENGL)
-
-elseif (RE_RENDER_BACKEND STREQUAL "SFML")
+if (RE_RENDER_BACKEND STREQUAL "SFML")
     message(STATUS "RenderCore: Building with SFML backend")
     file(GLOB_RECURSE BACKEND_SOURCES
             "src/SFML/*.cpp"
