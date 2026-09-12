@@ -1,0 +1,25 @@
+material {
+    name : ReLit,
+    parameters : [
+        { name : baseColorFactor, type : float4, precision : default },
+        { name : baseColorMap, type : sampler2d },
+        { name : normalMap, type : sampler2d }
+    ],
+    requires : [
+        uv0,
+        color
+    ],
+    shadingModel : lit,
+    depthWrite : true,
+    culling : back
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        vec2 uv = getUV0();
+        vec4 textureColor = texture(materialParams_baseColorMap, uv) * materialParams.baseColorFactor;
+        material.baseColor = textureColor * getColor();
+        material.normal = texture(materialParams_normalMap, uv).xyz * 2.0 - 1.0;
+    }
+}
