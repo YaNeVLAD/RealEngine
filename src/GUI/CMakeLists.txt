@@ -6,6 +6,7 @@ target_link_libraries(ReGUI
 
         ReRenderCore
         imgui
+        filagui
 )
 
 target_compile_definitions(ReGUI PRIVATE RE_GUI_EXPORTS)

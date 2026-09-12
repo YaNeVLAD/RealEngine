@@ -2,8 +2,12 @@
 
 #include <imgui.h>
 
-#ifdef RE_USE_GLFW_RENDER
+#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
 #include <backends/imgui_impl_glfw.h>
+struct GLFWwindow;
+#endif
+
+#if defined(RE_USE_GLFW_RENDER)
 #include <backends/imgui_impl_opengl3.h>
 #elif defined(RE_USE_SFML_RENDER)
 // TODO: Add support for SFML
@@ -22,27 +26,54 @@ void Init(void* nativeWindowHandle)
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
+#if defined(RE_USE_FILAMENT_RENDER)
+	ImGui_ImplGlfw_InitForOther(static_cast<GLFWwindow*>(nativeWindowHandle), true);
+
+	io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+
+	unsigned char* pixels;
+	int width, height;
+	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+#elif defined(RE_USE_GLFW_RENDER)
 	ImGui_ImplGlfw_InitForOpenGL(static_cast<GLFWwindow*>(nativeWindowHandle), true);
 	ImGui_ImplOpenGL3_Init("#version 450 core");
+#endif
 }
 
 void Shutdown()
 {
+#if defined(RE_USE_GLFW_RENDER)
 	ImGui_ImplOpenGL3_Shutdown();
+#endif
+
+#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
 	ImGui_ImplGlfw_Shutdown();
+#endif
+
+	ImGui::DestroyContext();
 }
 
 void BeginFrame()
 {
+#if defined(RE_USE_GLFW_RENDER)
 	ImGui_ImplOpenGL3_NewFrame();
+#endif
+
+#if defined(RE_USE_GLFW_RENDER) || defined(RE_USE_FILAMENT_RENDER)
 	ImGui_ImplGlfw_NewFrame();
+#endif
+
 	ImGui::NewFrame();
 }
 
 void EndFrame()
 {
 	ImGui::Render();
+
+#if defined(RE_USE_GLFW_RENDER)
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+#endif
 }
 
 bool ProcessEvent(const Event& event)
@@ -73,6 +104,11 @@ void SetInteractive(const bool interactive)
 	{
 		io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
 	}
+}
+
+void* GetDrawData()
+{
+	return ImGui::GetDrawData();
 }
 
 } // namespace re::gui::Context

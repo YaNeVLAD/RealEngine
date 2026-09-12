@@ -72,6 +72,9 @@ struct EditorLayout final : re::Layout
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
 
+		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Yellow);
+		auto cubeMesh = std::make_shared<re::StaticMesh>(cubeV, cubeI);
+
 		scene
 			.CreateEntity()
 			.Add<re::ScriptComponent>({
@@ -101,7 +104,7 @@ struct EditorLayout final : re::Layout
 				.scale = re::Vector3f(0.25f),
 			})
 			.Add<re::detail::OpaqueTag>()
-			.Add<re::StaticMeshComponent3D>(sphereMesh)
+			.Add<re::StaticMeshComponent3D>(cubeMesh)
 			.Add<re::MaterialComponent>(re::Material{ .emissionColor = re::Color::White })
 			.Add<LightGizmoTag>();
 
@@ -114,7 +117,7 @@ struct EditorLayout final : re::Layout
 			transform.position = { 0.f, 1.5f, 3.f };
 		}
 
-		ReplaceModel("model/Fox.glb");
+		// ReplaceModel("model/Fox.glb");
 	}
 
 	void OnUpdate(const re::core::TimeDelta dt) override
@@ -127,112 +130,112 @@ struct EditorLayout final : re::Layout
 		m_window.SetBackgroundColor(re::Color(63, 63, 63));
 	}
 
-	void OnUIDraw() override
-	{
-		ImGui::Begin("Scene Settings");
-
-		if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			static char modelPathBuffer[256] = "model/Fox.glb";
-			ImGui::InputText("File Path##Model", modelPathBuffer, sizeof(modelPathBuffer));
-
-			if (ImGui::Button("Load Model", ImVec2(-1, 0)))
-			{
-				ReplaceModel(modelPathBuffer);
-			}
-		}
-
-		if (!m_modelEntities.empty())
-		{
-			if (ImGui::CollapsingHeader("Model Transform", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				bool changed = false;
-
-				changed |= ImGui::DragFloat3("Position", &m_modelPos.RawRef().x, 0.1f);
-				changed |= ImGui::DragFloat3("Rotation", &m_modelRot.RawRef().x, 1.0f);
-				changed |= ImGui::DragFloat3("Scale", &m_modelScale.RawRef().x, 0.05f);
-
-				if (changed)
-				{
-					UpdateModelTransforms();
-				}
-
-				ImGui::BeginDisabled(!m_modelPos.Modified() && !m_modelRot.Modified() && !m_modelScale.Modified());
-				if (ImGui::Button("Reset Transform", ImVec2(-1, 0)))
-				{
-					m_modelPos.Reset();
-					m_modelRot.Reset();
-					m_modelScale.Reset();
-					UpdateModelTransforms();
-				}
-				ImGui::EndDisabled();
-			}
-		}
-
-		ImGui::Separator();
-
-		const auto lightView = GetScene().CreateView<re::LightComponent, re::TransformComponent>();
-		const auto gizmoView = GetScene().CreateView<LightGizmoTag, re::TransformComponent>();
-		for (auto&& [entity, light, transform] : *lightView)
-		{
-			if (ImGui::CollapsingHeader("Light Editor"))
-			{
-				bool changed = false;
-				changed |= ImGui::DragFloat3("Light Pos", &m_lightPos.RawRef().x, 0.1f);
-
-				if (changed)
-				{
-					UpdateLightTransforms(transform, gizmoView);
-				}
-
-				ImGui::BeginDisabled(!m_lightPos.Modified());
-				if (ImGui::Button("Reset Light Position", ImVec2(-1, 0)))
-				{
-					m_lightPos.Reset();
-					UpdateLightTransforms(transform, gizmoView);
-				}
-				ImGui::EndDisabled();
-
-				if (auto color = light.diffuse.ToFloat(); ImGui::ColorEdit3("Color", color.Data()))
-				{
-					light.diffuse = re::Color::FromFloat(color);
-				}
-
-				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
-				ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Renderer Settings", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			if (ImGui::Button("Reload Shaders", ImVec2(-1, 0)))
-			{
-				re::render::Renderer3D::ReloadShaders();
-			}
-
-			static char skyboxPathBuffer[256] = "model/grasslands_sunset_4k.hdr";
-			ImGui::InputText("File Path##Skybox", skyboxPathBuffer, sizeof(skyboxPathBuffer));
-
-			if (ImGui::Button("Load Skybox", ImVec2(-1, 0)))
-			{
-				UpdateSkybox(skyboxPathBuffer);
-			}
-		}
-
-		ImGui::End();
-
-		ImGui::SetNextWindowPos(ImVec2(10, 10));
-		ImGui::Begin("FPS Overlay", nullptr,
-			ImGuiWindowFlags_NoDecoration
-				| ImGuiWindowFlags_AlwaysAutoResize
-				| ImGuiWindowFlags_NoSavedSettings
-				| ImGuiWindowFlags_NoFocusOnAppearing
-				| ImGuiWindowFlags_NoNav
-				| ImGuiWindowFlags_NoMove);
-
-		ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
-		ImGui::End();
-	}
+	// void OnUIDraw() override
+	// {
+	// 	ImGui::Begin("Scene Settings");
+	//
+	// 	if (ImGui::CollapsingHeader("Model Loader", ImGuiTreeNodeFlags_DefaultOpen))
+	// 	{
+	// 		static char modelPathBuffer[256] = "model/Fox.glb";
+	// 		ImGui::InputText("File Path##Model", modelPathBuffer, sizeof(modelPathBuffer));
+	//
+	// 		if (ImGui::Button("Load Model", ImVec2(-1, 0)))
+	// 		{
+	// 			ReplaceModel(modelPathBuffer);
+	// 		}
+	// 	}
+	//
+	// 	if (!m_modelEntities.empty())
+	// 	{
+	// 		if (ImGui::CollapsingHeader("Model Transform", ImGuiTreeNodeFlags_DefaultOpen))
+	// 		{
+	// 			bool changed = false;
+	//
+	// 			changed |= ImGui::DragFloat3("Position", &m_modelPos.RawRef().x, 0.1f);
+	// 			changed |= ImGui::DragFloat3("Rotation", &m_modelRot.RawRef().x, 1.0f);
+	// 			changed |= ImGui::DragFloat3("Scale", &m_modelScale.RawRef().x, 0.05f);
+	//
+	// 			if (changed)
+	// 			{
+	// 				UpdateModelTransforms();
+	// 			}
+	//
+	// 			ImGui::BeginDisabled(!m_modelPos.Modified() && !m_modelRot.Modified() && !m_modelScale.Modified());
+	// 			if (ImGui::Button("Reset Transform", ImVec2(-1, 0)))
+	// 			{
+	// 				m_modelPos.Reset();
+	// 				m_modelRot.Reset();
+	// 				m_modelScale.Reset();
+	// 				UpdateModelTransforms();
+	// 			}
+	// 			ImGui::EndDisabled();
+	// 		}
+	// 	}
+	//
+	// 	ImGui::Separator();
+	//
+	// 	const auto lightView = GetScene().CreateView<re::LightComponent, re::TransformComponent>();
+	// 	const auto gizmoView = GetScene().CreateView<LightGizmoTag, re::TransformComponent>();
+	// 	for (auto&& [entity, light, transform] : *lightView)
+	// 	{
+	// 		if (ImGui::CollapsingHeader("Light Editor"))
+	// 		{
+	// 			bool changed = false;
+	// 			changed |= ImGui::DragFloat3("Light Pos", &m_lightPos.RawRef().x, 0.1f);
+	//
+	// 			if (changed)
+	// 			{
+	// 				UpdateLightTransforms(transform, gizmoView);
+	// 			}
+	//
+	// 			ImGui::BeginDisabled(!m_lightPos.Modified());
+	// 			if (ImGui::Button("Reset Light Position", ImVec2(-1, 0)))
+	// 			{
+	// 				m_lightPos.Reset();
+	// 				UpdateLightTransforms(transform, gizmoView);
+	// 			}
+	// 			ImGui::EndDisabled();
+	//
+	// 			if (auto color = light.diffuse.ToFloat(); ImGui::ColorEdit3("Color", color.Data()))
+	// 			{
+	// 				light.diffuse = re::Color::FromFloat(color);
+	// 			}
+	//
+	// 			ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
+	// 			ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
+	// 		}
+	// 	}
+	//
+	// 	if (ImGui::CollapsingHeader("Renderer Settings", ImGuiTreeNodeFlags_DefaultOpen))
+	// 	{
+	// 		if (ImGui::Button("Reload Shaders", ImVec2(-1, 0)))
+	// 		{
+	// 			re::render::Renderer3D::ReloadShaders();
+	// 		}
+	//
+	// 		static char skyboxPathBuffer[256] = "model/grasslands_sunset_4k.hdr";
+	// 		ImGui::InputText("File Path##Skybox", skyboxPathBuffer, sizeof(skyboxPathBuffer));
+	//
+	// 		if (ImGui::Button("Load Skybox", ImVec2(-1, 0)))
+	// 		{
+	// 			UpdateSkybox(skyboxPathBuffer);
+	// 		}
+	// 	}
+	//
+	// 	ImGui::End();
+	//
+	// 	ImGui::SetNextWindowPos(ImVec2(10, 10));
+	// 	ImGui::Begin("FPS Overlay", nullptr,
+	// 		ImGuiWindowFlags_NoDecoration
+	// 			| ImGuiWindowFlags_AlwaysAutoResize
+	// 			| ImGuiWindowFlags_NoSavedSettings
+	// 			| ImGuiWindowFlags_NoFocusOnAppearing
+	// 			| ImGuiWindowFlags_NoNav
+	// 			| ImGuiWindowFlags_NoMove);
+	//
+	// 	ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+	// 	ImGui::End();
+	// }
 
 	void OnEvent(re::Event const& event) override
 	{

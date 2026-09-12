@@ -213,10 +213,6 @@ struct MaterialComponent
 	}
 };
 
-namespace detail
-{
-class RenderSystem3D;
-}
 struct SkyboxComponent
 {
 	SkyboxComponent() = default;
@@ -230,15 +226,12 @@ struct SkyboxComponent
 	{
 		m_hdrTexture = texture;
 		m_cubemapID = 0;
-		irradianceID = 0;
+		m_irradianceID = 0;
 	}
 
-private:
 	std::shared_ptr<Texture> m_hdrTexture = nullptr;
 	std::uint32_t m_cubemapID = 0;
-	std::uint32_t irradianceID = 0;
-
-	friend class detail::RenderSystem3D;
+	std::uint32_t m_irradianceID = 0;
 };
 
 struct AnimatedMeshComponent3D

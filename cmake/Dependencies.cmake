@@ -70,7 +70,7 @@ if (RE_RENDER_BACKEND STREQUAL "SFML") # SFML
     )
     add_compile_definitions(RE_USE_SFML_RENDER)
 
-elseif (RE_RENDER_BACKEND STREQUAL "GLFW") # GLFW
+elseif (RE_RENDER_BACKEND STREQUAL "GLFW" OR RE_RENDER_BACKEND STREQUAL "FILAMENT") # GLFW || Filament
     # GLFW
     FetchContent_Declare(
             glfw
@@ -84,12 +84,22 @@ elseif (RE_RENDER_BACKEND STREQUAL "GLFW") # GLFW
     add_library(GLAD STATIC "${GLAD_PATH}/glad.c")
     target_include_directories(GLAD PUBLIC "${GLAD_PATH}")
 
-    set(RENDER_LIBS
-            glfw
-            glm::glm
-            GLAD
-    )
-    add_compile_definitions(RE_USE_GLFW_RENDER)
+    if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
+        set(RENDER_LIBS
+                glfw
+                GLAD
+                Filament::Filament
+                glm::glm
+        )
+        add_compile_definitions(RE_USE_FILAMENT_RENDER)
+    else ()
+        set(RENDER_LIBS
+                glfw
+                GLAD
+                glm::glm
+        )
+        add_compile_definitions(RE_USE_GLFW_RENDER)
+    endif ()
 endif ()
 
 # FSM
@@ -104,7 +114,7 @@ FetchContent_MakeAvailable(FSM)
 FetchContent_Declare(
         imgui_repo
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.91.1
+        GIT_TAG v1.92.9b
 )
 FetchContent_MakeAvailable(imgui_repo)
 set(IMGUI_SOURCES
@@ -120,7 +130,7 @@ target_include_directories(imgui PUBLIC
         "${imgui_repo_SOURCE_DIR}"
         "${imgui_repo_SOURCE_DIR}/backends"
 )
-if (RE_RENDER_BACKEND STREQUAL "GLFW")
+if (RE_RENDER_BACKEND STREQUAL "GLFW" OR RE_RENDER_BACKEND STREQUAL "FILAMENT")
     target_link_libraries(imgui PRIVATE glfw)
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
 endif ()
@@ -182,19 +192,19 @@ target_include_directories(miniaudio PUBLIC "${MINIAUDIO_PATH}")
 find_program(DOTNET_CLI dotnet)
 if (NOT DOTNET_CLI)
     message(FATAL_ERROR "dotnet CLI not found. Install .NET 10 SDK (or higher).")
-endif()
+endif ()
 
 if (WIN32)
     set(NETHOST_RID "win-x64")
     set(NETHOST_LIB_NAME "nethost")
     set(DEFAULT_DOTNET_ROOT "C:/Program Files/dotnet")
-endif()
+endif ()
 
 if (DEFINED ENV{DOTNET_ROOT})
     set(DOTNET_ROOT "$ENV{DOTNET_ROOT}")
-else()
+else ()
     set(DOTNET_ROOT ${DEFAULT_DOTNET_ROOT})
-endif()
+endif ()
 
 set(DOTNET_TARGET_VERSION "10.0")
 
@@ -202,7 +212,7 @@ file(GLOB NETHOST_SEARCH_PATHS "${DOTNET_ROOT}/packs/Microsoft.NETCore.App.Host.
 
 if (NOT NETHOST_SEARCH_PATHS)
     message(FATAL_ERROR "Can't find nethost packets for .NET ${DOTNET_TARGET_VERSION}.\n Make sure that installed .NET SDK match your architecture (x64/arm64).")
-endif()
+endif ()
 
 list(SORT NETHOST_SEARCH_PATHS COMPARE NATURAL ORDER DESCENDING)
 list(GET NETHOST_SEARCH_PATHS 0 NETHOST_PATH)
@@ -226,14 +236,14 @@ if (WIN32)
             PATHS ${NETHOST_PATH}
             NO_DEFAULT_PATH
     )
-    
+
     if (NETHOST_DLL)
         file(COPY "${NETHOST_DLL}" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
         message(STATUS "Copied nethost.dll to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-    else()
+    else ()
         message(WARNING "nethost.dll not found in ${NETHOST_PATH}")
-    endif()
-endif()
+    endif ()
+endif ()
 
 if (NETHOST_INCLUDE_DIR AND NETHOST_LIBRARY)
     add_library(dotnet_host STATIC IMPORTED)
@@ -241,6 +251,141 @@ if (NETHOST_INCLUDE_DIR AND NETHOST_LIBRARY)
             IMPORTED_LOCATION "${NETHOST_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${NETHOST_INCLUDE_DIR}"
     )
-else()
+else ()
     message(FATAL_ERROR "nethost headers not found in path: ${NETHOST_PATH}")
-endif()
+endif ()
+
+# FILAMENT
+set(FILAMENT_VERSION "v1.76.1")
+if (WIN32)
+    set(FILAMENT_URL "https://github.com/google/filament/releases/download/${FILAMENT_VERSION}/filament-${FILAMENT_VERSION}-windows.tgz")
+elseif (APPLE)
+    set(FILAMENT_URL "https://github.com/google/filament/releases/download/${FILAMENT_VERSION}/filament-${FILAMENT_VERSION}-mac.tgz")
+else ()
+    set(FILAMENT_URL "https://github.com/google/filament/releases/download/${FILAMENT_VERSION}/filament-${FILAMENT_VERSION}-linux.tgz")
+endif ()
+
+FetchContent_Declare(
+        filament_binaries
+        URL ${FILAMENT_URL}
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+
+FetchContent_MakeAvailable(filament_binaries)
+set(FILAMENT_DIR "${filament_binaries_SOURCE_DIR}")
+
+if (WIN32)
+    if (EXISTS "${FILAMENT_DIR}/lib/x86_64/md")
+        set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64/md")
+    elseif (EXISTS "${FILAMENT_DIR}/lib/x86_64/mt")
+        set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64/mt")
+    else ()
+        set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64")
+    endif ()
+else ()
+    set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64")
+endif ()
+
+add_library(Filament::Filament INTERFACE IMPORTED)
+
+target_include_directories(Filament::Filament INTERFACE
+        "${FILAMENT_DIR}/include"
+)
+
+if (WIN32)
+    file(GLOB FILAMENT_LIBRARIES "${FILAMENT_LIB_DIR}/*.lib")
+
+    message(STATUS "Found Filament libraries in ${FILAMENT_LIB_DIR}:")
+    foreach (lib_file IN LISTS FILAMENT_LIBRARIES)
+        message(STATUS "  - ${lib_file}")
+    endforeach ()
+
+    target_link_libraries(Filament::Filament INTERFACE
+            ${FILAMENT_LIBRARIES}
+            opengl32 gdi32 user32 shlwapi
+    )
+elseif (APPLE)
+    file(GLOB FILAMENT_LIBRARIES "${FILAMENT_LIB_DIR}/*.a")
+    target_link_libraries(Filament::Filament INTERFACE
+            ${FILAMENT_LIBRARIES}
+            "-framework Cocoa"
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework OpenGL"
+    )
+else ()
+    file(GLOB FILAMENT_LIBRARIES "${FILAMENT_LIB_DIR}/*.a")
+    target_link_libraries(Filament::Filament INTERFACE
+            ${FILAMENT_LIBRARIES}
+            GL dl pthread X11
+    )
+endif ()
+
+# FILAGUI (ImGui backend for Filament)
+set(FILAGUI_DIR "${CMAKE_CURRENT_BINARY_DIR}/filagui")
+file(MAKE_DIRECTORY "${FILAGUI_DIR}/include/filagui")
+file(MAKE_DIRECTORY "${FILAGUI_DIR}/src/materials")
+file(MAKE_DIRECTORY "${FILAGUI_DIR}/src/baked")
+file(MAKE_DIRECTORY "${FILAGUI_DIR}/generated/resources")
+
+set(FILAMENT_RAW_URL "https://raw.githubusercontent.com/google/filament/v1.76.1/libs/filagui")
+
+if (NOT EXISTS "${FILAGUI_DIR}/include/filagui/ImGuiHelper.h")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/include/filagui/ImGuiHelper.h" "${FILAGUI_DIR}/include/filagui/ImGuiHelper.h")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/include/filagui/ImGuiExtensions.h" "${FILAGUI_DIR}/include/filagui/ImGuiExtensions.h")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/include/filagui/ImGuiMath.h" "${FILAGUI_DIR}/include/filagui/ImGuiMath.h")
+endif ()
+
+if (NOT EXISTS "${FILAGUI_DIR}/src/ImGuiHelper.cpp")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/src/ImGuiHelper.cpp" "${FILAGUI_DIR}/src/ImGuiHelper.cpp")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/src/ImGuiExtensions.cpp" "${FILAGUI_DIR}/src/ImGuiExtensions.cpp")
+endif ()
+
+if (NOT EXISTS "${FILAGUI_DIR}/src/materials/uiBlit.mat")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/src/materials/uiBlit.mat" "${FILAGUI_DIR}/src/materials/uiBlit.mat")
+    file(DOWNLOAD "${FILAMENT_RAW_URL}/src/materials/uiBlitExternal.mat" "${FILAGUI_DIR}/src/materials/uiBlitExternal.mat")
+endif ()
+
+if (CMAKE_HOST_WIN32)
+    set(EXEC_SUFFIX ".exe")
+else ()
+    set(EXEC_SUFFIX "")
+endif ()
+
+set(MATC_TOOL "${FILAMENT_DIR}/bin/matc${EXEC_SUFFIX}")
+set(RESGEN_TOOL "${FILAMENT_DIR}/bin/resgen${EXEC_SUFFIX}")
+
+add_custom_command(
+        OUTPUT "${FILAGUI_DIR}/src/baked/uiBlit.filamat"
+        COMMAND "${MATC_TOOL}" -a opengl -a vulkan -a metal -o "${FILAGUI_DIR}/src/baked/uiBlit.filamat" "${FILAGUI_DIR}/src/materials/uiBlit.mat"
+        DEPENDS "${FILAGUI_DIR}/src/materials/uiBlit.mat"
+)
+
+add_custom_command(
+        OUTPUT "${FILAGUI_DIR}/src/baked/uiBlitExternal.filamat"
+        COMMAND "${MATC_TOOL}" -a opengl -a vulkan -a metal -o "${FILAGUI_DIR}/src/baked/uiBlitExternal.filamat" "${FILAGUI_DIR}/src/materials/uiBlitExternal.mat"
+        DEPENDS "${FILAGUI_DIR}/src/materials/uiBlitExternal.mat"
+)
+
+add_custom_command(
+        OUTPUT "${FILAGUI_DIR}/generated/resources/filagui_resources.h" "${FILAGUI_DIR}/generated/resources/filagui_resources.c"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${FILAGUI_DIR}/generated/resources"
+        COMMAND ${CMAKE_COMMAND} -E chdir "${FILAGUI_DIR}/generated/resources"
+        "${RESGEN_TOOL}" -c -p filagui_resources
+        "${FILAGUI_DIR}/src/baked/uiBlit.filamat"
+        "${FILAGUI_DIR}/src/baked/uiBlitExternal.filamat"
+
+        DEPENDS "${FILAGUI_DIR}/src/baked/uiBlit.filamat" "${FILAGUI_DIR}/src/baked/uiBlitExternal.filamat"
+        COMMENT "Generating UI material resources..."
+)
+
+add_library(filagui STATIC
+        "${FILAGUI_DIR}/src/ImGuiHelper.cpp"
+        "${FILAGUI_DIR}/src/ImGuiExtensions.cpp"
+        "${FILAGUI_DIR}/generated/resources/filagui_resources.c"
+        "${FILAGUI_DIR}/generated/resources/filagui_resources.h"
+)
+
+target_include_directories(filagui PUBLIC "${FILAGUI_DIR}/include")
+target_include_directories(filagui PRIVATE "${FILAGUI_DIR}/src" "${FILAGUI_DIR}")
+target_link_libraries(filagui PRIVATE imgui Filament::Filament)

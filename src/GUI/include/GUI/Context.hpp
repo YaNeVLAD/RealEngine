@@ -17,4 +17,6 @@ RE_GUI_API bool ProcessEvent(const Event& event);
 
 RE_GUI_API void SetInteractive(bool interactive);
 
+RE_GUI_API void* GetDrawData();
+
 } // namespace re::gui::Context

@@ -1,86 +1,31 @@
 #pragma once
 
-#include "RenderCore/GLFW/StaticMesh.hpp"
-
-#include <Runtime/Export.hpp>
-
 #include <ECS/System/System.hpp>
-#include <RenderCore/IWindow.hpp>
-#include <RenderCore/Vertex.hpp>
-#include <Runtime/Components.hpp>
+#include <RenderCore/Interface/IRenderBackend.hpp>
 
-#include <glm/glm.hpp>
+#include <unordered_map>
 
-namespace re::detail
+namespace re::render
 {
 
-struct StaticBatchItem
-{
-	StaticMesh* mesh{};
-	bool wireframe{};
-	float distance{};
-	glm::mat4 transform{};
-	MaterialComponent material;
-};
-
-struct OpaqueBatchCache
-{
-	StaticMesh* mesh{};
-	bool wireframe{};
-	MaterialComponent material;
-	std::vector<glm::mat4> transforms;
-};
-
-struct RenderCommand3D
-{
-	glm::mat4 transform{};
-
-	StaticMesh* staticMesh = nullptr;
-
-	const std::vector<Vertex>* vertices = nullptr;
-	const std::vector<std::uint32_t>* indices = nullptr;
-
-	float distanceToCamera = 0.0f;
-	bool wireframe = false;
-
-	std::shared_ptr<AnimatedModel> animatedModel = nullptr;
-	std::shared_ptr<Animator> animator = nullptr;
-
-	MaterialComponent material;
-};
-
-class RE_RUNTIME_API RenderSystem3D final : public ecs::System
+class RenderSystem3D : public ecs::System
 {
 public:
-	explicit RenderSystem3D(render::IWindow& window);
+	explicit RenderSystem3D(IRenderBackend& backend);
+	~RenderSystem3D() override = default;
 
 	void Update(ecs::Scene& scene, core::TimeDelta dt) override;
 
 private:
-	void ProcessTransforms(ecs::Scene& scene);
-	void RebuildStaticOpaqueBatches(ecs::Scene& scene);
-	void CollectDynamicAndTransparent(ecs::Scene& scene, const glm::vec3& camPos);
+	IRenderBackend& m_backend;
 
-	void RenderOpaqueGeometry(const glm::vec3& camPos, float farClip);
-	void RenderTransparentGeometry();
+	std::unordered_map<ecs::Entity, EntityRenderHandles> m_renderHandles;
 
-	void DrawFlatBatch(const std::vector<StaticBatchItem>& batch);
-	static void ExecuteRenderCommand(const RenderCommand3D& cmd);
-
-	static SkyboxComponent ExtractSkybox(ecs::Scene& scene);
-
-private:
-	render::IWindow& m_window;
-
-	std::vector<RenderCommand3D> m_opaqueQueue;
-	std::vector<RenderCommand3D> m_transparentQueue;
-
-	std::vector<StaticBatchItem> m_flatOpaqueBatch;
-	std::vector<StaticBatchItem> m_flatTransparentBatch;
-	std::vector<glm::mat4> m_instanceBuffer;
-
-	std::vector<OpaqueBatchCache> m_cachedOpaqueBatches;
-	bool m_isStaticDirty = true;
+	void ProcessCameras(ecs::Scene& scene) const;
+	void ProcessLights(ecs::Scene& scene);
+	void ProcessSkybox(ecs::Scene& scene) const;
+	void SyncRenderEntities(ecs::Scene& scene);
+	void CleanupDestroyedEntities(const ecs::Scene& scene);
 };
 
-} // namespace re::detail
+} // namespace re::render

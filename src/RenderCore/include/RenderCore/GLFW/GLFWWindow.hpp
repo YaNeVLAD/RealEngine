@@ -1,9 +1,12 @@
 #pragma once
 
 #include <RenderCore/Event.hpp>
+#include <RenderCore/GraphicsContext.hpp>
 #include <RenderCore/IWindow.hpp>
 
-struct GLFWwindow; // Forward declaration
+#include <memory>
+
+struct GLFWwindow;
 
 namespace re::render
 {
@@ -21,6 +24,8 @@ public:
 	void SetVSyncEnabled(bool enabled) override;
 
 	void* GetNativeHandle() override;
+
+	void* GetOSWindowHandle() const override;
 
 	bool IsOpen() const override;
 
@@ -52,6 +57,7 @@ private:
 
 private:
 	GLFWwindow* m_window{};
+	std::unique_ptr<GraphicsContext> m_context;
 
 	struct WindowData
 	{

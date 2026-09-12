@@ -203,8 +203,7 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 				auto deltaUV1 = uv1 - uv0;
 				auto deltaUV2 = uv2 - uv0;
 
-				float denominator = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-				if (std::abs(denominator) > std::numeric_limits<float>::epsilon())
+				if (float denominator = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y); std::abs(denominator) > std::numeric_limits<float>::epsilon())
 				{
 					float f = 1.0f / denominator;
 					Vector3f tangent(
@@ -221,8 +220,7 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 
 			for (auto& v : part.vertices)
 			{
-				Vector3f t{ v.tangent.x, v.tangent.y, v.tangent.z };
-				if (t.Length() > std::numeric_limits<float>::epsilon())
+				if (Vector3f t{ v.tangent.x, v.tangent.y, v.tangent.z }; t.Length() > std::numeric_limits<float>::epsilon())
 				{
 					t.Normalize();
 					v.tangent = { t, 1.0f };

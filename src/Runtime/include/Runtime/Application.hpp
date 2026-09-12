@@ -14,6 +14,11 @@
 #include <thread>
 #include <unordered_map>
 
+namespace re::render
+{
+class IRenderBackend;
+}
+
 namespace re
 {
 
@@ -83,6 +88,10 @@ private:
 	std::atomic_bool m_nextCursorLockState{ false };
 
 	std::unique_ptr<render::IWindow> m_window;
+
+#if defined(RE_USE_FILAMENT_RENDER)
+	std::unique_ptr<render::IRenderBackend> m_renderBackend;
+#endif
 };
 
 } // namespace re

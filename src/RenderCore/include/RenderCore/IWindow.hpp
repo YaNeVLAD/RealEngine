@@ -30,6 +30,7 @@ public:
 	virtual void Clear() = 0;
 	virtual void Display() = 0;
 	virtual void* GetNativeHandle() = 0;
+	virtual void* GetOSWindowHandle() const = 0;
 
 	using WorldPosCallback = std::function<Vector2f(Vector2i const&)>;
 	virtual void SetWorldPosCallback(WorldPosCallback&& callback) = 0;

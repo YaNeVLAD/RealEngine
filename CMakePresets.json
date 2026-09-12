@@ -133,6 +133,47 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
+    },
+    {
+      "name": "render-filament",
+      "hidden": true,
+      "cacheVariables": {
+        "RE_RENDER_BACKEND": "FILAMENT"
+      }
+    },
+    {
+      "name": "windows-debug-static-filament",
+      "displayName": "Windows Debug (Static + Filament)",
+      "description": "Static libraries build with Filament backend",
+      "inherits": [
+        "base-debug-static",
+        "render-filament"
+      ]
+    },
+    {
+      "name": "windows-debug-shared-filament",
+      "displayName": "Windows Debug (DLL + Filament)",
+      "description": "Shared libraries build with Filament backend",
+      "inherits": [
+        "base-debug-shared",
+        "render-filament"
+      ]
+    },
+    {
+      "name": "windows-release-shared-filament",
+      "displayName": "Windows Release (DLL + Filament)",
+      "inherits": "windows-debug-shared-filament",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "windows-release-static-filament",
+      "displayName": "Windows Release (Static + Filament)",
+      "inherits": "windows-debug-static-filament",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
     }
   ]
 }

@@ -2,7 +2,16 @@
 
 #include <glad/glad.h> // Include glad before any OpenGL library
 
+#if defined(RE_SYSTEM_WINDOWS)
+#define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(RE_SYSTEM_MACOS)
+#define GLFW_EXPOSE_NATIVE_COCOA
+#else
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
+
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 
 #include <iostream>
 
@@ -161,10 +170,7 @@ void GLFWWindow::Init(const std::string& title)
 		s_glfwInitialized = true;
 	}
 
-	// Настройка OpenGL 4.5 Core
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	GraphicsContext::OnBeforeWindowCreate();
 
 	m_window = glfwCreateWindow(
 		static_cast<int>(m_data.width),
@@ -179,20 +185,18 @@ void GLFWWindow::Init(const std::string& title)
 		return;
 	}
 
-	// Делаем контекст активным
+	m_context = std::make_unique<GraphicsContext>(m_window);
+	m_context->OnAfterWindowCreate();
+
 	glfwMakeContextCurrent(m_window);
 
-	// Инициализируем GLAD (загружаем функции OpenGL)
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
 		std::cout << "Failed to initialize GLAD" << std::endl;
 	}
 
-	// Связываем этот объект окна с GLFW окном
 	glfwSetWindowUserPointer(m_window, &m_data);
 	SetVSyncEnabled(true);
-
-	// --- Установка Коллбеков ---
 
 	// Resize
 	glfwSetWindowSizeCallback(m_window, [](GLFWwindow* window, int width, int height) {
@@ -232,13 +236,13 @@ void GLFWWindow::Init(const std::string& title)
 		}
 	});
 
-	// 4. Text Entry (Unicode)
+	// Text Entry (Unicode)
 	glfwSetCharCallback(m_window, [](GLFWwindow* window, const unsigned int codepoint) {
 		WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 		data.eventQueue.emplace_back(Event::TextEntered{ static_cast<char32_t>(codepoint) });
 	});
 
-	// 5. Mouse Button (Press, Release)
+	// Mouse Button (Press, Release)
 	glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, const int button, const int action, int) {
 		WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 
@@ -258,14 +262,14 @@ void GLFWWindow::Init(const std::string& title)
 		}
 	});
 
-	// 6. Mouse Move
+	// Mouse Move
 	glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, const double x, const double y) {
 		WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 		const Vector2i pos = { static_cast<int>(x), static_cast<int>(y) };
 		data.eventQueue.emplace_back(Event::MouseMoved{ pos });
 	});
 
-	// 7. Scroll
+	// Scroll
 	glfwSetScrollCallback(m_window, [](GLFWwindow* window, double , const double yoffset) {
 		WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 
@@ -279,6 +283,7 @@ void GLFWWindow::Init(const std::string& title)
 
 void GLFWWindow::Shutdown()
 {
+	m_context.reset();
 	if (m_window)
 	{
 		glfwDestroyWindow(m_window);
@@ -317,6 +322,17 @@ void GLFWWindow::SetVSyncEnabled(const bool enabled)
 void* GLFWWindow::GetNativeHandle()
 {
 	return m_window;
+}
+
+void* GLFWWindow::GetOSWindowHandle() const
+{
+#if defined(RE_SYSTEM_WINDOWS)
+	return reinterpret_cast<void*>(glfwGetWin32Window(m_window));
+#elif defined(RE_SYSTEM_MACOS)
+	return reinterpret_cast<void*>(glfwGetCocoaWindow(m_window));
+#else
+	return reinterpret_cast<void*>(static_cast<uintptr_t>(glfwGetX11Window(m_window)));
+#endif
 }
 
 bool GLFWWindow::IsOpen() const
@@ -382,7 +398,8 @@ Color GLFWWindow::GetBackgroundColor() const
 
 void GLFWWindow::SetBackgroundColor(const Color color)
 {
-	glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+	m_data.bgColor = color;
+	m_context->SetClearColor(color);
 }
 
 Vector2f GLFWWindow::ToWorldPos(const Vector2i& pixelPos)
@@ -397,15 +414,12 @@ Vector2f GLFWWindow::ToWorldPos(const Vector2i& pixelPos)
 
 void GLFWWindow::Clear()
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	m_context->Clear();
 }
 
 void GLFWWindow::Display()
 {
-	if (m_window)
-	{
-		glfwSwapBuffers(m_window);
-	}
+	m_context->SwapBuffers();
 }
 
 void GLFWWindow::SetWorldPosCallback(WorldPosCallback&& callback)

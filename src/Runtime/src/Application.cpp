@@ -7,10 +7,16 @@
 #include <Render3D/Renderer3D.hpp>
 #include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
+#include <Runtime/Internal/LegacyRenderSystem3D.hpp>
 #include <Runtime/Internal/RenderSystem2D.hpp>
 #include <Runtime/Internal/RenderSystem3D.hpp>
 #include <Runtime/System/HierarchySystem.hpp>
 #include <Runtime/System/PhysicsSystem.hpp>
+
+#if defined(RE_USE_FILAMENT_RENDER)
+#include <RenderCore/Filament/FilamentRenderBackend.hpp>
+#include <RenderCore/GLFW/GLFWWindow.hpp>
+#endif
 
 #if defined(RE_USE_SFML_RENDER)
 #include <RenderCore/SFML/SFMLRenderAPI.hpp>
@@ -37,7 +43,16 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	std::uint32_t width,
 	std::uint32_t height)
 {
-#if defined(RE_USE_GLFW_RENDER)
+#if defined(RE_USE_FILAMENT_RENDER)
+	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
+	if (!window->GetNativeHandle())
+	{
+		throw std::runtime_error("Failed to create GLFW window for Filament");
+	}
+	window->SetWorldPosCallback([](re::Vector2i const& pos) {
+		return re::render::Renderer2D::ScreenToWorld(pos);
+	});
+#elif defined(RE_USE_GLFW_RENDER)
 	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
 	if (window->GetNativeHandle())
 	{
@@ -82,6 +97,10 @@ Application::Application(std::string const& name)
 {
 	m_window = CreateWindow(name, 1920u, 1080u);
 	detail::Input::Init(m_window->GetNativeHandle());
+
+#if defined(RE_USE_FILAMENT_RENDER)
+	m_renderBackend = std::make_unique<render::FilamentRenderBackend>();
+#endif
 
 	physics::Init();
 
@@ -153,6 +172,13 @@ void Application::GameLoop()
 
 	gui::Context::Init(m_window->GetNativeHandle());
 
+#if defined(RE_USE_FILAMENT_RENDER)
+	if (m_renderBackend)
+	{
+		m_renderBackend->Init(m_window->GetOSWindowHandle(), m_window->Size().x, m_window->Size().y);
+	}
+#endif
+
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
@@ -160,6 +186,14 @@ void Application::GameLoop()
 		{
 			ChangeToPendingLayout();
 		}
+
+#if defined(RE_USE_FILAMENT_RENDER)
+		if (m_renderBackend)
+		{
+			const auto bgColor = m_window->GetBackgroundColor();
+			m_renderBackend->SetClearColor(bgColor);
+		}
+#endif
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
@@ -169,7 +203,15 @@ void Application::GameLoop()
 			if (m_wasResized.exchange(false))
 			{
 				Vector2u newSize = { m_newWidth, m_newHeight };
+
+#if defined(RE_USE_FILAMENT_RENDER)
+				if (m_renderBackend)
+				{
+					m_renderBackend->Resize(newSize.x, newSize.y);
+				}
+#else
 				render::Renderer2D::SetViewport(newSize);
+#endif
 
 				Event resizeEvent(Event::Resized{ newSize });
 
@@ -199,9 +241,17 @@ void Application::GameLoop()
 
 		m_window->Clear();
 
+#if defined(RE_USE_FILAMENT_RENDER)
+		if (m_renderBackend)
+		{
+			m_renderBackend->BeginFrame();
+		}
+#endif
+
 		OnUpdate(dt);
 		if (m_currentLayout)
 		{
+			// Подготавливаем инпуты (GLFW), но не дергаем ImGui::NewFrame
 			gui::Context::BeginFrame();
 
 			auto& scene = m_currentLayout->GetScene();
@@ -209,17 +259,38 @@ void Application::GameLoop()
 
 			m_currentLayout->OnUpdate(dt);
 
+#if defined(RE_USE_FILAMENT_RENDER)
+			if (m_renderBackend)
+			{
+				// m_renderBackend->RenderUI(dt, [&]() {
+				// 	m_currentLayout->OnUIDraw();
+				// });
+				m_renderBackend->RenderFrame();
+			}
+#else
+			// Для других бэкендов логика остается старой
 			m_currentLayout->OnUIDraw();
-
 			gui::Context::EndFrame();
+#endif
 
 			m_window->Display();
 
 			scene.ConfirmChanges();
 		}
+
+#if defined(RE_USE_FILAMENT_RENDER)
+		if (m_renderBackend)
+		{
+			m_renderBackend->EndFrame();
+		}
+#endif
 	}
 
 	gui::Context::Shutdown();
+
+#if defined(RE_USE_FILAMENT_RENDER)
+	m_renderBackend->Shutdown();
+#endif
 
 	m_window->SetActive(false);
 }
@@ -238,8 +309,20 @@ void Application::SetupScene(Layout& layout) const
 		.WithWrite<TransformComponent>()
 		.RunOnMainThread();
 
+#if defined(RE_USE_FILAMENT_RENDER)
 	scene
-		.AddSystem<detail::RenderSystem3D>(*m_window)
+		.AddSystem<render::RenderSystem3D>(*m_renderBackend)
+		.WithRead<
+			TransformComponent,
+			StaticMeshComponent3D,
+			LightComponent,
+			CameraComponent,
+			SkyboxComponent,
+			detail::DirtyTag<TransformComponent>>()
+		.RunOnMainThread();
+#elif defined(RE_USE_GLFW_RENDER) || defined(RE_USE_SFML_RENDER)
+	scene
+		.AddSystem<detail::LegacyRenderSystem3D>(*m_window)
 		.WithRead<
 			TransformComponent,
 			DynamicMeshComponent3D,
@@ -256,6 +339,7 @@ void Application::SetupScene(Layout& layout) const
 			DynamicTextureComponent>()
 		.WithWrite<DynamicTextureComponent>()
 		.RunOnMainThread();
+#endif
 
 	scene
 		.CreateEntity()

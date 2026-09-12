@@ -18,6 +18,7 @@ struct Material
 
 	// Common
 
+	Color ambientColor{ 50, 50, 50, 255 };
 	Color albedoColor{ 255, 255, 255, 255 };
 	Color emissionColor{ 0, 0, 0, 255 };
 
@@ -42,11 +43,11 @@ struct Material
 	bool operator<(Material const& rhs) const
 	{
 		return std::tie(
-				   workflow, albedoColor, emissionColor, specularColor, shininess,
+				   workflow, ambientColor, albedoColor, emissionColor, specularColor, shininess,
 				   metallicFactor, roughnessFactor,
 				   albedoMap, normalMap, emissionMap, metallicRoughnessMap, ambientOcclusionMap)
 			< std::tie(
-				rhs.workflow, rhs.albedoColor, rhs.emissionColor, rhs.specularColor, rhs.shininess,
+				rhs.workflow, ambientColor, rhs.albedoColor, rhs.emissionColor, rhs.specularColor, rhs.shininess,
 				rhs.metallicFactor, rhs.roughnessFactor,
 				rhs.albedoMap, rhs.normalMap, rhs.emissionMap, rhs.metallicRoughnessMap, rhs.ambientOcclusionMap);
 	}

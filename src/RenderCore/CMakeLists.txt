@@ -25,6 +25,17 @@ elseif (RE_RENDER_BACKEND STREQUAL "SFML")
     )
     set(BACKEND_DEFINES RE_RENDER_PLATFORM_SFML)
 
+elseif (RE_RENDER_BACKEND STREQUAL "FILAMENT")
+    message(STATUS "RenderCore: Building with Filament backend")
+    file(GLOB_RECURSE BACKEND_SOURCES
+            "src/Filament/*.cpp"
+            "include/RenderCore/Filament/*.hpp"
+    )
+    list(APPEND BACKEND_SOURCES
+            "src/GLFW/GLFWWindow.cpp"
+            "src/GLFW/Input.cpp"
+    )
+    set(BACKEND_DEFINES RE_RENDER_PLATFORM_FILAMENT)
 endif ()
 
 re_add_module(ReRenderCore
@@ -38,6 +49,8 @@ target_link_libraries(ReRenderCore
         ${RENDER_LIBS}
 
         PRIVATE
+        imgui
+        filagui
         stb_image
         stb_image_resize
         tinyobjloader
