@@ -201,6 +201,15 @@ struct EditorLayout final : re::Layout
 					light.diffuse = re::Color::FromFloat(color);
 				}
 
+				ImGui::SliderFloat("Intensity", &light.exponent, 0.0f, 100.0f);
+				ImGui::SliderFloat("Radius (Falloff)", &light.falloff, 0.0f, 500.0f);
+				ImGui::SliderFloat("Ambient", &light.ambientIntensity, 0.0f, 1.0f);
+
+				if (auto ambient = light.ambient.ToFloat(); ImGui::ColorEdit3("Ambient Color", ambient.Data()))
+				{
+					light.ambient = re::Color::FromFloat(ambient);
+				}
+
 				ImGui::SliderFloat("Linear", &light.linear, 0.0f, 0.5f);
 				ImGui::SliderFloat("Quad", &light.quadratic, 0.0f, 0.1f);
 			}
@@ -208,6 +217,15 @@ struct EditorLayout final : re::Layout
 
 		if (ImGui::CollapsingHeader("Renderer Settings", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			for (auto&& [camEntity, cam, camTransform] : *GetScene().CreateView<re::CameraComponent, re::TransformComponent>())
+			{
+				if (cam.isPrimal)
+				{
+					ImGui::SliderFloat("Camera ISO", &cam.iso, 25.0f, 3200.0f);
+					break;
+				}
+			}
+
 			if (ImGui::Button("Reload Shaders", ImVec2(-1, 0)))
 			{
 				re::render::Renderer3D::ReloadShaders();

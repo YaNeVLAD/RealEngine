@@ -87,6 +87,7 @@ void RenderSystem3D::ProcessCameras(ecs::Scene& scene) const
 		cameraView.nearClip = std::max(camera.nearClip, 0.01f);
 		cameraView.farClip = camera.farClip;
 		cameraView.aspect = 16.0f / 9.0f;
+		cameraView.iso = camera.iso;
 
 		m_backend.UpdateCamera(cameraView);
 		break;
@@ -131,16 +132,18 @@ void RenderSystem3D::ProcessLights(ecs::Scene& scene)
 		lightView.color = glm::vec3(light.diffuse.r / 255.0f, light.diffuse.g / 255.0f, light.diffuse.b / 255.0f);
 		lightView.intensity = light.exponent;
 		lightView.cutOffAngle = light.cutOffAngle;
+		lightView.falloff = light.falloff;
 
 		if (auto& handles = m_renderHandles[entity]; handles.lightHandle)
 		{
-			// TODO: Оптимизация — обновлять только если есть Dirty<TransformComponent> или Dirty<LightComponent>
 			m_backend.UpdateLight(handles.lightHandle, lightView);
 		}
 		else
 		{
 			handles.lightHandle = m_backend.CreateLight(lightView);
 		}
+
+		m_backend.SetAmbientLight(light.ambientIntensity * 100000.0f, light.ambient);
 	}
 }
 

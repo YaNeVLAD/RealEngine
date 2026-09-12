@@ -8,6 +8,7 @@
 #include <filament/Camera.h>
 #include <filament/Engine.h>
 #include <filament/IndexBuffer.h>
+#include <filament/IndirectLight.h>
 #include <filament/LightManager.h>
 #include <filament/Material.h>
 #include <filament/MaterialInstance.h>
@@ -137,6 +138,11 @@ struct FilamentRenderBackend::Impl
 	filament::Material* litMaterial = nullptr;
 	filament::Texture* whiteTexture = nullptr;
 	filament::Texture* flatNormalTexture = nullptr;
+
+	filament::IndirectLight* indirectLight = nullptr;
+	float ambientLux = 0.0f;
+	filament::math::float3 ambientColor{ 0.0f };
+
 	std::unordered_map<const Texture*, filament::Texture*> textureCache;
 };
 
@@ -195,6 +201,12 @@ void FilamentRenderBackend::Shutdown()
 	{
 		m_impl->uiHelper.reset();
 
+		for (const auto& entity : m_impl->entityMap | std::views::values)
+		{
+			m_impl->engine->destroy(entity);
+		}
+		m_impl->entityMap.clear();
+
 		for (auto& [vb, ib, inst] : m_impl->resourcesMap | std::views::values)
 		{
 			if (inst && m_impl->litMaterial)
@@ -212,11 +224,12 @@ void FilamentRenderBackend::Shutdown()
 		}
 		m_impl->resourcesMap.clear();
 
-		for (const auto& entity : m_impl->entityMap | std::views::values)
+		if (m_impl->indirectLight)
 		{
-			m_impl->engine->destroy(entity);
+			m_impl->scene->setIndirectLight(nullptr);
+			m_impl->engine->destroy(m_impl->indirectLight);
+			m_impl->indirectLight = nullptr;
 		}
-		m_impl->entityMap.clear();
 
 		if (m_impl->whiteTexture)
 		{
@@ -407,7 +420,7 @@ RenderEntityHandle FilamentRenderBackend::CreateLight(const LightDataView& light
 		.intensity(light.intensity * 100000.0f)
 		.position({ light.position.x, light.position.y, light.position.z })
 		.direction({ light.direction.x, light.direction.y, light.direction.z })
-		.falloff(150.0f)
+		.falloff(light.falloff)
 		.build(*m_impl->engine, lightEntity);
 
 	m_impl->scene->addEntity(lightEntity);
@@ -481,6 +494,7 @@ void FilamentRenderBackend::UpdateLight(const RenderEntityHandle handle, const L
 			lm.setDirection(instance, { light.direction.x, light.direction.y, light.direction.z });
 			lm.setColor(instance, filament::Color::toLinear<filament::ACCURATE>({ light.color.r, light.color.g, light.color.b }));
 			lm.setIntensity(instance, light.intensity * 100000.0f);
+			lm.setFalloff(instance, light.falloff);
 		}
 	}
 }
@@ -495,26 +509,74 @@ void FilamentRenderBackend::UpdateCamera(const CameraDataView& camera)
 	const glm::mat4 inverseView = glm::inverse(camera.viewMatrix);
 
 	m_impl->camera->setProjection(camera.fov, camera.aspect, camera.nearClip, camera.farClip, filament::Camera::Fov::VERTICAL);
-	m_impl->camera->setExposure(16.0f, 1.0f / 125.0f, 100.0f);
+	m_impl->camera->setExposure(16.0f, 1.0f / 125.0f, std::max(camera.iso, 25.0f));
 	m_impl->camera->setModelMatrix(*reinterpret_cast<const filament::math::mat4f*>(&inverseView));
 }
 
 void FilamentRenderBackend::SetSkybox(std::uint32_t cubemapID, std::uint32_t irradianceID) {}
 
+void FilamentRenderBackend::SetAmbientLight(const float intensity, const Color color)
+{
+	if (!m_impl->engine || !m_impl->scene)
+	{
+		return;
+	}
+
+	const auto [r, g, b, a] = color.ToFloat();
+	const filament::math::float3 linearColor = filament::Color::toLinear<filament::ACCURATE>({ r, g, b });
+
+	if (m_impl->ambientLux == intensity && m_impl->ambientColor == linearColor)
+	{
+		return;
+	}
+
+	m_impl->ambientLux = intensity;
+	m_impl->ambientColor = linearColor;
+
+	if (m_impl->indirectLight)
+	{
+		m_impl->scene->setIndirectLight(nullptr);
+		m_impl->engine->destroy(m_impl->indirectLight);
+		m_impl->indirectLight = nullptr;
+	}
+
+	if (intensity <= 0.0f)
+	{
+		return;
+	}
+
+	// Равномерное по полусфере окружение: достаточно одной SH-полосы (l=0).
+	// Реконструкция irradiance для band 0:  coef[0] * A[0] * Y00 = coef[0]/(4*PI).
+	// Чтобы итоговый вклад (умноженный на Builder::intensity == 1) равнялся intensity люкс,
+	// коэффициент задаём как color * intensity * 4*PI.
+	constexpr float kY001OverCos = 12.566370614f; // 4*PI == 1 / (A[0] * Y00)
+	const std::array sh{ linearColor * (intensity * kY001OverCos) };
+
+	m_impl->indirectLight = filament::IndirectLight::Builder()
+								.irradiance(1, sh.data())
+								.intensity(1.0f)
+								.build(*m_impl->engine);
+
+	if (m_impl->indirectLight)
+	{
+		m_impl->scene->setIndirectLight(m_impl->indirectLight);
+	}
+}
+
 void FilamentRenderBackend::SetClearColor(const Color color)
 {
 	if (m_impl->renderer)
 	{
-		const auto& c = color.ToFloat();
+		const auto [r, g, b, a] = color.ToFloat();
 		filament::Renderer::ClearOptions options;
-		options.clearColor = { c.r, c.g, c.b, c.a };
+		options.clearColor = { r, g, b, a };
 		options.clear = true;
 		options.discard = true;
 		m_impl->renderer->setClearOptions(options);
 	}
 }
 
-void FilamentRenderBackend::RenderUI(float dt, std::function<void()> uiCallback)
+void FilamentRenderBackend::RenderUI(const float dt, std::function<void()> uiCallback)
 {
 	if (m_impl->uiHelper)
 	{

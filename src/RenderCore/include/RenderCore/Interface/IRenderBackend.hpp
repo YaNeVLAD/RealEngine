@@ -71,6 +71,7 @@ struct LightDataView
 	glm::vec3 color{ 1.0f };
 	float intensity = 1.0f;
 	float cutOffAngle = 45.0f;
+	float falloff = 150.0f;
 };
 
 struct CameraDataView
@@ -81,6 +82,7 @@ struct CameraDataView
 	float aspect = 1.777f;
 	float nearClip = 0.1f;
 	float farClip = 1000.0f;
+	float iso = 100.0f;
 };
 
 struct UIDrawData
@@ -106,6 +108,8 @@ public:
 	virtual void UpdateLight(RenderEntityHandle handle, const LightDataView& light) = 0;
 	virtual void UpdateCamera(const CameraDataView& camera) = 0;
 	virtual void SetSkybox(std::uint32_t cubemapID, std::uint32_t irradianceID) = 0;
+
+	virtual void SetAmbientLight(float intensity, Color color) = 0;
 
 	virtual void SetClearColor(Color color) = 0;
 

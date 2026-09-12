@@ -26,6 +26,7 @@ public:
 	void UpdateLight(RenderEntityHandle handle, const LightDataView& light) override;
 	void UpdateCamera(const CameraDataView& camera) override;
 	void SetSkybox(std::uint32_t cubemapID, std::uint32_t irradianceID) override;
+	void SetAmbientLight(float intensity, Color color) override;
 
 	void SetClearColor(Color color) override;
 
