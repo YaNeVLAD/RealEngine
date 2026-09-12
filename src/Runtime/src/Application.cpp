@@ -230,8 +230,7 @@ void Application::GameLoop()
 		OnUpdate(dt);
 		if (m_currentLayout)
 		{
-			// Подготавливаем инпуты (GLFW), но не дергаем ImGui::NewFrame
-			gui::Context::BeginFrame();
+			// gui::Context::BeginFrame();
 
 			auto& scene = m_currentLayout->GetScene();
 			scene.Frame(dt);

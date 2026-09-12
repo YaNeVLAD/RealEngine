@@ -265,17 +265,39 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(filament_binaries)
 set(FILAMENT_DIR "${filament_binaries_SOURCE_DIR}")
 
+# Prebuilt Filament for Windows ships 4 CRT variants of static libs:
+#   md   = Release, dynamic CRT (/MD)
+#   mdd  = Debug,   dynamic CRT (/MDd)
+#   mt   = Release, static  CRT (/MT)
+#   mtd  = Debug,   static  CRT (/MTd)
+# Pick the variant matching the current build type and CRT linkage
+# so that debug builds link against the debug Filament binaries.
+set(RE_FILAMENT_LIB_CRT "DLL" CACHE STRING "Filament prebuilt libraries CRT: DLL (/MD) or STATIC (/MT)")
+set_property(CACHE RE_FILAMENT_LIB_CRT PROPERTY STRINGS "DLL" "STATIC")
+
 if (WIN32)
-    if (EXISTS "${FILAMENT_DIR}/lib/x86_64/md")
-        set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64/md")
-    elseif (EXISTS "${FILAMENT_DIR}/lib/x86_64/mt")
-        set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64/mt")
+    if (RE_FILAMENT_LIB_CRT STREQUAL "STATIC")
+        set(FILAMENT_CRT_COMPONENT "t")
     else ()
+        set(FILAMENT_CRT_COMPONENT "d")
+    endif ()
+
+    if (CMAKE_BUILD_TYPE MATCHES "^Debug" OR CMAKE_CONFIGURATION_TYPES MATCHES "Debug")
+        set(FILAMENT_CONFIG_SUFFIX "d")
+    else ()
+        set(FILAMENT_CONFIG_SUFFIX "")
+    endif ()
+
+    set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64/m${FILAMENT_CRT_COMPONENT}${FILAMENT_CONFIG_SUFFIX}")
+
+    if (NOT EXISTS "${FILAMENT_LIB_DIR}")
         set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64")
     endif ()
 else ()
     set(FILAMENT_LIB_DIR "${FILAMENT_DIR}/lib/x86_64")
 endif ()
+
+message(STATUS "Filament libraries selected: ${FILAMENT_LIB_DIR}")
 
 add_library(Filament::Filament INTERFACE IMPORTED)
 
