@@ -19,10 +19,12 @@ public:
 	void Resize(std::uint32_t width, std::uint32_t height) override;
 
 	RenderEntityHandle CreateStaticMesh(const MeshDataView& mesh, const MaterialDataView& material) override;
+	RenderEntityHandle CreateAnimatedMesh(const MeshDataView& mesh, const MaterialDataView& material, const SkinDataView& skin) override;
 	RenderEntityHandle CreateLight(const LightDataView& light) override;
 	void DestroyEntity(RenderEntityHandle handle) override;
 
 	void UpdateTransform(RenderEntityHandle handle, const glm::mat4& transformMatrix) override;
+	void UpdateBones(RenderEntityHandle handle, const glm::mat4* bones, std::size_t boneCount) override;
 	void UpdateLight(RenderEntityHandle handle, const LightDataView& light) override;
 	void UpdateCamera(const CameraDataView& camera) override;
 	void SetSkybox(std::uint32_t cubemapID, std::uint32_t irradianceID) override;

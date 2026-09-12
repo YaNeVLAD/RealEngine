@@ -26,6 +26,7 @@ private:
 	void ProcessLights(ecs::Scene& scene);
 	void ProcessSkybox(ecs::Scene& scene) const;
 	void SyncRenderEntities(ecs::Scene& scene);
+	void SyncAnimatedMeshes(ecs::Scene& scene, float dt);
 	void CleanupDestroyedEntities(const ecs::Scene& scene);
 };
 

@@ -25,6 +25,9 @@
 #include "Lab6/BattleCityLayout.hpp"
 
 #include <deque>
+#include <iostream>
+#include <string>
+#include <vector>
 
 struct EditorLayout final : re::Layout
 {
@@ -169,6 +172,66 @@ struct EditorLayout final : re::Layout
 					UpdateModelTransforms();
 				}
 				ImGui::EndDisabled();
+			}
+
+			if (ImGui::CollapsingHeader("Animation", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				const re::AnimatedModel* animatedModel = nullptr;
+				for (const auto entity : m_modelEntities)
+				{
+					if (GetScene().IsValid(entity) && GetScene().HasComponent<re::AnimatedMeshComponent3D>(entity))
+					{
+						animatedModel = GetScene().GetComponent<re::AnimatedMeshComponent3D>(entity).model.get();
+						break;
+					}
+				}
+
+				if (!animatedModel)
+				{
+					ImGui::Text("Loaded model has no animations (load a .glb).");
+				}
+				else
+				{
+					if (const auto& animations = animatedModel->Animations(); animations.empty())
+					{
+						ImGui::Text("Model has no animation clips.");
+					}
+					else
+					{
+						std::vector<std::string> labels;
+						labels.reserve(animations.size());
+						for (const auto& anim : animations)
+						{
+							labels.emplace_back(anim.name.empty() ? "<unnamed>" : anim.name);
+						}
+
+						std::vector<const char*> items;
+						items.reserve(labels.size());
+						for (const auto& label : labels)
+						{
+							items.push_back(label.c_str());
+						}
+
+						if (ImGui::Combo("Animation##Selector", &m_selectedAnimationIndex, items.data(), static_cast<int>(items.size())))
+						{
+							const int idx = m_selectedAnimationIndex;
+							const auto& anim = animations[idx];
+							std::cout << "[EditorLayout] Animation selected: [" << idx << "] '" << anim.name
+									  << "' (duration " << anim.duration << "s)\n";
+
+							for (const auto entity : m_modelEntities)
+							{
+								if (GetScene().IsValid(entity) && GetScene().HasComponent<re::AnimatedMeshComponent3D>(entity))
+								{
+									if (const auto& animComp = GetScene().GetComponent<re::AnimatedMeshComponent3D>(entity); animComp.animator)
+									{
+										animComp.animator->PlayAnimation(idx);
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 
@@ -369,8 +432,19 @@ private:
 			if (model)
 			{
 				meshParts = model->Parts();
+
+				const auto& skeleton = model->Skeleton();
+				const auto& animations = model->Animations();
+				std::cout << "[EditorLayout] AnimatedModel loaded: " << path << " | Skeleton bones: " << skeleton.size()
+						  << " | Animations: " << animations.size() << "\n";
+				for (std::size_t i = 0; i < animations.size(); ++i)
+				{
+					std::cout << "[EditorLayout]   [" << i << "] '" << animations[i].name << "' (duration " << animations[i].duration << "s)\n";
+				}
 			}
 		}
+
+		m_selectedAnimationIndex = 0;
 
 		for (auto&& [vertices, indices, material] : meshParts)
 		{
@@ -406,6 +480,7 @@ private:
 	re::DotNetScriptEngine m_csharpEngine;
 
 	std::vector<re::ecs::Entity> m_modelEntities;
+	int m_selectedAnimationIndex = 0;
 	re::Revertible<re::Vector3f> m_modelPos;
 	re::Revertible<re::Vector3f> m_modelRot;
 	re::Revertible<re::Vector3f> m_modelScale;

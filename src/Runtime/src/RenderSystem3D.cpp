@@ -6,6 +6,8 @@
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/norm.hpp>
 
+#include <algorithm>
+#include <cstddef>
 #include <vector>
 
 namespace re::render
@@ -42,6 +44,7 @@ void RenderSystem3D::Update(ecs::Scene& scene, [[maybe_unused]] float dt)
 	ProcessSkybox(scene);
 	ProcessLights(scene);
 	SyncRenderEntities(scene);
+	SyncAnimatedMeshes(scene, dt);
 	CleanupDestroyedEntities(scene);
 }
 
@@ -151,9 +154,9 @@ void RenderSystem3D::SyncRenderEntities(ecs::Scene& scene)
 {
 	for (auto&& [entity, meshComp, transformComp] : *scene.CreateView<StaticMeshComponent3D, TransformComponent>())
 	{
-		auto& [meshHandle, lightHandle] = m_renderHandles[entity];
+		auto& handles = m_renderHandles[entity];
 
-		if (!meshHandle)
+		if (!handles.meshHandle)
 		{
 			MeshDataView meshView{};
 			if (meshComp.mesh)
@@ -170,22 +173,116 @@ void RenderSystem3D::SyncRenderEntities(ecs::Scene& scene)
 			if (scene.HasComponent<MaterialComponent>(entity))
 			{
 				const auto& matComp = scene.GetComponent<MaterialComponent>(entity);
-				matView.ambient = Vector3f{ matComp.data.ambientColor.r / 255.0f, matComp.data.ambientColor.g / 255.0f, matComp.data.ambientColor.b / 255.0f };
-				matView.diffuse = Vector3f{ matComp.data.albedoColor.r / 255.0f, matComp.data.albedoColor.g / 255.0f, matComp.data.albedoColor.b / 255.0f };
-				matView.specular = Vector3f{ matComp.data.specularColor.r / 255.0f, matComp.data.specularColor.g / 255.0f, matComp.data.specularColor.b / 255.0f };
+				matView.ambient = matComp.data.ambientColor;
+				matView.diffuse = matComp.data.albedoColor;
+				matView.specular = matComp.data.specularColor;
 				matView.shininess = matComp.data.shininess;
 				matView.albedoTexture = matComp.data.albedoMap.get();
 			}
 			else if (meshComp.mesh)
 			{
-				matView.diffuse = Vector3f{ 1.0f };
+				matView.diffuse = Color::White;
 				matView.albedoTexture = meshComp.mesh->GetMaterial().albedoMap.get();
 			}
 
-			meshHandle = m_backend.CreateStaticMesh(meshView, matView);
+			handles.meshHandle = m_backend.CreateStaticMesh(meshView, matView);
 		}
 
-		m_backend.UpdateTransform(meshHandle, transformComp.modelMatrix);
+		m_backend.UpdateTransform(handles.meshHandle, transformComp.modelMatrix);
+	}
+}
+
+void RenderSystem3D::SyncAnimatedMeshes(ecs::Scene& scene, const float dt)
+{
+	for (auto&& [entity, animComp, transformComp] : *scene.CreateView<AnimatedMeshComponent3D, TransformComponent>())
+	{
+		if (animComp.animator)
+		{
+			animComp.animator->Update(dt);
+		}
+
+		auto& handles = m_renderHandles[entity];
+
+		if (!handles.meshHandle && handles.animatedMeshHandles.empty())
+		{
+			if (!animComp.model)
+			{
+				continue;
+			}
+
+			const auto& parts = animComp.model->Parts();
+			const auto& skeleton = animComp.model->Skeleton();
+
+			for (const auto& [vertices, indices, material] : parts)
+			{
+				if (vertices.empty() || indices.empty())
+				{
+					continue;
+				}
+
+				MeshDataView meshView{};
+				meshView.vertices = vertices.data();
+				meshView.vertexCount = vertices.size();
+				meshView.vertexStride = sizeof(Vertex);
+				meshView.indices = indices.data();
+				meshView.indexCount = indices.size();
+				meshView.is32BitIndices = true;
+
+				MaterialDataView matView{};
+				if (scene.HasComponent<MaterialComponent>(entity))
+				{
+					const auto& matComp = scene.GetComponent<MaterialComponent>(entity);
+					matView.ambient = matComp.data.ambientColor;
+					matView.diffuse = matComp.data.albedoColor;
+					matView.specular = matComp.data.specularColor;
+					matView.shininess = matComp.data.shininess;
+					matView.albedoTexture = matComp.data.albedoMap.get();
+				}
+				else
+				{
+					matView.diffuse = material.albedoColor;
+					matView.albedoTexture = material.albedoMap.get();
+				}
+
+				const bool skinned = !skeleton.empty() && std::ranges::any_of(vertices, [](const Vertex& v) {
+					const float s = v.boneWeights.x + v.boneWeights.y + v.boneWeights.z + v.boneWeights.w;
+					return s > std::numeric_limits<float>::epsilon();
+				});
+
+				if (skinned)
+				{
+					SkinDataView skinView{};
+					if (animComp.animator)
+					{
+						const auto& bones = animComp.animator->FinalBoneMatrices();
+						if (bones.size() == skeleton.size())
+						{
+							skinView.bones = bones.data();
+							skinView.boneCount = bones.size();
+						}
+					}
+					skinView.boneIndicesOffset = offsetof(Vertex, boneIDs);
+					skinView.boneWeightsOffset = offsetof(Vertex, boneWeights);
+
+					handles.animatedMeshHandles.emplace_back(m_backend.CreateAnimatedMesh(meshView, matView, skinView));
+				}
+				else
+				{
+					handles.animatedMeshHandles.emplace_back(m_backend.CreateStaticMesh(meshView, matView));
+				}
+			}
+		}
+
+		const auto* bones = animComp.animator ? animComp.animator->FinalBoneMatrices().data() : nullptr;
+		const std::size_t boneCount = animComp.animator ? animComp.animator->FinalBoneMatrices().size() : 0;
+		for (const auto& handle : handles.animatedMeshHandles)
+		{
+			if (bones && boneCount > 0)
+			{
+				m_backend.UpdateBones(handle, bones, boneCount);
+			}
+			m_backend.UpdateTransform(handle, transformComp.modelMatrix);
+		}
 	}
 }
 
@@ -199,12 +296,22 @@ void RenderSystem3D::CleanupDestroyedEntities(const ecs::Scene& scene)
 		const bool isEntityValid = scene.IsValid(entity);
 
 		const bool hasMesh = isEntityValid && scene.HasComponent<StaticMeshComponent3D>(entity);
+		const bool hasAnimation = isEntityValid && scene.HasComponent<AnimatedMeshComponent3D>(entity);
 		const bool hasLight = isEntityValid && scene.HasComponent<LightComponent>(entity);
 
 		if (!hasMesh && handles.meshHandle)
 		{
 			m_backend.DestroyEntity(handles.meshHandle);
 			handles.meshHandle = RenderEntityHandle{};
+		}
+
+		if (!hasAnimation && !handles.animatedMeshHandles.empty())
+		{
+			for (const auto& handle : handles.animatedMeshHandles)
+			{
+				m_backend.DestroyEntity(handle);
+			}
+			handles.animatedMeshHandles.clear();
 		}
 
 		if (!hasLight && handles.lightHandle)

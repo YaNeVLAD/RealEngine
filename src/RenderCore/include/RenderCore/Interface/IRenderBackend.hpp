@@ -5,9 +5,11 @@
 
 #include <glm/glm.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string_view>
+#include <vector>
 
 namespace re
 {
@@ -28,10 +30,11 @@ struct EntityRenderHandles
 {
 	RenderEntityHandle meshHandle{};
 	RenderEntityHandle lightHandle{};
+	std::vector<RenderEntityHandle> animatedMeshHandles{};
 
 	[[nodiscard]] bool IsEmpty() const
 	{
-		return !meshHandle && !lightHandle;
+		return !meshHandle && !lightHandle && animatedMeshHandles.empty();
 	}
 };
 
@@ -47,13 +50,21 @@ struct MeshDataView
 
 struct MaterialDataView
 {
-	Vector3f ambient{ 1.0f };
-	Vector3f diffuse{ 1.0f };
-	Vector3f specular{ 1.0f };
+	Color ambient = Color::White;
+	Color diffuse = Color::White;
+	Color specular = Color::White;
 	float shininess = 32.0f;
 	std::uint32_t albedoTextureID = 0;
-	const re::Texture* albedoTexture = nullptr;
+	const Texture* albedoTexture = nullptr;
 	std::string_view materialName;
+};
+
+struct SkinDataView
+{
+	const glm::mat4* bones = nullptr;
+	std::size_t boneCount = 0;
+	std::size_t boneIndicesOffset = 0;
+	std::size_t boneWeightsOffset = 0;
 };
 
 struct LightDataView
@@ -101,10 +112,12 @@ public:
 	virtual void Resize(std::uint32_t width, std::uint32_t height) = 0;
 
 	virtual RenderEntityHandle CreateStaticMesh(const MeshDataView& mesh, const MaterialDataView& material) = 0;
+	virtual RenderEntityHandle CreateAnimatedMesh(const MeshDataView& mesh, const MaterialDataView& material, const SkinDataView& skin) = 0;
 	virtual RenderEntityHandle CreateLight(const LightDataView& light) = 0;
 	virtual void DestroyEntity(RenderEntityHandle handle) = 0;
 
 	virtual void UpdateTransform(RenderEntityHandle handle, const glm::mat4& transformMatrix) = 0;
+	virtual void UpdateBones(RenderEntityHandle handle, const glm::mat4* bones, std::size_t boneCount) = 0;
 	virtual void UpdateLight(RenderEntityHandle handle, const LightDataView& light) = 0;
 	virtual void UpdateCamera(const CameraDataView& camera) = 0;
 	virtual void SetSkybox(std::uint32_t cubemapID, std::uint32_t irradianceID) = 0;

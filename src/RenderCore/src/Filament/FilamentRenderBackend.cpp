@@ -115,6 +115,39 @@ filament::TextureSampler CreateRepeatsLinearSampler() noexcept
 		filament::TextureSampler::WrapMode::REPEAT);
 }
 
+// Упаковывает атрибуты скиннинга в компактный буфер из 20 байт на вершину:
+//   [0..3]  индексы костей как ubyte4    (BONE_INDICES, stride 20, offset 0)
+//   [4..19] веса костей как float4       (BONE_WEIGHTS, stride 20, offset 4)
+// Индексы из non-standard int-формата приводятся к ожидаемому Filament
+// беззнаковому формату (uvec4), пустой bone id (-1) -> 0 с нулевым весом.
+[[nodiscard]] std::vector<std::uint8_t> PackBoneAttributes(
+	const std::uint8_t* vertices,
+	const std::size_t vertexCount,
+	const std::size_t vertexStride,
+	const std::size_t indicesOffset,
+	const std::size_t weightsOffset,
+	const std::size_t boneCount)
+{
+	std::vector<std::uint8_t> packed(vertexCount * 20, 0);
+
+	for (std::size_t i = 0; i < vertexCount; ++i)
+	{
+		const std::uint8_t* vertex = vertices + i * vertexStride;
+		const auto* indices = reinterpret_cast<const std::int32_t*>(vertex + indicesOffset);
+		const auto* weights = reinterpret_cast<const float*>(vertex + weightsOffset);
+
+		std::uint8_t* dst = packed.data() + i * 20;
+		for (int k = 0; k < 4; ++k)
+		{
+			const std::int32_t idx = indices[k];
+			dst[k] = (idx >= 0 && static_cast<std::size_t>(idx) < boneCount) ? static_cast<std::uint8_t>(idx) : 0;
+		}
+		std::memcpy(dst + 4, weights, 4 * sizeof(float));
+	}
+
+	return packed;
+}
+
 } // namespace
 
 struct FilamentRenderBackend::Impl
@@ -139,6 +172,7 @@ struct FilamentRenderBackend::Impl
 		filament::VertexBuffer* vb = nullptr;
 		filament::IndexBuffer* ib = nullptr;
 		filament::MaterialInstance* materialInstance = nullptr;
+		std::size_t boneCapacity = 0;
 	};
 	std::unordered_map<std::uint64_t, RenderResources> resourcesMap;
 
@@ -214,7 +248,7 @@ void FilamentRenderBackend::Shutdown()
 		}
 		m_impl->entityMap.clear();
 
-		for (auto& [vb, ib, inst] : m_impl->resourcesMap | std::views::values)
+		for (auto& [vb, ib, inst, boneCapacity] : m_impl->resourcesMap | std::views::values)
 		{
 			if (inst && m_impl->litMaterial)
 			{
@@ -388,7 +422,8 @@ RenderEntityHandle FilamentRenderBackend::CreateStaticMesh(const MeshDataView& m
 		materialInstance = m_impl->litMaterial->createInstance();
 		if (materialInstance)
 		{
-			materialInstance->setParameter("baseColorFactor", filament::math::float4{ material.diffuse.x, material.diffuse.y, material.diffuse.z, 1.0f });
+			const auto [r, g, b, a] = material.diffuse.ToFloat();
+			materialInstance->setParameter("baseColorFactor", filament::math::float4{ r, g, b, a });
 
 			const auto sampler = CreateRepeatsLinearSampler();
 			materialInstance->setParameter("baseColorMap", GetOrCreateTexture(m_impl->engine, m_impl->textureCache, material.albedoTexture, m_impl->whiteTexture), sampler);
@@ -403,6 +438,107 @@ RenderEntityHandle FilamentRenderBackend::CreateStaticMesh(const MeshDataView& m
 	m_impl->scene->addEntity(nativeEntity);
 	m_impl->entityMap[id] = nativeEntity;
 	m_impl->resourcesMap[id] = Impl::RenderResources{ vb, ib, materialInstance };
+
+	return RenderEntityHandle{ id };
+}
+
+RenderEntityHandle FilamentRenderBackend::CreateAnimatedMesh(const MeshDataView& mesh, const MaterialDataView& material, const SkinDataView& skin)
+{
+	if (mesh.vertexCount == 0 || !mesh.vertices || mesh.indexCount == 0 || !mesh.indices)
+	{
+		return RenderEntityHandle{ 0 };
+	}
+
+	if (skin.boneCount == 0 || !skin.bones)
+	{
+		return CreateStaticMesh(mesh, material);
+	}
+
+	const utils::Entity nativeEntity = utils::EntityManager::get().create();
+	const std::uint64_t id = ++m_impl->nextId;
+
+	// Буфер 1: интерлив каноничного Vertex (позиция/цвет/uv/тангенс),
+	// буфер 2: атрибуты скиннинга (см. PackBoneAttributes).
+	filament::VertexBuffer* vb = filament::VertexBuffer::Builder()
+									 .vertexCount(mesh.vertexCount)
+									 .bufferCount(2)
+									 .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT3, 0, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, 24, mesh.vertexStride)
+									 .normalized(filament::VertexAttribute::COLOR)
+									 .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, 28, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::TANGENTS, 0, filament::VertexBuffer::AttributeType::FLOAT4, 72, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::BONE_INDICES, 1, filament::VertexBuffer::AttributeType::UBYTE4, 0, 20)
+									 .attribute(filament::VertexAttribute::BONE_WEIGHTS, 1, filament::VertexBuffer::AttributeType::FLOAT4, 4, 20)
+									 .build(*m_impl->engine);
+
+	const std::size_t vSize = mesh.vertexCount * mesh.vertexStride;
+	void* vCopy = std::malloc(vSize);
+	std::memcpy(vCopy, mesh.vertices, vSize);
+	vb->setBufferAt(*m_impl->engine, 0, filament::VertexBuffer::BufferDescriptor(vCopy, vSize, [](void* buffer, size_t, void*) { std::free(buffer); }));
+
+	const auto packedBones = PackBoneAttributes(
+		static_cast<const std::uint8_t*>(mesh.vertices),
+		mesh.vertexCount,
+		mesh.vertexStride,
+		skin.boneIndicesOffset,
+		skin.boneWeightsOffset,
+		skin.boneCount);
+
+	void* bCopy = std::malloc(packedBones.size());
+	std::memcpy(bCopy, packedBones.data(), packedBones.size());
+	vb->setBufferAt(*m_impl->engine, 1, filament::VertexBuffer::BufferDescriptor(bCopy, packedBones.size(), [](void* buffer, size_t, void*) { std::free(buffer); }));
+
+	filament::IndexBuffer* ib = filament::IndexBuffer::Builder()
+									.indexCount(mesh.indexCount)
+									.bufferType(mesh.is32BitIndices ? filament::IndexBuffer::IndexType::UINT : filament::IndexBuffer::IndexType::USHORT)
+									.build(*m_impl->engine);
+
+	const std::size_t iSize = mesh.indexCount * (mesh.is32BitIndices ? 4 : 2);
+	void* iCopy = std::malloc(iSize);
+	std::memcpy(iCopy, mesh.indices, iSize);
+	ib->setBuffer(*m_impl->engine, filament::IndexBuffer::BufferDescriptor(iCopy, iSize, [](void* buffer, size_t, void*) { std::free(buffer); }));
+
+	// Кости: Filament требует кратного 4 числа матриц, анимированная поза может
+	// выходить за пределы box'а bind-позы, поэтому culling отключаем.
+	std::size_t boneCapacity = std::max<std::size_t>(4, (skin.boneCount + 3) & ~std::size_t{ 3 });
+	boneCapacity = std::min<std::size_t>(boneCapacity, 255);
+
+	std::vector<filament::math::mat4f> boneMatrices(boneCapacity);
+	const auto* srcBones = reinterpret_cast<const filament::math::mat4f*>(skin.bones);
+	for (std::size_t i = 0; i < std::min(skin.boneCount, boneCapacity); ++i)
+	{
+		boneMatrices[i] = srcBones[i];
+	}
+
+	filament::RenderableManager::Builder builder(1);
+	builder
+		.boundingBox(filament::Box{ filament::math::float3{ 0.0f }, filament::math::float3{ 10.0f } })
+		.geometry(0, filament::RenderableManager::PrimitiveType::TRIANGLES, vb, ib)
+		.culling(false)
+		.skinning(boneCapacity, boneMatrices.data());
+
+	filament::MaterialInstance* materialInstance = nullptr;
+	if (m_impl->litMaterial)
+	{
+		materialInstance = m_impl->litMaterial->createInstance();
+		if (materialInstance)
+		{
+			const auto [r, g, b, a] = material.diffuse.ToFloat();
+			materialInstance->setParameter("baseColorFactor", filament::math::float4{ r, g, b, a });
+
+			const auto sampler = CreateRepeatsLinearSampler();
+			materialInstance->setParameter("baseColorMap", GetOrCreateTexture(m_impl->engine, m_impl->textureCache, material.albedoTexture, m_impl->whiteTexture), sampler);
+			materialInstance->setParameter("normalMap", m_impl->flatNormalTexture, sampler);
+
+			builder.material(0, materialInstance);
+		}
+	}
+
+	builder.build(*m_impl->engine, nativeEntity);
+
+	m_impl->scene->addEntity(nativeEntity);
+	m_impl->entityMap[id] = nativeEntity;
+	m_impl->resourcesMap[id] = Impl::RenderResources{ vb, ib, materialInstance, boneCapacity };
 
 	return RenderEntityHandle{ id };
 }
@@ -487,6 +623,36 @@ void FilamentRenderBackend::UpdateTransform(const RenderEntityHandle handle, con
 			tcm.setTransform(instance, *reinterpret_cast<const filament::math::mat4f*>(&transformMatrix));
 		}
 	}
+}
+
+void FilamentRenderBackend::UpdateBones(const RenderEntityHandle handle, const glm::mat4* bones, const std::size_t boneCount)
+{
+	if (!bones || boneCount == 0)
+	{
+		return;
+	}
+
+	const auto it = m_impl->entityMap.find(handle.id);
+	if (it == m_impl->entityMap.end())
+	{
+		return;
+	}
+
+	const auto resIt = m_impl->resourcesMap.find(handle.id);
+	if (resIt == m_impl->resourcesMap.end() || resIt->second.boneCapacity == 0)
+	{
+		return;
+	}
+
+	auto& rcm = m_impl->engine->getRenderableManager();
+	const auto instance = rcm.getInstance(it->second);
+	if (!instance)
+	{
+		return;
+	}
+
+	const std::size_t count = std::min(boneCount, resIt->second.boneCapacity);
+	rcm.setBones(instance, reinterpret_cast<const filament::math::mat4f*>(bones), count, 0);
 }
 
 void FilamentRenderBackend::UpdateLight(const RenderEntityHandle handle, const LightDataView& light)
