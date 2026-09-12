@@ -43,7 +43,6 @@ std::expected<void*, String> LibraryLoader::GetSymbolAddress(String const& name)
 		return std::unexpected("Library is not loaded.");
 	}
 
-	// Сбрасываем старые ошибки
 	dlerror();
 
 	void* symbol = dlsym(m_handle, name.ToString().c_str());

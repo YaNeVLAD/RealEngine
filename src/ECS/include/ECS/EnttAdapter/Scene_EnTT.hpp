@@ -151,7 +151,6 @@ public:
 			return { this, Entity{ static_cast<uint32_t>(e) }, {} };
 		}
 
-		// Возвращаем невалидную сущность (INVALID_ID)
 		return { this, Entity{ Entity::INVALID_ID }, {} };
 	}
 

@@ -718,10 +718,6 @@ void FilamentRenderBackend::SetAmbientLight(const float intensity, const Color c
 		return;
 	}
 
-	// Равномерное по полусфере окружение: достаточно одной SH-полосы (l=0).
-	// Реконструкция irradiance для band 0:  coef[0] * A[0] * Y00 = coef[0]/(4*PI).
-	// Чтобы итоговый вклад (умноженный на Builder::intensity == 1) равнялся intensity люкс,
-	// коэффициент задаём как color * intensity * 4*PI.
 	constexpr float kY001OverCos = 12.566370614f; // 4*PI == 1 / (A[0] * Y00)
 	const std::array sh{ linearColor * (intensity * kY001OverCos) };
 
