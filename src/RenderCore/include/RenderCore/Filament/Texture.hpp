@@ -16,15 +16,17 @@ public:
 	Texture() = default;
 
 	Texture(const void* data, std::uint32_t width, std::uint32_t height, std::uint32_t channels);
-	Texture(const std::uint32_t width, const std::uint32_t height);
+	Texture(std::uint32_t width, std::uint32_t height);
 
-	[[nodiscard]] std::uint32_t Width() const { return m_width; }
-	[[nodiscard]] std::uint32_t Height() const { return m_height; }
-	[[nodiscard]] std::uint32_t Channels() const { return m_channels; }
+	[[nodiscard]] std::uint32_t Width() const;
+	[[nodiscard]] std::uint32_t Height() const;
+	[[nodiscard]] std::uint32_t Channels() const;
+	[[nodiscard]] bool IsSRGB() const;
+	[[nodiscard]] String const& GetFilePath() const;
 
-	[[nodiscard]] const std::vector<std::uint8_t>& GetPixelData() const { return m_pixelData; }
+	[[nodiscard]] const std::vector<std::uint8_t>& GetPixelData() const;
 
-	void SetData(const void* data, const std::size_t size);
+	void SetData(const void* data, std::size_t size);
 
 	bool LoadFromFile(String const& filePath, const AssetManager* manager) override;
 
@@ -38,6 +40,9 @@ private:
 	std::uint32_t m_channels{};
 
 	std::vector<std::uint8_t> m_pixelData{};
+
+	bool m_isSRGB = false;
+	String m_filePath{};
 };
 
 } // namespace re

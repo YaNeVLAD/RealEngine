@@ -28,12 +28,47 @@ elseif (RE_RENDER_BACKEND STREQUAL "FILAMENT")
             "src/GLFW/Input.cpp"
     )
     set(BACKEND_DEFINES RE_RENDER_PLATFORM_FILAMENT)
+
+    set(LIT_MATERIAL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/materials/lit.mat")
+    set(RENDER_CORE_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/resources")
+    set(LIT_MATERIAL_OUT "${RENDER_CORE_GENERATED_DIR}/lit.filamat")
+    set(LIT_RESOURCES_C "${RENDER_CORE_GENERATED_DIR}/lit_resources.c")
+    set(LIT_RESOURCES_H "${RENDER_CORE_GENERATED_DIR}/lit_resources.h")
+
+    add_custom_command(
+            OUTPUT "${LIT_MATERIAL_OUT}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${RENDER_CORE_GENERATED_DIR}"
+            COMMAND "${MATC_TOOL}" -a opengl -a vulkan -a metal -o "${LIT_MATERIAL_OUT}" "${LIT_MATERIAL_SRC}"
+            DEPENDS "${LIT_MATERIAL_SRC}"
+            COMMENT "Compiling lit material..."
+    )
+
+    add_custom_command(
+            OUTPUT "${LIT_RESOURCES_C}" "${LIT_RESOURCES_H}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${RENDER_CORE_GENERATED_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E chdir "${RENDER_CORE_GENERATED_DIR}"
+            "${RESGEN_TOOL}" -c -p lit_resources "${LIT_MATERIAL_OUT}"
+            DEPENDS "${LIT_MATERIAL_OUT}"
+            COMMENT "Embedding lit material resources..."
+    )
+
+    list(APPEND BACKEND_SOURCES
+            "${LIT_RESOURCES_C}"
+            "${LIT_RESOURCES_H}"
+    )
 endif ()
 
 re_add_module(ReRenderCore
         SOURCES
         ${COMMON_SOURCES}
         ${BACKEND_SOURCES})
+
+if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
+    target_include_directories(ReRenderCore
+            PRIVATE
+            "${RENDER_CORE_GENERATED_DIR}"
+    )
+endif ()
 
 target_link_libraries(ReRenderCore
         PUBLIC

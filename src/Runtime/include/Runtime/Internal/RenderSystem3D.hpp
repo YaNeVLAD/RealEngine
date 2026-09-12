@@ -22,6 +22,7 @@ private:
 	std::unordered_map<ecs::Entity, EntityRenderHandles> m_renderHandles;
 
 	void ProcessCameras(ecs::Scene& scene) const;
+	void ProcessTransforms(ecs::Scene& scene);
 	void ProcessLights(ecs::Scene& scene);
 	void ProcessSkybox(ecs::Scene& scene) const;
 	void SyncRenderEntities(ecs::Scene& scene);

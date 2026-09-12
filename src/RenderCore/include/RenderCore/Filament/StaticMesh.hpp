@@ -1,12 +1,12 @@
 #pragma once
 
-#pragma once
-
 #include <RenderCore/Export.hpp>
 
+#include <RenderCore/Material.hpp>
 #include <RenderCore/Vertex.hpp>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace re
@@ -24,15 +24,16 @@ public:
 	std::uint32_t GetIndexCount() const { return static_cast<std::uint32_t>(m_indices.size()); }
 	bool IsTransparent() const { return m_isTransparent; }
 
+	void SetMaterial(Material material) { m_material = std::move(material); }
+	[[nodiscard]] const Material& GetMaterial() const { return m_material; }
+
 private:
 	std::vector<Vertex> m_vertices;
 	std::vector<std::uint32_t> m_indices;
 
-	bool m_isTransparent = false;
+	Material m_material;
 
-	// В будущем здесь могут храниться сырые указатели filament::VertexBuffer*
-	// и filament::IndexBuffer*, если вы решите управлять их временем жизни прямо из меша,
-	// а не через хэндлы EntityRenderHandles в системе.
+	bool m_isTransparent = false;
 };
 
 } // namespace re

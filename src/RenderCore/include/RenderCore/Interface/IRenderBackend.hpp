@@ -9,6 +9,11 @@
 #include <functional>
 #include <string_view>
 
+namespace re
+{
+class Texture;
+}
+
 namespace re::render
 {
 
@@ -47,6 +52,7 @@ struct MaterialDataView
 	Vector3f specular{ 1.0f };
 	float shininess = 32.0f;
 	std::uint32_t albedoTextureID = 0;
+	const re::Texture* albedoTexture = nullptr;
 	std::string_view materialName;
 };
 

@@ -1,24 +1,31 @@
 #include <RenderCore/Filament/Font.hpp>
 
+#include <Core/String.hpp>
+
 #include <cstring>
 #include <fstream>
 
 namespace re
 {
 
-Font::Font(const std::string& filepath)
+bool Font::IsLoaded() const
 {
-	LoadFromFile(filepath);
+	return !m_fontData.empty();
 }
 
-Font::Font(const void* data, std::size_t size)
+Font::Font(const String& filepath)
+{
+	Font::LoadFromFile(filepath, nullptr);
+}
+
+Font::Font(const void* data, const std::size_t size)
 {
 	LoadFromMemory(data, size);
 }
 
-bool Font::LoadFromFile(const std::string& filepath)
+bool Font::LoadFromFile(String const& filePath, const AssetManager*)
 {
-	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+	std::ifstream file(filePath.ToString(), std::ios::binary | std::ios::ate);
 	if (!file.is_open())
 	{
 		return false;
@@ -51,6 +58,11 @@ bool Font::LoadFromMemory(const void* data, std::size_t size)
 
 	m_fontData.clear();
 	return false;
+}
+
+const std::vector<std::uint8_t>& Font::GetFontData() const
+{
+	return m_fontData;
 }
 
 } // namespace re

@@ -72,16 +72,16 @@ struct EditorLayout final : re::Layout
 		auto [sphereV, sphereI] = re::detail::PrimitiveBuilder::CreateSphere(re::Color::Yellow);
 		auto sphereMesh = std::make_shared<re::StaticMesh>(sphereV, sphereI);
 
-		auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Yellow);
-		auto cubeMesh = std::make_shared<re::StaticMesh>(cubeV, cubeI);
+		// auto [cubeV, cubeI] = re::detail::PrimitiveBuilder::CreateCube(re::Color::Yellow);
+		// auto cubeMesh = std::make_shared<re::StaticMesh>(cubeV, cubeI);
 
-		scene
-			.CreateEntity()
-			.Add<re::ScriptComponent>({
-				.Class = "Player",
-				.Namespace = "RealEngineTestProj",
-			})
-			.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
+		// scene
+		// 	.CreateEntity()
+		// 	.Add<re::ScriptComponent>({
+		// 		.Class = "Player",
+		// 		.Namespace = "RealEngineTestProj",
+		// 	})
+		// 	.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
 
 		const auto lightEntity
 			= scene.CreateEntity()
@@ -97,16 +97,16 @@ struct EditorLayout final : re::Layout
 		scene.CreateEntity()
 			.Add<re::SkyboxComponent>(skyboxTexture);
 
-		scene.CreateEntity()
-			.Add<re::Dirty<re::TransformComponent>>()
-			.Add<re::TransformComponent>({
-				.position = DEFAULT_LIGHT_POS,
-				.scale = re::Vector3f(0.25f),
-			})
-			.Add<re::detail::OpaqueTag>()
-			.Add<re::StaticMeshComponent3D>(cubeMesh)
-			.Add<re::MaterialComponent>(re::Material{ .emissionColor = re::Color::White })
-			.Add<LightGizmoTag>();
+		// scene.CreateEntity()
+		// 	.Add<re::Dirty<re::TransformComponent>>()
+		// 	.Add<re::TransformComponent>({
+		// 		.position = DEFAULT_LIGHT_POS,
+		// 		.scale = re::Vector3f(0.25f),
+		// 	})
+		// 	.Add<re::detail::OpaqueTag>()
+		// 	.Add<re::StaticMeshComponent3D>(sphereMesh)
+		// 	.Add<re::MaterialComponent>(re::Material{ .emissionColor = re::Color::White })
+		// 	.Add<LightGizmoTag>();
 
 		m_lightEntity = lightEntity.GetEntity();
 

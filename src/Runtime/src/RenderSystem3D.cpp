@@ -3,23 +3,62 @@
 #include <Runtime/Components.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/norm.hpp>
+
+#include <vector>
 
 namespace re::render
 {
+
+namespace
+{
+
+glm::mat4 CalculateModelMatrix(const TransformComponent& transform)
+{
+	glm::mat4 result = glm::translate(glm::mat4(1.0f), glm::vec3(transform.position.x, transform.position.y, transform.position.z));
+
+	result *= glm::eulerAngleYXZ(
+		glm::radians(transform.rotation.y),
+		glm::radians(transform.rotation.x),
+		glm::radians(transform.rotation.z));
+
+	result = glm::scale(result, glm::vec3(transform.scale.x, transform.scale.y, transform.scale.z));
+
+	return result;
+}
+
+} // namespace
 
 RenderSystem3D::RenderSystem3D(IRenderBackend& backend)
 	: m_backend(backend)
 {
 }
 
-void RenderSystem3D::Update(ecs::Scene& scene, float dt)
+void RenderSystem3D::Update(ecs::Scene& scene, [[maybe_unused]] float dt)
 {
+	ProcessTransforms(scene);
 	ProcessCameras(scene);
 	ProcessSkybox(scene);
 	ProcessLights(scene);
 	SyncRenderEntities(scene);
 	CleanupDestroyedEntities(scene);
+}
+
+void RenderSystem3D::ProcessTransforms(ecs::Scene& scene)
+{
+	std::vector<ecs::Entity> processedEntities;
+
+	for (auto&& [entity, transform, _] : *scene.CreateView<TransformComponent, Dirty<TransformComponent>>())
+	{
+		transform.modelMatrix = CalculateModelMatrix(transform);
+		processedEntities.emplace_back(entity);
+	}
+
+	for (const auto& entity : processedEntities)
+	{
+		scene.RemoveComponent<Dirty<TransformComponent>>(entity);
+	}
 }
 
 void RenderSystem3D::ProcessCameras(ecs::Scene& scene) const
@@ -109,7 +148,9 @@ void RenderSystem3D::SyncRenderEntities(ecs::Scene& scene)
 {
 	for (auto&& [entity, meshComp, transformComp] : *scene.CreateView<StaticMeshComponent3D, TransformComponent>())
 	{
-		if (auto& [meshHandle, lightHandle] = m_renderHandles[entity]; !meshHandle)
+		auto& [meshHandle, lightHandle] = m_renderHandles[entity];
+
+		if (!meshHandle)
 		{
 			MeshDataView meshView{};
 			if (meshComp.mesh)
@@ -130,15 +171,18 @@ void RenderSystem3D::SyncRenderEntities(ecs::Scene& scene)
 				matView.diffuse = Vector3f{ matComp.data.albedoColor.r / 255.0f, matComp.data.albedoColor.g / 255.0f, matComp.data.albedoColor.b / 255.0f };
 				matView.specular = Vector3f{ matComp.data.specularColor.r / 255.0f, matComp.data.specularColor.g / 255.0f, matComp.data.specularColor.b / 255.0f };
 				matView.shininess = matComp.data.shininess;
+				matView.albedoTexture = matComp.data.albedoMap.get();
+			}
+			else if (meshComp.mesh)
+			{
+				matView.diffuse = Vector3f{ 1.0f };
+				matView.albedoTexture = meshComp.mesh->GetMaterial().albedoMap.get();
 			}
 
 			meshHandle = m_backend.CreateStaticMesh(meshView, matView);
-			m_backend.UpdateTransform(meshHandle, transformComp.modelMatrix);
 		}
-		else if (scene.HasComponent<Dirty<TransformComponent>>(entity))
-		{
-			m_backend.UpdateTransform(meshHandle, transformComp.modelMatrix);
-		}
+
+		m_backend.UpdateTransform(meshHandle, transformComp.modelMatrix);
 	}
 }
 
