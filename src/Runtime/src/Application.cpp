@@ -230,7 +230,7 @@ void Application::GameLoop()
 		OnUpdate(dt);
 		if (m_currentLayout)
 		{
-			// gui::Context::BeginFrame();
+			gui::Context::BeginFrame();
 
 			auto& scene = m_currentLayout->GetScene();
 			scene.Frame(dt);
@@ -240,13 +240,12 @@ void Application::GameLoop()
 #if defined(RE_USE_FILAMENT_RENDER)
 			if (m_renderBackend)
 			{
-				// m_renderBackend->RenderUI(dt, [&]() {
-				// 	m_currentLayout->OnUIDraw();
-				// });
+				m_renderBackend->RenderUI(dt, [&]() {
+					m_currentLayout->OnUIDraw();
+				});
 				m_renderBackend->RenderFrame();
 			}
 #else
-			// Для других бэкендов логика остается старой
 			m_currentLayout->OnUIDraw();
 			gui::Context::EndFrame();
 #endif
@@ -264,11 +263,11 @@ void Application::GameLoop()
 #endif
 	}
 
-	gui::Context::Shutdown();
-
 #if defined(RE_USE_FILAMENT_RENDER)
 	m_renderBackend->Shutdown();
 #endif
+
+	gui::Context::Shutdown();
 
 	m_window->SetActive(false);
 }

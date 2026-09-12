@@ -1,5 +1,7 @@
 #include <RenderCore/Filament/FilamentRenderBackend.hpp>
 
+#include <filagui/ImGuiHelper.h>
+
 #include <filament/Box.h>
 #include <filament/Camera.h>
 #include <filament/Engine.h>
@@ -10,8 +12,6 @@
 #include <filament/Renderer.h>
 #include <filament/Scene.h>
 #include <filament/SwapChain.h>
-#include <filament/Texture.h>
-#include <filament/TextureSampler.h>
 #include <filament/TransformManager.h>
 #include <filament/VertexBuffer.h>
 #include <filament/View.h>
@@ -22,24 +22,13 @@
 #include <imgui.h>
 
 #include <algorithm>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
 #include <limits>
+#include <memory>
 #include <ranges>
 #include <unordered_map>
 
-struct ImGuiIO;
 namespace re::render
 {
-
-struct UIFrameData
-{
-	utils::Entity entity;
-	filament::VertexBuffer* vb;
-	filament::IndexBuffer* ib;
-	std::vector<filament::MaterialInstance*> matInstances;
-};
 
 struct FilamentRenderBackend::Impl
 {
@@ -51,15 +40,9 @@ struct FilamentRenderBackend::Impl
 	filament::SwapChain* swapChain = nullptr;
 	utils::Entity cameraEntity;
 
-	filament::Scene* uiScene = nullptr;
 	filament::View* uiView = nullptr;
-	filament::Camera* uiCamera = nullptr;
-	utils::Entity uiCameraEntity;
 
-	filament::Texture* fontTexture = nullptr;
-	filament::Material* uiMaterial = nullptr;
-
-	std::vector<UIFrameData> uiFrameData;
+	std::unique_ptr<filagui::ImGuiHelper> uiHelper;
 
 	std::uint64_t nextId = 0;
 	std::unordered_map<std::uint64_t, utils::Entity> entityMap;
@@ -98,70 +81,27 @@ void FilamentRenderBackend::Init(void* windowHandle, const std::uint32_t width, 
 	m_impl->view->setScene(m_impl->scene);
 	m_impl->view->setCamera(m_impl->camera);
 
-	m_impl->uiScene = m_impl->engine->createScene();
-	m_impl->uiCameraEntity = utils::EntityManager::get().create();
-	m_impl->uiCamera = m_impl->engine->createCamera(m_impl->uiCameraEntity);
+	// UI overlay view: filagui fills it with its own scene, camera and renderable.
 	m_impl->uiView = m_impl->engine->createView();
-
-	m_impl->uiView->setScene(m_impl->uiScene);
-	m_impl->uiView->setCamera(m_impl->uiCamera);
 	m_impl->uiView->setPostProcessingEnabled(false);
-
 	m_impl->uiView->setBlendMode(filament::View::BlendMode::TRANSLUCENT);
 
-	const ImGuiIO& io = ImGui::GetIO();
-	unsigned char* pixels;
-	int texWidth, texHeight;
-	io.Fonts->GetTexDataAsRGBA32(&pixels, &texWidth, &texHeight);
-
-	m_impl->fontTexture = filament::Texture::Builder()
-							  .width(static_cast<std::uint32_t>(texWidth))
-							  .height(static_cast<std::uint32_t>(texHeight))
-							  .levels(1)
-							  .format(filament::Texture::InternalFormat::RGBA8)
-							  .build(*m_impl->engine);
-
-	filament::Texture::PixelBufferDescriptor pb(
-		pixels, static_cast<std::size_t>(texWidth * texHeight * 4),
-		filament::Texture::Format::RGBA, filament::Texture::Type::UBYTE);
-	m_impl->fontTexture->setImage(*m_impl->engine, 0, std::move(pb));
+	// filagui creates its own ImGui scene/camera/material and shares the ImGui context
+	// that gui::Context created at startup (so input state stays in one context).
+	m_impl->uiHelper = std::make_unique<filagui::ImGuiHelper>(
+		m_impl->engine,
+		m_impl->uiView,
+		utils::Path("assets/Roboto.ttf"),
+		ImGui::GetCurrentContext());
 
 	Resize(width, height);
-	// LoadUIMaterial("imgui.filamat");
 }
 
 void FilamentRenderBackend::Shutdown()
 {
 	if (m_impl->engine)
 	{
-		// 1. ОЧИСТКА КАДРОВ И ИНСТАНСОВ (ДО БАЗОВОГО МАТЕРИАЛА)
-		for (auto& fd : m_impl->uiFrameData)
-		{
-			m_impl->engine->destroy(fd.entity);
-			m_impl->engine->destroy(fd.vb);
-			m_impl->engine->destroy(fd.ib);
-			for (auto* mi : fd.matInstances)
-			{
-				m_impl->engine->destroy(mi); // Удаляем инстанс до удаления базы
-			}
-			utils::EntityManager::get().destroy(fd.entity);
-		}
-		m_impl->uiFrameData.clear();
-
-		// 2. ОЧИСТКА БАЗОВЫХ РЕСУРСОВ UI
-		if (m_impl->uiMaterial)
-			m_impl->engine->destroy(m_impl->uiMaterial);
-		if (m_impl->fontTexture)
-			m_impl->engine->destroy(m_impl->fontTexture);
-
-		if (m_impl->uiView)
-			m_impl->engine->destroy(m_impl->uiView);
-		if (m_impl->uiScene)
-			m_impl->engine->destroy(m_impl->uiScene);
-		if (m_impl->uiCamera)
-			m_impl->engine->destroyCameraComponent(m_impl->uiCameraEntity);
-		utils::EntityManager::get().destroy(m_impl->uiCameraEntity);
-
+		m_impl->uiHelper.reset();
 		for (auto& [vb, ib] : m_impl->resourcesMap | std::views::values)
 		{
 			if (vb)
@@ -181,6 +121,10 @@ void FilamentRenderBackend::Shutdown()
 		}
 		m_impl->entityMap.clear();
 
+		if (m_impl->uiView)
+		{
+			m_impl->engine->destroy(m_impl->uiView);
+		}
 		if (m_impl->swapChain)
 		{
 			m_impl->engine->destroy(m_impl->swapChain);
@@ -213,6 +157,10 @@ void FilamentRenderBackend::Resize(std::uint32_t width, std::uint32_t height)
 	{
 		m_impl->view->setViewport({ 0, 0, width, height });
 		m_impl->uiView->setViewport({ 0, 0, width, height });
+	}
+	if (m_impl->uiHelper)
+	{
+		m_impl->uiHelper->setDisplaySize(width, height);
 	}
 }
 
@@ -307,9 +255,13 @@ RenderEntityHandle FilamentRenderBackend::CreateLight(const LightDataView& light
 
 	auto type = filament::LightManager::Type::DIRECTIONAL;
 	if (light.type == LightDataView::LightType::Light)
+	{
 		type = filament::LightManager::Type::POINT;
+	}
 	else if (light.type == LightDataView::LightType::Spot)
+	{
 		type = filament::LightManager::Type::SPOT;
+	}
 
 	filament::LightManager::Builder(type)
 		.color(filament::Color::toLinear<filament::ACCURATE>({ light.color.r, light.color.g, light.color.b }))
@@ -414,138 +366,16 @@ void FilamentRenderBackend::SetClearColor(const Color color)
 		m_impl->renderer->setClearOptions(options);
 	}
 }
+
 void FilamentRenderBackend::RenderUI(float dt, std::function<void()> uiCallback)
 {
+	if (m_impl->uiHelper)
+	{
+		m_impl->uiHelper->render(dt, [uiCallback](filament::Engine*, filament::View*) {
+			uiCallback();
+		});
+	}
 }
-
-// void FilamentRenderBackend::RenderUI(const UIDrawData& uiData)
-// {
-// 	const auto drawData = static_cast<ImDrawData*>(uiData.nativeData);
-// 	if (!drawData || drawData->CmdListsCount == 0 || !m_impl->uiMaterial)
-// 	{
-// 		return;
-// 	}
-//
-// 	// --- ИНИЦИАЛИЗАЦИЯ / ОБНОВЛЕНИЕ ШРИФТОВОГО АТЛАСА ---
-// 	ImGuiIO& io = ImGui::GetIO();
-// 	if (io.Fonts->IsBuilt() && !m_impl->fontTexture)
-// 	{
-// 		unsigned char* pixels;
-// 		int texWidth, texHeight;
-// 		io.Fonts->GetTexDataAsRGBA32(&pixels, &texWidth, &texHeight);
-//
-// 		m_impl->fontTexture = filament::Texture::Builder()
-// 								  .width(static_cast<std::uint32_t>(texWidth))
-// 								  .height(static_cast<std::uint32_t>(texHeight))
-// 								  .levels(1)
-// 								  .format(filament::Texture::InternalFormat::RGBA8)
-// 								  .build(*m_impl->engine);
-//
-// 		filament::Texture::PixelBufferDescriptor pb(
-// 			pixels, static_cast<std::size_t>(texWidth * texHeight * 4),
-// 			filament::Texture::Format::RGBA, filament::Texture::Type::UBYTE);
-//
-// 		m_impl->fontTexture->setImage(*m_impl->engine, 0, std::move(pb));
-//
-// 		// Регистрируем ID текстуры в ImGui для обратной связи
-// 		io.Fonts->SetTexID(reinterpret_cast<ImTextureID>(m_impl->fontTexture));
-// 	}
-//
-// 	// Очистка предыдущего кадра UI
-// 	for (auto& fd : m_impl->uiFrameData)
-// 	{
-// 		m_impl->uiScene->remove(fd.entity);
-// 		m_impl->engine->destroy(fd.entity);
-// 		m_impl->engine->destroy(fd.vb);
-// 		m_impl->engine->destroy(fd.ib);
-// 		for (auto* mi : fd.matInstances)
-// 			m_impl->engine->destroy(mi);
-// 		utils::EntityManager::get().destroy(fd.entity);
-// 	}
-// 	m_impl->uiFrameData.clear();
-//
-// 	const float L = drawData->DisplayPos.x;
-// 	const float R = drawData->DisplayPos.x + drawData->DisplaySize.x;
-// 	const float T = drawData->DisplayPos.y;
-// 	const float B = drawData->DisplayPos.y + drawData->DisplaySize.y;
-// 	m_impl->uiCamera->setProjection(filament::Camera::Projection::ORTHO, L, R, B, T, -1.0f, 1.0f);
-//
-// 	float fb_height = drawData->DisplaySize.y * drawData->FramebufferScale.y;
-//
-// 	for (int n = 0; n < drawData->CmdListsCount; n++)
-// 	{
-// 		const ImDrawList* cmd_list = drawData->CmdLists[n];
-// 		UIFrameData frameData;
-//
-// 		frameData.vb = filament::VertexBuffer::Builder()
-// 						   .vertexCount(cmd_list->VtxBuffer.Size)
-// 						   .bufferCount(1)
-// 						   .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT2, offsetof(ImDrawVert, pos), sizeof(ImDrawVert))
-// 						   .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, offsetof(ImDrawVert, uv), sizeof(ImDrawVert))
-// 						   .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, offsetof(ImDrawVert, col), sizeof(ImDrawVert))
-// 						   .normalized(filament::VertexAttribute::COLOR)
-// 						   .build(*m_impl->engine);
-//
-// 		void* vCopy = std::malloc(cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
-// 		std::memcpy(vCopy, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
-// 		frameData.vb->setBufferAt(*m_impl->engine, 0, filament::VertexBuffer::BufferDescriptor(vCopy, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), [](void* b, size_t, void*) { std::free(b); }));
-//
-// 		// ПРЕВРАЩАЕМ В 32-БИТА: Жестко запекаем смещение VtxOffset во избежание "каши"
-// 		frameData.ib = filament::IndexBuffer::Builder()
-// 						   .indexCount(cmd_list->IdxBuffer.Size)
-// 						   .bufferType(filament::IndexBuffer::IndexType::UINT)
-// 						   .build(*m_impl->engine);
-//
-// 		uint32_t* iCopy = static_cast<uint32_t*>(std::malloc(cmd_list->IdxBuffer.Size * sizeof(uint32_t)));
-// 		const ImDrawIdx* srcIdx = cmd_list->IdxBuffer.Data;
-// 		for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
-// 		{
-// 			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-// 			for (unsigned int i = 0; i < pcmd->ElemCount; i++)
-// 			{
-// 				iCopy[pcmd->IdxOffset + i] = static_cast<uint32_t>(srcIdx[pcmd->IdxOffset + i]) + pcmd->VtxOffset;
-// 			}
-// 		}
-// 		frameData.ib->setBuffer(*m_impl->engine, filament::IndexBuffer::BufferDescriptor(iCopy, cmd_list->IdxBuffer.Size * sizeof(uint32_t), [](void* b, size_t, void*) { std::free(b); }));
-//
-// 		frameData.entity = utils::EntityManager::get().create();
-// 		m_impl->engine->getTransformManager().create(frameData.entity);
-//
-// 		filament::RenderableManager::Builder builder(cmd_list->CmdBuffer.Size);
-// 		builder.boundingBox(filament::Box{ { 0, 0, 0 }, { 10000, 10000, 10000 } }).culling(false);
-//
-// 		for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
-// 		{
-// 			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-//
-// 			// Создаем уникальный материал для каждой команды отрисовки (для Scissor)
-// 			filament::MaterialInstance* mi = m_impl->uiMaterial->createInstance();
-// 			filament::TextureSampler sampler(filament::TextureSampler::MinFilter::LINEAR, filament::TextureSampler::MagFilter::LINEAR);
-// 			mi->setParameter("albedo", m_impl->fontTexture, sampler);
-//
-// 			// Конвертируем ClipRect ImGui в координаты Filament (с инверсией Y)
-// 			float clipMinX = pcmd->ClipRect.x * drawData->FramebufferScale.x;
-// 			float clipMinY = pcmd->ClipRect.y * drawData->FramebufferScale.y;
-// 			float clipMaxX = pcmd->ClipRect.z * drawData->FramebufferScale.x;
-// 			float clipMaxY = pcmd->ClipRect.w * drawData->FramebufferScale.y;
-//
-// 			float filClipMinY = fb_height - clipMaxY;
-// 			float filClipMaxY = fb_height - clipMinY;
-//
-// 			mi->setParameter("clipRect", filament::math::float4{ clipMinX, filClipMinY, clipMaxX, filClipMaxY });
-//
-// 			builder.geometry(cmd_i, filament::RenderableManager::PrimitiveType::TRIANGLES, frameData.vb, frameData.ib, pcmd->IdxOffset, pcmd->ElemCount);
-// 			builder.material(cmd_i, mi);
-// 			builder.blendOrder(cmd_i, cmd_i);
-//
-// 			frameData.matInstances.push_back(mi);
-// 		}
-// 		builder.build(*m_impl->engine, frameData.entity);
-//
-// 		m_impl->uiScene->addEntity(frameData.entity);
-// 		m_impl->uiFrameData.push_back(std::move(frameData));
-// 	}
-// }
 
 void FilamentRenderBackend::BeginFrame() {}
 

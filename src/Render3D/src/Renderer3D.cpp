@@ -124,7 +124,10 @@ void Renderer3D::SetCullMode(const CullMode mode)
 
 void Renderer3D::ReloadShaders()
 {
-	m_api->ReloadShaders();
+	if (m_api)
+	{
+		m_api->ReloadShaders();
+	}
 }
 
 } // namespace re::render
