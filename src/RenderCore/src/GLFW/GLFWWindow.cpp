@@ -1,7 +1,5 @@
 #include <RenderCore/GLFW/GLFWWindow.hpp>
 
-#include <glad/glad.h> // Include glad before any OpenGL library
-
 #if defined(RE_SYSTEM_WINDOWS)
 #define GLFW_EXPOSE_NATIVE_WIN32
 #elif defined(RE_SYSTEM_MACOS)
@@ -189,11 +187,6 @@ void GLFWWindow::Init(const std::string& title)
 	m_context->OnAfterWindowCreate();
 
 	glfwMakeContextCurrent(m_window);
-
-	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
-	}
 
 	glfwSetWindowUserPointer(m_window, &m_data);
 	SetVSyncEnabled(true);

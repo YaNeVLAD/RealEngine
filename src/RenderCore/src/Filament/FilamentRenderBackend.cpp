@@ -88,8 +88,15 @@ filament::Texture* GetOrCreateTexture(filament::Engine* engine, std::unordered_m
 		return fallback;
 	}
 
+	const std::size_t rowBytes = static_cast<std::size_t>(texture->Width()) * 4;
 	void* copy = std::malloc(pixels.size());
-	std::memcpy(copy, pixels.data(), pixels.size());
+	for (std::uint32_t y = 0; y < texture->Height(); ++y)
+	{
+		std::memcpy(
+			static_cast<std::uint8_t*>(copy) + static_cast<std::size_t>(texture->Height() - 1 - y) * rowBytes,
+			pixels.data() + static_cast<std::size_t>(y) * rowBytes,
+			rowBytes);
+	}
 
 	created->setImage(*engine, 0, filament::Texture::PixelBufferDescriptor(copy, pixels.size(), filament::Texture::Format::RGBA, filament::Texture::Type::UBYTE, [](void* buffer, std::size_t, void*) { std::free(buffer); }));
 

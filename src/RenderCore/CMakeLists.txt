@@ -67,7 +67,6 @@ if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
     target_include_directories(ReRenderCore
             PRIVATE
             "${RENDER_CORE_GENERATED_DIR}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
     )
 endif ()
 
@@ -81,6 +80,7 @@ target_link_libraries(ReRenderCore
         filagui
         stb_image
         stb_image_resize
+        bcdec
         tinyobjloader
         tinygltf
 )

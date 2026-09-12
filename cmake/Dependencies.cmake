@@ -79,14 +79,8 @@ elseif (RE_RENDER_BACKEND STREQUAL "FILAMENT") # Filament
     )
     FetchContent_MakeAvailable(glfw)
 
-    # GLAD
-    set(GLAD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/glad")
-    add_library(GLAD STATIC "${GLAD_PATH}/glad.c")
-    target_include_directories(GLAD PUBLIC "${GLAD_PATH}")
-
     set(RENDER_LIBS
             glfw
-            GLAD
             Filament::Filament
             glm::glm
     )
@@ -114,7 +108,7 @@ set(IMGUI_SOURCES
         "${imgui_repo_SOURCE_DIR}/imgui_tables.cpp"
         "${imgui_repo_SOURCE_DIR}/imgui_widgets.cpp"
         "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
-        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+        "${imgui_repo_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
 )
 add_library(imgui STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui PUBLIC
@@ -123,7 +117,6 @@ target_include_directories(imgui PUBLIC
 )
 if (RE_RENDER_BACKEND STREQUAL "FILAMENT")
     target_link_libraries(imgui PRIVATE glfw)
-    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
 endif ()
 
 # TINYGLTF
@@ -178,6 +171,15 @@ if (NOT EXISTS "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 endif ()
 add_library(miniaudio STATIC "${MINIAUDIO_PATH}/miniaudio_impl.cpp")
 target_include_directories(miniaudio PUBLIC "${MINIAUDIO_PATH}")
+
+# BCDEC
+set(BCDEC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/bcdec")
+if (NOT EXISTS "${BCDEC_PATH}/bcdec_impl.cpp")
+    file(WRITE "${BCDEC_PATH}/bcdec_impl.cpp"
+            "#define BCDEC_IMPLEMENTATION\n#include \"bcdec.h\"")
+endif ()
+add_library(bcdec STATIC "${BCDEC_PATH}/bcdec_impl.cpp")
+target_include_directories(bcdec PUBLIC "${BCDEC_PATH}")
 
 # .NET CORE HOST (nethost)
 find_program(DOTNET_CLI dotnet)
