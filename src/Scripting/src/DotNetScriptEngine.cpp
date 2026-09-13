@@ -75,6 +75,11 @@ scripting::IScriptClass* DotNetScriptEngine::GetClass(String const& Namespace, S
 
 void DotNetScriptEngine::InitImpl(const scripting::EngineApiPointers& apiPointers)
 {
+	if (apiPointers.apiVersion != scripting::EngineApiVersion)
+	{
+		throw std::runtime_error("Engine API version mismatch! Update C# EngineAPI bindings.");
+	}
+
 	char_t buffer[1024];
 	size_t bufferSuze = sizeof(buffer) / sizeof(char_t);
 	if (get_hostfxr_path(buffer, &bufferSuze, nullptr) != 0)
@@ -161,6 +166,7 @@ void DotNetScriptEngine::InitImpl(const scripting::EngineApiPointers& apiPointer
 	load_csharp_method(NET_STR("InvokeOnCreate"), reinterpret_cast<void**>(&scripting::DotNetInterop::InvokeOnCreate));
 	load_csharp_method(NET_STR("InvokeOnUpdate"), reinterpret_cast<void**>(&scripting::DotNetInterop::InvokeOnUpdate));
 	load_csharp_method(NET_STR("FreeInstance"), reinterpret_cast<void**>(&scripting::DotNetInterop::FreeInstance));
+	load_csharp_method(NET_STR("OnDestroy"), reinterpret_cast<void**>(&scripting::DotNetInterop::OnDestroy));
 	load_csharp_method(NET_STR("CheckClassExists"), reinterpret_cast<void**>(&scripting::DotNetInterop::CheckClassExists));
 	load_csharp_method(NET_STR("InvokeMethodByName"), reinterpret_cast<void**>(&scripting::DotNetInterop::InvokeMethodByName));
 

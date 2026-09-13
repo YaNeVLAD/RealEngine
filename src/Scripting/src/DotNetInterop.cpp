@@ -5,5 +5,6 @@ re::scripting::DotNetInterop::CreateInstanceFn re::scripting::DotNetInterop::Cre
 re::scripting::DotNetInterop::InvokeOnCreateFn re::scripting::DotNetInterop::InvokeOnCreate = nullptr;
 re::scripting::DotNetInterop::InvokeOnUpdateFn re::scripting::DotNetInterop::InvokeOnUpdate = nullptr;
 re::scripting::DotNetInterop::FreeInstanceFn re::scripting::DotNetInterop::FreeInstance = nullptr;
+re::scripting::DotNetInterop::OnDestroyFn re::scripting::DotNetInterop::OnDestroy = nullptr;
 re::scripting::DotNetInterop::CheckClassExistsFn re::scripting::DotNetInterop::CheckClassExists = nullptr;
 re::scripting::DotNetInterop::InvokeMethodByNameFn re::scripting::DotNetInterop::InvokeMethodByName = nullptr;

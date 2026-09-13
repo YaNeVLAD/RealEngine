@@ -4,6 +4,8 @@
 #include <Runtime/Internal/ScriptBinder.hpp>
 #include <Scripting/Interface/IScriptEngine.hpp>
 
+#include <unordered_map>
+
 namespace re
 {
 
@@ -38,6 +40,7 @@ public:
 					script.Instance = script.ScriptClass->Instantiate(entity);
 					if (script.Instance)
 					{
+						m_instances[entity.Id()] = script.Instance;
 						script.Instance->OnCreate();
 					}
 				}
@@ -49,11 +52,33 @@ public:
 			}
 		}
 
+		ReleaseDestroyedInstances(scene);
+
 		runtime::ScriptBinder::SetActiveScene(nullptr);
 	}
 
 private:
+	void ReleaseDestroyedInstances(const ecs::Scene& scene)
+	{
+		for (auto it = m_instances.begin(); it != m_instances.end();)
+		{
+			const auto entity = ecs::Entity{ it->first };
+			const bool stillAlive = scene.IsValid(entity) && scene.HasComponent<ScriptComponent>(entity);
+
+			if (stillAlive)
+			{
+				++it;
+				continue;
+			}
+
+			it->second->Release();
+			it = m_instances.erase(it);
+		}
+	}
+
+private:
 	scripting::IScriptEngine* m_scriptEngine = nullptr;
+	std::unordered_map<std::uint64_t, std::shared_ptr<scripting::IScriptInstance>> m_instances;
 };
 
 } // namespace re
