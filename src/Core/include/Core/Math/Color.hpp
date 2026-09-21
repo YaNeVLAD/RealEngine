@@ -1,6 +1,7 @@
 #pragma once
 
 #include <compare>
+#include <cstddef>
 #include <cstdint>
 #include <tuple>
 
@@ -52,6 +53,10 @@ public:
 	constexpr bool operator==(const Color&) const = default;
 	constexpr bool operator!=(const Color&) const = default;
 	constexpr auto operator<=>(const Color&) const = default;
+
+	[[nodiscard]] constexpr std::uint8_t* Data() noexcept;
+	[[nodiscard]] constexpr const std::uint8_t* Data() const noexcept;
+	[[nodiscard]] static constexpr std::size_t Count() noexcept;
 
 	std::uint8_t r{};
 	std::uint8_t g{};

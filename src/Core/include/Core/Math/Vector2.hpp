@@ -5,6 +5,7 @@
 #include <cmath>
 #include <compare>
 #include <concepts>
+#include <cstddef>
 
 namespace re
 {
@@ -34,6 +35,10 @@ struct Vector2
 	constexpr explicit operator Vector2<U>() const noexcept;
 
 	constexpr auto operator<=>(const Vector2&) const noexcept = default;
+
+	[[nodiscard]] constexpr T* Data() noexcept;
+	[[nodiscard]] constexpr const T* Data() const noexcept;
+	[[nodiscard]] static constexpr std::size_t Count() noexcept;
 
 	T x{};
 	T y{};

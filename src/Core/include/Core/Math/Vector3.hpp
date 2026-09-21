@@ -5,6 +5,7 @@
 #include <cmath>
 #include <compare>
 #include <concepts>
+#include <cstddef>
 #include <numbers>
 
 namespace re
@@ -40,6 +41,10 @@ struct Vector3
 		requires std::floating_point<T>;
 
 	[[nodiscard]] static constexpr Vector3 Zero() noexcept;
+
+	[[nodiscard]] constexpr T* Data() noexcept;
+	[[nodiscard]] constexpr const T* Data() const noexcept;
+	[[nodiscard]] static constexpr std::size_t Count() noexcept;
 
 	[[nodiscard]] static constexpr Vector3 Up() noexcept;
 	[[nodiscard]] static constexpr Vector3 Down() noexcept;

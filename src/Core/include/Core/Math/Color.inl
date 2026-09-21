@@ -1,5 +1,7 @@
 #include <Core/Math/Color.hpp>
 
+#include <type_traits>
+
 namespace re
 {
 
@@ -120,6 +122,23 @@ inline float* ColorF::Data()
 inline const float* ColorF::Data() const
 {
 	return &r;
+}
+
+constexpr std::uint8_t* Color::Data() noexcept
+{
+	static_assert(std::is_standard_layout_v<Color> && sizeof(Color) == 4 * sizeof(std::uint8_t));
+	return &r;
+}
+
+constexpr const std::uint8_t* Color::Data() const noexcept
+{
+	static_assert(std::is_standard_layout_v<Color> && sizeof(Color) == 4 * sizeof(std::uint8_t));
+	return &r;
+}
+
+constexpr std::size_t Color::Count() noexcept
+{
+	return 4;
 }
 
 } // namespace re

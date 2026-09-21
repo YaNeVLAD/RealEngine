@@ -86,6 +86,16 @@ struct EditorLayout final : re::Layout
 		// 	})
 		// 	.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
 
+		// Demo: скрипт-пример рефлексии моста C# <-> C++ (RealEngineTestProj/ReflectionDemo.cs).
+		// Требует RealEngineTestProj.dll рядом с exe. Убрать вместе с примером при ненадобности.
+		scene.CreateEntity()
+			.Add<re::ScriptComponent>({
+				.Class = "ReflectionDemo",
+				.Namespace = "RealEngineTestProj",
+			})
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
+
 		const auto lightEntity
 			= scene.CreateEntity()
 				  .Add<re::Dirty<re::TransformComponent>>()

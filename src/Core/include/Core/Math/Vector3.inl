@@ -1,5 +1,7 @@
 #include <Core/Math/Vector3.hpp>
 
+#include <type_traits>
+
 namespace re
 {
 
@@ -293,6 +295,29 @@ template <typename T, std::floating_point U>
 constexpr Vector3<T> Lerp(Vector3<T> const& a, Vector3<T> const& b, U t) noexcept
 {
 	return a * (static_cast<U>(1) - t) + b * t;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr T* Vector3<T>::Data() noexcept
+{
+	static_assert(std::is_standard_layout_v<Vector3<T>> && sizeof(Vector3<T>) == 3 * sizeof(T));
+	return &x;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr const T* Vector3<T>::Data() const noexcept
+{
+	static_assert(std::is_standard_layout_v<Vector3<T>> && sizeof(Vector3<T>) == 3 * sizeof(T));
+	return &x;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr std::size_t Vector3<T>::Count() noexcept
+{
+	return 3;
 }
 
 } // namespace re

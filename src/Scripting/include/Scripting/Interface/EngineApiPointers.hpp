@@ -4,41 +4,18 @@
 
 #include <cstdint>
 
+#include "bridge/ReflectionIds.gen.hpp"
+
 namespace re::scripting
 {
 
-inline constexpr std::uint32_t EngineApiVersion = 2;
+inline constexpr std::uint32_t EngineApiVersion = 4;
 
-enum class ComponentDataKind : std::int32_t
+struct ComponentFieldInfo
 {
-	Transform = 0,
-	Camera = 1,
-	Light = 2,
-};
-
-struct TransformComponentData
-{
-	float position[3]; // X, Y, Z
-	float rotation[3]; // euler, degrees
-	float scale[3];
-};
-
-struct CameraComponentData
-{
-	float fov; // degrees
-	float nearClip;
-	float farClip;
-	float zoom;
-	std::uint32_t isPrimal;
-};
-
-struct LightComponentData
-{
-	std::int32_t type; // 0 = Directional, 1 = Light (Point), 2 = Spot
-	float color[3]; // RGB diffuse, normalized
-	float falloff;
-	float cutOffAngle;
-	float ambientIntensity;
+	char name[48];
+	FieldType type;
+	std::uint32_t size;
 };
 
 struct EngineApiPointers
@@ -51,11 +28,17 @@ struct EngineApiPointers
 	bool (*Scene_IsEntityValid)(std::uint64_t entityID);
 	void (*Scene_DestroyEntity)(std::uint64_t entityID);
 
-	bool (*Entity_GetComponentData)(std::uint64_t entityID, ComponentDataKind kind, void* outData, std::uint32_t maxBytes, std::uint32_t* outBytes);
-	bool (*Entity_SetComponentData)(std::uint64_t entityID, ComponentDataKind kind, const void* data, std::uint32_t bytes);
-
 	bool (*Input_IsKeyDown)(int key);
 	bool (*Input_IsMouseButtonDown)(int button);
+
+	std::uint64_t (*Entity_GetComponentMask)(std::uint64_t entityID);
+	bool (*Entity_AddComponent)(std::uint64_t entityID, ReflectedComponentId component);
+	bool (*Entity_RemoveComponent)(std::uint64_t entityID, ReflectedComponentId component);
+	bool (*Entity_GetFieldData)(std::uint64_t entityID, ReflectedComponentId component, std::int32_t fieldIndex, void* outData, std::uint32_t maxBytes, std::uint32_t* outBytes);
+	bool (*Entity_SetFieldData)(std::uint64_t entityID, ReflectedComponentId component, std::int32_t fieldIndex, const void* data, std::uint32_t bytes);
+
+	std::int32_t (*Component_GetFieldCount)(ReflectedComponentId component);
+	bool (*Component_GetFieldInfo)(ReflectedComponentId component, std::int32_t fieldIndex, ComponentFieldInfo* outInfo);
 };
 
 } // namespace re::scripting

@@ -1,5 +1,7 @@
 #include <Core/Math/Vector2.hpp>
 
+#include <type_traits>
+
 namespace re
 {
 
@@ -122,6 +124,29 @@ constexpr Vector2<T>& operator/=(Vector2<T>& left, T right) noexcept
 	left.y /= right;
 
 	return left;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr T* Vector2<T>::Data() noexcept
+{
+	static_assert(std::is_standard_layout_v<Vector2<T>> && sizeof(Vector2<T>) == 2 * sizeof(T));
+	return &x;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr const T* Vector2<T>::Data() const noexcept
+{
+	static_assert(std::is_standard_layout_v<Vector2<T>> && sizeof(Vector2<T>) == 2 * sizeof(T));
+	return &x;
+}
+
+template <typename T>
+	requires std::floating_point<T> || std::integral<T>
+constexpr std::size_t Vector2<T>::Count() noexcept
+{
+	return 2;
 }
 
 } // namespace re

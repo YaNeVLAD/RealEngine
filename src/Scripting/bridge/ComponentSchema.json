@@ -1,0 +1,69 @@
+{
+  "fieldTypes": [
+    {"name": "Bool", "size": 4},
+    {"name": "Int32", "size": 4},
+    {"name": "Float", "size": 4},
+    {"name": "Float2", "size": 8},
+    {"name": "Float3", "size": 12},
+    {"name": "Color", "size": 4}
+  ],
+  "components": [
+    {
+      "name": "Transform", "cpp": "TransformComponent", "dirty": true,
+      "fields": [
+        {"name": "position", "kind": "float3", "member": "position"},
+        {"name": "rotation", "kind": "float3", "member": "rotation"},
+        {"name": "scale", "kind": "float3", "member": "scale"}
+      ]
+    },
+    {
+      "name": "Camera", "cpp": "CameraComponent", "dirty": true,
+      "fields": [
+        {"name": "isPrimal", "kind": "bool", "member": "isPrimal"},
+        {"name": "fov", "kind": "float", "member": "fov"},
+        {"name": "nearClip", "kind": "float", "member": "nearClip"},
+        {"name": "farClip", "kind": "float", "member": "farClip"},
+        {"name": "zoom", "kind": "float", "member": "zoom"},
+        {"name": "iso", "kind": "float", "member": "iso"},
+        {"name": "up", "kind": "float3", "member": "up"}
+      ]
+    },
+    {
+      "name": "Light", "cpp": "LightComponent", "dirty": true,
+      "fields": [
+        {"name": "type", "kind": "lightType"},
+        {"name": "ambient", "kind": "color", "member": "ambient"},
+        {"name": "diffuse", "kind": "color", "member": "diffuse"},
+        {"name": "specular", "kind": "color", "member": "specular"},
+        {"name": "constant", "kind": "float", "member": "constant"},
+        {"name": "linear", "kind": "float", "member": "linear"},
+        {"name": "quadratic", "kind": "float", "member": "quadratic"},
+        {"name": "ambientIntensity", "kind": "float", "member": "ambientIntensity"},
+        {"name": "falloff", "kind": "float", "member": "falloff"},
+        {"name": "cutOffAngle", "kind": "float", "member": "cutOffAngle"},
+        {"name": "exponent", "kind": "float", "member": "exponent"}
+      ]
+    },
+    {
+      "name": "Circle", "cpp": "CircleComponent", "dirty": false,
+      "fields": [
+        {"name": "color", "kind": "color", "member": "color"},
+        {"name": "radius", "kind": "float", "member": "radius"}
+      ]
+    },
+    {
+      "name": "Rectangle", "cpp": "RectangleComponent", "dirty": false,
+      "fields": [
+        {"name": "color", "kind": "color", "member": "color"},
+        {"name": "size", "kind": "float2", "member": "size"}
+      ]
+    },
+    {
+      "name": "BoxCollider", "cpp": "BoxColliderComponent", "dirty": false,
+      "fields": [
+        {"name": "size", "kind": "float2", "member": "size"},
+        {"name": "position", "kind": "float2", "member": "position"}
+      ]
+    }
+  ]
+}
