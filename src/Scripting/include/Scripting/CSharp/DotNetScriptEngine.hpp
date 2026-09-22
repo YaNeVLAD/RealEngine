@@ -2,9 +2,9 @@
 
 #include <Scripting/Export.hpp>
 
-#include <Core/LibraryLoader.hpp>
 #include <Core/String.hpp>
 #include <Scripting/CSharp/DotNetScriptClass.hpp>
+#include <Scripting/Host/IManagedHost.hpp>
 #include <Scripting/Interface/IScriptEngine.hpp>
 
 #include <memory>
@@ -30,6 +30,7 @@ public:
 	~DotNetScriptEngine() override;
 
 	void Init(const scripting::EngineApiPointers& apiPointers) override;
+	void Init(const scripting::EngineApiPointers& apiPointers, String const& runtimeConfig);
 
 	void Shutdown() override;
 
@@ -37,15 +38,16 @@ public:
 
 	scripting::IScriptClass* GetClass(String const& Namespace, String const& Class) override;
 
+	[[nodiscard]] void* LoadManagedEntryPoint(String const& assemblyPath, String const& typeName, String const& methodName) const;
+
 private:
-	void InitImpl(const scripting::EngineApiPointers& apiPointers);
+	void InitImpl(const scripting::EngineApiPointers& apiPointers, String const& runtimeConfig);
 	void ShutdownImpl();
 
 private:
 	std::unordered_map<String, std::unique_ptr<DotNetScriptClass>> m_classes;
 
-	std::unique_ptr<LibraryLoader> m_coreClrLoader;
-	void* m_loadAssemblyFn = nullptr;
+	std::unique_ptr<scripting::IManagedHost> m_host;
 };
 
 } // namespace re
