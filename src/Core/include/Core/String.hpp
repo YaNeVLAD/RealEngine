@@ -135,6 +135,26 @@ RE_CORE_API std::ostream& operator<<(std::ostream& os, const String& str);
 
 RE_CORE_API std::wostream& operator<<(std::wostream& os, const String& str);
 
+namespace literals
+{
+
+inline String operator""_s(const char* u8Str, std::size_t)
+{
+	return String{ u8Str };
+}
+
+inline String operator""_s(const wchar_t* wStr, std::size_t)
+{
+	return String{ wStr };
+}
+
+inline String operator""_s(const char32_t* u32Str, std::size_t size)
+{
+	return String{ u32Str, size };
+}
+
+} // namespace literals
+
 } // namespace re
 
 template <>
