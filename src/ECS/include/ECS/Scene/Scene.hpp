@@ -66,6 +66,11 @@ public:
 		return m_entityManager->IsValid(entity);
 	}
 
+	std::vector<Entity> GetAllEntities() const
+	{
+		return m_entityManager->GetActiveEntities();
+	}
+
 	template <typename TComponent>
 	void AddComponent(Entity entity, TComponent const& component)
 	{

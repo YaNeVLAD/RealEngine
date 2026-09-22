@@ -96,6 +96,15 @@ struct EditorLayout final : re::Layout
 			.Add<re::Dirty<re::TransformComponent>>()
 			.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
 
+		// Demo: smoke-тест editor-API (RealEngineTestProj/EditorSmoke.cs). См. выше.
+		scene.CreateEntity()
+			.Add<re::ScriptComponent>({
+				.Class = "EditorSmoke",
+				.Namespace = "RealEngineTestProj",
+			})
+			.Add<re::Dirty<re::TransformComponent>>()
+			.Add<re::TransformComponent>({ .position = re::Vector3f::Zero() });
+
 		const auto lightEntity
 			= scene.CreateEntity()
 				  .Add<re::Dirty<re::TransformComponent>>()

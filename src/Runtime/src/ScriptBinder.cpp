@@ -4,9 +4,12 @@
 #include <RenderCore/Keyboard.hpp>
 #include <RenderCore/Mouse.hpp>
 #include <Runtime/Components.hpp>
+#include <Runtime/Internal/PrimitiveBuilder.hpp>
 #include <Scripting/CSharp/DotNetInterop.hpp>
 
+#include <algorithm>
 #include <cstring>
+#include <string_view>
 
 // ReSharper disable CppDeclaratorNeverUsed
 // ReSharper disable CppDFAUnreachableFunctionCall
@@ -275,6 +278,8 @@ bool EnsureRegistered(ecs::Scene* scene)
 		return false;
 	}
 
+	EnsureComponentRegistered<NameComponent>(scene);
+
 	return RegisterReflectedComponents(scene);
 }
 
@@ -310,18 +315,28 @@ scripting::EngineApiPointers ScriptBinder::CreateApiPointers()
 		.apiVersion = scripting::EngineApiVersion,
 		.NativeLog = &NativeLog_Impl,
 		.OnScriptError = &OnScriptError_Impl,
-		.Scene_CreateEntity = &Scene_CreateEntity_Impl,
-		.Scene_IsEntityValid = &Scene_IsEntityValid_Impl,
-		.Scene_DestroyEntity = &Scene_DestroyEntity_Impl,
+
 		.Input_IsKeyDown = &Input_IsKeyDown_Impl,
 		.Input_IsMouseButtonDown = &Input_IsMouseButtonDown_Impl,
+
 		.Entity_GetComponentMask = &Entity_GetComponentMask_Impl,
 		.Entity_AddComponent = &Entity_AddComponent_Impl,
 		.Entity_RemoveComponent = &Entity_RemoveComponent_Impl,
 		.Entity_GetFieldData = &Entity_GetFieldData_Impl,
 		.Entity_SetFieldData = &Entity_SetFieldData_Impl,
+		.Entity_GetName = &Entity_GetName_Impl,
+		.Entity_SetName = &Entity_SetName_Impl,
+
 		.Component_GetFieldCount = &Component_GetFieldCount_Impl,
 		.Component_GetFieldInfo = &Component_GetFieldInfo_Impl,
+
+		.Scene_CreateEntity = &Scene_CreateEntity_Impl,
+		.Scene_IsEntityValid = &Scene_IsEntityValid_Impl,
+		.Scene_DestroyEntity = &Scene_DestroyEntity_Impl,
+		.Scene_GetEntityCount = &Scene_GetEntityCount_Impl,
+		.Scene_GetEntities = &Scene_GetEntities_Impl,
+		.Scene_ClearEntities = &Scene_ClearEntities_Impl,
+		.Scene_SpawnPrimitive = &Scene_SpawnPrimitive_Impl,
 	};
 }
 
@@ -526,6 +541,148 @@ bool ScriptBinder::Entity_SetFieldData_Impl(
 	}
 
 	return true;
+}
+
+std::uint32_t ScriptBinder::Scene_GetEntityCount_Impl()
+{
+	if (!s_ActiveScene)
+	{
+		return 0;
+	}
+
+	return static_cast<std::uint32_t>(s_ActiveScene->GetAllEntities().size());
+}
+
+bool ScriptBinder::Scene_GetEntities_Impl(std::uint64_t* outIds, const std::uint32_t capacity, std::uint32_t* outCount)
+{
+	if (!s_ActiveScene || !outIds || !outCount)
+	{
+		return false;
+	}
+
+	const auto entities = s_ActiveScene->GetAllEntities();
+	const auto total = static_cast<std::uint32_t>(entities.size());
+	const auto count = std::min(total, capacity);
+	for (std::uint32_t i = 0; i < count; ++i)
+	{
+		outIds[i] = entities[i].Id();
+	}
+	*outCount = total;
+
+	return true;
+}
+
+std::uint32_t ScriptBinder::Scene_ClearEntities_Impl()
+{
+	if (!s_ActiveScene)
+	{
+		return 0;
+	}
+
+	const auto entities = s_ActiveScene->GetAllEntities();
+	for (const auto entity : entities)
+	{
+		s_ActiveScene->DestroyEntity(entity);
+	}
+
+	return static_cast<std::uint32_t>(entities.size());
+}
+
+bool ScriptBinder::Entity_GetName_Impl(const std::uint64_t entityID, char* outName, const std::uint32_t capacity, std::uint32_t* outBytes)
+{
+	if (!EnsureRegistered(s_ActiveScene) || !outBytes)
+	{
+		return false;
+	}
+
+	const auto entity = ToEntity(entityID);
+	if (!s_ActiveScene->IsValid(entity) || !s_ActiveScene->HasComponent<NameComponent>(entity))
+	{
+		*outBytes = 0;
+		return false;
+	}
+
+	const std::string bytes = s_ActiveScene->GetComponent<NameComponent>(entity).name.ToString();
+	const auto needed = static_cast<std::uint32_t>(bytes.size());
+	*outBytes = needed;
+	if (!outName || capacity == 0)
+	{
+		return false;
+	}
+	if (capacity < needed)
+	{
+		return false;
+	}
+
+	std::memcpy(outName, bytes.data(), needed);
+
+	return true;
+}
+
+bool ScriptBinder::Entity_SetName_Impl(const std::uint64_t entityID, const char* nameUtf8)
+{
+	if (!EnsureRegistered(s_ActiveScene) || !nameUtf8)
+	{
+		return false;
+	}
+
+	const auto entity = ToEntity(entityID);
+	if (!s_ActiveScene->IsValid(entity))
+	{
+		return false;
+	}
+
+	if (nameUtf8[0] == '\0')
+	{
+		s_ActiveScene->RemoveComponent<NameComponent>(entity);
+		return true;
+	}
+
+	if (!s_ActiveScene->HasComponent<NameComponent>(entity))
+	{
+		s_ActiveScene->AddComponent<NameComponent>(entity, NameComponent{});
+	}
+	s_ActiveScene->GetComponent<NameComponent>(entity).name = String(std::string_view{ nameUtf8 });
+
+	return true;
+}
+
+std::uint64_t ScriptBinder::Scene_SpawnPrimitive_Impl(const std::int32_t kind, const std::uint32_t rgba)
+{
+	if (!EnsureRegistered(s_ActiveScene))
+	{
+		return ecs::Entity::INVALID_ID.Id();
+	}
+
+	const Color color{ rgba };
+
+	std::pair<std::vector<Vertex>, std::vector<std::uint32_t>> mesh;
+	switch (static_cast<scripting::PrimitiveKind>(kind))
+	{
+	case scripting::PrimitiveKind::Cube:
+		mesh = detail::PrimitiveBuilder::CreateCube(color);
+		break;
+	case scripting::PrimitiveKind::Sphere:
+		mesh = detail::PrimitiveBuilder::CreateSphere(color);
+		break;
+	default:
+		return ecs::Entity::INVALID_ID.Id();
+	}
+
+	Material material;
+	material.metallicFactor = 0.f;
+	material.albedoColor = color;
+	material.emissionColor = color;
+
+	const auto entity = s_ActiveScene->CreateEntity()
+							.Add<Dirty<TransformComponent>>()
+							.Add<TransformComponent>()
+							.Add<detail::OpaqueTag>()
+							.Add<StaticMeshComponent3D>(mesh.first, mesh.second)
+							.Add<MaterialComponent>(material)
+							.GetEntity();
+
+	return entity.Id();
 }
 
 } // namespace re::runtime

@@ -265,4 +265,9 @@ struct ScriptComponent
 	std::shared_ptr<scripting::IScriptInstance> Instance = nullptr;
 };
 
+struct NameComponent
+{
+	String name;
+};
+
 } // namespace re

@@ -59,6 +59,20 @@ public:
 		return m_registry.valid(static_cast<entt::entity>(entity.Id()));
 	}
 
+	std::vector<Entity> GetAllEntities() const
+	{
+		std::vector<Entity> result;
+		if (const auto* entities = m_registry.storage<entt::entity>())
+		{
+			result.reserve(entities->size());
+			for (const auto [e] : entities->each())
+			{
+				result.emplace_back(static_cast<std::uint32_t>(e));
+			}
+		}
+		return result;
+	}
+
 	template <typename TComponent>
 	void AddComponent(const Entity entity, TComponent const& component)
 	{

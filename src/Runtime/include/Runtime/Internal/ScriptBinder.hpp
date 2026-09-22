@@ -31,6 +31,13 @@ private:
 	static bool Entity_GetFieldData_Impl(std::uint64_t entityID, scripting::ReflectedComponentId component, std::int32_t fieldIndex, void* outData, std::uint32_t maxBytes, std::uint32_t* outBytes);
 	static bool Entity_SetFieldData_Impl(std::uint64_t entityID, scripting::ReflectedComponentId component, std::int32_t fieldIndex, const void* data, std::uint32_t bytes);
 
+	static std::uint32_t Scene_GetEntityCount_Impl();
+	static bool Scene_GetEntities_Impl(std::uint64_t* outIds, std::uint32_t capacity, std::uint32_t* outCount);
+	static std::uint32_t Scene_ClearEntities_Impl();
+	static bool Entity_GetName_Impl(std::uint64_t entityID, char* outName, std::uint32_t capacity, std::uint32_t* outBytes);
+	static bool Entity_SetName_Impl(std::uint64_t entityID, const char* nameUtf8);
+	static std::uint64_t Scene_SpawnPrimitive_Impl(std::int32_t kind, std::uint32_t rgba);
+
 	static bool Input_IsKeyDown_Impl(int key);
 	static bool Input_IsMouseButtonDown_Impl(int button);
 };
