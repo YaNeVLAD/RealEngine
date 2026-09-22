@@ -38,6 +38,8 @@ public:
 	void RenderFrame() override;
 	void EndFrame() override;
 
+	void SetVSyncEnabled(bool enabled, float refreshRateHz) override;
+
 private:
 	struct Impl;
 	std::unique_ptr<Impl> m_impl;

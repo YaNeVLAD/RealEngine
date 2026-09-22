@@ -176,6 +176,7 @@ void RenderSystem3D::SyncRenderEntities(ecs::Scene& scene)
 				matView.ambient = matComp.data.ambientColor;
 				matView.diffuse = matComp.data.albedoColor;
 				matView.specular = matComp.data.specularColor;
+				matView.emissive = matComp.data.emissionColor;
 				matView.shininess = matComp.data.shininess;
 				matView.albedoTexture = matComp.data.albedoMap.get();
 			}
@@ -235,12 +236,14 @@ void RenderSystem3D::SyncAnimatedMeshes(ecs::Scene& scene, const float dt)
 					matView.ambient = matComp.data.ambientColor;
 					matView.diffuse = matComp.data.albedoColor;
 					matView.specular = matComp.data.specularColor;
+					matView.emissive = matComp.data.emissionColor;
 					matView.shininess = matComp.data.shininess;
 					matView.albedoTexture = matComp.data.albedoMap.get();
 				}
 				else
 				{
 					matView.diffuse = material.albedoColor;
+					matView.emissive = material.emissionColor;
 					matView.albedoTexture = material.albedoMap.get();
 				}
 

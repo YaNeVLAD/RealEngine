@@ -399,4 +399,15 @@ render::IWindow& Application::Window() const
 	return *m_window;
 }
 
+void Application::SetVSyncEnabled(const bool enabled)
+{
+	m_window->SetVSyncEnabled(enabled);
+#if defined(RE_USE_FILAMENT_RENDER)
+	if (m_renderBackend)
+	{
+		m_renderBackend->SetVSyncEnabled(enabled, m_window->GetRefreshRateHz());
+	}
+#endif
+}
+
 } // namespace re

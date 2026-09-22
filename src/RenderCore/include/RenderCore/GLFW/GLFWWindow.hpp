@@ -23,6 +23,8 @@ public:
 
 	void SetVSyncEnabled(bool enabled) override;
 
+	[[nodiscard]] float GetRefreshRateHz() const override;
+
 	void* GetNativeHandle() override;
 
 	void* GetOSWindowHandle() const override;

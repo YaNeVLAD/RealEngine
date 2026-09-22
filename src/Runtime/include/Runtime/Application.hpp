@@ -56,6 +56,8 @@ protected:
 
 	[[nodiscard]] render::IWindow& Window() const;
 
+	void SetVSyncEnabled(bool enabled);
+
 private:
 	void GameLoop();
 

@@ -312,6 +312,22 @@ void GLFWWindow::SetVSyncEnabled(const bool enabled)
 	}
 }
 
+float GLFWWindow::GetRefreshRateHz() const
+{
+	if (GLFWmonitor* monitor = glfwGetPrimaryMonitor())
+	{
+		if (const GLFWvidmode* mode = glfwGetVideoMode(monitor))
+		{
+			if (mode->refreshRate > 0)
+			{
+				return static_cast<float>(mode->refreshRate);
+			}
+		}
+	}
+
+	return 60.0f;
+}
+
 void* GLFWWindow::GetNativeHandle()
 {
 	return m_window;

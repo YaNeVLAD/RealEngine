@@ -42,6 +42,8 @@ public:
 
 	void SetVSyncEnabled(bool enabled) override;
 
+	[[nodiscard]] float GetRefreshRateHz() const override;
+
 	void SetWorldPosCallback(WorldPosCallback&& callback) override;
 
 private:

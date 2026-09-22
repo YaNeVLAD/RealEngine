@@ -31,9 +31,11 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <limits>
 #include <memory>
 #include <ranges>
+#include <thread>
 #include <unordered_map>
 
 namespace re::render
@@ -184,6 +186,10 @@ struct FilamentRenderBackend::Impl
 	float ambientLux = 0.0f;
 	filament::math::float3 ambientColor{ 0.0f };
 
+	bool vsyncEnabled = true;
+	float vsyncRefreshRateHz = 60.0f;
+	std::chrono::steady_clock::time_point nextFrameTime{};
+
 	std::unordered_map<const Texture*, filament::Texture*> textureCache;
 };
 
@@ -233,7 +239,30 @@ void FilamentRenderBackend::Init(void* windowHandle, const std::uint32_t width, 
 	m_impl->whiteTexture = CreateSolidTexture(m_impl->engine, 255, 255, 255, 255);
 	m_impl->flatNormalTexture = CreateSolidTexture(m_impl->engine, 128, 128, 255, 255);
 
+	SetVSyncEnabled(m_impl->vsyncEnabled, m_impl->vsyncRefreshRateHz);
+
 	Resize(width, height);
+}
+
+void FilamentRenderBackend::SetVSyncEnabled(const bool enabled, const float refreshRateHz)
+{
+	m_impl->vsyncEnabled = enabled;
+	if (refreshRateHz > 0.0f)
+	{
+		m_impl->vsyncRefreshRateHz = refreshRateHz;
+	}
+
+	if (!m_impl->renderer)
+	{
+		return;
+	}
+
+	const float rate = m_impl->vsyncRefreshRateHz > 0.0f ? m_impl->vsyncRefreshRateHz : 60.0f;
+	m_impl->renderer->setDisplayInfo({ m_impl->vsyncEnabled ? rate : 0.0f });
+
+	filament::Renderer::FrameRateOptions options{};
+	options.interval = m_impl->vsyncEnabled ? 1 : 0;
+	m_impl->renderer->setFrameRateOptions(options);
 }
 
 void FilamentRenderBackend::Shutdown()
@@ -349,14 +378,15 @@ RenderEntityHandle FilamentRenderBackend::CreateStaticMesh(const MeshDataView& m
 	utils::Entity nativeEntity = utils::EntityManager::get().create();
 	std::uint64_t id = ++m_impl->nextId;
 
+	const auto vertexStride = static_cast<std::uint8_t>(mesh.vertexStride);
 	filament::VertexBuffer* vb = filament::VertexBuffer::Builder()
 									 .vertexCount(mesh.vertexCount)
 									 .bufferCount(1)
-									 .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT3, 0, mesh.vertexStride)
-									 .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, 24, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT3, 0, vertexStride)
+									 .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, 24, vertexStride)
 									 .normalized(filament::VertexAttribute::COLOR)
-									 .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, 28, mesh.vertexStride)
-									 .attribute(filament::VertexAttribute::TANGENTS, 0, filament::VertexBuffer::AttributeType::FLOAT4, 72, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, 28, vertexStride)
+									 .attribute(filament::VertexAttribute::TANGENTS, 0, filament::VertexBuffer::AttributeType::FLOAT4, 72, vertexStride)
 									 .build(*m_impl->engine);
 
 	const std::size_t vSize = mesh.vertexCount * mesh.vertexStride;
@@ -425,6 +455,9 @@ RenderEntityHandle FilamentRenderBackend::CreateStaticMesh(const MeshDataView& m
 			const auto [r, g, b, a] = material.diffuse.ToFloat();
 			materialInstance->setParameter("baseColorFactor", filament::math::float4{ r, g, b, a });
 
+			const auto [er, eg, eb, ea] = material.emissive.ToFloat();
+			materialInstance->setParameter("emissiveFactor", filament::math::float4{ er, eg, eb, ea });
+
 			const auto sampler = CreateRepeatsLinearSampler();
 			materialInstance->setParameter("baseColorMap", GetOrCreateTexture(m_impl->engine, m_impl->textureCache, material.albedoTexture, m_impl->whiteTexture), sampler);
 			materialInstance->setParameter("normalMap", m_impl->flatNormalTexture, sampler);
@@ -457,16 +490,15 @@ RenderEntityHandle FilamentRenderBackend::CreateAnimatedMesh(const MeshDataView&
 	const utils::Entity nativeEntity = utils::EntityManager::get().create();
 	const std::uint64_t id = ++m_impl->nextId;
 
-	// Буфер 1: интерлив каноничного Vertex (позиция/цвет/uv/тангенс),
-	// буфер 2: атрибуты скиннинга (см. PackBoneAttributes).
+	const auto vertexStride = static_cast<std::uint8_t>(mesh.vertexStride);
 	filament::VertexBuffer* vb = filament::VertexBuffer::Builder()
 									 .vertexCount(mesh.vertexCount)
 									 .bufferCount(2)
-									 .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT3, 0, mesh.vertexStride)
-									 .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, 24, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::POSITION, 0, filament::VertexBuffer::AttributeType::FLOAT3, 0, vertexStride)
+									 .attribute(filament::VertexAttribute::COLOR, 0, filament::VertexBuffer::AttributeType::UBYTE4, 24, vertexStride)
 									 .normalized(filament::VertexAttribute::COLOR)
-									 .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, 28, mesh.vertexStride)
-									 .attribute(filament::VertexAttribute::TANGENTS, 0, filament::VertexBuffer::AttributeType::FLOAT4, 72, mesh.vertexStride)
+									 .attribute(filament::VertexAttribute::UV0, 0, filament::VertexBuffer::AttributeType::FLOAT2, 28, vertexStride)
+									 .attribute(filament::VertexAttribute::TANGENTS, 0, filament::VertexBuffer::AttributeType::FLOAT4, 72, vertexStride)
 									 .attribute(filament::VertexAttribute::BONE_INDICES, 1, filament::VertexBuffer::AttributeType::UBYTE4, 0, 20)
 									 .attribute(filament::VertexAttribute::BONE_WEIGHTS, 1, filament::VertexBuffer::AttributeType::FLOAT4, 4, 20)
 									 .build(*m_impl->engine);
@@ -525,6 +557,9 @@ RenderEntityHandle FilamentRenderBackend::CreateAnimatedMesh(const MeshDataView&
 		{
 			const auto [r, g, b, a] = material.diffuse.ToFloat();
 			materialInstance->setParameter("baseColorFactor", filament::math::float4{ r, g, b, a });
+
+			const auto [er, eg, eb, ea] = material.emissive.ToFloat();
+			materialInstance->setParameter("emissiveFactor", filament::math::float4{ er, eg, eb, ea });
 
 			const auto sampler = CreateRepeatsLinearSampler();
 			materialInstance->setParameter("baseColorMap", GetOrCreateTexture(m_impl->engine, m_impl->textureCache, material.albedoTexture, m_impl->whiteTexture), sampler);
@@ -771,6 +806,35 @@ void FilamentRenderBackend::RenderFrame()
 	}
 }
 
-void FilamentRenderBackend::EndFrame() {}
+void FilamentRenderBackend::EndFrame()
+{
+	if (!m_impl->vsyncEnabled)
+	{
+		return;
+	}
+
+	using Clock = std::chrono::steady_clock;
+	const double rate = m_impl->vsyncRefreshRateHz > 0.0 ? static_cast<double>(m_impl->vsyncRefreshRateHz) : 60.0;
+	const auto period = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0 / rate));
+
+	const auto now = Clock::now();
+	if (m_impl->nextFrameTime == Clock::time_point{})
+	{
+		m_impl->nextFrameTime = now + period;
+		return;
+	}
+
+	if (now < m_impl->nextFrameTime)
+	{
+		std::this_thread::sleep_until(m_impl->nextFrameTime);
+	}
+
+	const auto afterSleep = Clock::now();
+	m_impl->nextFrameTime += period;
+	if (m_impl->nextFrameTime < afterSleep)
+	{
+		m_impl->nextFrameTime = afterSleep + period;
+	}
+}
 
 } // namespace re::render

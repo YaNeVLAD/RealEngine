@@ -21,6 +21,7 @@ public:
 	virtual void SetTitle(String const& title) = 0;
 	virtual void SetIcon(Image const& image) = 0;
 	virtual void SetVSyncEnabled(bool enabled) = 0;
+	[[nodiscard]] virtual float GetRefreshRateHz() const = 0;
 	virtual Vector2f ToWorldPos(Vector2i const& pixelPos) = 0;
 	virtual std::optional<Event> PollEvent() = 0;
 	virtual Vector2u Size() = 0;

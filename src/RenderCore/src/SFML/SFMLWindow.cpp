@@ -145,6 +145,11 @@ void SFMLWindow::SetVSyncEnabled(const bool enabled)
 	m_window.setVerticalSyncEnabled(enabled);
 }
 
+float SFMLWindow::GetRefreshRateHz() const
+{
+	return 60.0f;
+}
+
 void SFMLWindow::SetWorldPosCallback(WorldPosCallback&& callback)
 {
 	std::ignore = callback;

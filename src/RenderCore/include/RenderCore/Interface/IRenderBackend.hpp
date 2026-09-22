@@ -53,6 +53,7 @@ struct MaterialDataView
 	Color ambient = Color::White;
 	Color diffuse = Color::White;
 	Color specular = Color::White;
+	Color emissive = Color::Black;
 	float shininess = 32.0f;
 	std::uint32_t albedoTextureID = 0;
 	const Texture* albedoTexture = nullptr;
@@ -131,6 +132,8 @@ public:
 	virtual void BeginFrame() = 0;
 	virtual void RenderFrame() = 0;
 	virtual void EndFrame() = 0;
+
+	virtual void SetVSyncEnabled(bool enabled, float refreshRateHz) = 0;
 };
 
 } // namespace re::render
