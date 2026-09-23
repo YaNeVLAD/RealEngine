@@ -186,6 +186,9 @@ struct FilamentRenderBackend::Impl
 	float ambientLux = 0.0f;
 	filament::math::float3 ambientColor{ 0.0f };
 
+	std::uint32_t viewWidth = 0;
+	std::uint32_t viewHeight = 0;
+
 	bool vsyncEnabled = true;
 	float vsyncRefreshRateHz = 60.0f;
 	std::chrono::steady_clock::time_point nextFrameTime{};
@@ -357,6 +360,11 @@ void FilamentRenderBackend::Shutdown()
 
 void FilamentRenderBackend::Resize(std::uint32_t width, std::uint32_t height)
 {
+	if (width > 0 && height > 0)
+	{
+		m_impl->viewWidth = width;
+		m_impl->viewHeight = height;
+	}
 	if (m_impl->view && width > 0 && height > 0)
 	{
 		m_impl->view->setViewport({ 0, 0, width, height });
@@ -716,7 +724,11 @@ void FilamentRenderBackend::UpdateCamera(const CameraDataView& camera)
 
 	const glm::mat4 inverseView = glm::inverse(camera.viewMatrix);
 
-	m_impl->camera->setProjection(camera.fov, camera.aspect, camera.nearClip, camera.farClip, filament::Camera::Fov::VERTICAL);
+	const float aspect = (m_impl->viewWidth > 0 && m_impl->viewHeight > 0)
+		? static_cast<float>(m_impl->viewWidth) / static_cast<float>(m_impl->viewHeight)
+		: camera.aspect;
+
+	m_impl->camera->setProjection(camera.fov, aspect, camera.nearClip, camera.farClip, filament::Camera::Fov::VERTICAL);
 	m_impl->camera->setExposure(16.0f, 1.0f / 125.0f, std::max(camera.iso, 25.0f));
 	m_impl->camera->setModelMatrix(*reinterpret_cast<const filament::math::mat4f*>(&inverseView));
 }
