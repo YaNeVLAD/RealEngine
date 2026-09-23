@@ -5,23 +5,13 @@
 #include <Physics/Core.hpp>
 #include <Render2D/Renderer2D.hpp>
 #include <Render3D/Renderer3D.hpp>
+#include <RenderCore/Filament/FilamentRenderBackend.hpp>
+#include <RenderCore/GLFW/GLFWWindow.hpp>
 #include <RenderCore/Internal/Input.hpp>
 #include <Runtime/Components.hpp>
-#include <Runtime/Internal/LegacyRenderSystem3D.hpp>
-#include <Runtime/Internal/RenderSystem2D.hpp>
 #include <Runtime/Internal/RenderSystem3D.hpp>
 #include <Runtime/System/HierarchySystem.hpp>
 #include <Runtime/System/PhysicsSystem.hpp>
-
-#if defined(RE_USE_FILAMENT_RENDER)
-#include <RenderCore/Filament/FilamentRenderBackend.hpp>
-#include <RenderCore/GLFW/GLFWWindow.hpp>
-#endif
-
-#if defined(RE_USE_SFML_RENDER)
-#include <RenderCore/SFML/SFMLRenderAPI.hpp>
-#include <RenderCore/SFML/SFMLWindow.hpp>
-#endif
 
 #include <chrono>
 
@@ -38,7 +28,6 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	std::uint32_t width,
 	std::uint32_t height)
 {
-#if defined(RE_USE_FILAMENT_RENDER)
 	auto window = std::make_unique<re::render::GLFWWindow>(title, width, height);
 	if (!window->GetNativeHandle())
 	{
@@ -47,21 +36,6 @@ std::unique_ptr<re::render::IWindow> CreateWindow(
 	window->SetWorldPosCallback([](re::Vector2i const& pos) {
 		return re::render::Renderer2D::ScreenToWorld(pos);
 	});
-#elif defined(RE_USE_SFML_RENDER)
-	auto window = std::make_unique<re::render::SFMLWindow>(title, width, height);
-	if (auto* sfWindow = window->GetSFMLWindow())
-	{
-		re::render::Renderer2D::Init(std::make_unique<re::render::SFMLRenderAPI>(*sfWindow));
-		re::render::Renderer2D::SetViewport(window->Size());
-		window->SetWorldPosCallback([](re::Vector2i const& pos) {
-			return re::render::Renderer2D::ScreenToWorld(pos);
-		});
-	}
-	else
-	{
-		throw std::runtime_error("Created window and render api are not compatible");
-	}
-#endif
 
 	return window;
 }
@@ -77,9 +51,7 @@ Application::Application(std::string const& name)
 	m_window = CreateWindow(name, 1920u, 1080u);
 	detail::Input::Init(m_window->GetNativeHandle());
 
-#if defined(RE_USE_FILAMENT_RENDER)
 	m_renderBackend = std::make_unique<render::FilamentRenderBackend>();
-#endif
 
 	physics::Init();
 
@@ -151,12 +123,10 @@ void Application::GameLoop()
 
 	gui::Context::Init(m_window->GetNativeHandle());
 
-#if defined(RE_USE_FILAMENT_RENDER)
 	if (m_renderBackend)
 	{
 		m_renderBackend->Init(m_window->GetOSWindowHandle(), m_window->Size().x, m_window->Size().y);
 	}
-#endif
 
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
@@ -166,13 +136,11 @@ void Application::GameLoop()
 			ChangeToPendingLayout();
 		}
 
-#if defined(RE_USE_FILAMENT_RENDER)
 		if (m_renderBackend)
 		{
 			const auto bgColor = m_window->GetBackgroundColor();
 			m_renderBackend->SetClearColor(bgColor);
 		}
-#endif
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
@@ -183,14 +151,10 @@ void Application::GameLoop()
 			{
 				Vector2u newSize = { m_newWidth, m_newHeight };
 
-#if defined(RE_USE_FILAMENT_RENDER)
 				if (m_renderBackend)
 				{
 					m_renderBackend->Resize(newSize.x, newSize.y);
 				}
-#else
-				render::Renderer2D::SetViewport(newSize);
-#endif
 
 				Event resizeEvent(Event::Resized{ newSize });
 
@@ -220,12 +184,10 @@ void Application::GameLoop()
 
 		m_window->Clear();
 
-#if defined(RE_USE_FILAMENT_RENDER)
 		if (m_renderBackend)
 		{
 			m_renderBackend->BeginFrame();
 		}
-#endif
 
 		OnUpdate(dt);
 		if (m_currentLayout)
@@ -237,7 +199,6 @@ void Application::GameLoop()
 
 			m_currentLayout->OnUpdate(dt);
 
-#if defined(RE_USE_FILAMENT_RENDER)
 			if (m_renderBackend)
 			{
 				m_renderBackend->RenderUI(dt, [&]() {
@@ -245,27 +206,19 @@ void Application::GameLoop()
 				});
 				m_renderBackend->RenderFrame();
 			}
-#else
-			m_currentLayout->OnUIDraw();
-			gui::Context::EndFrame();
-#endif
 
 			m_window->Display();
 
 			scene.ConfirmChanges();
 		}
 
-#if defined(RE_USE_FILAMENT_RENDER)
 		if (m_renderBackend)
 		{
 			m_renderBackend->EndFrame();
 		}
-#endif
 	}
 
-#if defined(RE_USE_FILAMENT_RENDER)
 	m_renderBackend->Shutdown();
-#endif
 
 	gui::Context::Shutdown();
 
@@ -286,7 +239,6 @@ void Application::SetupScene(Layout& layout) const
 		.WithWrite<TransformComponent>()
 		.RunOnMainThread();
 
-#if defined(RE_USE_FILAMENT_RENDER)
 	scene
 		.AddSystem<render::RenderSystem3D>(*m_renderBackend)
 		.WithRead<
@@ -297,26 +249,6 @@ void Application::SetupScene(Layout& layout) const
 			SkyboxComponent,
 			detail::DirtyTag<TransformComponent>>()
 		.RunOnMainThread();
-#elif defined(RE_USE_SFML_RENDER)
-	scene
-		.AddSystem<detail::LegacyRenderSystem3D>(*m_window)
-		.WithRead<
-			TransformComponent,
-			DynamicMeshComponent3D,
-			StaticMeshComponent3D,
-			detail::DirtyTag<TransformComponent>>()
-		.RunOnMainThread();
-
-	scene
-		.AddSystem<detail::RenderSystem2D>(*m_window)
-		.WithRead<
-			TransformComponent,
-			RectangleComponent,
-			CircleComponent,
-			DynamicTextureComponent>()
-		.WithWrite<DynamicTextureComponent>()
-		.RunOnMainThread();
-#endif
 
 	scene
 		.CreateEntity()
@@ -399,15 +331,13 @@ render::IWindow& Application::Window() const
 	return *m_window;
 }
 
-void Application::SetVSyncEnabled(const bool enabled)
+void Application::SetVSyncEnabled(const bool enabled) const
 {
 	m_window->SetVSyncEnabled(enabled);
-#if defined(RE_USE_FILAMENT_RENDER)
 	if (m_renderBackend)
 	{
 		m_renderBackend->SetVSyncEnabled(enabled, m_window->GetRefreshRateHz());
 	}
-#endif
 }
 
 } // namespace re

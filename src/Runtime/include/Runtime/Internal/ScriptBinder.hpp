@@ -37,6 +37,7 @@ private:
 	static bool Entity_GetName_Impl(std::uint64_t entityID, char* outName, std::uint32_t capacity, std::uint32_t* outBytes);
 	static bool Entity_SetName_Impl(std::uint64_t entityID, const char* nameUtf8);
 	static std::uint64_t Scene_SpawnPrimitive_Impl(std::int32_t kind, std::uint32_t rgba);
+	static void Scene_ConfirmChanges_Impl();
 
 	static bool Input_IsKeyDown_Impl(int key);
 	static bool Input_IsMouseButtonDown_Impl(int button);

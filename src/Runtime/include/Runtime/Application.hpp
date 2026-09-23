@@ -56,7 +56,7 @@ protected:
 
 	[[nodiscard]] render::IWindow& Window() const;
 
-	void SetVSyncEnabled(bool enabled);
+	void SetVSyncEnabled(bool enabled) const;
 
 private:
 	void GameLoop();
@@ -91,9 +91,7 @@ private:
 
 	std::unique_ptr<render::IWindow> m_window;
 
-#if defined(RE_USE_FILAMENT_RENDER)
 	std::unique_ptr<render::IRenderBackend> m_renderBackend;
-#endif
 };
 
 } // namespace re

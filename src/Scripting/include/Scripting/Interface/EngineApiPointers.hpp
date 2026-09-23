@@ -9,7 +9,7 @@
 namespace re::scripting
 {
 
-inline constexpr std::uint32_t EngineApiVersion = 5;
+inline constexpr std::uint32_t EngineApiVersion = 7;
 
 struct ComponentFieldInfo
 {
@@ -45,6 +45,12 @@ struct EngineApiPointers
 	bool (*Scene_GetEntities)(std::uint64_t* outIds, std::uint32_t capacity, std::uint32_t* outCount);
 	std::uint32_t (*Scene_ClearEntities)();
 	std::uint64_t (*Scene_SpawnPrimitive)(std::int32_t kind, std::uint32_t rgba);
+	void (*Scene_ConfirmChanges)();
+
+	bool (*Viewport_Create)(std::uint64_t hwnd, std::uint32_t width, std::uint32_t height);
+	bool (*Viewport_Render)();
+	void (*Viewport_Resize)(std::uint32_t width, std::uint32_t height);
+	void (*Viewport_Destroy)();
 };
 
 enum class PrimitiveKind : std::int32_t

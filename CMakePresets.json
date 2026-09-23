@@ -53,54 +53,6 @@
       }
     },
     {
-      "name": "render-sfml",
-      "hidden": true,
-      "cacheVariables": {
-        "RE_RENDER_BACKEND": "SFML"
-      }
-    },
-    {
-      "name": "render-filament",
-      "hidden": true,
-      "cacheVariables": {
-        "RE_RENDER_BACKEND": "FILAMENT"
-      }
-    },
-    {
-      "name": "windows-debug-static-sfml",
-      "displayName": "Windows Debug (Static + SFML)",
-      "description": "Static libraries build (Single executable) with SFML backend",
-      "inherits": [
-        "base-debug-static",
-        "render-sfml"
-      ]
-    },
-    {
-      "name": "windows-debug-shared-sfml",
-      "displayName": "Windows Debug (DLL + SFML)",
-      "description": "Static libraries build (Single executable) with SFML backend",
-      "inherits": [
-        "base-debug-shared",
-        "render-sfml"
-      ]
-    },
-    {
-      "name": "windows-release-shared-sfml",
-      "displayName": "Windows Release (DLL + SFML)",
-      "inherits": "windows-debug-shared-sfml",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "windows-release-static-sfml",
-      "displayName": "Windows Release (Static + SFML)",
-      "inherits": "windows-debug-static-sfml",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
       "name": "windows-debug-static-filament",
       "displayName": "Windows Debug (Static + Filament)",
       "description": "Static libraries build with Filament backend",

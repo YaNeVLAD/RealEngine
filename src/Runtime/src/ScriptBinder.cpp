@@ -337,6 +337,7 @@ scripting::EngineApiPointers ScriptBinder::CreateApiPointers()
 		.Scene_GetEntities = &Scene_GetEntities_Impl,
 		.Scene_ClearEntities = &Scene_ClearEntities_Impl,
 		.Scene_SpawnPrimitive = &Scene_SpawnPrimitive_Impl,
+		.Scene_ConfirmChanges = &Scene_ConfirmChanges_Impl,
 	};
 }
 
@@ -683,6 +684,14 @@ std::uint64_t ScriptBinder::Scene_SpawnPrimitive_Impl(const std::int32_t kind, c
 							.GetEntity();
 
 	return entity.Id();
+}
+
+void ScriptBinder::Scene_ConfirmChanges_Impl()
+{
+	if (s_ActiveScene)
+	{
+		s_ActiveScene->ConfirmChanges();
+	}
 }
 
 } // namespace re::runtime
