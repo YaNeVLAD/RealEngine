@@ -7,7 +7,7 @@ static_assert(offsetof(ReEngine_ComponentFieldInfo, name) == offsetof(re::script
 static_assert(offsetof(ReEngine_ComponentFieldInfo, type) == offsetof(re::scripting::ComponentFieldInfo, type));
 static_assert(offsetof(ReEngine_ComponentFieldInfo, size) == offsetof(re::scripting::ComponentFieldInfo, size));
 
-uint64_t ReEngine_Entity_GetComponentMask(uint64_t entity)
+uint64_t RE_CALL ReEngine_Entity_GetComponentMask(uint64_t entity)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -18,7 +18,7 @@ uint64_t ReEngine_Entity_GetComponentMask(uint64_t entity)
 	return host.scene.api.Entity_GetComponentMask(entity);
 }
 
-int32_t ReEngine_Entity_AddComponent(const uint64_t entity, int32_t component)
+int32_t RE_CALL ReEngine_Entity_AddComponent(const uint64_t entity, int32_t component)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -31,7 +31,7 @@ int32_t ReEngine_Entity_AddComponent(const uint64_t entity, int32_t component)
 		: RE_ENGINE_FAILED;
 }
 
-int32_t ReEngine_Entity_RemoveComponent(const uint64_t entity, int32_t component)
+int32_t RE_CALL ReEngine_Entity_RemoveComponent(const uint64_t entity, int32_t component)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -44,7 +44,7 @@ int32_t ReEngine_Entity_RemoveComponent(const uint64_t entity, int32_t component
 		: RE_ENGINE_FAILED;
 }
 
-int32_t ReEngine_Entity_GetFieldData(
+int32_t RE_CALL ReEngine_Entity_GetFieldData(
 	const uint64_t entity,
 	int32_t component,
 	const int32_t fieldIndex,
@@ -68,7 +68,7 @@ int32_t ReEngine_Entity_GetFieldData(
 		: RE_ENGINE_FAILED;
 }
 
-int32_t ReEngine_Entity_SetFieldData(
+int32_t RE_CALL ReEngine_Entity_SetFieldData(
 	const uint64_t entity,
 	int32_t component,
 	const int32_t fieldIndex,
@@ -91,7 +91,7 @@ int32_t ReEngine_Entity_SetFieldData(
 		: RE_ENGINE_FAILED;
 }
 
-int32_t ReEngine_Entity_GetName(const uint64_t entity, char* outName, const uint32_t capacity, uint32_t* outNeeded)
+int32_t RE_CALL ReEngine_Entity_GetName(const uint64_t entity, char* outName, const uint32_t capacity, uint32_t* outNeeded)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -116,7 +116,7 @@ int32_t ReEngine_Entity_GetName(const uint64_t entity, char* outName, const uint
 	return RE_ENGINE_OK;
 }
 
-int32_t ReEngine_Entity_SetName(const uint64_t entity, const char* nameUtf8)
+int32_t RE_CALL ReEngine_Entity_SetName(const uint64_t entity, const char* nameUtf8)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -131,7 +131,7 @@ int32_t ReEngine_Entity_SetName(const uint64_t entity, const char* nameUtf8)
 	return host.scene.api.Entity_SetName(entity, nameUtf8) ? RE_ENGINE_OK : RE_ENGINE_FAILED;
 }
 
-int32_t ReEngine_Component_GetFieldCount(int32_t component)
+int32_t RE_CALL ReEngine_Component_GetFieldCount(int32_t component)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -142,7 +142,7 @@ int32_t ReEngine_Component_GetFieldCount(int32_t component)
 	return host.scene.api.Component_GetFieldCount(static_cast<re::scripting::ReflectedComponentId>(component));
 }
 
-int32_t ReEngine_Component_GetFieldInfo(int32_t component, const int32_t fieldIndex, ReEngine_ComponentFieldInfo* outInfo)
+int32_t RE_CALL ReEngine_Component_GetFieldInfo(int32_t component, const int32_t fieldIndex, ReEngine_ComponentFieldInfo* outInfo)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)

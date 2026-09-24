@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -26,7 +27,7 @@ struct LifecycleContext
 struct SceneContext
 {
 	re::ecs::Scene scene;
-	re::PhysicsSystem physics{ scene };
+	std::optional<re::PhysicsSystem> physics;
 	re::HierarchySystem hierarchy;
 	re::AssetManager assets;
 	re::scripting::EngineApiPointers api{};

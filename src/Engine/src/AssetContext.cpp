@@ -6,10 +6,13 @@
 #include <RenderCore/Model.hpp>
 #include <RenderCore/Texture.hpp>
 #include <Runtime/Components.hpp>
+#include <Runtime/System/HierarchySystem.hpp>
 
+#include <filesystem>
+#include <string>
 #include <string_view>
 
-uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
+uint32_t RE_CALL ReEngine_Scene_LoadModel(const char* pathUtf8)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -19,18 +22,9 @@ uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
 
 	auto& scene = host.scene.scene;
 	auto& modelEntities = host.assets.modelEntities;
-	for (const auto entity : modelEntities)
-	{
-		if (scene.IsValid(entity))
-		{
-			scene.DestroyEntity(entity);
-		}
-	}
-	modelEntities.clear();
 
 	if (!pathUtf8 || pathUtf8[0] == '\0')
 	{
-		scene.ConfirmChanges();
 		return 0;
 	}
 
@@ -52,6 +46,20 @@ uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
 		}
 	}
 
+	if (meshParts.empty())
+	{
+		return 0;
+	}
+
+	const std::string baseName = std::filesystem::path(path.ToString()).stem().string();
+	const auto parent = scene.CreateEntity()
+							.Add<re::Dirty<re::TransformComponent>>()
+							.Add<re::TransformComponent>()
+							.Add<re::NameComponent>(re::String(baseName));
+	const re::ecs::Entity parentEntity = parent.GetEntity();
+	modelEntities.push_back(parentEntity);
+
+	std::uint32_t partIndex = 0;
 	for (auto&& [vertices, indices, material] : meshParts)
 	{
 		material.metallicFactor = 0.f;
@@ -59,6 +67,7 @@ uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
 						  .Add<re::Dirty<re::TransformComponent>>()
 						  .Add<re::TransformComponent>()
 						  .Add<re::detail::OpaqueTag>()
+						  .Add<re::HierarchyComponent>(parentEntity)
 						  .Add<re::MaterialComponent>(material);
 
 		if (path.Find(".glb") != re::String::NPos || path.Find(".gltf") != re::String::NPos)
@@ -74,15 +83,14 @@ uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
 			entity.Add<re::StaticMeshComponent3D>(vertices, indices);
 		}
 
-		entity.Add<re::NameComponent>("Model");
-		modelEntities.push_back(entity.GetEntity());
+		entity.Add<re::NameComponent>(re::String(baseName + "_Part_" + std::to_string(partIndex)));
+		++partIndex;
 	}
 
-	scene.ConfirmChanges();
-	return static_cast<std::uint32_t>(modelEntities.size());
+	return partIndex;
 }
 
-int32_t ReEngine_Scene_SetSkybox(const char* pathUtf8)
+int32_t RE_CALL ReEngine_Scene_SetSkybox(const char* pathUtf8)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -108,6 +116,9 @@ int32_t ReEngine_Scene_SetSkybox(const char* pathUtf8)
 		return RE_ENGINE_OK;
 	}
 
-	scene.CreateEntity().Add<re::SkyboxComponent>(texture);
+	scene.CreateEntity()
+		.Add<re::SkyboxComponent>(texture)
+		.Add<re::NameComponent>("Skybox");
+
 	return RE_ENGINE_OK;
 }

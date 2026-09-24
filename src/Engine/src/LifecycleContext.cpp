@@ -4,12 +4,12 @@
 
 #include <filesystem>
 
-int32_t ReEngine_GetVersion(void)
+int32_t RE_CALL ReEngine_GetVersion(void)
 {
 	return static_cast<int32_t>(RE_ENGINE_API_VERSION);
 }
 
-int32_t ReEngine_Initialize(const ReEngine_InitArgs* args)
+int32_t RE_CALL ReEngine_Initialize(const ReEngine_InitArgs* args)
 {
 	auto& [initialized, logCallback, logUserdata] = Host().lifecycle;
 	if (initialized)
@@ -46,6 +46,7 @@ int32_t ReEngine_Initialize(const ReEngine_InitArgs* args)
 	}
 
 	auto& scene = Host().scene;
+	scene.physics.emplace(scene.scene);
 	re::runtime::ScriptBinder::SetActiveScene(&scene.scene);
 	scene.api = re::runtime::ScriptBinder::CreateApiPointers();
 
@@ -55,7 +56,7 @@ int32_t ReEngine_Initialize(const ReEngine_InitArgs* args)
 	return RE_ENGINE_OK;
 }
 
-void ReEngine_Shutdown(void)
+void RE_CALL ReEngine_Shutdown()
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -64,12 +65,13 @@ void ReEngine_Shutdown(void)
 	}
 
 	host.viewports.viewports.clear();
+	host.scene.physics.reset();
 	re::physics::Shutdown();
 	re::runtime::ScriptBinder::SetActiveScene(nullptr);
 	host.lifecycle.initialized = false;
 }
 
-int32_t ReEngine_Update(const float deltaSeconds)
+int32_t RE_CALL ReEngine_Update(const float deltaSeconds)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -80,13 +82,13 @@ int32_t ReEngine_Update(const float deltaSeconds)
 	const float dt = std::clamp(deltaSeconds, 0.f, 0.1f);
 	host.scene.lastDt = dt;
 
-	host.scene.physics.Update(host.scene.scene, dt);
+	host.scene.physics->Update(host.scene.scene, dt);
 	host.scene.hierarchy.Update(host.scene.scene, dt);
 	host.scene.scene.ConfirmChanges();
 	return RE_ENGINE_OK;
 }
 
-void ReEngine_SetLogCallback(const ReEngine_LogCallback callback, void* userdata)
+void RE_CALL ReEngine_SetLogCallback(const ReEngine_LogCallback callback, void* userdata)
 {
 	auto& lifecycle = Host().lifecycle;
 	lifecycle.logCallback = callback;

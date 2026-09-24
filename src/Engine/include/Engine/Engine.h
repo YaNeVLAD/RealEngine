@@ -105,6 +105,11 @@ RE_ENGINE_API int32_t RE_CALL ReEngine_Component_GetFieldInfo(int32_t component,
 RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_LoadModel(const char* pathUtf8);
 RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_SetSkybox(const char* pathUtf8);
 
+// Parent of the entity via HierarchyComponent, or 0xFFFFFFFF when none/invalid.
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Entity_GetParent(uint64_t entity);
+// Direct children ids (up to capacity), total always reported in outTotal.
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_GetChildren(uint64_t entity, uint64_t* outIds, uint32_t capacity, uint32_t* outTotal);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

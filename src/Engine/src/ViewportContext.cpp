@@ -2,7 +2,7 @@
 
 #include <exception>
 
-uint64_t ReEngine_Viewport_Create(const uint64_t hwnd, const uint32_t width, const uint32_t height)
+uint64_t RE_CALL ReEngine_Viewport_Create(const uint64_t hwnd, const uint32_t width, const uint32_t height)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -36,7 +36,7 @@ uint64_t ReEngine_Viewport_Create(const uint64_t hwnd, const uint32_t width, con
 	return id;
 }
 
-int32_t ReEngine_Viewport_Render(const uint64_t viewport)
+int32_t RE_CALL ReEngine_Viewport_Render(const uint64_t viewport)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -58,7 +58,7 @@ int32_t ReEngine_Viewport_Render(const uint64_t viewport)
 	return RE_ENGINE_OK;
 }
 
-int32_t ReEngine_Viewport_Resize(const uint64_t viewport, const uint32_t width, const uint32_t height)
+int32_t RE_CALL ReEngine_Viewport_Resize(const uint64_t viewport, const uint32_t width, const uint32_t height)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -82,7 +82,7 @@ int32_t ReEngine_Viewport_Resize(const uint64_t viewport, const uint32_t width, 
 	return RE_ENGINE_OK;
 }
 
-void ReEngine_Viewport_Destroy(const uint64_t viewport)
+void RE_CALL ReEngine_Viewport_Destroy(const uint64_t viewport)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -96,7 +96,7 @@ void ReEngine_Viewport_Destroy(const uint64_t viewport)
 	}
 }
 
-int32_t ReEngine_Viewport_SetClearColor(const uint64_t viewport, const uint32_t rgba)
+int32_t RE_CALL ReEngine_Viewport_SetClearColor(const uint64_t viewport, const uint32_t rgba)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)

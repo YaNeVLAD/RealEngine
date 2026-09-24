@@ -33,11 +33,13 @@ void SeedCameraAndSun(re::ecs::Scene& scene)
 				.position = { 0.f, 1.5f, 3.f },
 				.rotation = { -26.6f, 0.f, 0.f },
 			})
-			.Add<re::CameraComponent>();
+			.Add<re::CameraComponent>()
+			.Add<re::NameComponent>("Main Camera");
 	}
 
 	scene.CreateEntity()
 		.Add<re::Dirty<re::TransformComponent>>()
 		.Add<re::TransformComponent>({ .position = { 0.f, 2.f, 1.f } })
-		.Add<re::LightComponent>(re::LightComponent::CreateDirectional(re::Color::White));
+		.Add<re::LightComponent>(re::LightComponent::CreateDirectional(re::Color::White))
+		.Add<re::NameComponent>("Light");
 }

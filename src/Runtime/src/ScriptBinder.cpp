@@ -606,10 +606,12 @@ bool ScriptBinder::Entity_GetName_Impl(const std::uint64_t entityID, char* outNa
 	const std::string bytes = s_ActiveScene->GetComponent<NameComponent>(entity).name.ToString();
 	const auto needed = static_cast<std::uint32_t>(bytes.size());
 	*outBytes = needed;
+
 	if (!outName || capacity == 0)
 	{
-		return false;
+		return true;
 	}
+
 	if (capacity < needed)
 	{
 		return false;
@@ -643,7 +645,8 @@ bool ScriptBinder::Entity_SetName_Impl(const std::uint64_t entityID, const char*
 	{
 		s_ActiveScene->AddComponent<NameComponent>(entity, NameComponent{});
 	}
-	s_ActiveScene->GetComponent<NameComponent>(entity).name = String(std::string_view{ nameUtf8 });
+	RE_LOG_INFO("entityID: {}, nameUtf8: {}", entityID, nameUtf8);
+	s_ActiveScene->GetComponent<NameComponent>(entity).name = String(nameUtf8);
 
 	return true;
 }
