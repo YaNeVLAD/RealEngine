@@ -5,29 +5,40 @@
 #include <compare>
 #include <cstddef>
 
+namespace re::detail
+{
+
+inline constexpr std::size_t ENTITY_INDEX_BITS = 32;
+inline constexpr std::size_t ENTITY_GENERATION_BITS = 32;
+
+inline constexpr std::size_t ENTITY_INDEX_MASK = (1ULL << ENTITY_INDEX_BITS) - 1;
+inline constexpr std::size_t ENTITY_GENERATION_MASK = (1ULL << ENTITY_GENERATION_BITS) - 1;
+
+} // namespace re::detail
+
 namespace re::ecs
 {
 
-class RE_ECS_API Entity final
+class Entity final
 {
 public:
-	explicit Entity(std::size_t id);
+	constexpr explicit Entity(std::size_t id);
 
-	Entity(std::size_t index, std::size_t generation);
+	constexpr Entity(std::size_t index, std::size_t generation);
 
-	operator std::size_t() const;
+	constexpr operator std::size_t() const;
 
 	static const Entity INVALID_ID;
 
-	[[nodiscard]] std::size_t Id() const;
+	[[nodiscard]] constexpr std::size_t Id() const;
 
-	[[nodiscard]] std::size_t Index() const;
+	[[nodiscard]] constexpr std::size_t Index() const;
 
-	[[nodiscard]] std::size_t Generation() const;
+	[[nodiscard]] constexpr std::size_t Generation() const;
 
-	[[nodiscard]] bool Valid() const;
+	[[nodiscard]] constexpr bool Valid() const;
 
-	auto operator<=>(Entity const&) const = default;
+	constexpr auto operator<=>(Entity const&) const = default;
 
 private:
 	std::size_t m_id{};
@@ -43,3 +54,5 @@ struct std::hash<re::ecs::Entity>
 		return entity.Id();
 	}
 };
+
+#include <ECS/Entity/Entity.inl>
