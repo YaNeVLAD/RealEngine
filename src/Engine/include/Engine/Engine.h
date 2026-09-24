@@ -12,8 +12,6 @@ extern "C" {
 
 typedef void(RE_CALL* ReEngine_LogCallback)(int32_t level, const char* messageUtf8, void* userdata);
 
-#pragma pack(push, 8)
-
 typedef enum ReEngine_Status
 {
 	RE_ENGINE_OK = 0,
@@ -48,6 +46,8 @@ typedef enum ReEngine_FieldType
 	RE_ENGINE_FIELD_COLOR = 5
 } ReEngine_FieldType;
 
+#pragma pack(push, 8)
+
 typedef struct ReEngine_InitArgs
 {
 	uint32_t version;
@@ -73,33 +73,37 @@ RE_ENGINE_API void RE_CALL ReEngine_Shutdown(void);
 RE_ENGINE_API int32_t RE_CALL ReEngine_Update(float deltaSeconds);
 RE_ENGINE_API void RE_CALL ReEngine_SetLogCallback(ReEngine_LogCallback callback, void* userdata);
 
-RE_ENGINE_API uint64_t RE_CALL ReEngine_ViewportCreate(uint64_t hwnd, uint32_t width, uint32_t height);
-RE_ENGINE_API int32_t RE_CALL ReEngine_ViewportRender(uint64_t viewport);
-RE_ENGINE_API int32_t RE_CALL ReEngine_ViewportResize(uint64_t viewport, uint32_t width, uint32_t height);
-RE_ENGINE_API void RE_CALL ReEngine_ViewportDestroy(uint64_t viewport);
-RE_ENGINE_API int32_t RE_CALL ReEngine_ViewportSetClearColor(uint64_t viewport, uint32_t rgba8888);
+RE_ENGINE_API int RE_CALL ReEngine_Input_IsKeyPressed(int keyCode);
+RE_ENGINE_API int RE_CALL ReEngine_Input_IsMouseButtonDown(int button);
 
-RE_ENGINE_API uint64_t RE_CALL ReEngine_SceneCreateEntity(void);
-RE_ENGINE_API int32_t RE_CALL ReEngine_SceneIsEntityValid(uint64_t entity);
-RE_ENGINE_API void RE_CALL ReEngine_SceneDestroyEntity(uint64_t entity);
-RE_ENGINE_API uint32_t RE_CALL ReEngine_SceneGetEntityCount(void);
-RE_ENGINE_API int32_t RE_CALL ReEngine_SceneGetEntities(uint64_t* outIds, uint32_t capacity, uint32_t* outTotal);
-RE_ENGINE_API uint32_t RE_CALL ReEngine_SceneClearEntities(void);
-RE_ENGINE_API uint64_t RE_CALL ReEngine_SceneSpawnPrimitive(int32_t kind, uint32_t rgba8888);
-RE_ENGINE_API void RE_CALL ReEngine_SceneConfirmChanges(void);
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Viewport_Create(uint64_t hwnd, uint32_t width, uint32_t height);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Viewport_Render(uint64_t viewport);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Viewport_Resize(uint64_t viewport, uint32_t width, uint32_t height);
+RE_ENGINE_API void RE_CALL ReEngine_Viewport_Destroy(uint64_t viewport);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Viewport_SetClearColor(uint64_t viewport, uint32_t rgba);
 
-RE_ENGINE_API uint64_t RE_CALL ReEngine_EntityGetComponentMask(uint64_t entity);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntityAddComponent(uint64_t entity, int32_t component);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntityRemoveComponent(uint64_t entity, int32_t component);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntityGetFieldData(uint64_t entity, int32_t component, int32_t fieldIndex, void* outData, uint32_t maxBytes, uint32_t* outBytes);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntitySetFieldData(uint64_t entity, int32_t component, int32_t fieldIndex, const void* data, uint32_t bytes);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntityGetName(uint64_t entity, char* outName, uint32_t capacity, uint32_t* outNeeded);
-RE_ENGINE_API int32_t RE_CALL ReEngine_EntitySetName(uint64_t entity, const char* nameUtf8);
-RE_ENGINE_API int32_t RE_CALL ReEngine_ComponentGetFieldCount(int32_t component);
-RE_ENGINE_API int32_t RE_CALL ReEngine_ComponentGetFieldInfo(int32_t component, int32_t fieldIndex, ReEngine_ComponentFieldInfo* outInfo);
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Scene_CreateEntity(void);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_IsEntityValid(uint64_t entity);
+RE_ENGINE_API void RE_CALL ReEngine_Scene_DestroyEntity(uint64_t entity);
+RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_GetEntityCount(void);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_GetEntities(uint64_t* outIds, uint32_t capacity, uint32_t* outTotal);
+RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_ClearEntities(void);
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(int32_t kind, uint32_t rgba8888);
+RE_ENGINE_API void RE_CALL ReEngine_Scene_ConfirmChanges(void);
 
-RE_ENGINE_API uint32_t RE_CALL ReEngine_SceneLoadModel(const char* pathUtf8);
-RE_ENGINE_API int32_t RE_CALL ReEngine_SceneSetSkybox(const char* pathUtf8);
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Entity_GetComponentMask(uint64_t entity);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_AddComponent(uint64_t entity, int32_t component);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_RemoveComponent(uint64_t entity, int32_t component);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_GetFieldData(uint64_t entity, int32_t component, int32_t fieldIndex, void* outData, uint32_t maxBytes, uint32_t* outBytes);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_SetFieldData(uint64_t entity, int32_t component, int32_t fieldIndex, const void* data, uint32_t bytes);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_GetName(uint64_t entity, char* outName, uint32_t capacity, uint32_t* outNeeded);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Entity_SetName(uint64_t entity, const char* nameUtf8);
+
+RE_ENGINE_API int32_t RE_CALL ReEngine_Component_GetFieldCount(int32_t component);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Component_GetFieldInfo(int32_t component, int32_t fieldIndex, ReEngine_ComponentFieldInfo* outInfo);
+
+RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_LoadModel(const char* pathUtf8);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_SetSkybox(const char* pathUtf8);
 
 #ifdef __cplusplus
 } // extern "C"

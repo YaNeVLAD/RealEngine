@@ -9,7 +9,7 @@
 
 #include <string_view>
 
-uint32_t ReEngine_SceneLoadModel(const char* pathUtf8)
+uint32_t ReEngine_Scene_LoadModel(const char* pathUtf8)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -82,7 +82,7 @@ uint32_t ReEngine_SceneLoadModel(const char* pathUtf8)
 	return static_cast<std::uint32_t>(modelEntities.size());
 }
 
-int32_t ReEngine_SceneSetSkybox(const char* pathUtf8)
+int32_t ReEngine_Scene_SetSkybox(const char* pathUtf8)
 {
 	auto& host = Host();
 	if (!host.lifecycle.initialized)
