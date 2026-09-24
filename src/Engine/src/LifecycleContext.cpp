@@ -82,10 +82,36 @@ int32_t RE_CALL ReEngine_Update(const float deltaSeconds)
 	const float dt = std::clamp(deltaSeconds, 0.f, 0.1f);
 	host.scene.lastDt = dt;
 
-	host.scene.physics->Update(host.scene.scene, dt);
+	if (host.scene.simulating)
+	{
+		host.scene.physics->Update(host.scene.scene, dt);
+	}
 	host.scene.hierarchy.Update(host.scene.scene, dt);
 	host.scene.scene.ConfirmChanges();
 	return RE_ENGINE_OK;
+}
+
+int32_t RE_CALL ReEngine_Scene_SetSimulating(const int32_t simulating)
+{
+	auto& host = Host();
+	if (!host.lifecycle.initialized)
+	{
+		return RE_ENGINE_NOT_INITIALIZED;
+	}
+
+	host.scene.simulating = simulating != 0;
+	return RE_ENGINE_OK;
+}
+
+int32_t RE_CALL ReEngine_Scene_IsSimulating()
+{
+	const auto& host = Host();
+	if (!host.lifecycle.initialized)
+	{
+		return 0;
+	}
+
+	return host.scene.simulating ? 1 : 0;
 }
 
 void RE_CALL ReEngine_SetLogCallback(const ReEngine_LogCallback callback, void* userdata)

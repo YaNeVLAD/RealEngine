@@ -32,6 +32,7 @@ struct SceneContext
 	re::AssetManager assets;
 	re::scripting::EngineApiPointers api{};
 	float lastDt = 1.f / 60.f;
+	bool simulating = false;
 };
 
 struct ComponentContext

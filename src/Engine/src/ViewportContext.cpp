@@ -52,7 +52,7 @@ int32_t RE_CALL ReEngine_Viewport_Render(const uint64_t viewport)
 	}
 
 	it->second.backend->BeginFrame();
-	it->second.system->Update(host.scene.scene, host.scene.lastDt);
+	it->second.system->Update(host.scene.scene, host.scene.simulating ? host.scene.lastDt : 0.f);
 	it->second.backend->RenderFrame();
 	it->second.backend->EndFrame();
 	return RE_ENGINE_OK;

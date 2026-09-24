@@ -141,7 +141,7 @@ uint32_t RE_CALL ReEngine_Scene_ClearEntities()
 	return host.scene.api.Scene_ClearEntities();
 }
 
-uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(const int32_t kind, const uint32_t rgba8888)
+uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(const int32_t kind, const uint32_t rgba)
 {
 	const auto& host = Host();
 	if (!host.lifecycle.initialized)
@@ -149,7 +149,7 @@ uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(const int32_t kind, const uint32_
 		return kInvalidEntity;
 	}
 
-	return host.scene.api.Scene_SpawnPrimitive(kind, rgba8888);
+	return host.scene.api.Scene_SpawnPrimitive(kind, rgba);
 }
 
 void RE_CALL ReEngine_Scene_ConfirmChanges()

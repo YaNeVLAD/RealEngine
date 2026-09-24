@@ -111,7 +111,15 @@ def validate(schema: dict) -> tuple[list[dict], list[dict]]:
             if kind not in KINDS:
                 fail(f"unknown kind '{kind}' for field '{name}.{fname}'")
             member = field.get("member")
-            if "codec" in KINDS[kind]:
+            codec = field.get("codec")
+            if codec is not None:
+                if not isinstance(codec, dict) or not isinstance(codec.get("get"), str) or not IDENT.match(codec["get"]):
+                    fail(f"codec field '{name}.{fname}' needs {{'get': FuncName, 'set': FuncName}}")
+                if not isinstance(codec.get("set"), str) or not IDENT.match(codec["set"]):
+                    fail(f"codec field '{name}.{fname}' needs {{'get': FuncName, 'set': FuncName}}")
+                if member is not None:
+                    fail(f"codec field '{name}.{fname}' must not have 'member'")
+            elif "codec" in KINDS[kind]:
                 if member is not None:
                     fail(f"codec field '{name}.{fname}' must not have 'member'")
             elif not isinstance(member, str) or not IDENT.match(member):
@@ -153,6 +161,9 @@ def gen_cpp_ids(field_types: list[dict], components: list[dict]) -> str:
 def field_row(comp_cpp: str, field: dict) -> str:
     kind = KINDS[field["kind"]]
     ft = f"scripting::FieldType::{kind['ft']}"
+    if field.get("codec") is not None:
+        codec = field["codec"]
+        return f'\t\t{{ "{field["name"]}", {ft}, {kind["size"]}, &{codec["get"]}, &{codec["set"]} }},'
     if "codec" in kind:
         return f'\t\t{{ "{field["name"]}", {ft}, {kind["size"]}, &{kind["get"]}, &{kind["set"]} }},'
     member = field["member"]

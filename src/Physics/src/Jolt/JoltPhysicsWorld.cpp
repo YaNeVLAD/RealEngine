@@ -139,6 +139,28 @@ re::Vector3f FromJPH(const JPH::Vec3& v)
 JPH::RefConst<JPH::Shape> CreateBaseShape(const re::physics::RigidBody& desc)
 {
 	using namespace re::physics;
+	using namespace re::literals;
+
+	const bool hasMeshData = desc.collider.vertices != nullptr && desc.collider.vertexCount > 0;
+	if ((desc.collider.type == ColliderType::ConvexMesh
+			|| desc.collider.type == ColliderType::TriangleMesh)
+		&& !hasMeshData)
+	{
+		RE_LOG_WARN("Physics"_logcat, "No mesh data for {} collider, falling back to Box",
+			desc.collider.type == ColliderType::ConvexMesh ? "ConvexMesh" : "TriangleMesh");
+		return new JPH::BoxShape(ToJPH(desc.collider.halfExtends));
+	}
+	if (desc.collider.type == ColliderType::TriangleMesh
+		&& (desc.collider.indices == nullptr || desc.collider.indexCount == 0))
+	{
+		RE_LOG_WARN("Physics"_logcat, "No index data for TriangleMesh collider, falling back to Box");
+		return new JPH::BoxShape(ToJPH(desc.collider.halfExtends));
+	}
+	if (desc.collider.type == ColliderType::TriangleMesh && desc.type != BodyType::Static)
+	{
+		RE_LOG_WARN("Physics"_logcat, "TriangleMesh requires a Static body, falling back to Box");
+		return new JPH::BoxShape(ToJPH(desc.collider.halfExtends));
+	}
 
 	switch (desc.collider.type)
 	{

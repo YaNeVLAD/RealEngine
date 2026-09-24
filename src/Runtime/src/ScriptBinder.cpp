@@ -5,11 +5,11 @@
 #include <RenderCore/Mouse.hpp>
 #include <Runtime/Components.hpp>
 #include <Runtime/Internal/PrimitiveBuilder.hpp>
+#include <Runtime/System/HierarchySystem.hpp>
 #include <Scripting/CSharp/DotNetInterop.hpp>
 
 #include <algorithm>
 #include <cstring>
-#include <string_view>
 
 // ReSharper disable CppDeclaratorNeverUsed
 // ReSharper disable CppDFAUnreachableFunctionCall
@@ -209,6 +209,447 @@ bool SetLightTypeField(ecs::Scene* scene, const ecs::Entity entity, const void* 
 		return false;
 	}
 	scene->GetComponent<LightComponent>(entity).type = static_cast<LightType>(value);
+
+	return true;
+}
+
+bool HasMeshOnEntity(ecs::Scene* scene, const ecs::Entity entity)
+{
+	if (scene->HasComponent<StaticMeshComponent3D>(entity))
+	{
+		const auto& meshComp = scene->GetComponent<StaticMeshComponent3D>(entity);
+		if (meshComp.mesh && !meshComp.mesh->GetVertices().empty() && !meshComp.mesh->GetIndices().empty())
+		{
+			return true;
+		}
+	}
+	if (scene->HasComponent<AnimatedMeshComponent3D>(entity))
+	{
+		const auto& animComp = scene->GetComponent<AnimatedMeshComponent3D>(entity);
+		if (animComp.model)
+		{
+			for (const auto& part : animComp.model->Parts())
+			{
+				if (!part.vertices.empty() && !part.indices.empty())
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+bool HasUsableMesh(ecs::Scene* scene, const ecs::Entity entity)
+{
+	if (HasMeshOnEntity(scene, entity))
+	{
+		return true;
+	}
+
+	for (auto&& [child, hierarchy] : *scene->CreateView<HierarchyComponent>())
+	{
+		if (hierarchy.parent.Id() != entity.Id())
+		{
+			continue;
+		}
+		if (HasMeshOnEntity(scene, child))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool GetRigidBodyType(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = static_cast<std::int32_t>(scene->GetComponent<RigidBodyComponent>(entity).type);
+
+	return true;
+}
+
+bool SetRigidBodyType(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	const auto value = *static_cast<const std::int32_t*>(data);
+	if (value < 0 || value > 2)
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	if (value != static_cast<std::int32_t>(physics::BodyType::Static)
+		&& body.collider.type == physics::ColliderType::TriangleMesh)
+	{
+		using namespace re::literals;
+		RE_LOG_ERROR("Physics"_logcat, "TriangleMesh collider requires a Static body, entity {}", entity.Id());
+		return false;
+	}
+	body.type = static_cast<physics::BodyType>(value);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyMass(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<float*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).mass;
+
+	return true;
+}
+
+bool SetRigidBodyMass(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.mass = *static_cast<const float*>(data);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyFriction(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<float*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).friction;
+
+	return true;
+}
+
+bool SetRigidBodyFriction(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.friction = *static_cast<const float*>(data);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyRestitution(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<float*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).restitution;
+
+	return true;
+}
+
+bool SetRigidBodyRestitution(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.restitution = *static_cast<const float*>(data);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyGravityFactor(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<float*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).gravityFactor;
+
+	return true;
+}
+
+bool SetRigidBodyGravityFactor(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.gravityFactor = *static_cast<const float*>(data);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLinearDamping(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<float*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).linearDamping;
+
+	return true;
+}
+
+bool SetRigidBodyLinearDamping(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.linearDamping = *static_cast<const float*>(data);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLinearVelocity(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	const auto& velocity = scene->GetComponent<RigidBodyComponent>(entity).linearVelocity;
+	std::memcpy(outData, velocity.Data(), sizeof(velocity));
+
+	return true;
+}
+
+bool SetRigidBodyLinearVelocity(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	std::memcpy(body.linearVelocity.Data(), data, sizeof(body.linearVelocity));
+	body.isVelocityDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyColliderType(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = static_cast<std::int32_t>(scene->GetComponent<RigidBodyComponent>(entity).collider.type);
+
+	return true;
+}
+
+bool SetRigidBodyColliderType(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	const auto value = *static_cast<const std::int32_t*>(data);
+	if (value < 0 || value > 4)
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	if (value == static_cast<std::int32_t>(physics::ColliderType::TriangleMesh)
+		&& body.type != physics::BodyType::Static)
+	{
+		using namespace re::literals;
+		RE_LOG_ERROR("Physics"_logcat, "TriangleMesh collider requires a Static body, entity {}", entity.Id());
+		return false;
+	}
+	if ((value == static_cast<std::int32_t>(physics::ColliderType::ConvexMesh)
+			|| value == static_cast<std::int32_t>(physics::ColliderType::TriangleMesh))
+		&& !HasUsableMesh(scene, entity))
+	{
+		using namespace re::literals;
+		RE_LOG_ERROR("Physics"_logcat, "Mesh collider needs mesh data on the entity or its children, entity {}", entity.Id());
+		return false;
+	}
+	body.collider.type = static_cast<physics::ColliderType>(value);
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodySensor(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).isSensor ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodySensor(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.isSensor = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockTranslationX(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockTranslation.x ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockTranslationX(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockTranslation.x = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockTranslationY(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockTranslation.y ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockTranslationY(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockTranslation.y = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockTranslationZ(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockTranslation.z ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockTranslationZ(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockTranslation.z = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockRotationX(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockRotation.x ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockRotationX(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockRotation.x = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockRotationY(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockRotation.y ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockRotationY(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockRotation.y = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
+
+	return true;
+}
+
+bool GetRigidBodyLockRotationZ(ecs::Scene* scene, const ecs::Entity entity, void* outData)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	*static_cast<std::int32_t*>(outData) = scene->GetComponent<RigidBodyComponent>(entity).lockRotation.z ? 1 : 0;
+
+	return true;
+}
+
+bool SetRigidBodyLockRotationZ(ecs::Scene* scene, const ecs::Entity entity, const void* data)
+{
+	if (!scene->HasComponent<RigidBodyComponent>(entity))
+	{
+		return false;
+	}
+	auto& body = scene->GetComponent<RigidBodyComponent>(entity);
+	body.lockRotation.z = *static_cast<const std::int32_t*>(data) != 0;
+	body.isShapeDirty = true;
 
 	return true;
 }
@@ -645,7 +1086,7 @@ bool ScriptBinder::Entity_SetName_Impl(const std::uint64_t entityID, const char*
 	{
 		s_ActiveScene->AddComponent<NameComponent>(entity, NameComponent{});
 	}
-	RE_LOG_INFO("entityID: {}, nameUtf8: {}", entityID, nameUtf8);
+
 	s_ActiveScene->GetComponent<NameComponent>(entity).name = String(nameUtf8);
 
 	return true;

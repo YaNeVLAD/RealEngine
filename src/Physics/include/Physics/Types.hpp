@@ -3,6 +3,7 @@
 #include <Core/Math/Vector3.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace re::physics
 {
@@ -60,7 +61,11 @@ struct RigidBody
 	Vector3<bool> lockTranslation = { false, false, false };
 	Vector3<bool> lockRotation = { false, false, false };
 
+	std::vector<Vector3f> meshVertices;
+	std::vector<std::uint32_t> meshIndices;
+
 	bool isVelocityDirty = false;
+	bool isShapeDirty = false;
 	bool isSensor = false;
 
 	std::uint32_t entityId = 0xFFFFFFFF;

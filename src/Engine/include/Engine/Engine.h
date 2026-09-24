@@ -88,7 +88,9 @@ RE_ENGINE_API void RE_CALL ReEngine_Scene_DestroyEntity(uint64_t entity);
 RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_GetEntityCount(void);
 RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_GetEntities(uint64_t* outIds, uint32_t capacity, uint32_t* outTotal);
 RE_ENGINE_API uint32_t RE_CALL ReEngine_Scene_ClearEntities(void);
-RE_ENGINE_API uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(int32_t kind, uint32_t rgba8888);
+RE_ENGINE_API uint64_t RE_CALL ReEngine_Scene_SpawnPrimitive(int32_t kind, uint32_t rgba);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_SetSimulating(int32_t simulating);
+RE_ENGINE_API int32_t RE_CALL ReEngine_Scene_IsSimulating(void);
 RE_ENGINE_API void RE_CALL ReEngine_Scene_ConfirmChanges(void);
 
 RE_ENGINE_API uint64_t RE_CALL ReEngine_Entity_GetComponentMask(uint64_t entity);

@@ -59,10 +59,31 @@
       ]
     },
     {
-      "name": "BoxCollider", "cpp": "BoxColliderComponent", "dirty": false,
+      "name": "RigidBody", "cpp": "RigidBodyComponent", "dirty": false,
       "fields": [
-        {"name": "size", "kind": "float2", "member": "size"},
-        {"name": "position", "kind": "float2", "member": "position"}
+        {"name": "type", "kind": "int32", "codec": {"get": "GetRigidBodyType", "set": "SetRigidBodyType"}},
+        {"name": "mass", "kind": "float", "codec": {"get": "GetRigidBodyMass", "set": "SetRigidBodyMass"}},
+        {"name": "friction", "kind": "float", "codec": {"get": "GetRigidBodyFriction", "set": "SetRigidBodyFriction"}},
+        {"name": "restitution", "kind": "float", "codec": {"get": "GetRigidBodyRestitution", "set": "SetRigidBodyRestitution"}},
+        {"name": "gravityFactor", "kind": "float", "codec": {"get": "GetRigidBodyGravityFactor", "set": "SetRigidBodyGravityFactor"}},
+        {"name": "linearDamping", "kind": "float", "codec": {"get": "GetRigidBodyLinearDamping", "set": "SetRigidBodyLinearDamping"}},
+        {"name": "linearVelocity", "kind": "float3", "codec": {"get": "GetRigidBodyLinearVelocity", "set": "SetRigidBodyLinearVelocity"}},
+        {"name": "colliderType", "kind": "int32", "codec": {"get": "GetRigidBodyColliderType", "set": "SetRigidBodyColliderType"}},
+        {"name": "isSensor", "kind": "bool", "codec": {"get": "GetRigidBodySensor", "set": "SetRigidBodySensor"}},
+        {"name": "lockTranslationX", "kind": "bool", "codec": {"get": "GetRigidBodyLockTranslationX", "set": "SetRigidBodyLockTranslationX"}},
+        {"name": "lockTranslationY", "kind": "bool", "codec": {"get": "GetRigidBodyLockTranslationY", "set": "SetRigidBodyLockTranslationY"}},
+        {"name": "lockTranslationZ", "kind": "bool", "codec": {"get": "GetRigidBodyLockTranslationZ", "set": "SetRigidBodyLockTranslationZ"}},
+        {"name": "lockRotationX", "kind": "bool", "codec": {"get": "GetRigidBodyLockRotationX", "set": "SetRigidBodyLockRotationX"}},
+        {"name": "lockRotationY", "kind": "bool", "codec": {"get": "GetRigidBodyLockRotationY", "set": "SetRigidBodyLockRotationY"}},
+        {"name": "lockRotationZ", "kind": "bool", "codec": {"get": "GetRigidBodyLockRotationZ", "set": "SetRigidBodyLockRotationZ"}}
+      ]
+    },
+    {
+      "name": "Hierarchy", "cpp": "HierarchyComponent", "dirty": false,
+      "fields": [
+        {"name": "localPosition", "kind": "float3", "member": "localPosition"},
+        {"name": "localRotation", "kind": "float3", "member": "localRotation"},
+        {"name": "localScale", "kind": "float3", "member": "localScale"}
       ]
     }
   ]
