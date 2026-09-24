@@ -43,7 +43,7 @@ void AppendMeshPart(physics::RigidBody& rb, const std::vector<Vertex>& vertices,
 	for (const auto& vertex : vertices)
 	{
 		const glm::vec4 p = rootLocal * glm::vec4(vertex.position.x, vertex.position.y, vertex.position.z, 1.0f);
-		rb.meshVertices.push_back({ p.x, p.y, p.z });
+		rb.meshVertices.emplace_back(p.x, p.y, p.z);
 	}
 	rb.meshIndices.reserve(rb.meshIndices.size() + indices.size());
 	for (const std::uint32_t index : indices)
@@ -52,21 +52,18 @@ void AppendMeshPart(physics::RigidBody& rb, const std::vector<Vertex>& vertices,
 	}
 }
 
-// Gathers static + animated (bind pose) meshes of a single entity.
 void AppendEntityMeshes(ecs::Scene& scene, const ecs::Entity entity, physics::RigidBody& rb, const glm::mat4& rootLocal)
 {
 	if (scene.HasComponent<StaticMeshComponent3D>(entity))
 	{
-		const auto& meshComp = scene.GetComponent<StaticMeshComponent3D>(entity);
-		if (meshComp.mesh)
+		if (const auto& meshComp = scene.GetComponent<StaticMeshComponent3D>(entity); meshComp.mesh)
 		{
 			AppendMeshPart(rb, meshComp.mesh->GetVertices(), meshComp.mesh->GetIndices(), rootLocal);
 		}
 	}
 	if (scene.HasComponent<AnimatedMeshComponent3D>(entity))
 	{
-		const auto& animComp = scene.GetComponent<AnimatedMeshComponent3D>(entity);
-		if (animComp.model)
+		if (const auto& animComp = scene.GetComponent<AnimatedMeshComponent3D>(entity); animComp.model)
 		{
 			for (const auto& part : animComp.model->Parts())
 			{
@@ -85,11 +82,6 @@ bool FillColliderMeshData(ecs::Scene& scene, const ecs::Entity entity, const Tra
 	rb.collider.indices = nullptr;
 	rb.collider.indexCount = 0;
 
-	// Body frame: Jolt places the body at root position/rotation and applies
-	// root scale via ScaledShape, so merged verts are root-TR-relative divided
-	// by root scale. Child world matrices compose manually from Hierarchy
-	// locals — no dependency on HierarchySystem tick order. Direct children
-	// only (LoadModel root + flat _Part_i layout).
 	const glm::mat4 rootWorld = TRSMatrix(rootTransform.position, rootTransform.rotation, rootTransform.scale);
 	const glm::mat4 toBody = glm::inverse(TRSMatrix(rootTransform.position, rootTransform.rotation, { 1.f, 1.f, 1.f }));
 	glm::vec3 invScale(1.0f);
