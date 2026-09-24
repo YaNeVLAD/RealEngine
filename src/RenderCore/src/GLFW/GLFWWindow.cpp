@@ -286,7 +286,7 @@ void GLFWWindow::Shutdown()
 
 std::optional<Event> GLFWWindow::PollEvent()
 {
-	glfwPollEvents();
+	// glfwPollEvents();
 	if (m_data.eventQueue.empty())
 	{
 		return std::nullopt;

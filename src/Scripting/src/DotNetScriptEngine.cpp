@@ -91,13 +91,6 @@ void DotNetScriptEngine::InitImpl(const scripting::EngineApiPointers& apiPointer
 	m_host = std::make_unique<scripting::HostFxrBackend>();
 	m_host->Initialize(runtimeConfig);
 
-	using InitMethod_Fn = void (*)(scripting::EngineApiPointers*);
-	auto* initMethod = reinterpret_cast<InitMethod_Fn>(m_host->LoadEntryPoint(
-		"EngineAPI.dll"_s,
-		"EngineAPI.Program, EngineAPI"_s,
-		"InitializeDotNetHost"_s));
-	initMethod(const_cast<scripting::EngineApiPointers*>(&apiPointers));
-
 	RE_LOG_INFO(".NET CoreCLR initialized successfully.");
 
 	auto loadBridgeMethod = [&](const char* methodName, void** outPtr) {

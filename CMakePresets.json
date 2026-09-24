@@ -53,6 +53,14 @@
       }
     },
     {
+      "name": "render-filament",
+      "hidden": true,
+      "description": "Filament renderer backend options",
+      "cacheVariables": {
+        "RE_RENDERER_BACKEND": "FILAMENT"
+      }
+    },
+    {
       "name": "windows-debug-static-filament",
       "displayName": "Windows Debug (Static + Filament)",
       "description": "Static libraries build with Filament backend",

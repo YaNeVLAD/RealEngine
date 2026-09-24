@@ -8,7 +8,7 @@
 #     Source files (.cpp)
 function(re_add_module target_name)
     set(options "")
-    set(oneValueArgs "")
+    set(oneValueArgs "TYPE")
     set(multiValueArgs SOURCES)
 
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -38,7 +38,7 @@ function(re_add_module target_name)
         message(STATUS "Module ${target_name}: Auto-discovered ${ARG_SOURCES}")
     endif ()
 
-    add_library(${target_name} ${ARG_SOURCES})
+    add_library(${target_name} ${ARG_TYPE} ${ARG_SOURCES})
 
     target_include_directories(${target_name}
             PUBLIC

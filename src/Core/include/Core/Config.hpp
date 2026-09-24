@@ -8,7 +8,17 @@
 #define RE_DEBUG
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(_WIN64)
+
+#define RE_CALL __stdcall
+
+#else
+
+#define RE_CALL
+
+#endif
+
+#if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
 
 #define RE_SYSTEM_WINDOWS
 
@@ -28,30 +38,33 @@
 
 #endif
 
-#if !defined(RE_STATIC)
-
 #if defined(RE_SYSTEM_WINDOWS)
 
-#define RE_API_EXPORT __declspec(dllexport)
-#define RE_API_IMPORT __declspec(dllimport)
+#define RE_DYNAMIC_EXPORT __declspec(dllexport)
+#define RE_DYNAMIC_IMPORT __declspec(dllimport)
 
-#ifdef _MSC_VER
+#else
+
+#define RE_DYNAMIC_EXPORT __attribute__((__visibility__("default")))
+#define RE_DYNAMIC_IMPORT __attribute__((__visibility__("default")))
+
+#endif
+
+#if defined(RE_STATIC)
+
+#define RE_API_EXPORT
+#define RE_API_IMPORT
+
+#else
+
+#define RE_API_EXPORT RE_DYNAMIC_EXPORT
+#define RE_API_IMPORT RE_DYNAMIC_IMPORT
+
+#if defined(_MSC_VER)
 
 #pragma warning(disable : 4251) // Using standard library types in our own exported types is okay
 #pragma warning(disable : 4275) // Exporting types derived from the standard library is okay
 
 #endif
-
-#else
-
-#define RE_API_EXPORT __attribute__((__visibility__("default")))
-#define RE_API_IMPORT __attribute__((__visibility__("default")))
-
-#endif
-
-#else
-
-#define RE_API_EXPORT
-#define RE_API_IMPORT
 
 #endif
