@@ -6,6 +6,7 @@
 #include <Core/Types.hpp>
 #include <ECS/Scene.hpp>
 #include <RenderCore/IWindow.hpp>
+#include <RenderCore/Interface/IRenderBackend.hpp>
 #include <Runtime/Layout.hpp>
 
 #include <atomic>
@@ -26,12 +27,15 @@ class RE_RUNTIME_API Application
 {
 public:
 	explicit Application(std::string const& name);
+	Application(std::string const& name, std::unique_ptr<render::IWindow> window);
 
 	virtual ~Application();
 
 	void Run();
 
 	void Shutdown();
+
+	void Frame(float dt);
 
 	virtual void OnStart() = 0;
 
@@ -41,13 +45,15 @@ public:
 
 	virtual void OnStop() = 0;
 
+	void SetVSyncEnabled(bool enabled) const;
+
 	void SetUIOverlayActive(bool active);
 
 	bool IsUIOverlayActive() const;
 
 protected:
 	template <std::derived_from<Layout> TLayout, typename... TArgs>
-	void AddLayout(TArgs&&... args);
+	TLayout& AddLayout(TArgs&&... args);
 
 	template <std::derived_from<Layout> TLayout>
 	void SwitchLayout();
@@ -56,12 +62,18 @@ protected:
 
 	[[nodiscard]] render::IWindow& Window() const;
 
-	void SetVSyncEnabled(bool enabled) const;
+	[[nodiscard]] render::IRenderBackend& Backend() const;
+
+	virtual void SetupScene(Layout& layout) const;
+
+	virtual std::unique_ptr<render::IRenderBackend> CreateBackend() const;
+
+	virtual void InitInput() const;
+
+	virtual void DrawOverlay(float dt);
 
 private:
 	void GameLoop();
-
-	void SetupScene(Layout& layout) const;
 
 	void SwitchLayoutImpl(const char* name);
 

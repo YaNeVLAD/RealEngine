@@ -4,7 +4,7 @@ namespace re
 {
 
 template <std::derived_from<Layout> TLayout, typename... TArgs>
-void Application::AddLayout(TArgs&&... args)
+TLayout& Application::AddLayout(TArgs&&... args)
 {
 	const auto layoutsSize = m_layouts.size();
 
@@ -12,12 +12,14 @@ void Application::AddLayout(TArgs&&... args)
 	const auto hash = type.Hash();
 	const auto name = type.Name();
 
-	if (m_layouts.contains(hash))
+	if (const auto it = m_layouts.find(hash); it != m_layouts.end())
 	{
-		return;
+		return static_cast<TLayout&>(*it->second);
 	}
 
-	auto& layout = *(m_layouts[hash] = std::make_shared<TLayout>(*this, std::forward<TArgs>(args)...));
+	auto stored = std::make_shared<TLayout>(*this, std::forward<TArgs>(args)...);
+	auto& layout = *stored;
+	m_layouts[hash] = std::move(stored);
 	SetupScene(layout);
 	layout.OnCreate();
 
@@ -25,6 +27,8 @@ void Application::AddLayout(TArgs&&... args)
 	{
 		SwitchLayoutImpl(name);
 	}
+
+	return layout;
 }
 
 template <std::derived_from<Layout> TLayout>

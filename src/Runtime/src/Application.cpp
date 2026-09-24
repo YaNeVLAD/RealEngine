@@ -46,12 +46,17 @@ namespace re
 {
 
 Application::Application(std::string const& name)
-	: m_isRunning(false)
+	: Application(name, CreateWindow(name, 1920u, 1080u))
 {
-	m_window = CreateWindow(name, 1920u, 1080u);
-	detail::Input::Init(m_window->GetNativeHandle());
+}
 
-	m_renderBackend = std::make_unique<render::FilamentRenderBackend>();
+Application::Application(std::string const& name, std::unique_ptr<render::IWindow> window)
+	: m_isRunning(false)
+	, m_window(std::move(window))
+{
+	(void)name;
+
+	m_renderBackend = Application::CreateBackend();
 
 	physics::Init();
 
@@ -66,6 +71,8 @@ Application::~Application()
 
 void Application::Run()
 {
+	InitInput();
+
 	m_isRunning = true;
 
 	OnStart();
@@ -131,17 +138,6 @@ void Application::GameLoop()
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	while (m_isRunning)
 	{
-		if (m_pendingLayoutHash != INVALID_HASH)
-		{
-			ChangeToPendingLayout();
-		}
-
-		if (m_renderBackend)
-		{
-			const auto bgColor = m_window->GetBackgroundColor();
-			m_renderBackend->SetClearColor(bgColor);
-		}
-
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
 		lastTime = currentTime;
@@ -184,38 +180,9 @@ void Application::GameLoop()
 
 		m_window->Clear();
 
-		if (m_renderBackend)
-		{
-			m_renderBackend->BeginFrame();
-		}
+		Frame(dt);
 
-		OnUpdate(dt);
-		if (m_currentLayout)
-		{
-			gui::Context::BeginFrame();
-
-			auto& scene = m_currentLayout->GetScene();
-			scene.Frame(dt);
-
-			m_currentLayout->OnUpdate(dt);
-
-			if (m_renderBackend)
-			{
-				m_renderBackend->RenderUI(dt, [&]() {
-					m_currentLayout->OnUIDraw();
-				});
-				m_renderBackend->RenderFrame();
-			}
-
-			m_window->Display();
-
-			scene.ConfirmChanges();
-		}
-
-		if (m_renderBackend)
-		{
-			m_renderBackend->EndFrame();
-		}
+		m_window->Display();
 	}
 
 	m_renderBackend->Shutdown();
@@ -338,6 +305,77 @@ void Application::SetVSyncEnabled(const bool enabled) const
 	{
 		m_renderBackend->SetVSyncEnabled(enabled, m_window->GetRefreshRateHz());
 	}
+}
+
+void Application::Frame(const float dt)
+{
+	if (m_pendingLayoutHash != INVALID_HASH)
+	{
+		ChangeToPendingLayout();
+	}
+
+	if (m_renderBackend)
+	{
+		m_renderBackend->SetClearColor(m_window->GetBackgroundColor());
+	}
+
+	OnUpdate(dt);
+	if (!m_currentLayout)
+	{
+		return;
+	}
+
+	auto& scene = m_currentLayout->GetScene();
+
+	if (m_renderBackend)
+	{
+		m_renderBackend->BeginFrame();
+	}
+
+	scene.Frame(dt);
+
+	m_currentLayout->OnUpdate(dt);
+
+	DrawOverlay(dt);
+
+	if (m_renderBackend)
+	{
+		m_renderBackend->RenderFrame();
+	}
+
+	scene.ConfirmChanges();
+
+	if (m_renderBackend)
+	{
+		m_renderBackend->EndFrame();
+	}
+}
+
+void Application::DrawOverlay(const float dt)
+{
+	gui::Context::BeginFrame();
+
+	if (m_renderBackend && m_currentLayout)
+	{
+		m_renderBackend->RenderUI(dt, [&]() {
+			m_currentLayout->OnUIDraw();
+		});
+	}
+}
+
+std::unique_ptr<render::IRenderBackend> Application::CreateBackend() const
+{
+	return std::make_unique<render::FilamentRenderBackend>();
+}
+
+void Application::InitInput() const
+{
+	detail::Input::Init(m_window->GetNativeHandle());
+}
+
+render::IRenderBackend& Application::Backend() const
+{
+	return *m_renderBackend;
 }
 
 } // namespace re
