@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Core/Logger.hpp>
+
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <stdexcept>
 
 namespace re::FileCache
@@ -24,6 +25,7 @@ auto Execute(
 	namespace fs = std::filesystem;
 	bool loadFromCache = false;
 
+	const auto cachePathStr = cachePath.string();
 	if (fs::exists(cachePath) && fs::exists(sourcePath))
 	{
 		if (fs::last_write_time(cachePath) >= fs::last_write_time(sourcePath))
@@ -34,20 +36,20 @@ auto Execute(
 
 	if (loadFromCache)
 	{
-		std::cout << "[Info] Loading from cache: " << cachePath.string() << "...\n";
+		RE_LOG_INFO("Loading from cache: {}...", cachePathStr);
 		std::ifstream cacheFile(cachePath, std::ios::binary);
 		if (!cacheFile.is_open())
 		{
-			throw std::runtime_error("Failed to open cache file: " + cachePath.string());
+			throw std::runtime_error("Failed to open cache file: " + cachePathStr);
 		}
 
 		return policy.load(cacheFile);
 	}
 
-	std::cout << "[Info] Building from scratch (this may take a while)...\n";
+	RE_LOG_INFO("Rebuilding {}... (this may take a while)", cachePathStr);
 	auto result = policy.build(sourcePath);
 
-	std::cout << "[Info] Saving to cache...\n";
+	RE_LOG_INFO("Saving {} to cache...", cachePathStr);
 	std::ofstream cacheFile(cachePath, std::ios::binary);
 	if (!cacheFile.is_open())
 	{

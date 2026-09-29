@@ -1,4 +1,6 @@
 #include <RenderCore/AnimatedModel.hpp>
+
+#include <Core/Logger.hpp>
 #include <RenderCore/Assets/AssetManager.hpp>
 #include <RenderCore/Material.hpp>
 
@@ -6,11 +8,13 @@
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_NO_EXTERNAL_IMAGE
+#include <glm/gtc/type_ptr.hpp>
 #include <tiny_gltf.h>
 
 #include <filesystem>
-#include <glm/gtc/type_ptr.hpp>
-#include <iostream>
+#include <sstream>
+
+using namespace re::literals;
 
 namespace
 {
@@ -348,42 +352,42 @@ void ParseNodeRecursive(
 	}
 }
 
-void PrintBoneRecursive(const std::vector<re::render::Bone>& skeleton, int boneIndex, int depth);
+void PrintBoneRecursive(std::ostream& out, const std::vector<re::render::Bone>& skeleton, int boneIndex, int depth);
 
-void PrintSkeleton(const std::vector<re::render::Bone>& skeleton)
+void PrintSkeleton(std::ostream& out, const std::vector<re::render::Bone>& skeleton)
 {
 	if (skeleton.empty())
 	{
-		std::cout << "Model has no skeleton.\n";
+		out << "Model has no skeleton.\n";
 		return;
 	}
 
-	std::cout << "--- Skeleton Hierarchy ---\n";
+	out << "--- Skeleton Hierarchy ---\n";
 
 	for (std::size_t i = 0; i < skeleton.size(); ++i)
 	{
 		if (skeleton[i].parentIndex == re::render::Bone::ROOT_BONE_IDX)
 		{
-			PrintBoneRecursive(skeleton, static_cast<int>(i), 0);
+			PrintBoneRecursive(out, skeleton, static_cast<int>(i), 0);
 		}
 	}
-	std::cout << "--------------------------\n";
+	out << "--------------------------\n";
 }
 
-void PrintBoneRecursive(const std::vector<re::render::Bone>& skeleton, const int boneIndex, const int depth)
+void PrintBoneRecursive(std::ostream& out, const std::vector<re::render::Bone>& skeleton, const int boneIndex, const int depth)
 {
 	for (int i = 0; i < depth; ++i)
 	{
-		std::cout << "  ";
+		out << "  ";
 	}
 
-	std::cout << "|- [" << boneIndex << "] " << skeleton[boneIndex].name << "\n";
+	out << "|- [" << boneIndex << "] " << skeleton[boneIndex].name << "\n";
 
 	for (std::size_t i = 0; i < skeleton.size(); ++i)
 	{
 		if (skeleton[i].parentIndex == boneIndex)
 		{
-			PrintBoneRecursive(skeleton, static_cast<int>(i), depth + 1);
+			PrintBoneRecursive(out, skeleton, static_cast<int>(i), depth + 1);
 		}
 	}
 }
@@ -432,11 +436,11 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 
 	if (!warn.empty())
 	{
-		std::cout << "[glTF Warn]: " << warn << "\n";
+		RE_LOG_WARN("AnimatedModel"_logcat, "Received parsing warning: {}", warn);
 	}
 	if (!err.empty())
 	{
-		std::cerr << "[glTF Error]: " << err << "\n";
+		RE_LOG_ERROR("AnimatedModel"_logcat, "Received parsing error: {}", err);
 	}
 	if (!ret)
 	{
@@ -601,7 +605,9 @@ bool AnimatedModel::LoadFromFile(String const& filePath, const AssetManager* man
 		m_animations.push_back(anim);
 	}
 
-	PrintSkeleton(m_skeleton);
+	std::ostringstream ss;
+	PrintSkeleton(ss, m_skeleton);
+	RE_LOG_INFO("AnimatedModel"_logcat, "{}", ss.str());
 
 	return true;
 }

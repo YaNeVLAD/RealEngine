@@ -165,3 +165,19 @@ struct std::hash<re::String>
 		return str.Hash();
 	}
 };
+
+template <>
+struct std::formatter<re::String>
+{
+	std::formatter<std::string> inner;
+
+	constexpr auto parse(std::format_parse_context& ctx)
+	{
+		return inner.parse(ctx);
+	}
+
+	auto format(re::String const& str, std::format_context& ctx) const
+	{
+		return inner.format(str.ToString(), ctx);
+	}
+};

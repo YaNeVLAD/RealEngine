@@ -1,6 +1,7 @@
 #include <Physics/Jolt/JoltPhysicsWorld.hpp>
 
 #include <Core/Assert.hpp>
+#include <Core/Logger.hpp>
 
 #include <Jolt/Jolt.h>
 
@@ -17,7 +18,7 @@
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 
-#include <iostream>
+using namespace re::literals;
 
 namespace
 {
@@ -248,7 +249,7 @@ void JoltPhysicsWorld::Init()
 
 	m_state->physicsSystem.SetContactListener(&m_state->contactListener);
 
-	std::cout << "[Physics] Physics World initialized.\n";
+	RE_LOG_INFO("Physics"_logcat, "Physics World initialized");
 }
 
 void JoltPhysicsWorld::Step(const float deltaTime)

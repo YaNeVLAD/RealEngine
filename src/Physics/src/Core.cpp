@@ -1,11 +1,13 @@
 #include <Physics/Core.hpp>
 
+#include <Core/Logger.hpp>
+
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
 #include <Jolt/RegisterTypes.h>
 
-#include <iostream>
+using namespace re::literals;
 
 namespace re::physics
 {
@@ -18,7 +20,7 @@ bool Init()
 
 	JPH::RegisterTypes();
 
-	std::cout << "[Physics] Jolt Physics initialized successfully.\n";
+	RE_LOG_INFO("Physics"_logcat, "Jolt Physics initialized successfully");
 
 	return true;
 }
@@ -30,7 +32,7 @@ void Shutdown()
 	delete JPH::Factory::sInstance;
 	JPH::Factory::sInstance = nullptr;
 
-	std::cout << "[Physics] Physics subsystem shutdown.\n";
+	RE_LOG_INFO("Physics"_logcat, "Jolt Physics subsystem shutdown");
 }
 
 } // namespace re::physics

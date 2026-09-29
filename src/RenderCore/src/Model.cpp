@@ -1,15 +1,17 @@
 #include <RenderCore/Model.hpp>
 
 #include "RenderCore/Assets/AssetManager.hpp"
+#include <Core/Logger.hpp>
 #include <RenderCore/Material.hpp>
 #include <RenderCore/Vertex.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-#include <iostream>
 #include <ranges>
 #include <unordered_map>
+
+using namespace re::literals;
 
 namespace
 {
@@ -55,11 +57,11 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 
 	if (!warn.empty())
 	{
-		std::cout << "[Model Warning]: " << warn << std::endl;
+		RE_LOG_WARN("Model"_logcat, "Received parsing waning: {}", warn);
 	}
 	if (!err.empty())
 	{
-		std::cerr << "[Model Error]: " << err << std::endl;
+		RE_LOG_ERROR("Model"_logcat, "Received parsing error: {}", err);
 	}
 	if (!success)
 	{
@@ -80,11 +82,11 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 		{
 			const_cast<AssetManager*>(manager)->Add(texPath, texture);
 
-			std::cout << "  [Texture Loaded]: " << texPath << std::endl;
+			RE_LOG_INFO("Model"_logcat, "Loaded texture: {}", texPath);
 
 			return texture;
 		}
-		std::cerr << "  [Texture Failed]: " << texPath << std::endl;
+		RE_LOG_ERROR("Model"_logcat, "Failed to load texture: {}", texPath);
 
 		return nullptr;
 	};
@@ -234,7 +236,7 @@ bool Model::LoadFromFile(String const& filePath, const AssetManager* manager)
 		}
 	}
 
-	std::cout << "[Model Loaded]: " << filePath << " | Parts: " << m_parts.size() << std::endl;
+	RE_LOG_INFO("Model"_logcat, "Loaded {} | Parts: {}", filePath, m_parts.size());
 
 	return true;
 }
