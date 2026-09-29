@@ -5,7 +5,6 @@
 #include <Core/String.hpp>
 
 #include <expected>
-#include <stdexcept>
 
 namespace re
 {

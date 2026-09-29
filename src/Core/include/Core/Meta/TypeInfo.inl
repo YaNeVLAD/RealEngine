@@ -1,4 +1,6 @@
-#include <Core/Meta/TypeInfo.hpp>
+#pragma once
+
+#include <cstring>
 
 namespace re::meta
 {

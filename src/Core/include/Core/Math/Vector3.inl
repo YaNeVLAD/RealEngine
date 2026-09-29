@@ -1,5 +1,7 @@
-#include <Core/Math/Vector3.hpp>
+#pragma once
 
+#include <cmath>
+#include <numbers>
 #include <type_traits>
 
 namespace re

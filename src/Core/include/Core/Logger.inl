@@ -1,4 +1,6 @@
-#include <Core/Logger.hpp>
+#pragma once
+
+#include <iostream>
 
 namespace re
 {

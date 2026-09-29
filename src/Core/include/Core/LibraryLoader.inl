@@ -1,4 +1,6 @@
-#include <Core/LibraryLoader.hpp>
+#pragma once
+
+#include <stdexcept>
 
 namespace re
 {

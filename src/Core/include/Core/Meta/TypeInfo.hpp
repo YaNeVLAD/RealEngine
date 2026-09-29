@@ -6,7 +6,6 @@
 
 #include <mutex>
 #include <string>
-#include <cstring>
 #include <unordered_map>
 
 namespace re::meta

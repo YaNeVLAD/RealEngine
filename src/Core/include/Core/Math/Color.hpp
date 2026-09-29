@@ -3,7 +3,6 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
-#include <tuple>
 
 namespace re
 {

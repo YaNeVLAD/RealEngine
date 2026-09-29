@@ -1,4 +1,4 @@
-#include <Core/Math/Color.hpp>
+#pragma once
 
 #include <type_traits>
 

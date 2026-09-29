@@ -1,4 +1,4 @@
-#include <Core/Math/Vector4.hpp>
+#pragma once
 
 namespace re
 {

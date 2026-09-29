@@ -1,4 +1,4 @@
-#include <Core/FileSystem.hpp>
+#pragma once
 
 namespace re::file_system::raw
 {
